@@ -291,24 +291,28 @@
 
         document.getElementById('dbSearchBtn').addEventListener('click', async () => {
             const searchTerm = document.getElementById('dbSearchInput').value.trim();
-        const searchUpper = searchTerm.toUpperCase();
-        const searchTermClean = searchTerm.split(',')[0].trim();
+            const searchUpper = searchTerm.toUpperCase();
             const statusEl = document.getElementById('dbStatus');
-            if (!searchTerm) { statusEl.textContent = 'Enter ZIP or State'; return; }
+            if (!searchTerm) { statusEl.textContent = 'Enter ZIP, State, or City'; return; }
             statusEl.textContent = '🔄 Searching...';
             try {
                 let baseQuery;
                 if (searchTerm.match(/^\d{5}$/)) {
-                    // ZIP code — strip leading zero since DB stores without it
+                    // ZIP code — try both with and without leading zero
                     const zipStripped = String(parseInt(searchTerm, 10));
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?zip=eq.' + zipStripped;
-                } else if (searchTerm.length === 2 && searchUpper.match(/^[A-Z]{2}$/)) {
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(zip.eq.' + searchTerm + ',zip.eq.' + zipStripped + ')';
+                } else if (searchUpper.length === 2 && searchUpper.match(/^[A-Z]{2}$/)) {
                     // 2-letter state code
                     baseQuery = SUPABASE_URL + '/rest/v1/clinics?state=eq.' + searchUpper;
+                } else if (searchUpper.includes(',')) {
+                    // "City, ST" format — split and query both city and state
+                    const parts = searchUpper.split(',');
+                    const cityOnly = parts[0].trim();
+                    const stateOnly = parts[1].trim();
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?city=eq.' + encodeURIComponent(cityOnly) + '&state=eq.' + stateOnly;
                 } else {
-                    // City name — strip ", ST" suffix, uppercase to match DB storage
-                    const cityOnly = searchTerm.split(',')[0].trim().toUpperCase();
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?city=eq.' + encodeURIComponent(cityOnly);
+                    // City name only — uppercase to match DB storage
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?city=eq.' + encodeURIComponent(searchUpper);
                 }
                 
                 // Fetch all clinics with pagination (Supabase limit is 1000 per request)
