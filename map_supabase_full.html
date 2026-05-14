@@ -292,6 +292,7 @@
         document.getElementById('dbSearchBtn').addEventListener('click', async () => {
             const searchTerm = document.getElementById('dbSearchInput').value.trim();
         const searchUpper = searchTerm.toUpperCase();
+        const searchTermClean = searchTerm.split(',')[0].trim();
             const statusEl = document.getElementById('dbStatus');
             if (!searchTerm) { statusEl.textContent = 'Enter ZIP or State'; return; }
             statusEl.textContent = '🔄 Searching...';
@@ -305,9 +306,9 @@
                     // 2-letter state code
                     baseQuery = SUPABASE_URL + '/rest/v1/clinics?state=eq.' + searchUpper;
                 } else {
-                    // City name — strip ", ST" suffix if user types "City, ST" format
-                    const cityOnly = searchTerm.split(',')[0].trim();
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?city=ilike.' + cityOnly + '*';
+                    // City name — strip ", ST" suffix, uppercase to match DB storage
+                    const cityOnly = searchTerm.split(',')[0].trim().toUpperCase();
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?city=eq.' + encodeURIComponent(cityOnly);
                 }
                 
                 // Fetch all clinics with pagination (Supabase limit is 1000 per request)
