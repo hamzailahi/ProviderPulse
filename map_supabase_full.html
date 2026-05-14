@@ -335,26 +335,25 @@
                 
                 if (clinicData.length === 0) { statusEl.textContent = '\u274c No clinics found'; return; }
 
-                // Fetch demographics for these ZIPs from demographics_raw table
+                // Fetch demographics for these ZIPs from demographics_raw table in batches
                 const zips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
-                statusEl.textContent = '\u{1F504} Loading demographics for ' + zips.length + ' ZIPs...';
+                statusEl.textContent = '🔄 Loading demographics for ' + zips.length + ' ZIPs...';
 
-                const demQuery = SUPABASE_URL + '/rest/v1/demographics_raw?zip=in.(' + zips.join(',') + ')&select=*';
-                const demResponse = await fetch(demQuery, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
-                const demData = demResponse.ok ? await demResponse.json() : [];
-
-                // Merge all raw demographic columns per ZIP
                 const demByZip = {};
-                demData.forEach(d => {
-                    if (!demByZip[d.zip]) {
-                        demByZip[d.zip] = { 'ZIP Code': d.zip, 'State': d.state };
-                    }
-                    Object.keys(d).forEach(key => {
-                        if (key !== 'id' && key !== 'created_at') {
-                            demByZip[d.zip][key] = d[key];
-                        }
+                const ZIP_BATCH_SIZE = 50;
+                for (let i = 0; i < zips.length; i += ZIP_BATCH_SIZE) {
+                    const zipBatch = zips.slice(i, i + ZIP_BATCH_SIZE);
+                    const demQuery = SUPABASE_URL + '/rest/v1/demographics_raw?zip=in.(' + zipBatch.join(',') + ')&select=*';
+                    const demResponse = await fetch(demQuery, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                    if (!demResponse.ok) continue;
+                    const demData = await demResponse.json();
+                    demData.forEach(d => {
+                        if (!demByZip[d.zip]) demByZip[d.zip] = { 'ZIP Code': d.zip, 'State': d.state };
+                        Object.keys(d).forEach(key => {
+                            if (key !== 'id' && key !== 'created_at') demByZip[d.zip][key] = d[key];
+                        });
                     });
-                });
+                }
 
                 // Convert clinic rows to format processData() expects, merged with demographics
                 const converted = clinicData.map(c => {
