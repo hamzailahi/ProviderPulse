@@ -305,14 +305,17 @@
                     // 2-letter state code
                     baseQuery = SUPABASE_URL + '/rest/v1/clinics?state=eq.' + searchUpper;
                 } else if (searchUpper.includes(',')) {
-                    // "City, ST" format — split and query both city and state
+                    // "City, ST" format — try both mixed case and uppercase
                     const parts = searchUpper.split(',');
-                    const cityOnly = parts[0].trim();
+                    const cityUpper = parts[0].trim();
+                    const cityMixed = cityUpper.charAt(0) + cityUpper.slice(1).toLowerCase();
                     const stateOnly = parts[1].trim();
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?city=eq.' + encodeURIComponent(cityOnly) + '&state=eq.' + stateOnly;
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')&state=eq.' + stateOnly;
                 } else {
-                    // City name only — uppercase to match DB storage
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?city=eq.' + encodeURIComponent(searchUpper);
+                    // City only — try both uppercase and title case
+                    const cityUpper = searchUpper;
+                    const cityMixed = cityUpper.charAt(0) + cityUpper.slice(1).toLowerCase();
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')';
                 }
                 
                 // Fetch all clinics with pagination (Supabase limit is 1000 per request)
