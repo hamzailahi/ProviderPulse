@@ -282,46 +282,51 @@
         function debounce(func, wait) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); }; }
 
         // Supabase configuration
-        const SUPABASE_URL = "https://tpflohinlqxjudhzsgfa.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_afoCj8szvv7lszlJcXpEiQ_CzoOjAAC";
+        const SUPABASE_URL = "https://hgyatsjvmcjrkafhxdtr.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_NAw8o8vpgS2SvqW1Kxi_mQ_1oQsLMWm";
 
         document.getElementById('dbSearchInput').addEventListener('keydown', e => {
             if (e.key === 'Enter') document.getElementById('dbSearchBtn').click();
         });
 
         document.getElementById('dbSearchBtn').addEventListener('click', async () => {
-            const searchTerm = document.getElementById('dbSearchInput').value.trim().toUpperCase();
+            const searchTerm = document.getElementById('dbSearchInput').value.trim();
+        const searchUpper = searchTerm.toUpperCase();
             const statusEl = document.getElementById('dbStatus');
             if (!searchTerm) { statusEl.textContent = 'Enter ZIP or State'; return; }
             statusEl.textContent = '🔄 Searching...';
             try {
                 let baseQuery;
                 if (searchTerm.match(/^\d{5}$/)) {
-                    // ZIP code
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?zip=eq.' + searchTerm;
-                } else if (searchTerm.length === 2 && searchTerm.match(/^[A-Z]{2}$/)) {
+                    // ZIP code — strip leading zero since DB stores without it
+                    const zipStripped = String(parseInt(searchTerm, 10));
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?zip=eq.' + zipStripped;
+                } else if (searchTerm.length === 2 && searchUpper.match(/^[A-Z]{2}$/)) {
                     // 2-letter state code
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?state=eq.' + searchTerm;
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?state=eq.' + searchUpper;
                 } else {
-                    // City name — search inside address field using ilike
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?address=ilike.*' + encodeURIComponent(searchTerm) + '*';
+                    // City name — strip ", ST" suffix if user types "City, ST" format
+                    const cityOnly = searchTerm.split(',')[0].trim();
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?city=ilike.' + cityOnly + '*';
                 }
                 
                 // Fetch all clinics with pagination (Supabase limit is 1000 per request)
                 let clinicData = [];
                 let offset = 0;
-                let batchCount = 0;
+                const isRPC = baseQuery.includes('/rpc/');
                 
                 while (true) {
-                    const query = baseQuery + '&limit=1000&offset=' + offset;
-                    const response = await fetch(query, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json', 'Prefer': 'count=exact' } });
+                    const sep = baseQuery.includes('?') ? '&' : '?';
+                    const query = isRPC 
+                        ? baseQuery + '&limit=1000&offset=' + offset
+                        : baseQuery + '&limit=1000&offset=' + offset;
+                    const response = await fetch(query, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
                     if (!response.ok) throw new Error('HTTP ' + response.status);
                     
                     const batch = await response.json();
                     if (!batch || batch.length === 0) break;
                     
                     clinicData.push(...batch);
-                    batchCount++;
                     statusEl.textContent = '🔄 Loaded ' + clinicData.length + ' clinics...';
                     
                     if (batch.length < 1000) break;
