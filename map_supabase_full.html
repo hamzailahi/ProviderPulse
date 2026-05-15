@@ -116,11 +116,21 @@
     <div id="controls">
         <div>
             <strong>Search Database</strong>
-            <div style="display:flex;gap:6px;align-items:center;">
-                <input type="text" id="dbSearchInput" placeholder="ZIP, State, or City (e.g. Jonesboro)" style="width:260px;" />
-                <button class="control-btn" id="dbSearchBtn" style="background:var(--accent);color:#fff;border-color:var(--accent);">Search</button>
+            <div style="position:relative;display:inline-block;">
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <input type="text" id="dbSearchInput" placeholder="City, ST or ZIP or State..." 
+                           style="width:280px;" autocomplete="off" />
+                    <button class="control-btn" id="dbSearchBtn" 
+                            style="background:var(--accent);color:#fff;border-color:var(--accent);">Search</button>
+                </div>
+                <div id="autocomplete-list" style="
+                    display:none; position:absolute; top:100%; left:0; z-index:9999;
+                    background:var(--bg-elevated); border:1px solid var(--border);
+                    border-radius:6px; width:280px; max-height:220px; overflow-y:auto;
+                    box-shadow:0 4px 16px rgba(0,0,0,0.4); margin-top:4px;
+                "></div>
             </div>
-            <span id="dbStatus" style="font-size:10px;color:var(--text-muted);display:block;margin-top:3px;">ZIP · State (2-letter) · City name</span>
+            <span id="dbStatus" style="font-size:10px;color:var(--text-muted);display:block;margin-top:3px;">Type a city, state, or ZIP</span>
         </div>
         <div>
             <strong>Search Map</strong>
@@ -281,7 +291,93 @@
         function getColor(i, t) { return `hsl(${i * (360 / Math.max(t, 1))}, 75%, 55%)`; }
         function debounce(func, wait) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); }; }
 
-        // Supabase configuration
+        // ── Autocomplete ─────────────────────────────────────────────
+        let autocompleteTimer = null;
+        const acList = document.getElementById('autocomplete-list');
+
+        function closeAutocomplete() {
+            acList.style.display = 'none';
+            acList.innerHTML = '';
+        }
+
+        function showSuggestion(label, searchValue) {
+            const item = document.createElement('div');
+            item.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12px;color:var(--text-primary);border-bottom:1px solid var(--border);';
+            item.textContent = label;
+            item.addEventListener('mouseenter', () => item.style.background = 'var(--bg-surface)');
+            item.addEventListener('mouseleave', () => item.style.background = '');
+            item.addEventListener('mousedown', () => {
+                document.getElementById('dbSearchInput').value = searchValue;
+                closeAutocomplete();
+                document.getElementById('dbSearchBtn').click();
+            });
+            acList.appendChild(item);
+        }
+
+        async function fetchSuggestions(query) {
+            const q = query.trim();
+            if (q.length < 2) { closeAutocomplete(); return; }
+
+            try {
+                let results = [];
+
+                if (q.match(/^\d+$/)) {
+                    // Numeric — suggest ZIPs
+                    const r = await fetch(
+                        `${SUPABASE_URL}/rest/v1/clinics?zip=like.${q}*&select=zip,state&limit=8`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                    );
+                    const data = await r.json();
+                    const seen = new Set();
+                    data.forEach(d => {
+                        const key = `${d.zip}-${d.state}`;
+                        if (!seen.has(key)) { seen.add(key); results.push({ label: `${d.zip} — ${d.state}`, value: d.zip }); }
+                    });
+                } else if (q.length === 2 && q.match(/^[a-zA-Z]+$/)) {
+                    // 2 letters — suggest state
+                    results.push({ label: `State: ${q.toUpperCase()}`, value: q.toUpperCase() });
+                } else {
+                    // City search — query distinct cities
+                    const cityQ = q.toUpperCase();
+                    const r = await fetch(
+                        `${SUPABASE_URL}/rest/v1/clinics?city=ilike.${encodeURIComponent(cityQ)}*&select=city,state&limit=50`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                    );
+                    const data = await r.json();
+                    const seen = new Set();
+                    data.forEach(d => {
+                        if (!d.city) return;
+                        const key = `${d.city}-${d.state}`;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            results.push({ label: `${d.city}, ${d.state}`, value: `${d.city}, ${d.state}` });
+                        }
+                    });
+                }
+
+                acList.innerHTML = '';
+                if (results.length === 0) { closeAutocomplete(); return; }
+                results.slice(0, 10).forEach(r => showSuggestion(r.label, r.value));
+                acList.style.display = 'block';
+
+            } catch(e) { closeAutocomplete(); }
+        }
+
+        document.getElementById('dbSearchInput').addEventListener('input', e => {
+            clearTimeout(autocompleteTimer);
+            autocompleteTimer = setTimeout(() => fetchSuggestions(e.target.value), 300);
+        });
+
+        document.getElementById('dbSearchInput').addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeAutocomplete();
+            if (e.key === 'Enter') { closeAutocomplete(); document.getElementById('dbSearchBtn').click(); }
+        });
+
+        document.addEventListener('click', e => {
+            if (!e.target.closest('#autocomplete-list') && e.target.id !== 'dbSearchInput') closeAutocomplete();
+        });
+
+        // ── Supabase Search ──────────────────────────────────────────
         const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
         const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
 
