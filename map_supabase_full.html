@@ -592,7 +592,20 @@
             
             activeFetches++;
             document.getElementById('zip-loading').style.display = 'inline-block';
-            
+
+            // PR uses Census TIGER API since OpenDataDE doesn't have PR
+            if (code === 'PR') {
+                fetch('https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/2/query?where=ZCTA5CE10+LIKE+%2700%25%27&outFields=ZCTA5CE10&f=geojson&outSR=4326')
+                    .then(r => r.json())
+                    .then(data => { zipGeoJSONLayer.addData(data); })
+                    .catch(err => console.warn('PR boundary load failed', err))
+                    .finally(() => {
+                        activeFetches--;
+                        if (activeFetches === 0) document.getElementById('zip-loading').style.display = 'none';
+                    });
+                return;
+            }
+
             fetch(`${BASE_URL}${filename}_zip_codes_geo.min.json`)
                 .then(r => r.json())
                 .then(data => { 
