@@ -282,6 +282,7 @@
         let lockedZip = null, lockedLayer = null;
         let selectedTaxonomies = new Set();
         let dashCharts = { rawAge: null, rawInc: null, age: null, inc: null, race: null };
+        let activeStatesInCSV = new Set(); // Global so loadNeighboringZips can access it
         
         let searchCircle = null, circleCenter = null, centerMarker = null, circleRadiusMiles = 0, isPlacingCircle = false;
 
@@ -664,7 +665,7 @@
 
         async function processData(data) {
             groupedData = {}; taxonomies.clear(); zipDemographics = {};
-            let activeStatesInCSV = new Set();
+            activeStatesInCSV = new Set(); // Reset global
             
             if (!data || data.length === 0) return alert("Empty CSV file.");
 
@@ -1165,11 +1166,36 @@
             });
         }
 
-        function updateMultiZipDemographics() {
+        async function updateMultiZipDemographics() {
             const zips = [...selectedZips];
+
+            // Find ZIPs we don't have demographics for yet
+            const missingZips = zips.filter(z => {
+                const zp = String(z).padStart(5,'0');
+                return !zipDemographics[z] && !zipDemographics[zp];
+            });
+
+            // Fetch missing demographics from Supabase
+            if (missingZips.length > 0) {
+                try {
+                    const demQuery = `${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${missingZips.join(',')})&select=*`;
+                    const demRes = await fetch(demQuery, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                    if (demRes.ok) {
+                        const demData = await demRes.json();
+                        demData.forEach(d => {
+                            const z = String(d.zip).padStart(5,'0');
+                            zipDemographics[z] = d;
+                            zipDemographics[d.zip] = d;
+                        });
+                    }
+                } catch(e) { console.warn('Demographics fetch failed:', e); }
+            }
+
+            // Now aggregate
             let agg = {};
             zips.forEach(z => {
-                const row = zipDemographics[z] || zipDemographics[String(z).padStart(5,'0')];
+                const zp = String(z).padStart(5,'0');
+                const row = zipDemographics[z] || zipDemographics[zp];
                 if (row) {
                     for (let key in row) {
                         if (key.includes('Total') || key.includes('Insured')) {
@@ -1178,6 +1204,7 @@
                     }
                 }
             });
+
             document.getElementById('dashboard-title').textContent = `${zips.length} ZIP CODES SELECTED`;
             document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${zips.join(', ')}</span><br/><button onclick="loadNeighboringZips()" style="margin-top:6px;padding:4px 10px;font-size:11px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-secondary);border-radius:4px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Load Neighboring ZIPs</button><button onclick="clearZipSelection()" style="margin-top:6px;margin-left:6px;padding:4px 10px;font-size:11px;background:var(--bg-elevated);border:1px solid var(--border);color:#f85149;border-radius:4px;cursor:pointer;font-family:'DM Sans',sans-serif;">✕ Clear</button>`;
             document.getElementById('closePanelBtn').style.display = 'none';
@@ -1258,18 +1285,29 @@
             seedPadded.forEach(z => selectedZips.add(z));
             lockedZip = null; lockedLayer = null;
 
-            // Fetch Supabase data for neighbor ZIPs
-            document.getElementById('dbStatus').textContent = `🔄 Fetching data for ${neighborZips.length} neighboring ZIPs...`;
+            // Fetch Supabase data for neighbor ZIPs with pagination
+            document.getElementById('dbStatus').textContent = `🔄 Fetching clinics for ${neighborZips.length} neighboring ZIPs...`;
             try {
                 const zipList = neighborZips.join(',');
-                const [clinicRes, demRes] = await Promise.all([
-                    fetch(`${SUPABASE_URL}/rest/v1/clinics?zip=in.(${zipList})&limit=5000`,
-                          { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }),
-                    fetch(`${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${zipList})&select=*`,
-                          { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } })
-                ]);
+                let clinicData = [];
+                let offset = 0;
+                while (true) {
+                    const res = await fetch(
+                        `${SUPABASE_URL}/rest/v1/clinics?zip=in.(${zipList})&limit=1000&offset=${offset}`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                    );
+                    if (!res.ok) break;
+                    const batch = await res.json();
+                    if (!batch || batch.length === 0) break;
+                    clinicData.push(...batch);
+                    if (batch.length < 1000) break;
+                    offset += 1000;
+                }
 
-                const clinicData = clinicRes.ok ? await clinicRes.json() : [];
+                const demRes = await fetch(
+                    `${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${zipList})&select=*`,
+                    { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                );
                 const demData = demRes.ok ? await demRes.json() : [];
 
                 // Add demographics
