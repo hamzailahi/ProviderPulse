@@ -176,6 +176,7 @@
         </div>
         <span id="zip-loading">⏳ Loading ZIP Boundaries…</span>
         <span id="county-loading" style="display:none;color:var(--orange);font-size:11px;font-family:'DM Mono',monospace;background:rgba(240,136,62,0.08);border:1px solid rgba(240,136,62,0.2);padding:4px 10px;border-radius:4px;">⏳ Loading County Boundaries…</span>
+        <span style="font-size:10px;color:var(--text-muted);margin-left:8px;">💡 Click ZIP to isolate · Ctrl+Click to multi-select · <button onclick="loadNeighboringZips()" class="control-btn" style="font-size:10px;padding:3px 8px;">+ Neighbors</button> · <button onclick="clearZipSelection()" class="control-btn" style="font-size:10px;padding:3px 8px;color:#f85149;">✕ Clear</button></span>
         <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
             <span id="sessionInfo" style="font-size:10px;color:var(--text-muted);"></span>
             <button class="control-btn" onclick="logoutMap()" style="color:#f85149;border-color:#da3633;">Sign Out</button>
@@ -949,15 +950,41 @@
         }
 
         // --- ZIP HOVER & CLICK LOGIC ---
+        let selectedZips = new Set(); // Multi-ZIP selection
+
         function attachZipHover(feature, layer) {
             const zip = feature.properties.ZCTA5CE10;
-            layer.on('click', function() {
-                if (lockedZip === zip) { 
-                    lockedZip = null; lockedLayer = null; 
+            layer.on('click', function(e) {
+                // Ctrl/Cmd+click adds to multi-selection
+                if (e.originalEvent.ctrlKey || e.originalEvent.metaKey) {
+                    if (selectedZips.has(zip)) {
+                        selectedZips.delete(zip);
+                        zipGeoJSONLayer.resetStyle(layer);
+                    } else {
+                        selectedZips.add(zip);
+                        layer.setStyle({ weight: 2, color: '#58a6ff', fillOpacity: 0.35, fillColor: '#58a6ff' });
+                    }
+                    if (selectedZips.size > 0) {
+                        updateMultiZipDemographics();
+                    } else {
+                        lockedZip = null; lockedLayer = null;
+                        updateDemographics();
+                    }
+                    return;
+                }
+
+                // Regular click — single ZIP isolation
+                if (lockedZip === zip && selectedZips.size === 0) { 
+                    lockedZip = null; lockedLayer = null;
+                    selectedZips.clear();
                     updateDemographics();
                     return; 
                 }
                 
+                // Clear multi-selection
+                selectedZips.clear();
+                zipGeoJSONLayer.eachLayer(l => zipGeoJSONLayer.resetStyle(l));
+
                 if (lockedLayer) zipGeoJSONLayer.resetStyle(lockedLayer);
                 
                 if (searchCircle) {
@@ -971,6 +998,78 @@
                 layer.setStyle({ weight: 3, color: '#58a6ff', fillOpacity: 0.4, fillColor: '#58a6ff' }); 
                 updateDemographics();
             });
+
+            layer.on('mouseover', function() {
+                if (!selectedZips.has(zip) && lockedZip !== zip) {
+                    layer.setStyle({ weight: 2, color: '#58a6ff', fillOpacity: 0.2, fillColor: '#58a6ff' });
+                }
+                layer.bindTooltip(zip, { permanent: false, sticky: true, className: 'zip-tooltip' }).openTooltip();
+            });
+
+            layer.on('mouseout', function() {
+                if (!selectedZips.has(zip) && lockedZip !== zip) {
+                    zipGeoJSONLayer.resetStyle(layer);
+                }
+                layer.closeTooltip();
+            });
+        }
+
+        function updateMultiZipDemographics() {
+            const zips = [...selectedZips];
+            let agg = {};
+            zips.forEach(z => {
+                const row = zipDemographics[z] || zipDemographics[String(z).padStart(5,'0')];
+                if (row) {
+                    for (let key in row) {
+                        if (key.includes('Total') || key.includes('Insured')) {
+                            agg[key] = (agg[key] || 0) + safeParseNum(row[key]);
+                        }
+                    }
+                }
+            });
+            document.getElementById('dashboard-title').textContent = `${zips.length} ZIP CODES SELECTED`;
+            document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${zips.join(', ')}</span><br/><button onclick="loadNeighboringZips()" style="margin-top:6px;padding:4px 10px;font-size:11px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-secondary);border-radius:4px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Load Neighboring ZIPs</button><button onclick="clearZipSelection()" style="margin-top:6px;margin-left:6px;padding:4px 10px;font-size:11px;background:var(--bg-elevated);border:1px solid var(--border);color:#f85149;border-radius:4px;cursor:pointer;font-family:'DM Sans',sans-serif;">✕ Clear</button>`;
+            document.getElementById('closePanelBtn').style.display = 'none';
+            renderDashboard(agg);
+        }
+
+        function clearZipSelection() {
+            selectedZips.clear();
+            lockedZip = null; lockedLayer = null;
+            if (zipGeoJSONLayer) zipGeoJSONLayer.eachLayer(l => zipGeoJSONLayer.resetStyle(l));
+            updateDemographics();
+        }
+
+        function loadNeighboringZips() {
+            if (selectedZips.size === 0 && !lockedZip) return;
+            const seedZips = selectedZips.size > 0 ? [...selectedZips] : [lockedZip];
+            const seedBounds = [];
+
+            zipGeoJSONLayer.eachLayer(l => {
+                const z = l.feature.properties.ZCTA5CE10;
+                if (seedZips.includes(z)) seedBounds.push(l.getBounds());
+            });
+
+            if (seedBounds.length === 0) return;
+
+            let added = 0;
+            zipGeoJSONLayer.eachLayer(l => {
+                const z = l.feature.properties.ZCTA5CE10;
+                if (selectedZips.has(z) || seedZips.includes(z)) return;
+                const lb = l.getBounds();
+                const isNeighbor = seedBounds.some(sb => sb.intersects(lb));
+                if (isNeighbor) {
+                    selectedZips.add(z);
+                    l.setStyle({ weight: 2, color: '#3fb950', fillOpacity: 0.25, fillColor: '#3fb950' });
+                    added++;
+                }
+            });
+
+            // Also add seed ZIPs to selection if not already
+            seedZips.forEach(z => selectedZips.add(z));
+            lockedZip = null; lockedLayer = null;
+
+            if (added > 0) updateMultiZipDemographics();
         }
 
         // --- PLACES HEALTH METRICS ---
