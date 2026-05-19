@@ -37,7 +37,7 @@ exports.handler = async function(event, context) {
                 <div style="font-family: 'Courier New', monospace; font-size: 32px; font-weight: 700; color: #58a6ff; letter-spacing: 0.2em;">${code}</div>
                 <div style="font-size: 12px; color: #8b949e; margin-top: 10px;">Expires: ${expiryDate}</div>
               </div>
-              <a href="https://healthcareproviders.netlify.app/login.html"
+              <a href="https://medicalpracticemap.netlify.app/login.html"
                  style="display: block; background: #3b82f6; color: #fff; text-align: center; padding: 12px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500; margin-bottom: 24px;">
                 Access the Map →
               </a>

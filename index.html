@@ -92,6 +92,13 @@
 
       if (!res.ok) throw new Error('Submission failed');
 
+      // Notify admins
+      await fetch('/.netlify/functions/notify-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, organization: org, reason })
+      });
+
       msg.className = 'msg success';
       msg.textContent = '✅ Request submitted! You\'ll receive your access code within 24 hours.';
       btn.textContent = 'Submitted';
