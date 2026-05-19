@@ -326,27 +326,88 @@
             }
         })();
 
-        // ── Autocomplete ─────────────────────────────────────────────
+        // ── Autocomplete with multi-ZIP selection ────────────────────
         let autocompleteTimer = null;
+        let selectedSearchZips = new Set(); // ZIPs selected from dropdown
         const acList = document.getElementById('autocomplete-list');
 
         function closeAutocomplete() {
             acList.style.display = 'none';
-            acList.innerHTML = '';
         }
 
-        function showSuggestion(label, searchValue) {
-            const item = document.createElement('div');
-            item.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12px;color:var(--text-primary);border-bottom:1px solid var(--border);';
-            item.textContent = label;
-            item.addEventListener('mouseenter', () => item.style.background = 'var(--bg-surface)');
-            item.addEventListener('mouseleave', () => item.style.background = '');
-            item.addEventListener('mousedown', () => {
-                document.getElementById('dbSearchInput').value = searchValue;
-                closeAutocomplete();
-                document.getElementById('dbSearchBtn').click();
+        function updateSearchInput() {
+            const input = document.getElementById('dbSearchInput');
+            if (selectedSearchZips.size > 0) {
+                input.value = [...selectedSearchZips].join(', ');
+            }
+        }
+
+        function renderAutocompleteResults(results, isZip) {
+            acList.innerHTML = '';
+            if (results.length === 0) { closeAutocomplete(); return; }
+
+            if (isZip && results.length > 1) {
+                // Add "Select All" option
+                const selectAll = document.createElement('div');
+                selectAll.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:11px;color:#58a6ff;border-bottom:1px solid var(--border);font-weight:600;display:flex;align-items:center;gap:8px;';
+                selectAll.innerHTML = `<input type="checkbox" id="selectAllZips" style="cursor:pointer;"> Select All (${results.length})`;
+                selectAll.querySelector('input').addEventListener('change', e => {
+                    if (e.target.checked) {
+                        results.forEach(r => selectedSearchZips.add(r.value));
+                        acList.querySelectorAll('.zip-check').forEach(cb => cb.checked = true);
+                    } else {
+                        results.forEach(r => selectedSearchZips.delete(r.value));
+                        acList.querySelectorAll('.zip-check').forEach(cb => cb.checked = false);
+                    }
+                    updateSearchInput();
+                });
+                acList.appendChild(selectAll);
+            }
+
+            results.forEach(r => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12px;color:var(--text-primary);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;';
+
+                if (isZip) {
+                    const checked = selectedSearchZips.has(r.value);
+                    item.innerHTML = `<input type="checkbox" class="zip-check" style="cursor:pointer;" ${checked ? 'checked' : ''}> <span><strong>${r.zip}</strong> <span style="color:#8b949e">— ${r.city}, ${r.state}</span></span>`;
+                    const cb = item.querySelector('input');
+                    cb.addEventListener('change', e => {
+                        if (e.target.checked) selectedSearchZips.add(r.value);
+                        else selectedSearchZips.delete(r.value);
+                        updateSearchInput();
+                        // Update select all checkbox
+                        const allChecked = [...acList.querySelectorAll('.zip-check')].every(c => c.checked);
+                        const selectAllCb = document.getElementById('selectAllZips');
+                        if (selectAllCb) selectAllCb.checked = allChecked;
+                    });
+                    item.addEventListener('click', e => {
+                        if (e.target.type !== 'checkbox') cb.click();
+                    });
+                } else {
+                    item.textContent = r.label;
+                    item.addEventListener('click', () => {
+                        document.getElementById('dbSearchInput').value = r.value;
+                        selectedSearchZips.clear();
+                        closeAutocomplete();
+                        document.getElementById('dbSearchBtn').click();
+                    });
+                }
+
+                item.addEventListener('mouseenter', () => item.style.background = 'var(--bg-elevated)');
+                item.addEventListener('mouseleave', () => item.style.background = '');
+                acList.appendChild(item);
             });
-            acList.appendChild(item);
+
+            // Add Search button at bottom if ZIP multi-select
+            if (isZip) {
+                const searchBtn = document.createElement('div');
+                searchBtn.style.cssText = 'padding:8px 12px;';
+                searchBtn.innerHTML = `<button style="width:100%;padding:7px;background:var(--accent);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;font-family:DM Sans,sans-serif;" onclick="runZipSearch()">Search Selected ZIPs</button>`;
+                acList.appendChild(searchBtn);
+            }
+
+            acList.style.display = 'block';
         }
 
         async function fetchSuggestions(query) {
@@ -354,58 +415,70 @@
             if (q.length < 2) { closeAutocomplete(); return; }
 
             try {
-                let results = [];
-
                 if (q.match(/^\d+$/)) {
-                    // Numeric — suggest ZIPs
+                    // Numeric — suggest ZIPs with city names
                     const r = await fetch(
-                        `${SUPABASE_URL}/rest/v1/clinics?zip=like.${q}*&select=zip,state&limit=8`,
+                        `${SUPABASE_URL}/rest/v1/clinics?zip=like.${q}*&select=zip,city,state&limit=200`,
                         { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
                     );
                     const data = await r.json();
                     const seen = new Set();
+                    const results = [];
                     data.forEach(d => {
-                        const key = `${d.zip}-${d.state}`;
-                        if (!seen.has(key)) { seen.add(key); results.push({ label: `${d.zip} — ${d.state}`, value: d.zip }); }
+                        if (seen.has(d.zip)) return;
+                        seen.add(d.zip);
+                        results.push({ zip: d.zip, city: d.city || '—', state: d.state, value: d.zip, label: `${d.zip} — ${d.city}, ${d.state}` });
                     });
+                    renderAutocompleteResults(results, true);
+
                 } else if (q.length === 2 && q.match(/^[a-zA-Z]+$/)) {
-                    // 2 letters — suggest state
-                    results.push({ label: `State: ${q.toUpperCase()}`, value: q.toUpperCase() });
+                    renderAutocompleteResults([{ label: `State: ${q.toUpperCase()}`, value: q.toUpperCase() }], false);
+
                 } else {
-                    // City search — query distinct cities
                     const cityQ = q.toUpperCase();
                     const r = await fetch(
-                        `${SUPABASE_URL}/rest/v1/clinics?city=ilike.${encodeURIComponent(cityQ)}*&select=city,state&limit=50`,
+                        `${SUPABASE_URL}/rest/v1/clinics?city=ilike.${encodeURIComponent(cityQ)}*&select=city,state&limit=100`,
                         { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
                     );
                     const data = await r.json();
                     const seen = new Set();
+                    const results = [];
                     data.forEach(d => {
                         if (!d.city) return;
                         const key = `${d.city}-${d.state}`;
-                        if (!seen.has(key)) {
-                            seen.add(key);
-                            results.push({ label: `${d.city}, ${d.state}`, value: `${d.city}, ${d.state}` });
-                        }
+                        if (seen.has(key)) return;
+                        seen.add(key);
+                        results.push({ label: `${d.city}, ${d.state}`, value: `${d.city}, ${d.state}` });
                     });
+                    renderAutocompleteResults(results, false);
                 }
-
-                acList.innerHTML = '';
-                if (results.length === 0) { closeAutocomplete(); return; }
-                results.slice(0, 10).forEach(r => showSuggestion(r.label, r.value));
-                acList.style.display = 'block';
-
             } catch(e) { closeAutocomplete(); }
         }
 
+        async function runZipSearch() {
+            closeAutocomplete();
+            if (selectedSearchZips.size === 0) {
+                document.getElementById('dbSearchBtn').click();
+                return;
+            }
+            // Search all selected ZIPs
+            document.getElementById('dbSearchInput').value = [...selectedSearchZips].join(', ');
+            await searchMultipleZips([...selectedSearchZips]);
+        }
+
         document.getElementById('dbSearchInput').addEventListener('input', e => {
+            selectedSearchZips.clear();
             clearTimeout(autocompleteTimer);
             autocompleteTimer = setTimeout(() => fetchSuggestions(e.target.value), 300);
         });
 
         document.getElementById('dbSearchInput').addEventListener('keydown', e => {
             if (e.key === 'Escape') closeAutocomplete();
-            if (e.key === 'Enter') { closeAutocomplete(); document.getElementById('dbSearchBtn').click(); }
+            if (e.key === 'Enter') {
+                closeAutocomplete();
+                if (selectedSearchZips.size > 0) runZipSearch();
+                else document.getElementById('dbSearchBtn').click();
+            }
         });
 
         document.addEventListener('click', e => {
@@ -416,11 +489,8 @@
         const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
         const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
 
-        document.getElementById('dbSearchInput').addEventListener('keydown', e => {
-            if (e.key === 'Enter') document.getElementById('dbSearchBtn').click();
-        });
-
         document.getElementById('dbSearchBtn').addEventListener('click', async () => {
+            if (selectedSearchZips.size > 0) { await searchMultipleZips([...selectedSearchZips]); return; }
             const searchTerm = document.getElementById('dbSearchInput').value.trim();
             const searchUpper = searchTerm.toUpperCase();
             const statusEl = document.getElementById('dbStatus');
@@ -526,6 +596,72 @@
 
         // CSV upload replaced by Supabase search above
 
+        async function searchMultipleZips(zips) {
+            const statusEl = document.getElementById('dbStatus');
+            statusEl.textContent = `🔄 Loading ${zips.length} ZIPs...`;
+            try {
+                // Fetch clinics for all selected ZIPs in batches
+                let clinicData = [];
+                const ZIP_BATCH = 20;
+                for (let i = 0; i < zips.length; i += ZIP_BATCH) {
+                    const batch = zips.slice(i, i + ZIP_BATCH);
+                    // Try both padded and unpadded
+                    const zipVariants = [...new Set(batch.flatMap(z => [z, String(parseInt(z, 10))]))];
+                    let offset = 0;
+                    while (true) {
+                        const query = `${SUPABASE_URL}/rest/v1/clinics?zip=in.(${zipVariants.join(',')})&limit=1000&offset=${offset}`;
+                        const res = await fetch(query, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                        if (!res.ok) break;
+                        const batchData = await res.json();
+                        if (!batchData || batchData.length === 0) break;
+                        clinicData.push(...batchData);
+                        statusEl.textContent = `🔄 Loaded ${clinicData.length} clinics...`;
+                        if (batchData.length < 1000) break;
+                        offset += 1000;
+                    }
+                }
+
+                if (clinicData.length === 0) { statusEl.textContent = '❌ No clinics found'; return; }
+
+                // Fetch demographics
+                const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
+                const demByZip = {};
+                for (let i = 0; i < allZips.length; i += 50) {
+                    const zipBatch = allZips.slice(i, i + 50);
+                    const demQuery = `${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${zipBatch.join(',')})&select=*`;
+                    const demRes = await fetch(demQuery, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                    if (!demRes.ok) continue;
+                    const demData = await demRes.json();
+                    demData.forEach(d => {
+                        if (!demByZip[d.zip]) demByZip[d.zip] = { 'ZIP Code': d.zip, 'State': d.state };
+                        Object.keys(d).forEach(key => {
+                            if (key !== 'id' && key !== 'created_at') demByZip[d.zip][key] = d[key];
+                        });
+                    });
+                }
+
+                const converted = clinicData.map(c => {
+                    const dem = demByZip[c.zip] || {};
+                    return {
+                        'NPI': c.npi || '', 'Name': c.name || '',
+                        'Primary Practice Address': c.address || '',
+                        'Primary Taxonomy': c.primary_taxonomy || '',
+                        'ZIP Code': c.zip || '', 'State': c.state || '',
+                        'Latitude': c.latitude || '', 'Longitude': c.longitude || '',
+                        ...Object.fromEntries(Object.entries(dem).filter(([k]) =>
+                            !['zip','state','id','created_at','ZIP Code','State','Latitude','Longitude'].includes(k)))
+                    };
+                });
+
+                statusEl.textContent = `✅ Loaded ${clinicData.length} clinics across ${zips.length} ZIPs`;
+                document.getElementById('welcome-overlay').style.opacity = '0';
+                setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
+                processData(converted);
+            } catch(e) {
+                statusEl.textContent = `❌ ${e.message}`;
+            }
+        }
+
         async function processData(data) {
             groupedData = {}; taxonomies.clear(); zipDemographics = {};
             let activeStatesInCSV = new Set();
@@ -584,7 +720,6 @@
                 zipGeoJSONLayer.clearLayers();
             } else {
                 zipGeoJSONLayer = L.geoJSON(null, { 
-                    filter: f => !!(zipDemographics[f.properties.ZCTA5CE10] || zipDemographics[String(f.properties.ZCTA5CE10).padStart(5,'0')]), 
                     style: () => ({ color: '#3b82f6', weight: 1, fillOpacity: 0.04, fillColor: '#3b82f6' }), 
                     onEachFeature: attachZipHover 
                 }).addTo(map);
@@ -1056,36 +1191,118 @@
             updateDemographics();
         }
 
-        function loadNeighboringZips() {
-            if (selectedZips.size === 0 && !lockedZip) return;
-            const seedZips = selectedZips.size > 0 ? [...selectedZips] : [lockedZip];
-            const seedBounds = [];
+        async function loadNeighboringZips() {
+            if (selectedZips.size === 0 && !lockedZip) {
+                alert('Please click a ZIP code first, then click + Neighbors.');
+                return;
+            }
 
+            const seedZips = selectedZips.size > 0 ? [...selectedZips] : [lockedZip];
+            const seedPadded = seedZips.map(z => String(z).padStart(5,'0'));
+
+            // Get bounds of seed ZIPs
+            const seedBounds = [];
             zipGeoJSONLayer.eachLayer(l => {
-                const z = l.feature.properties.ZCTA5CE10;
-                if (seedZips.includes(z)) seedBounds.push(l.getBounds());
+                const z = String(l.feature.properties.ZCTA5CE10).padStart(5,'0');
+                if (seedPadded.includes(z)) seedBounds.push(l.getBounds());
             });
 
-            if (seedBounds.length === 0) return;
+            if (seedBounds.length === 0) {
+                alert('ZIP boundary not visible. Make sure ZIP Codes layer is ON.');
+                return;
+            }
 
-            let added = 0;
+            // Get the combined bounds of all seed ZIPs
+            let combinedBounds = seedBounds[0];
+            seedBounds.forEach(b => { combinedBounds = combinedBounds.extend(b); });
+
+            // Find which states intersect the seed bounds — load their boundaries too
+            document.getElementById('dbStatus').textContent = '🔄 Loading neighboring boundaries...';
+            const stateLoadPromises = [];
+            for (const [stateCode] of Object.entries(STATE_FILES)) {
+                if (!loadedStates.has(stateCode)) {
+                    // Check if this state could plausibly neighbor our ZIP
+                    // Load all adjacent states by checking if seed bounds are near state boundaries
+                    // We load states that aren't already loaded and are in our database
+                    if (activeStatesInCSV.has(stateCode)) {
+                        stateLoadPromises.push(new Promise(resolve => {
+                            loadState(stateCode);
+                            setTimeout(resolve, 2000); // Give time to load
+                        }));
+                    }
+                }
+            }
+
+            // Wait for boundary loads to settle
+            await new Promise(resolve => setTimeout(resolve, 2500));
+
+            // Now find all ZIPs touching seed bounds
+            let neighborZips = [];
             zipGeoJSONLayer.eachLayer(l => {
-                const z = l.feature.properties.ZCTA5CE10;
-                if (selectedZips.has(z) || seedZips.includes(z)) return;
+                const z = String(l.feature.properties.ZCTA5CE10).padStart(5,'0');
+                if (seedPadded.includes(z)) return;
                 const lb = l.getBounds();
-                const isNeighbor = seedBounds.some(sb => sb.intersects(lb));
-                if (isNeighbor) {
-                    selectedZips.add(z);
+                if (seedBounds.some(sb => sb.intersects(lb))) {
+                    neighborZips.push(z);
                     l.setStyle({ weight: 2, color: '#3fb950', fillOpacity: 0.25, fillColor: '#3fb950' });
-                    added++;
                 }
             });
 
-            // Also add seed ZIPs to selection if not already
-            seedZips.forEach(z => selectedZips.add(z));
+            if (neighborZips.length === 0) {
+                document.getElementById('dbStatus').textContent = '❌ No neighbors found';
+                return;
+            }
+
+            // Add to selection
+            neighborZips.forEach(z => selectedZips.add(z));
+            seedPadded.forEach(z => selectedZips.add(z));
             lockedZip = null; lockedLayer = null;
 
-            if (added > 0) updateMultiZipDemographics();
+            // Fetch Supabase data for neighbor ZIPs
+            document.getElementById('dbStatus').textContent = `🔄 Fetching data for ${neighborZips.length} neighboring ZIPs...`;
+            try {
+                const zipList = neighborZips.join(',');
+                const [clinicRes, demRes] = await Promise.all([
+                    fetch(`${SUPABASE_URL}/rest/v1/clinics?zip=in.(${zipList})&limit=5000`,
+                          { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }),
+                    fetch(`${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${zipList})&select=*`,
+                          { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } })
+                ]);
+
+                const clinicData = clinicRes.ok ? await clinicRes.json() : [];
+                const demData = demRes.ok ? await demRes.json() : [];
+
+                // Add demographics
+                demData.forEach(d => {
+                    const z = String(d.zip).padStart(5,'0');
+                    if (!zipDemographics[z]) zipDemographics[z] = d;
+                });
+
+                // Add clinics to groupedData
+                clinicData.forEach(c => {
+                    if (!c.latitude || !c.longitude) return;
+                    const key = c.address || `${c.latitude},${c.longitude}`;
+                    if (!groupedData[key]) {
+                        groupedData[key] = { lat: parseFloat(c.latitude), lng: parseFloat(c.longitude), practices: [] };
+                    }
+                    const exists = groupedData[key].practices.some(p => p['NPI'] === c.npi);
+                    if (!exists) {
+                        groupedData[key].practices.push({
+                            'NPI': c.npi, 'Name': c.name, 'Primary Practice Address': c.address,
+                            'Primary Taxonomy': c.primary_taxonomy, 'ZIP Code': c.zip,
+                            'State': c.state, 'Latitude': c.latitude, 'Longitude': c.longitude
+                        });
+                    }
+                });
+
+                document.getElementById('dbStatus').textContent = `✅ ${neighborZips.length} neighboring ZIPs loaded`;
+                updateMultiZipDemographics();
+                renderMap();
+
+            } catch(e) {
+                document.getElementById('dbStatus').textContent = `❌ ${e.message}`;
+                updateMultiZipDemographics();
+            }
         }
 
         // --- PLACES HEALTH METRICS ---
