@@ -15,7 +15,7 @@ exports.handler = async function(event, context) {
       },
       body: JSON.stringify({
         from: 'onboarding@resend.dev',
-        to: ['hilahi@itconnections.info', 'ryunus@itconnections.net'],
+        to: ['hilahi@itconnections.info'],
         subject: `New Map Access Request — ${name}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #0d1117; color: #e6edf3; border-radius: 12px; overflow: hidden; border: 1px solid #2a3444;">
