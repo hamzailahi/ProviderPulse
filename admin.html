@@ -185,11 +185,10 @@
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
-        'Prefer': 'return=representation',
         ...(opts.headers || {})
       }
     });
-    if (opts.method === 'PATCH' || (opts.method === 'POST' && opts.noReturn)) return res;
+    if (opts.method === 'PATCH' || opts.method === 'DELETE') return res;
     return res.json();
   }
 
@@ -260,7 +259,7 @@
 
   async function approve(id, email, name) {
     const code = generateCode();
-    const expires_at = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+    const expires_at = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
     try {
       // Insert code
@@ -272,42 +271,46 @@
       // Update request status
       await sbFetch(`access_requests?id=eq.${id}`, {
         method: 'PATCH',
+        headers: { 'Prefer': 'return=minimal' },
         body: JSON.stringify({ status: 'approved' })
       });
 
-      // Send email via Netlify function
-      const emailRes = await fetch('/.netlify/functions/send-code', {
+      // Send email via Netlify function — don't block on failure
+      fetch('/.netlify/functions/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, name, code, expires_at })
-      });
-
-      if (!emailRes.ok) throw new Error('Email failed');
+      }).then(r => {
+        if (!r.ok) console.error('Email send failed');
+      }).catch(e => console.error('Email error:', e));
 
       showToast(`✅ Approved & emailed ${email}`);
-      loadAll();
+      await loadAll();
 
     } catch(e) {
       showToast(`❌ Error: ${e.message}`, '#da3633');
+      await loadAll();
     }
   }
 
   async function deny(id) {
     await sbFetch(`access_requests?id=eq.${id}`, {
       method: 'PATCH',
+      headers: { 'Prefer': 'return=minimal' },
       body: JSON.stringify({ status: 'denied' })
     });
     showToast('Request denied');
-    loadAll();
+    await loadAll();
   }
 
   async function revoke(id) {
     await sbFetch(`access_codes?id=eq.${id}`, {
       method: 'PATCH',
+      headers: { 'Prefer': 'return=minimal' },
       body: JSON.stringify({ used: true })
     });
     showToast('Code revoked');
-    loadAll();
+    await loadAll();
   }
 
   // Check if already authenticated
