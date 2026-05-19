@@ -176,7 +176,9 @@
         </div>
         <span id="zip-loading">⏳ Loading ZIP Boundaries…</span>
         <span id="county-loading" style="display:none;color:var(--orange);font-size:11px;font-family:'DM Mono',monospace;background:rgba(240,136,62,0.08);border:1px solid rgba(240,136,62,0.2);padding:4px 10px;border-radius:4px;">⏳ Loading County Boundaries…</span>
-        <span style="font-size:10px;color:var(--text-muted);margin-left:8px;">💡 Click ZIP to isolate · Ctrl+Click to multi-select · <button onclick="loadNeighboringZips()" class="control-btn" style="font-size:10px;padding:3px 8px;">+ Neighbors</button> · <button onclick="clearZipSelection()" class="control-btn" style="font-size:10px;padding:3px 8px;color:#f85149;">✕ Clear</button></span>
+        <button id="multiSelectBtn" class="control-btn" onclick="toggleMultiSelect()" style="font-size:11px;">⊞ Multi-Select</button>
+        <button class="control-btn" onclick="loadNeighboringZips()" style="font-size:11px;">+ Neighbors</button>
+        <button class="control-btn" onclick="clearZipSelection()" style="font-size:11px;color:#f85149;">✕ Clear ZIPs</button>
         <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
             <span id="sessionInfo" style="font-size:10px;color:var(--text-muted);"></span>
             <button class="control-btn" onclick="logoutMap()" style="color:#f85149;border-color:#da3633;">Sign Out</button>
@@ -950,13 +952,31 @@
         }
 
         // --- ZIP HOVER & CLICK LOGIC ---
-        let selectedZips = new Set(); // Multi-ZIP selection
+        let selectedZips = new Set();
+        let multiSelectMode = false;
+
+        function toggleMultiSelect() {
+            multiSelectMode = !multiSelectMode;
+            const btn = document.getElementById('multiSelectBtn');
+            if (multiSelectMode) {
+                btn.textContent = '✓ Multi-Select ON';
+                btn.style.background = '#238636';
+                btn.style.color = '#fff';
+                btn.style.borderColor = '#238636';
+            } else {
+                btn.textContent = '⊞ Multi-Select';
+                btn.style.background = '';
+                btn.style.color = '';
+                btn.style.borderColor = '';
+                clearZipSelection();
+            }
+        }
 
         function attachZipHover(feature, layer) {
             const zip = feature.properties.ZCTA5CE10;
             layer.on('click', function(e) {
-                // Ctrl/Cmd+click adds to multi-selection
-                if (e.originalEvent.ctrlKey || e.originalEvent.metaKey) {
+                if (multiSelectMode) {
+                    // Multi-select mode — toggle ZIP in/out of selection
                     if (selectedZips.has(zip)) {
                         selectedZips.delete(zip);
                         zipGeoJSONLayer.resetStyle(layer);
@@ -973,7 +993,7 @@
                     return;
                 }
 
-                // Regular click — single ZIP isolation
+                // Single select mode
                 if (lockedZip === zip && selectedZips.size === 0) { 
                     lockedZip = null; lockedLayer = null;
                     selectedZips.clear();
@@ -981,10 +1001,8 @@
                     return; 
                 }
                 
-                // Clear multi-selection
                 selectedZips.clear();
                 zipGeoJSONLayer.eachLayer(l => zipGeoJSONLayer.resetStyle(l));
-
                 if (lockedLayer) zipGeoJSONLayer.resetStyle(lockedLayer);
                 
                 if (searchCircle) {
@@ -1003,14 +1021,12 @@
                 if (!selectedZips.has(zip) && lockedZip !== zip) {
                     layer.setStyle({ weight: 2, color: '#58a6ff', fillOpacity: 0.2, fillColor: '#58a6ff' });
                 }
-                layer.bindTooltip(zip, { permanent: false, sticky: true, className: 'zip-tooltip' }).openTooltip();
             });
 
             layer.on('mouseout', function() {
                 if (!selectedZips.has(zip) && lockedZip !== zip) {
                     zipGeoJSONLayer.resetStyle(layer);
                 }
-                layer.closeTooltip();
             });
         }
 
