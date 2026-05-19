@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Admin Panel — Healthcare Map</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; }
+
+  /* Login screen */
+  #loginScreen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+  .login-card { background: #161b22; border: 1px solid #2a3444; border-radius: 12px; padding: 40px; width: 100%; max-width: 380px; }
+  .login-card h1 { font-size: 20px; margin-bottom: 6px; }
+  .login-card p { font-size: 13px; color: #8b949e; margin-bottom: 24px; }
+  label { font-size: 12px; font-weight: 500; color: #8b949e; display: block; margin-bottom: 6px; }
+  input[type=password], input[type=text], input[type=email] {
+    width: 100%; background: #1c2330; border: 1px solid #2a3444; border-radius: 6px;
+    padding: 10px 12px; font-size: 13px; color: #e6edf3; font-family: 'DM Sans', sans-serif;
+    margin-bottom: 16px; }
+  input:focus { border-color: #3b82f6; outline: none; }
+
+  /* Admin screen */
+  #adminScreen { display: none; }
+  .topbar { background: #161b22; border-bottom: 1px solid #2a3444; padding: 14px 28px;
+             display: flex; align-items: center; justify-content: space-between; }
+  .topbar h1 { font-size: 15px; font-weight: 600; }
+  .topbar span { font-size: 12px; color: #8b949e; }
+  .content { padding: 28px; max-width: 1100px; margin: 0 auto; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+  .stat { background: #161b22; border: 1px solid #2a3444; border-radius: 8px; padding: 16px; }
+  .stat .n { font-size: 28px; font-weight: 600; color: #58a6ff; }
+  .stat .l { font-size: 11px; color: #8b949e; margin-top: 4px; text-transform: uppercase; }
+
+  h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; color: #8b949e;
+       letter-spacing: 0.05em; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; background: #161b22; border: 1px solid #2a3444;
+          border-radius: 8px; overflow: hidden; margin-bottom: 28px; }
+  th { background: #1c2330; font-size: 11px; font-weight: 600; color: #8b949e; text-transform: uppercase;
+       padding: 10px 14px; text-align: left; border-bottom: 1px solid #2a3444; }
+  td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid #2a3444; color: #e6edf3; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1c2330; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge.pending { background: #3b2f0a; color: #e3b341; border: 1px solid #9e6a03; }
+  .badge.approved { background: #0d2b1d; color: #3fb950; border: 1px solid #238636; }
+  .badge.denied { background: #2d1117; color: #f85149; border: 1px solid #da3633; }
+  .badge.active { background: #0d2b1d; color: #3fb950; border: 1px solid #238636; }
+  .badge.expired { background: #2a3444; color: #8b949e; border: 1px solid #484f58; }
+
+  .btn { padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 500; cursor: pointer;
+         border: none; font-family: 'DM Sans', sans-serif; transition: 0.15s; }
+  .btn-approve { background: #238636; color: #fff; }
+  .btn-approve:hover { background: #2ea043; }
+  .btn-deny { background: #2a3444; color: #8b949e; border: 1px solid #484f58; }
+  .btn-deny:hover { background: #da3633; color: #fff; border-color: #da3633; }
+  .btn-revoke { background: #2a3444; color: #f85149; border: 1px solid #da3633; }
+  .btn-revoke:hover { background: #da3633; color: #fff; }
+
+  .code-badge { font-family: 'DM Mono', monospace; font-size: 13px; color: #58a6ff; background: #1c2330;
+                padding: 2px 8px; border-radius: 4px; border: 1px solid #2a3444; }
+  .logout { background: none; border: 1px solid #2a3444; color: #8b949e; padding: 6px 14px;
+            border-radius: 5px; cursor: pointer; font-size: 12px; font-family: 'DM Sans', sans-serif; }
+  .logout:hover { border-color: #da3633; color: #f85149; }
+  .refresh { background: #1c2330; border: 1px solid #2a3444; color: #8b949e; padding: 6px 14px;
+             border-radius: 5px; cursor: pointer; font-size: 12px; font-family: 'DM Sans', sans-serif; margin-right: 8px; }
+  .empty { text-align: center; color: #484f58; font-size: 13px; padding: 32px; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #238636; color: #fff;
+           padding: 10px 18px; border-radius: 8px; font-size: 13px; display: none; z-index: 999; }
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>Admin Panel</h1>
+    <p>Healthcare Provider Map — IT Connections LLC</p>
+    <label>Admin Password</label>
+    <input type="password" id="adminPwd" placeholder="Enter password" onkeydown="if(event.key==='Enter')adminLogin()" />
+    <button class="btn btn-approve" style="width:100%;padding:10px;" onclick="adminLogin()">Sign In</button>
+    <div id="loginErr" style="font-size:12px;color:#f85149;margin-top:12px;display:none;">Incorrect password.</div>
+  </div>
+</div>
+
+<!-- Admin Screen -->
+<div id="adminScreen">
+  <div class="topbar">
+    <h1>Healthcare Map — Admin Panel</h1>
+    <div>
+      <button class="refresh" onclick="loadAll()">↻ Refresh</button>
+      <button class="logout" onclick="logout()">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="stats">
+      <div class="stat"><div class="n" id="statPending">—</div><div class="l">Pending Requests</div></div>
+      <div class="stat"><div class="n" id="statApproved">—</div><div class="l">Total Approved</div></div>
+      <div class="stat"><div class="n" id="statActive">—</div><div class="l">Active Codes</div></div>
+      <div class="stat"><div class="n" id="statExpired">—</div><div class="l">Expired Codes</div></div>
+    </div>
+
+    <h2>Pending Requests</h2>
+    <table id="pendingTable">
+      <thead><tr><th>Name</th><th>Email</th><th>Organization</th><th>Reason</th><th>Requested</th><th>Action</th></tr></thead>
+      <tbody id="pendingBody"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+    </table>
+
+    <h2>Active Access Codes</h2>
+    <table id="activeTable">
+      <thead><tr><th>Email</th><th>Code</th><th>Expires</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody id="activeBody"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+    </table>
+
+    <h2>All Requests</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Email</th><th>Organization</th><th>Status</th><th>Requested</th></tr></thead>
+      <tbody id="allBody"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
+  const ADMIN_PASSWORD = "Password12@$#";
+
+  function adminLogin() {
+    const pwd = document.getElementById('adminPwd').value;
+    if (pwd === ADMIN_PASSWORD) {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('adminScreen').style.display = 'block';
+      sessionStorage.setItem('admin_auth', '1');
+      loadAll();
+    } else {
+      document.getElementById('loginErr').style.display = 'block';
+    }
+  }
+
+  function logout() {
+    sessionStorage.removeItem('admin_auth');
+    location.reload();
+  }
+
+  function showToast(msg, color = '#238636') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.background = color;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 3000);
+  }
+
+  function generateCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  }
+
+  function timeAgo(dateStr) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  function timeLeft(dateStr) {
+    const diff = new Date(dateStr).getTime() - Date.now();
+    if (diff <= 0) return 'Expired';
+    const hrs = Math.floor(diff / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    return `${hrs}h ${mins}m`;
+  }
+
+  async function sbFetch(path, opts = {}) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      ...opts,
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation',
+        ...(opts.headers || {})
+      }
+    });
+    if (opts.method === 'PATCH' || (opts.method === 'POST' && opts.noReturn)) return res;
+    return res.json();
+  }
+
+  async function loadAll() {
+    const [requests, codes] = await Promise.all([
+      sbFetch('access_requests?order=created_at.desc'),
+      sbFetch('access_codes?order=created_at.desc')
+    ]);
+
+    const pending = requests.filter(r => r.status === 'pending');
+    const approved = requests.filter(r => r.status === 'approved');
+    const now = new Date();
+    const active = codes.filter(c => new Date(c.expires_at) > now && !c.used);
+    const expired = codes.filter(c => new Date(c.expires_at) <= now || c.used);
+
+    document.getElementById('statPending').textContent = pending.length;
+    document.getElementById('statApproved').textContent = approved.length;
+    document.getElementById('statActive').textContent = active.length;
+    document.getElementById('statExpired').textContent = expired.length;
+
+    // Pending table
+    const pb = document.getElementById('pendingBody');
+    pb.innerHTML = pending.length === 0
+      ? '<tr><td colspan="6" class="empty">No pending requests</td></tr>'
+      : pending.map(r => `
+        <tr>
+          <td>${r.name}</td>
+          <td>${r.email}</td>
+          <td>${r.organization || '—'}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.reason || '—'}</td>
+          <td>${timeAgo(r.created_at)}</td>
+          <td style="display:flex;gap:6px;">
+            <button class="btn btn-approve" onclick="approve(${r.id}, '${r.email}', '${r.name}')">Approve</button>
+            <button class="btn btn-deny" onclick="deny(${r.id})">Deny</button>
+          </td>
+        </tr>`).join('');
+
+    // Active codes table
+    const ab = document.getElementById('activeBody');
+    const allCodes = [...active, ...expired].slice(0, 30);
+    ab.innerHTML = allCodes.length === 0
+      ? '<tr><td colspan="5" class="empty">No codes issued yet</td></tr>'
+      : allCodes.map(c => {
+          const isActive = new Date(c.expires_at) > now && !c.used;
+          return `
+          <tr>
+            <td>${c.email}</td>
+            <td><span class="code-badge">${c.code}</span></td>
+            <td>${new Date(c.expires_at).toLocaleString()} <span style="color:#8b949e">(${timeLeft(c.expires_at)})</span></td>
+            <td><span class="badge ${isActive ? 'active' : 'expired'}">${isActive ? 'Active' : 'Expired'}</span></td>
+            <td>${isActive ? `<button class="btn btn-revoke" onclick="revoke(${c.id})">Revoke</button>` : '—'}</td>
+          </tr>`;
+        }).join('');
+
+    // All requests table
+    const allb = document.getElementById('allBody');
+    allb.innerHTML = requests.length === 0
+      ? '<tr><td colspan="5" class="empty">No requests yet</td></tr>'
+      : requests.map(r => `
+        <tr>
+          <td>${r.name}</td>
+          <td>${r.email}</td>
+          <td>${r.organization || '—'}</td>
+          <td><span class="badge ${r.status}">${r.status}</span></td>
+          <td>${timeAgo(r.created_at)}</td>
+        </tr>`).join('');
+  }
+
+  async function approve(id, email, name) {
+    const code = generateCode();
+    const expires_at = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+
+    try {
+      // Insert code
+      await sbFetch('access_codes', {
+        method: 'POST',
+        body: JSON.stringify({ request_id: id, email: email.toLowerCase(), code, expires_at })
+      });
+
+      // Update request status
+      await sbFetch(`access_requests?id=eq.${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'approved' })
+      });
+
+      // Send email via Netlify function
+      const emailRes = await fetch('/.netlify/functions/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name, code, expires_at })
+      });
+
+      if (!emailRes.ok) throw new Error('Email failed');
+
+      showToast(`✅ Approved & emailed ${email}`);
+      loadAll();
+
+    } catch(e) {
+      showToast(`❌ Error: ${e.message}`, '#da3633');
+    }
+  }
+
+  async function deny(id) {
+    await sbFetch(`access_requests?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'denied' })
+    });
+    showToast('Request denied');
+    loadAll();
+  }
+
+  async function revoke(id) {
+    await sbFetch(`access_codes?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ used: true })
+    });
+    showToast('Code revoked');
+    loadAll();
+  }
+
+  // Check if already authenticated
+  window.addEventListener('load', () => {
+    if (sessionStorage.getItem('admin_auth') === '1') {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('adminScreen').style.display = 'block';
+      loadAll();
+    }
+  });
+</script>
+</body>
+</html>
