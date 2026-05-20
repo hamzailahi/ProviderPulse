@@ -407,6 +407,15 @@
             const statusEl = document.getElementById('dbStatus');
             if (!searchTerm) { statusEl.textContent = 'Enter ZIP, State, or City'; return; }
             statusEl.textContent = '🔄 Searching...';
+
+            // Check for comma-separated ZIPs like "38017, 38654"
+            const commaParts = searchTerm.split(',').map(s => s.trim()).filter(Boolean);
+            const allAreZips = commaParts.length > 1 && commaParts.every(p => p.match(/^\d{5}$/));
+            if (allAreZips) {
+                await searchMultipleZips(commaParts);
+                return;
+            }
+
             try {
                 let baseQuery;
                 if (searchTerm.match(/^\d{5}$/)) {
@@ -417,14 +426,14 @@
                     // 2-letter state code
                     baseQuery = SUPABASE_URL + '/rest/v1/clinics?state=eq.' + searchUpper;
                 } else if (searchUpper.includes(',')) {
-                    // "City, ST" format — try both mixed case and uppercase
+                    // "City, ST" format
                     const parts = searchUpper.split(',');
                     const cityUpper = parts[0].trim();
                     const cityMixed = cityUpper.charAt(0) + cityUpper.slice(1).toLowerCase();
                     const stateOnly = parts[1].trim();
                     baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')&state=eq.' + stateOnly;
                 } else {
-                    // City only — try both uppercase and title case
+                    // City only
                     const cityUpper = searchUpper;
                     const cityMixed = cityUpper.charAt(0) + cityUpper.slice(1).toLowerCase();
                     baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')';
@@ -506,6 +515,66 @@
         });
 
         // CSV upload replaced by Supabase search above
+
+        async function searchMultipleZips(zips) {
+            const statusEl = document.getElementById('dbStatus');
+            statusEl.textContent = `🔄 Loading ${zips.length} ZIPs...`;
+            try {
+                let clinicData = [];
+                // Try both padded and stripped formats
+                const zipVariants = [...new Set(zips.flatMap(z => [z, String(parseInt(z, 10))]))];
+                let offset = 0;
+                while (true) {
+                    const res = await fetch(
+                        `${SUPABASE_URL}/rest/v1/clinics?zip=in.(${zipVariants.join(',')})&limit=1000&offset=${offset}`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                    );
+                    if (!res.ok) break;
+                    const batch = await res.json();
+                    if (!batch || batch.length === 0) break;
+                    clinicData.push(...batch);
+                    statusEl.textContent = `🔄 Loaded ${clinicData.length} clinics...`;
+                    if (batch.length < 1000) break;
+                    offset += 1000;
+                }
+
+                if (!clinicData.length) { statusEl.textContent = '❌ No clinics found'; return; }
+
+                // Fetch demographics in batches of 50
+                const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
+                const demByZip = {};
+                for (let i = 0; i < allZips.length; i += 50) {
+                    const batch = allZips.slice(i, i + 50);
+                    const res = await fetch(
+                        `${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${batch.join(',')})&select=*`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                    );
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    data.forEach(d => {
+                        if (!demByZip[d.zip]) demByZip[d.zip] = { 'ZIP Code': d.zip, 'State': d.state };
+                        Object.keys(d).forEach(k => { if (k !== 'id' && k !== 'created_at') demByZip[d.zip][k] = d[k]; });
+                    });
+                }
+
+                const converted = clinicData.map(c => ({
+                    'NPI': c.npi || '', 'Name': c.name || '',
+                    'Primary Practice Address': c.address || '',
+                    'Primary Taxonomy': c.primary_taxonomy || '',
+                    'ZIP Code': c.zip || '', 'State': c.state || '',
+                    'Latitude': c.latitude || '', 'Longitude': c.longitude || '',
+                    ...Object.fromEntries(Object.entries(demByZip[c.zip] || {}).filter(([k]) =>
+                        !['zip','state','id','created_at','ZIP Code','State','Latitude','Longitude'].includes(k)))
+                }));
+
+                statusEl.textContent = `✅ Loaded ${clinicData.length} clinics across ${zips.length} ZIPs`;
+                document.getElementById('welcome-overlay').style.opacity = '0';
+                setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
+                processData(converted);
+            } catch(e) {
+                statusEl.textContent = `❌ ${e.message}`;
+            }
+        }
 
         async function processData(data) {
             groupedData = {}; taxonomies.clear(); zipDemographics = {};
@@ -1351,11 +1420,10 @@
                 if (lockedCountyLayer) countyGeoJSONLayer.resetStyle(lockedCountyLayer);
                 lockedCounty = label; lockedCountyLayer = layer;
                 layer.setStyle({ color: '#f0883e', weight: 2.5, fillOpacity: 0.18, fillColor: '#f0883e' });
+
+                // Only fetch PLACES data — do NOT filter clinics by county
                 // Pan to county
                 map.fitBounds(layer.getBounds(), { padding: [40, 40] });
-                // Put county name in search box to filter providers
-                document.getElementById('searchInput').value = label;
-                renderMap();
 
                 // Fetch PLACES data for all ZIPs in this county
                 const countyBounds = layer.getBounds();
