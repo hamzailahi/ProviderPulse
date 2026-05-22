@@ -1206,193 +1206,122 @@
             document.getElementById('placesMetrics').innerHTML = '<em style="color: var(--text-muted);">Loading health data...</em>';
 
             try {
-                // locationid in PLACES is just the 5-digit ZIP code: 01001, 05251, etc.
-                // Build SoQL WHERE clause: locationid='05251' OR locationid='05254' OR ...
                 const whereClause = zips.map(z => `locationid='${z}'`).join(' OR ');
                 const url = `https://data.cdc.gov/resource/qnzd-25i4.json?$where=${encodeURIComponent(whereClause)}&$limit=50000`;
-
-                console.log('PLACES Debug: Total ZIPs requested:', zips.length);
-                console.log('PLACES Debug: ZIP list:', zips.join(', '));
-                console.log('PLACES Debug: Where clause:', whereClause);
-                console.log('PLACES Debug: Full URL:', url);
-
                 const response = await fetch(url);
-                
-                console.log('PLACES Debug: Response status:', response.status);
-
-                const responseText = await response.text();
-                console.log('PLACES Debug: Response first 500 chars:', responseText.substring(0, 500));
-
-                if (!response.ok) {
-                    console.log('PLACES Debug: Full error response:', responseText);
-                    throw new Error(`HTTP ${response.status}: ${responseText}`);
-                }
-
-                let rows;
-                try {
-                    rows = JSON.parse(responseText);
-                } catch (e) {
-                    console.error('PLACES Debug: JSON parse error:', e);
-                    throw new Error('Response is not valid JSON');
-                }
-
-                console.log('PLACES Debug: Total records returned:', rows.length);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const rows = await response.json();
 
                 if (!rows || rows.length === 0) {
                     document.getElementById('placesMetrics').innerHTML = '<em style="color: var(--text-muted);">No PLACES data found for these ZIPs.</em>';
                     return;
                 }
 
-                // PLACES format: each row is one measure for one location
-                // Group by measure name and category, calculate average data_value across all ZIPs
-                const measuresByCategory = {};
-                const measureAverages = {};
-                const measureCounts = {};
-
+                // Average values per measure across all ZIPs in county
+                const totals = {}, counts = {}, meta = {};
                 rows.forEach(row => {
-                    if (!row || !row.measure || row.data_value === null || row.data_value === undefined) return;
-                    
-                    const measure = row.measure;
-                    const category = row.category || 'Other';
-                    const value = parseFloat(row.data_value);
-                    
-                    if (!isNaN(value)) {
-                        // Track by category
-                        if (!measuresByCategory[category]) {
-                            measuresByCategory[category] = [];
-                        }
-                        
-                        // Track average
-                        if (!measureAverages[measure]) {
-                            measureAverages[measure] = 0;
-                            measureCounts[measure] = 0;
-                        }
-                        measureAverages[measure] += value;
-                        measureCounts[measure] += 1;
-                    }
+                    if (!row.measure || row.data_value == null) return;
+                    const v = parseFloat(row.data_value);
+                    if (isNaN(v)) return;
+                    const key = row.measure;
+                    totals[key] = (totals[key] || 0) + v;
+                    counts[key] = (counts[key] || 0) + 1;
+                    if (!meta[key]) meta[key] = {
+                        category: row.category || 'Other',
+                        short: row.short_question_text || row.measure,
+                        unit: row.data_value_unit || '%'
+                    };
                 });
 
-                // Calculate final averages and group by category
-                const categorizedData = {};
-                Object.keys(measureAverages).forEach(measure => {
-                    if (measureCounts[measure] > 0) {
-                        const avg = (measureAverages[measure] / measureCounts[measure]).toFixed(1);
-                        
-                        // Find category for this measure
-                        let category = 'Other';
-                        rows.forEach(row => {
-                            if (row.measure === measure && row.category) {
-                                category = row.category;
-                            }
-                        });
-                        
-                        if (!categorizedData[category]) {
-                            categorizedData[category] = [];
-                        }
-                        categorizedData[category].push({ measure, value: parseFloat(avg) });
-                    }
-                });
+                // Define category display order and colors
+                const CATEGORY_ORDER = [
+                    'Health Outcomes',
+                    'Prevention',
+                    'Health Risk Behaviors',
+                    'Disability',
+                    'Health Status',
+                    'Health-Related Social Needs',
+                    'Other'
+                ];
 
-                console.log('PLACES Debug: Categories found:', Object.keys(categorizedData).length);
-                console.log('PLACES Debug: Categories:', Object.keys(categorizedData).join(', '));
+                const CATEGORY_COLORS = {
+                    'Health Outcomes':              '#f85149',
+                    'Prevention':                   '#3fb950',
+                    'Health Risk Behaviors':        '#f0883e',
+                    'Disability':                   '#79c0ff',
+                    'Health Status':                '#d2a8ff',
+                    'Health-Related Social Needs':  '#ffa657',
+                    'Other':                        '#8b949e'
+                };
 
-                if (Object.keys(categorizedData).length === 0) {
-                    document.getElementById('placesMetrics').innerHTML = '<em style="color: var(--text-muted);">No health measures found in the data.</em>';
-                    return;
-                }
-
-                // Render charts for each category
-                let html = `<div style="margin-bottom: 8px; font-size: 10px; color: var(--text-muted);">
-                    ${zips.length} ZIP${zips.length > 1 ? 's' : ''} in this county
-                </div>`;
-
-                Object.keys(categorizedData).sort().forEach((category, categoryIdx) => {
-                    const chartId = `placesChart_${categoryIdx}`;
-                    html += `<div class="chart-card" style="margin-bottom: 12px;">
-                        <h4 style="font-size: 12px; margin: 0 0 8px 0;">${category}</h4>
-                        <div class="chart-wrapper" style="height: 180px; position: relative;">
-                            <canvas id="${chartId}"></canvas>
-                        </div>
-                    </div>`;
-                });
-
-                document.getElementById('placesMetrics').innerHTML = html;
-
-                // Create Chart.js charts for each category
-                const categoryOrder = Object.keys(categorizedData).sort();
-                categoryOrder.forEach((category, categoryIdx) => {
-                    const chartId = `placesChart_${categoryIdx}`;
-                    const ctx = document.getElementById(chartId);
-                    
-                    if (!ctx) return;
-                    
-                    const data = categorizedData[category];
-                    // Sort by value descending for better visualization
-                    data.sort((a, b) => b.value - a.value);
-                    
-                    const labels = data.map(d => d.measure.length > 30 ? d.measure.substring(0, 27) + '...' : d.measure);
-                    const values = data.map(d => d.value);
-                    
-                    new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: 'Prevalence %',
-                                data: values,
-                                backgroundColor: '#06b6d4',
-                                borderColor: '#06b6d4',
-                                borderWidth: 0,
-                                borderRadius: 4,
-                                barThickness: 'flex',
-                                maxBarThickness: 20
-                            }]
-                        },
-                        options: {
-                            indexAxis: 'y',
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: {
-                                    backgroundColor: '#1c2330',
-                                    borderColor: '#2a3444',
-                                    borderWidth: 1,
-                                    titleColor: '#e6edf3',
-                                    bodyColor: '#8b949e',
-                                    padding: 8,
-                                    displayColors: false,
-                                    callbacks: {
-                                        label: function(context) {
-                                            return context.parsed.x.toFixed(1) + '%';
-                                        },
-                                        afterLabel: function(context) {
-                                            return data[context.dataIndex].measure;
-                                        }
-                                    }
-                                }
-                            },
-                            scales: {
-                                x: {
-                                    beginAtZero: true,
-                                    max: 100,
-                                    grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
-                                    ticks: { color: '#8b949e', font: { size: 10, family: "'DM Sans', sans-serif" } }
-                                },
-                                y: {
-                                    grid: { display: false, drawBorder: false },
-                                    ticks: { color: '#8b949e', font: { size: 9, family: "'DM Sans', sans-serif" } }
-                                }
-                            }
-                        }
+                // Group by category
+                const byCategory = {};
+                Object.keys(totals).forEach(key => {
+                    const avg = (totals[key] / counts[key]);
+                    const cat = meta[key].category;
+                    if (!byCategory[cat]) byCategory[cat] = [];
+                    byCategory[cat].push({
+                        measure: key,
+                        short: meta[key].short,
+                        value: avg,
+                        unit: meta[key].unit
                     });
                 });
 
-                console.log('PLACES Debug: Success - charts rendered for', categoryOrder.length, 'categories');
+                // Sort each category by value descending
+                Object.values(byCategory).forEach(arr => arr.sort((a, b) => b.value - a.value));
+
+                // Color code value based on severity (higher = worse for most measures)
+                function valueColor(v) {
+                    if (v >= 40) return '#f85149';
+                    if (v >= 25) return '#f0883e';
+                    if (v >= 15) return '#e3b341';
+                    return '#3fb950';
+                }
+
+                let html = `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">
+                    ${zips.length} ZIP code${zips.length > 1 ? 's' : ''} · Averaged across county · % of adults unless noted
+                </div>`;
+
+                const orderedCats = [
+                    ...CATEGORY_ORDER.filter(c => byCategory[c]),
+                    ...Object.keys(byCategory).filter(c => !CATEGORY_ORDER.includes(c))
+                ];
+
+                orderedCats.forEach(category => {
+                    const measures = byCategory[category];
+                    const color = CATEGORY_COLORS[category] || '#8b949e';
+                    html += `
+                    <div style="margin-bottom:14px;">
+                        <div style="font-size:11px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid ${color}33;">
+                            ${category} <span style="font-weight:400;font-size:10px;color:var(--text-muted);">(${measures.length})</span>
+                        </div>
+                        <table style="width:100%;border-collapse:collapse;font-size:11px;">`;
+
+                    measures.forEach(m => {
+                        const pct = m.value.toFixed(1);
+                        const barW = Math.min(m.value, 100);
+                        html += `
+                            <tr style="border-bottom:1px solid var(--border);">
+                                <td style="padding:5px 4px;color:var(--text-secondary);max-width:160px;">${m.short || m.measure}</td>
+                                <td style="padding:5px 4px;width:80px;">
+                                    <div style="background:var(--bg-elevated);border-radius:2px;height:6px;overflow:hidden;">
+                                        <div style="width:${barW}%;height:100%;background:${valueColor(m.value)};border-radius:2px;"></div>
+                                    </div>
+                                </td>
+                                <td style="padding:5px 4px;text-align:right;font-weight:600;color:${valueColor(m.value)};white-space:nowrap;">${pct}${m.unit === '%' ? '%' : ' ' + m.unit}</td>
+                            </tr>`;
+                    });
+
+                    html += `</table></div>`;
+                });
+
+                html += `<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Source: CDC PLACES 2024 release (2022 BRFSS data)</div>`;
+                document.getElementById('placesMetrics').innerHTML = html;
+
             } catch (err) {
                 console.warn('PLACES fetch error:', err);
-                console.error('PLACES full error object:', err);
-                document.getElementById('placesMetrics').innerHTML = `<em style="color: var(--orange);">Error: ${err.message}</em>`;
+                document.getElementById('placesMetrics').innerHTML = `<em style="color: var(--orange);">Error loading PLACES data: ${err.message}</em>`;
             }
         }
 
@@ -1450,24 +1379,6 @@
                         </tr>`).join('')}
                 </table>
 
-                <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Hospital Admissions per 100,000 (ICD-derived)</div>
-                <table style="width:100%;border-collapse:collapse;font-size:11px;">
-                    ${[
-                        ['Heart Failure (CHF)', d.chf_admits_lt65, d.chf_admits_65_74, d.chf_admits_75plus],
-                        ['Diabetes Complications', d.diabetes_admits_lt65, d.diabetes_admits_65_74, d.diabetes_admits_75plus],
-                        ['COPD / Asthma', d.copd_admits_lt65, d.copd_admits_65_74, d.copd_admits_75plus],
-                        ['Hypertension', d.htn_admits_lt65, d.htn_admits_65_74, d.htn_admits_75plus],
-                        ['Pneumonia', d.pneumonia_admits_lt65, d.pneumonia_admits_65_74, d.pneumonia_admits_75plus],
-                        ['UTI', d.uti_admits_lt65, d.uti_admits_65_74, d.uti_admits_75plus],
-                        ['Lower Extremity Amputation', d.amputation_admits_lt65, d.amputation_admits_65_74, d.amputation_admits_75plus],
-                    ].map(([label, lt65, a65, a75]) => `
-                        <tr style="border-bottom:1px solid var(--border);">
-                            <td style="padding:6px 4px;color:var(--text-secondary);">${label}</td>
-                            <td style="padding:6px 4px;text-align:center;color:var(--text-muted);font-size:10px;">&lt;65: ${lt65 != null ? Number(lt65).toFixed(0) : 'N/A'}</td>
-                            <td style="padding:6px 4px;text-align:center;color:var(--text-muted);font-size:10px;">65-74: ${a65 != null ? Number(a65).toFixed(0) : 'N/A'}</td>
-                            <td style="padding:6px 4px;text-align:center;color:var(--text-muted);font-size:10px;">75+: ${a75 != null ? Number(a75).toFixed(0) : 'N/A'}</td>
-                        </tr>`).join('')}
-                </table>
                 <div style="font-size:10px;color:var(--text-muted);margin-top:8px;">Source: CMS Medicare Geographic Variation 2024 · Medicare FFS beneficiaries only</div>`;
 
             } catch(e) {
