@@ -257,6 +257,10 @@
                     <div id="placesMetrics" style="font-size: 12px; max-height: 400px; overflow-y: auto;">
                         <em style="color: var(--text-muted);">Click a county to load health measures from CDC PLACES.</em>
                     </div>
+                    <h4 style="margin-top:14px;">Medicare Utilization (2024)</h4>
+                    <div id="cmsMetrics" style="font-size: 12px;">
+                        <em style="color: var(--text-muted);">Click a county to load CMS utilization data.</em>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1392,6 +1396,85 @@
             }
         }
 
+        // --- CMS COUNTY UTILIZATION ---
+        async function fetchCMSCountyData(fips, countyName) {
+            const el = document.getElementById('cmsMetrics');
+            el.innerHTML = '<em style="color:var(--text-muted);">Loading Medicare utilization data...</em>';
+
+            if (!fips) {
+                el.innerHTML = '<em style="color:var(--text-muted);">County FIPS code not available.</em>';
+                return;
+            }
+
+            try {
+                const res = await fetch(
+                    `${SUPABASE_URL}/rest/v1/cms_county_utilization?fips=eq.${fips}&select=*`,
+                    { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                );
+                const data = await res.json();
+                if (!data || data.length === 0) {
+                    el.innerHTML = '<em style="color:var(--text-muted);">No CMS data found for this county.</em>';
+                    return;
+                }
+                const d = data[0];
+                const fmt = v => v != null ? Number(v).toLocaleString() : 'N/A';
+                const fmtR = (v, dec=1) => v != null ? Number(v).toFixed(dec) : 'N/A';
+
+                el.innerHTML = `
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+                    <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;padding:10px;">
+                        <div style="font-size:18px;font-weight:600;color:#58a6ff;">${fmt(d.total_beneficiaries)}</div>
+                        <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Medicare Beneficiaries</div>
+                    </div>
+                    <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;padding:10px;">
+                        <div style="font-size:18px;font-weight:600;color:#f0883e;">$${fmtR(d.per_capita_payment, 0)}</div>
+                        <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Per Capita Payment</div>
+                    </div>
+                </div>
+
+                <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Utilization</div>
+                <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px;">
+                    ${[
+                        ['ER Visits', fmt(d.er_visits), `${fmtR(d.er_visits_per_1000)} per 1,000`],
+                        ['Hospital Stays', fmt(d.ip_stays), `${fmtR(d.ip_stays_per_1000)} per 1,000`],
+                        ['Readmissions', fmt(d.readmissions), `${fmtR(d.readmission_rate * 100)}% rate`],
+                        ['Dialysis Users', fmt(d.dialysis_users), `${fmtR(d.dialysis_visits_per_1000)} visits/1,000`],
+                        ['Home Health', fmt(d.home_health_users), ''],
+                        ['Skilled Nursing', fmt(d.snf_users), ''],
+                        ['Hospice', fmt(d.hospice_users), ''],
+                    ].map(([label, val, sub]) => `
+                        <tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:6px 4px;color:var(--text-secondary);">${label}</td>
+                            <td style="padding:6px 4px;text-align:right;font-weight:500;">${val}</td>
+                            <td style="padding:6px 4px;text-align:right;color:var(--text-muted);font-size:10px;">${sub}</td>
+                        </tr>`).join('')}
+                </table>
+
+                <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Hospital Admissions per 100,000 (ICD-derived)</div>
+                <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                    ${[
+                        ['Heart Failure (CHF)', d.chf_admits_lt65, d.chf_admits_65_74, d.chf_admits_75plus],
+                        ['Diabetes Complications', d.diabetes_admits_lt65, d.diabetes_admits_65_74, d.diabetes_admits_75plus],
+                        ['COPD / Asthma', d.copd_admits_lt65, d.copd_admits_65_74, d.copd_admits_75plus],
+                        ['Hypertension', d.htn_admits_lt65, d.htn_admits_65_74, d.htn_admits_75plus],
+                        ['Pneumonia', d.pneumonia_admits_lt65, d.pneumonia_admits_65_74, d.pneumonia_admits_75plus],
+                        ['UTI', d.uti_admits_lt65, d.uti_admits_65_74, d.uti_admits_75plus],
+                        ['Lower Extremity Amputation', d.amputation_admits_lt65, d.amputation_admits_65_74, d.amputation_admits_75plus],
+                    ].map(([label, lt65, a65, a75]) => `
+                        <tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:6px 4px;color:var(--text-secondary);">${label}</td>
+                            <td style="padding:6px 4px;text-align:center;color:var(--text-muted);font-size:10px;">&lt;65: ${lt65 != null ? Number(lt65).toFixed(0) : 'N/A'}</td>
+                            <td style="padding:6px 4px;text-align:center;color:var(--text-muted);font-size:10px;">65-74: ${a65 != null ? Number(a65).toFixed(0) : 'N/A'}</td>
+                            <td style="padding:6px 4px;text-align:center;color:var(--text-muted);font-size:10px;">75+: ${a75 != null ? Number(a75).toFixed(0) : 'N/A'}</td>
+                        </tr>`).join('')}
+                </table>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:8px;">Source: CMS Medicare Geographic Variation 2024 · Medicare FFS beneficiaries only</div>`;
+
+            } catch(e) {
+                el.innerHTML = `<em style="color:var(--orange);">Error loading CMS data: ${e.message}</em>`;
+            }
+        }
+
         // --- COUNTY HOVER & CLICK LOGIC ---
         function attachCountyHover(feature, layer) {
             const label = feature.properties._countyLabel || feature.properties.NAME || 'County';
@@ -1425,7 +1508,7 @@
                 // Pan to county
                 map.fitBounds(layer.getBounds(), { padding: [40, 40] });
 
-                // Fetch PLACES data for all ZIPs in this county
+                // Fetch PLACES data + CMS county utilization data
                 const countyBounds = layer.getBounds();
                 const zipsInCounty = new Set();
                 if (zipGeoJSONLayer) {
@@ -1436,7 +1519,9 @@
                         }
                     });
                 }
+                const fips = feature.properties._fips || feature.properties.GEOID || feature.properties.FIPS || '';
                 fetchPLACESData(Array.from(zipsInCounty));
+                fetchCMSCountyData(fips, label);
             });
         }
 
