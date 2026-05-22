@@ -952,10 +952,16 @@
                 document.getElementById('closePanelBtn').style.display = 'block';
                 const r = zipDemographics[lockedZip] || zipDemographics[String(lockedZip).padStart(5,'0')] || null;
                 renderDashboard(r);
+                // Load PLACES data for this ZIP
+                const zipPadded = String(lockedZip).padStart(5,'0');
+                fetchPLACESData([zipPadded]);
+                document.getElementById('cmsMetrics').innerHTML = '<em style="color:var(--text-muted);">Click a county boundary to load Medicare utilization data.</em>';
                 return;
             }
 
             document.getElementById('closePanelBtn').style.display = 'none';
+            document.getElementById('placesMetrics').innerHTML = '<em style="color: var(--text-muted);">Click a county to load health measures from CDC PLACES.</em>';
+            document.getElementById('cmsMetrics').innerHTML = '<em style="color:var(--text-muted);">Click a county to load Medicare utilization data.</em>';
 
             if (searchCircle) {
                 const circleBounds = searchCircle.getBounds();
