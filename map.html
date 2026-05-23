@@ -223,6 +223,7 @@
 
             <div id="sidebar-tabs">
                 <button class="sidebar-tab active" onclick="switchTab('demographics')">📊 Demographics</button>
+                <button class="sidebar-tab" onclick="switchTab('health')">🏥 Health Data</button>
                 <button class="sidebar-tab" onclick="switchTab('ai')">🤖 AI Query</button>
             </div>
 
@@ -278,13 +279,17 @@
                     <h4>Total vs Insured by Race / Ethnicity</h4>
                     <div class="chart-wrapper" style="height: 220px;"><canvas id="raceChart"></canvas></div>
                 </div>
+            </div>
 
+            <div id="health-panel" style="display:none;flex:1;overflow-y:auto;padding:14px;background:var(--bg-base);">
                 <div class="chart-card">
                     <h4>CDC PLACES Health Metrics</h4>
-                    <div id="placesMetrics" style="font-size: 12px; max-height: 400px; overflow-y: auto;">
-                        <em style="color: var(--text-muted);">Click a county to load health measures from CDC PLACES.</em>
+                    <div id="placesMetrics" style="font-size: 12px; max-height:none; overflow-y: visible;">
+                        <em style="color: var(--text-muted);">Click a county or ZIP to load health measures from CDC PLACES.</em>
                     </div>
-                    <h4 style="margin-top:14px;">Medicare Utilization (2024)</h4>
+                </div>
+                <div class="chart-card" style="margin-top:12px;">
+                    <h4>Medicare Utilization (2024)</h4>
                     <div id="cmsMetrics" style="font-size: 12px;">
                         <em style="color: var(--text-muted);">Click a county to load CMS utilization data.</em>
                     </div>
@@ -379,35 +384,126 @@
         // ── Autocomplete ─────────────────────────────────────────────
         let autocompleteTimer = null;
         const acList = document.getElementById('autocomplete-list');
+        let selectedSearchItems = new Set(); // selected ZIPs or cities
+        let searchMode = null; // 'zip' or 'city'
 
         function closeAutocomplete() { acList.style.display = 'none'; acList.innerHTML = ''; }
+
+        function updateSearchInputDisplay() {
+            const input = document.getElementById('dbSearchInput');
+            if (selectedSearchItems.size > 0) {
+                input.value = [...selectedSearchItems].join(', ');
+            }
+        }
+
+        function renderMultiSelectDropdown(results, mode) {
+            acList.innerHTML = '';
+            if (!results.length) { closeAutocomplete(); return; }
+            searchMode = mode;
+
+            // Select All row
+            const selectAll = document.createElement('div');
+            selectAll.style.cssText = 'padding:7px 10px;cursor:pointer;font-size:11px;color:#58a6ff;border-bottom:1px solid var(--border);font-weight:600;display:flex;align-items:center;gap:8px;background:var(--bg-surface);';
+            selectAll.innerHTML = `<input type="checkbox" id="selectAllItems" style="cursor:pointer;"> Select All (${results.length})`;
+            selectAll.querySelector('input').addEventListener('change', e => {
+                if (e.target.checked) results.forEach(r => selectedSearchItems.add(r.value));
+                else results.forEach(r => selectedSearchItems.delete(r.value));
+                acList.querySelectorAll('.item-check').forEach(cb => cb.checked = e.target.checked);
+                updateSearchInputDisplay();
+            });
+            acList.appendChild(selectAll);
+
+            results.slice(0, 20).forEach(r => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding:7px 10px;cursor:pointer;font-size:12px;color:var(--text-primary);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;';
+                const checked = selectedSearchItems.has(r.value);
+                item.innerHTML = `<input type="checkbox" class="item-check" style="cursor:pointer;" ${checked ? 'checked' : ''}> <span>${r.label}</span>`;
+                const cb = item.querySelector('input');
+                cb.addEventListener('change', e => {
+                    if (e.target.checked) selectedSearchItems.add(r.value);
+                    else selectedSearchItems.delete(r.value);
+                    updateSearchInputDisplay();
+                    const allCb = document.getElementById('selectAllItems');
+                    if (allCb) allCb.checked = [...acList.querySelectorAll('.item-check')].every(c => c.checked);
+                });
+                item.addEventListener('click', e => { if (e.target.type !== 'checkbox') cb.click(); });
+                item.addEventListener('mouseenter', () => item.style.background = 'var(--bg-elevated)');
+                item.addEventListener('mouseleave', () => item.style.background = '');
+                acList.appendChild(item);
+            });
+
+            // Search button
+            const btn = document.createElement('div');
+            btn.style.cssText = 'padding:8px 10px;background:var(--bg-surface);';
+            btn.innerHTML = `<button style="width:100%;padding:7px;background:var(--accent);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;font-family:DM Sans,sans-serif;" onclick="runMultiSearch()">Search Selected</button>`;
+            acList.appendChild(btn);
+            acList.style.display = 'block';
+        }
+
+        async function runMultiSearch() {
+            closeAutocomplete();
+            if (selectedSearchItems.size === 0) {
+                document.getElementById('dbSearchBtn').click();
+                return;
+            }
+            const items = [...selectedSearchItems];
+            const allZips = items.every(i => i.match(/^\d{5}$/));
+            if (allZips) {
+                await searchMultipleZips(items);
+            } else {
+                await searchMultipleCities(items);
+            }
+            selectedSearchItems.clear();
+        }
 
         async function fetchSuggestions(query) {
             const q = query.trim();
             if (q.length < 2) { closeAutocomplete(); return; }
+
+            // Check if last comma-segment is being typed
+            const parts = q.split(',').map(s => s.trim());
+            const activeQuery = parts[parts.length - 1];
+            if (activeQuery.length < 2) { closeAutocomplete(); return; }
+
             try {
-                let results = [];
-                if (q.match(/^\d+$/)) {
+                if (activeQuery.match(/^\d+$/)) {
                     const r = await fetch(
-                        `${SUPABASE_URL}/rest/v1/clinics?zip=like.${q}*&select=zip,city,state&limit=200`,
+                        `${SUPABASE_URL}/rest/v1/clinics?zip=like.${activeQuery}*&select=zip,city,state&limit=200`,
                         { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
                     );
                     const data = await r.json();
                     const seen = new Set();
+                    const results = [];
                     data.forEach(d => {
                         if (seen.has(d.zip)) return;
                         seen.add(d.zip);
                         results.push({ label: `${d.zip} — ${d.city || ''}, ${d.state}`, value: d.zip });
                     });
-                } else if (q.length === 2 && q.match(/^[a-zA-Z]+$/)) {
-                    results.push({ label: `State: ${q.toUpperCase()}`, value: q.toUpperCase() });
+                    // Add already-typed ZIPs to selection
+                    parts.slice(0, -1).forEach(p => { if (p.match(/^\d{5}$/)) selectedSearchItems.add(p); });
+                    renderMultiSelectDropdown(results, 'zip');
+                } else if (activeQuery.length === 2 && activeQuery.match(/^[a-zA-Z]+$/)) {
+                    // State code — single select
+                    acList.innerHTML = '';
+                    const item = document.createElement('div');
+                    item.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12px;color:var(--text-primary);border-bottom:1px solid var(--border);';
+                    item.textContent = `State: ${activeQuery.toUpperCase()}`;
+                    item.addEventListener('mousedown', () => {
+                        document.getElementById('dbSearchInput').value = activeQuery.toUpperCase();
+                        selectedSearchItems.clear();
+                        closeAutocomplete();
+                        document.getElementById('dbSearchBtn').click();
+                    });
+                    acList.appendChild(item);
+                    acList.style.display = 'block';
                 } else {
                     const r = await fetch(
-                        `${SUPABASE_URL}/rest/v1/clinics?city=ilike.${encodeURIComponent(q.toUpperCase())}*&select=city,state&limit=50`,
+                        `${SUPABASE_URL}/rest/v1/clinics?city=ilike.${encodeURIComponent(activeQuery.toUpperCase())}*&select=city,state&limit=100`,
                         { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
                     );
                     const data = await r.json();
                     const seen = new Set();
+                    const results = [];
                     data.forEach(d => {
                         if (!d.city) return;
                         const key = `${d.city}-${d.state}`;
@@ -415,33 +511,25 @@
                         seen.add(key);
                         results.push({ label: `${d.city}, ${d.state}`, value: `${d.city}, ${d.state}` });
                     });
+                    // Add already-typed cities to selection
+                    parts.slice(0, -1).forEach(p => { if (p.length > 2) selectedSearchItems.add(p); });
+                    renderMultiSelectDropdown(results, 'city');
                 }
-                acList.innerHTML = '';
-                if (!results.length) { closeAutocomplete(); return; }
-                results.slice(0, 12).forEach(r => {
-                    const item = document.createElement('div');
-                    item.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12px;color:var(--text-primary);border-bottom:1px solid var(--border);';
-                    item.textContent = r.label;
-                    item.addEventListener('mouseenter', () => item.style.background = 'var(--bg-elevated)');
-                    item.addEventListener('mouseleave', () => item.style.background = '');
-                    item.addEventListener('mousedown', () => {
-                        document.getElementById('dbSearchInput').value = r.value;
-                        closeAutocomplete();
-                        document.getElementById('dbSearchBtn').click();
-                    });
-                    acList.appendChild(item);
-                });
-                acList.style.display = 'block';
             } catch(e) { closeAutocomplete(); }
         }
 
         document.getElementById('dbSearchInput').addEventListener('input', e => {
+            selectedSearchItems.clear();
             clearTimeout(autocompleteTimer);
             autocompleteTimer = setTimeout(() => fetchSuggestions(e.target.value), 300);
         });
         document.getElementById('dbSearchInput').addEventListener('keydown', e => {
             if (e.key === 'Escape') closeAutocomplete();
-            if (e.key === 'Enter') { closeAutocomplete(); document.getElementById('dbSearchBtn').click(); }
+            if (e.key === 'Enter') {
+                closeAutocomplete();
+                if (selectedSearchItems.size > 0) runMultiSearch();
+                else document.getElementById('dbSearchBtn').click();
+            }
         });
         document.addEventListener('click', e => {
             if (!e.target.closest('#autocomplete-list') && e.target.id !== 'dbSearchInput') closeAutocomplete();
@@ -461,10 +549,9 @@
             // Check for comma-separated ZIPs like "38017, 38654"
             const commaParts = searchTerm.split(',').map(s => s.trim()).filter(Boolean);
             const allAreZips = commaParts.length > 1 && commaParts.every(p => p.match(/^\d{5}$/));
-            if (allAreZips) {
-                await searchMultipleZips(commaParts);
-                return;
-            }
+            const allAreCities = commaParts.length > 1 && commaParts.every(p => p.length > 2 && !p.match(/^\d+$/));
+            if (allAreZips) { await searchMultipleZips(commaParts); return; }
+            if (allAreCities) { await searchMultipleCities(commaParts); return; }
 
             try {
                 let baseQuery;
@@ -626,7 +713,62 @@
             }
         }
 
-        async function processData(data) {
+        async function searchMultipleCities(cityStateList) {
+            const statusEl = document.getElementById('dbStatus');
+            statusEl.textContent = `🔄 Loading ${cityStateList.length} cities...`;
+            try {
+                let clinicData = [];
+                for (const cityState of cityStateList) {
+                    const parts = cityState.split(',').map(s => s.trim());
+                    const cityUpper = parts[0].toUpperCase();
+                    let url = `${SUPABASE_URL}/rest/v1/clinics?city=eq.${encodeURIComponent(cityUpper)}`;
+                    if (parts[1]) url += `&state=eq.${parts[1].trim().toUpperCase()}`;
+                    let offset = 0;
+                    while (true) {
+                        const res = await fetch(`${url}&limit=1000&offset=${offset}`, {
+                            headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' }
+                        });
+                        if (!res.ok) break;
+                        const batch = await res.json();
+                        if (!batch || batch.length === 0) break;
+                        clinicData.push(...batch);
+                        statusEl.textContent = `🔄 Loaded ${clinicData.length} clinics...`;
+                        if (batch.length < 1000) break;
+                        offset += 1000;
+                    }
+                }
+                if (!clinicData.length) { statusEl.textContent = '❌ No clinics found'; return; }
+
+                const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
+                const demByZip = {};
+                for (let i = 0; i < allZips.length; i += 50) {
+                    const batch = allZips.slice(i, i + 50);
+                    const res = await fetch(`${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${batch.join(',')})&select=*`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    data.forEach(d => {
+                        if (!demByZip[d.zip]) demByZip[d.zip] = { 'ZIP Code': d.zip, 'State': d.state };
+                        Object.keys(d).forEach(k => { if (k !== 'id' && k !== 'created_at') demByZip[d.zip][k] = d[k]; });
+                    });
+                }
+                const converted = clinicData.map(c => ({
+                    'NPI': c.npi || '', 'Name': c.name || '',
+                    'Primary Practice Address': c.address || '',
+                    'Primary Taxonomy': c.primary_taxonomy || '',
+                    'ZIP Code': c.zip || '', 'State': c.state || '',
+                    'Latitude': c.latitude || '', 'Longitude': c.longitude || '',
+                    ...Object.fromEntries(Object.entries(demByZip[c.zip] || {}).filter(([k]) =>
+                        !['zip','state','id','created_at','ZIP Code','State','Latitude','Longitude'].includes(k)))
+                }));
+                statusEl.textContent = `✅ Loaded ${clinicData.length} clinics across ${cityStateList.length} cities`;
+                document.getElementById('welcome-overlay').style.opacity = '0';
+                setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
+                processData(converted);
+            } catch(e) {
+                statusEl.textContent = `❌ ${e.message}`;
+            }
+        }
             groupedData = {}; taxonomies.clear(); zipDemographics = {};
             activeStatesInCSV = new Set(); // Reset global
             
@@ -1615,17 +1757,23 @@
         function switchTab(tab) {
             const tabs = document.querySelectorAll('.sidebar-tab');
             const demo = document.getElementById('dashboard-panel');
+            const health = document.getElementById('health-panel');
             const ai = document.getElementById('ai-panel');
+
+            demo.style.display = 'none';
+            health.style.display = 'none';
+            ai.style.display = 'none';
+            tabs.forEach(t => t.classList.remove('active'));
+
             if (tab === 'demographics') {
                 demo.style.display = 'block';
-                ai.style.display = 'none';
                 tabs[0].classList.add('active');
-                tabs[1].classList.remove('active');
-            } else {
-                demo.style.display = 'none';
-                ai.style.display = 'flex';
-                tabs[0].classList.remove('active');
+            } else if (tab === 'health') {
+                health.style.display = 'block';
                 tabs[1].classList.add('active');
+            } else {
+                ai.style.display = 'flex';
+                tabs[2].classList.add('active');
                 document.getElementById('ai-input').focus();
             }
         }
