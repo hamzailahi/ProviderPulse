@@ -1,3 +1,5 @@
+const https = require('https');
+
 exports.handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method not allowed' };
@@ -11,37 +13,44 @@ exports.handler = async function(event, context) {
     try {
         const { system, messages } = JSON.parse(event.body);
 
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-                model: 'claude-sonnet-4-20250514',
-                max_tokens: 1000,
-                system,
-                messages
-            })
+        const payload = JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1000,
+            system,
+            messages
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            return { 
-                statusCode: response.status, 
-                body: JSON.stringify({ error: data.error?.message || 'API error' }) 
-            };
-        }
+        const result = await new Promise((resolve, reject) => {
+            const req = https.request({
+                hostname: 'api.anthropic.com',
+                path: '/v1/messages',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                    'Content-Length': Buffer.byteLength(payload)
+                }
+            }, res => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => resolve({ status: res.statusCode, body: data }));
+            });
+            req.on('error', reject);
+            req.write(payload);
+            req.end();
+        });
 
         return {
-            statusCode: 200,
+            statusCode: result.status,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: result.body
         };
 
     } catch(e) {
-        return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+        return { 
+            statusCode: 500, 
+            body: JSON.stringify({ error: e.message }) 
+        };
     }
 };
