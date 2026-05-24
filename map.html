@@ -872,17 +872,17 @@
 
         // Dedicated state loader bypassing map movement logic
         function loadState(code) {
-            if (loadedStates.has(code)) return;
+            if (loadedStates.has(code)) return Promise.resolve();
             loadedStates.add(code);
             const filename = STATE_FILES[code];
-            if (!filename) return;
+            if (!filename) return Promise.resolve();
             
             activeFetches++;
             document.getElementById('zip-loading').style.display = 'inline-block';
 
             // PR uses Census cartographic boundary file since OpenDataDE doesn't have PR
             if (code === 'PR') {
-                fetch('https://raw.githubusercontent.com/uscensusbureau/citysdk/master/v2/GeoJSON/500k/2019/PR/zcta520.json')
+                return fetch('https://raw.githubusercontent.com/uscensusbureau/citysdk/master/v2/GeoJSON/500k/2019/PR/zcta520.json')
                     .then(r => {
                         if (!r.ok) throw new Error('not found');
                         return r.json();
@@ -893,10 +893,9 @@
                         activeFetches--;
                         if (activeFetches === 0) document.getElementById('zip-loading').style.display = 'none';
                     });
-                return;
             }
 
-            fetch(`${BASE_URL}${filename}_zip_codes_geo.min.json`)
+            return fetch(`${BASE_URL}${filename}_zip_codes_geo.min.json`)
                 .then(r => r.json())
                 .then(data => { 
                     zipGeoJSONLayer.addData(data); 
@@ -1325,17 +1324,15 @@
                 if (stateData.length > 0) seedState = stateData[0].state;
             } catch(e) {}
 
-            // Load neighboring state boundaries
+            // Load neighboring state boundaries and properly await them
             if (seedState && STATE_NEIGHBORS[seedState]) {
                 const neighborStates = STATE_NEIGHBORS[seedState];
-                neighborStates.forEach(st => {
-                    if (!loadedStates.has(st)) {
-                        loadState(st);
-                    }
-                });
-                // Wait for boundaries to load
-                if (neighborStates.some(st => !loadedStates.has(st))) {
-                    await new Promise(resolve => setTimeout(resolve, 2500));
+                const loadPromises = neighborStates
+                    .filter(st => !loadedStates.has(st))
+                    .map(st => loadState(st));
+                if (loadPromises.length > 0) {
+                    statusEl.textContent = `🔄 Loading boundaries for neighboring states...`;
+                    await Promise.all(loadPromises);
                 }
             }
 
