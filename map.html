@@ -1863,6 +1863,72 @@
             return clinics;
         }
 
+        function buildDemographicsContext() {
+            const ADULT_KEYS = [
+                'Total: 19 to 25 years', 'Total: 26 to 34 years',
+                'Total: 35 to 44 years', 'Total: 45 to 54 years',
+                'Total: 55 to 64 years', 'Total: 65 to 74 years',
+                'Total: 75 years and older'
+            ];
+
+            const zips = {};
+            Object.entries(zipDemographics).forEach(([zip, row]) => {
+                if (!zip || zip === 'undefined') return;
+                const padded = String(zip).padStart(5, '0');
+                if (zips[padded]) return;
+
+                const totalPop = safeParseNum(row['Total Population'] || row['Total_Total'] || 0);
+                const adultPop = ADULT_KEYS.reduce((sum, k) => sum + safeParseNum(row[k] || 0), 0);
+                const insuredPop = safeParseNum(row['Insured Population'] || 0);
+                const insuredRate = totalPop > 0 ? Math.round((insuredPop / totalPop) * 100) : null;
+
+                zips[padded] = {
+                    zip: padded,
+                    state: row['state'] || row['State'] || null,
+                    total_population: Math.round(totalPop),
+                    adult_population_18plus: Math.round(adultPop),
+                    insured_population: Math.round(insuredPop),
+                    insured_pct: insuredRate
+                };
+            });
+            return Object.values(zips).filter(z => z.total_population > 0).slice(0, 200);
+        }
+
+        function buildPLACESContext() {
+            // Extract PLACES data from the rendered HTML in the sidebar
+            const el = document.getElementById('placesMetrics');
+            if (!el || el.querySelector('em')) return null;
+            // Get all measure rows from rendered tables
+            const rows = el.querySelectorAll('tr');
+            const measures = [];
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 2) {
+                    const measure = cells[0].textContent.trim();
+                    const value = cells[cells.length - 1].textContent.trim();
+                    if (measure && value) measures.push({ measure, value });
+                }
+            });
+            return measures.length > 0 ? measures : null;
+        }
+
+        function buildCMSContext() {
+            // Extract CMS Medicare data from the rendered sidebar
+            const el = document.getElementById('cmsMetrics');
+            if (!el || el.querySelector('em')) return null;
+            const rows = el.querySelectorAll('tr');
+            const metrics = [];
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 2) {
+                    const label = cells[0].textContent.trim();
+                    const value = cells[1].textContent.trim();
+                    if (label && value) metrics.push({ label, value });
+                }
+            });
+            return metrics.length > 0 ? metrics : null;
+        }
+
         async function sendAIQuery() {
             const input = document.getElementById('ai-input');
             const query = input.value.trim();
@@ -1878,36 +1944,45 @@
             input.value = '';
             document.getElementById('ai-send').disabled = true;
 
-            const loadingId = appendAIMessage('ai', '⏳ Analyzing ' + clinics.length.toLocaleString() + ' clinics...');
+            const loadingId = appendAIMessage('ai', '⏳ Analyzing loaded data...');
 
             try {
-                // Send to Claude API with clinic context
-                // Cap at 3000 clinics to stay within token limits
-                const contextClinics = clinics.length > 3000 ? clinics.slice(0, 3000) : clinics;
-                const truncated = clinics.length > 3000;
+                const contextClinics = clinics.length > 2000 ? clinics.slice(0, 2000) : clinics;
+                const truncated = clinics.length > 2000;
+                const demographics = buildDemographicsContext();
+                const places = buildPLACESContext();
+                const cms = buildCMSContext();
 
-                const systemPrompt = `You are a healthcare market intelligence assistant embedded in a provider mapping tool. 
-You have access to a list of ${contextClinics.length} healthcare clinics currently loaded on the map${truncated ? ' (truncated from ' + clinics.length + ' total for context length)' : ''}.
+                const systemPrompt = `You are a healthcare market intelligence assistant embedded in a provider mapping tool called ProviderPulse.
+You have access ONLY to the data currently loaded on the user's screen. Do not make up data or reference anything outside what is provided below.
 
-Each clinic has: name, npi, taxonomy (specialty), address, zip, state.
+DATA AVAILABLE:
+1. CLINICS: ${contextClinics.length} providers currently on the map${truncated ? ' (showing first 2,000 of ' + clinics.length + ' total)' : ''}. Each has: name, npi, taxonomy (specialty), address, zip, state.
+2. ZIP DEMOGRAPHICS: Population and insurance data for ${demographics ? demographics.length : 0} loaded ZIP codes. Each ZIP has: total_population, adult_population_18plus (sum of all age groups 18+), insured_population, insured_pct. Use adult_population_18plus when calculating per-capita rates for adults.
+3. CDC PLACES HEALTH METRICS: ${places ? places.length + ' health measures for the selected county/ZIP' : 'Not loaded (user must click a county or ZIP first)'}.
+4. CMS MEDICARE UTILIZATION: ${cms ? cms.length + ' Medicare utilization metrics for the selected county' : 'Not loaded (user must click a county first)'}.
 
-When the user asks a question, analyze the clinic data and respond helpfully.
-For lists or tables, respond with a markdown table using | pipe syntax with columns: Name | NPI | Taxonomy | Address | ZIP.
-Keep responses concise and focused. If asked for complementary specialties, think about referral relationships — e.g. a primary care physician would want to know cardiologists, endocrinologists, nephrologists, orthopedic surgeons, psychiatrists nearby.
-If asked for a count or summary, give a clear number first then details.
-Do not make up data — only use what is in the clinic list provided.`;
+RESPONSE RULES:
+- For provider lists/tables use markdown pipe tables: | Name | NPI | Taxonomy | Address | ZIP |
+- For complementary specialties think referral relationships: primary care → cardiology, endocrinology, nephrology, orthopedics, psychiatry, neurology etc.
+- For counts give the number first then details.
+- If data isn't loaded tell the user what to do (e.g. "click a county to load PLACES data").
+- Keep responses concise and actionable.`;
 
-                const userMessage = `Here are the clinics currently on the map:
-${JSON.stringify(contextClinics)}
-
-User question: ${query}`;
+                const contextParts = [
+                    `CLINICS ON MAP:\n${JSON.stringify(contextClinics)}`,
+                    demographics ? `\nZIP DEMOGRAPHICS:\n${JSON.stringify(demographics)}` : '',
+                    places ? `\nCDC PLACES HEALTH METRICS:\n${JSON.stringify(places)}` : '',
+                    cms ? `\nCMS MEDICARE UTILIZATION:\n${JSON.stringify(cms)}` : '',
+                    `\nUSER QUESTION: ${query}`
+                ].filter(Boolean).join('\n');
 
                 const response = await fetch('/.netlify/functions/ai-query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         system: systemPrompt,
-                        messages: [{ role: 'user', content: userMessage }]
+                        messages: [{ role: 'user', content: contextParts }]
                     })
                 });
 
