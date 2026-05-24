@@ -381,6 +381,10 @@
             }
         })();
 
+        // ── Supabase Search ──────────────────────────────────────────
+        const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
+
         // ── Autocomplete ─────────────────────────────────────────────
         let autocompleteTimer = null;
         const acList = document.getElementById('autocomplete-list');
@@ -534,10 +538,6 @@
         document.addEventListener('click', e => {
             if (!e.target.closest('#autocomplete-list') && e.target.id !== 'dbSearchInput') closeAutocomplete();
         });
-
-        // ── Supabase Search ──────────────────────────────────────────
-        const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
 
         document.getElementById('dbSearchBtn').addEventListener('click', async () => {
             const searchTerm = document.getElementById('dbSearchInput').value.trim();
@@ -769,6 +769,8 @@
                 statusEl.textContent = `❌ ${e.message}`;
             }
         }
+
+        async function processData(data) {
             groupedData = {}; taxonomies.clear(); zipDemographics = {};
             activeStatesInCSV = new Set(); // Reset global
             
