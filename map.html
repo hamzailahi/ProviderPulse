@@ -1413,7 +1413,17 @@
                             'Latitude': c.latitude, 'Longitude': c.longitude
                         });
                     }
+                    // Add taxonomy to color map if not already present
+                    if (c.primary_taxonomy && !taxonomyColors[c.primary_taxonomy]) {
+                        taxonomies.add(c.primary_taxonomy);
+                    }
                 });
+
+                // Rebuild taxonomy colors to include any new taxonomies from neighbors
+                const taxArray = Array.from(taxonomies).sort();
+                taxArray.forEach((t, i) => taxonomyColors[t] = getColor(i, taxArray.length));
+                selectedTaxonomies = new Set(taxArray);
+                updateLegend();
 
                 // Show aggregate demographics for seed + neighbors
                 const allZips = [seedPadded, ...neighborZipList];
