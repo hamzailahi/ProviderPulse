@@ -224,6 +224,7 @@
             <div id="sidebar-tabs">
                 <button class="sidebar-tab active" onclick="switchTab('demographics')">📊 Demographics</button>
                 <button class="sidebar-tab" onclick="switchTab('health')">🏥 Health Data</button>
+                <button class="sidebar-tab" onclick="switchTab('procedures')">💊 Procedures</button>
                 <button class="sidebar-tab" onclick="switchTab('ai')">🤖 AI Query</button>
             </div>
 
@@ -296,8 +297,13 @@
                 </div>
             </div>
 
+            <div id="procedures-panel" style="display:none;flex:1;overflow-y:auto;padding:14px;background:var(--bg-base);">
+                <div id="proceduresContent">
+                    <em style="color:var(--text-muted);font-size:12px;">Click a ZIP boundary or search a ZIP to load Medicare procedure data.</em>
+                </div>
+            </div>
+
             <div id="ai-panel">
-                <div id="ai-messages">
                     <div class="ai-msg-ai">
                         <strong>ProviderPulse AI</strong><br>
                         Ask me anything about the clinics currently loaded on the map. For example:<br><br>
@@ -1147,6 +1153,7 @@
                 // Load PLACES data for this ZIP
                 const zipPadded = String(lockedZip).padStart(5,'0');
                 fetchPLACESData([zipPadded]);
+                fetchProceduresData([zipPadded]);
                 document.getElementById('cmsMetrics').innerHTML = '<em style="color:var(--text-muted);">Click a county boundary to load Medicare utilization data.</em>';
                 return;
             }
@@ -1154,6 +1161,7 @@
             document.getElementById('closePanelBtn').style.display = 'none';
             document.getElementById('placesMetrics').innerHTML = '<em style="color: var(--text-muted);">Click a county to load health measures from CDC PLACES.</em>';
             document.getElementById('cmsMetrics').innerHTML = '<em style="color:var(--text-muted);">Click a county to load Medicare utilization data.</em>';
+            document.getElementById('proceduresContent').innerHTML = '<em style="color:var(--text-muted);font-size:12px;">Click a ZIP boundary or search a ZIP to load Medicare procedure data.</em>';
 
             if (searchCircle) {
                 const circleBounds = searchCircle.getBounds();
@@ -1694,6 +1702,7 @@
                 const fips = feature.properties._fips || feature.properties.GEOID || feature.properties.FIPS || '';
                 fetchPLACESData(Array.from(zipsInCounty));
                 fetchCMSCountyData(fips, label);
+                fetchProceduresData(Array.from(zipsInCounty));
             });
         }
 
@@ -1825,10 +1834,12 @@
             const tabs = document.querySelectorAll('.sidebar-tab');
             const demo = document.getElementById('dashboard-panel');
             const health = document.getElementById('health-panel');
+            const procedures = document.getElementById('procedures-panel');
             const ai = document.getElementById('ai-panel');
 
             demo.style.display = 'none';
             health.style.display = 'none';
+            procedures.style.display = 'none';
             ai.style.display = 'none';
             tabs.forEach(t => t.classList.remove('active'));
 
@@ -1838,10 +1849,150 @@
             } else if (tab === 'health') {
                 health.style.display = 'block';
                 tabs[1].classList.add('active');
+            } else if (tab === 'procedures') {
+                procedures.style.display = 'block';
+                tabs[2].classList.add('active');
             } else {
                 ai.style.display = 'flex';
-                tabs[2].classList.add('active');
+                tabs[3].classList.add('active');
                 document.getElementById('ai-input').focus();
+            }
+        }
+
+        // --- MEDICARE PROCEDURES ---
+        async function fetchProceduresData(zips) {
+            const el = document.getElementById('proceduresContent');
+            if (!zips || zips.length === 0) {
+                el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">No ZIPs loaded.</em>';
+                return;
+            }
+            el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">⏳ Loading Medicare procedure data...</em>';
+
+            try {
+                // Fetch top 10 procedures per specialty for these ZIPs from Supabase
+                const zipList = zips.map(z => String(z).padStart(5,'0')).join(',');
+                const res = await fetch(
+                    `${SUPABASE_URL}/rest/v1/cms_zip_procedures?zip=in.(${zipList})&select=*&order=specialty,rank`,
+                    { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                );
+                const data = await res.json();
+
+                if (!data || data.length === 0) {
+                    el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">No Medicare procedure data found for these ZIPs.</em>';
+                    return;
+                }
+
+                // Group by specialty, aggregate Tot_Benes across ZIPs per procedure
+                const bySpec = {};
+                data.forEach(row => {
+                    const sp = row.specialty;
+                    if (!bySpec[sp]) bySpec[sp] = {};
+                    const cd = row.hcpcs_cd;
+                    if (!bySpec[sp][cd]) {
+                        bySpec[sp][cd] = {
+                            hcpcs_cd: cd,
+                            hcpcs_desc: row.hcpcs_desc,
+                            tot_benes: 0,
+                            avg_mdcr_pymt: row.avg_mdcr_pymt
+                        };
+                    }
+                    bySpec[sp][cd].tot_benes += parseInt(row.tot_benes || 0);
+                });
+
+                // Sort specialties, then build HTML
+                const SPEC_COLORS = {
+                    'Cardiology': '#f85149',
+                    'Interventional Cardiology': '#ff7b72',
+                    'Clinical Cardiac Electrophysiology': '#ffa198',
+                    'Advanced Heart Failure and Transplant Cardiology': '#ffb3ae',
+                    'Cardiac Surgery': '#e03830',
+                    'Nephrology': '#79c0ff',
+                    'Psychiatry': '#d2a8ff',
+                    'Geriatric Psychiatry': '#c0a0f0',
+                    'Neuropsychiatry': '#b090e0',
+                    'Psychologist, Clinical': '#a080d0',
+                    'Neurology': '#ffa657',
+                    'Neurosurgery': '#f09040',
+                    'Epileptologists': '#e08030',
+                    'Internal Medicine': '#3fb950',
+                    'Family Practice': '#58a6ff',
+                    'General Practice': '#4896ef',
+                    'Hospitalist': '#3886df',
+                    'Geriatric Medicine': '#28a060',
+                    'Endocrinology': '#ffb3c1',
+                    'Gastroenterology': '#7ee787',
+                    'Pulmonary Disease': '#a5d6ff',
+                    'Rheumatology': '#e3b341',
+                    'Infectious Disease': '#f0c060',
+                    'Hematology-Oncology': '#e3b341',
+                    'Medical Oncology': '#d4a431',
+                    'Radiation Oncology': '#c59421',
+                    'Surgical Oncology': '#b68411',
+                    'Gynecological Oncology': '#a77401',
+                    'Orthopedic Surgery': '#f0883e',
+                    'General Surgery': '#e0782e',
+                    'Vascular Surgery': '#d0681e',
+                    'Thoracic Surgery': '#c0580e',
+                    'Urology': '#8b949e',
+                    'Ophthalmology': '#7b849e',
+                    'Otolaryngology': '#6b748e',
+                    'Dermatology': '#5b647e',
+                    'Obstetrics & Gynecology': '#ffb3c1',
+                    'Pain Management': '#c9a227',
+                    'Interventional Pain Management': '#b99217',
+                    'Physical Medicine and Rehabilitation': '#58a6ff',
+                    'Sleep Medicine': '#4479a1',
+                    'Allergy/ Immunology': '#22863a',
+                    'Nurse Practitioner': '#6e7681',
+                    'Physician Assistant': '#5e6671',
+                };
+
+                let html = `<div style="font-size:10px;color:var(--text-muted);margin-bottom:12px;">
+                    ${zips.length} ZIP${zips.length > 1 ? 's' : ''} · Top 10 procedures by unique Medicare patients · 2024
+                </div>`;
+
+                Object.keys(bySpec).sort().forEach(specialty => {
+                    const procs = Object.values(bySpec[specialty])
+                        .sort((a, b) => b.tot_benes - a.tot_benes)
+                        .slice(0, 10);
+
+                    const color = SPEC_COLORS[specialty] || '#8b949e';
+                    const maxBenes = procs[0]?.tot_benes || 1;
+
+                    html += `
+                    <div style="margin-bottom:16px;">
+                        <div style="font-size:11px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid ${color}33;">
+                            ${specialty}
+                        </div>
+                        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                            <tr>
+                                <th style="text-align:left;padding:4px;color:var(--text-muted);font-size:10px;font-weight:500;border-bottom:1px solid var(--border);">Procedure</th>
+                                <th style="text-align:right;padding:4px;color:var(--text-muted);font-size:10px;font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Medicare Pts</th>
+                                <th style="text-align:right;padding:4px;color:var(--text-muted);font-size:10px;font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Avg Pay</th>
+                            </tr>
+                            ${procs.map(p => {
+                                const barW = Math.round((p.tot_benes / maxBenes) * 100);
+                                return `<tr style="border-bottom:1px solid var(--border);">
+                                    <td style="padding:5px 4px;color:var(--text-secondary);max-width:160px;">
+                                        <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;">${p.hcpcs_cd}</div>
+                                        <div style="line-height:1.3;">${p.hcpcs_desc.length > 60 ? p.hcpcs_desc.slice(0,57)+'...' : p.hcpcs_desc}</div>
+                                        <div style="background:var(--bg-elevated);border-radius:2px;height:3px;margin-top:3px;overflow:hidden;">
+                                            <div style="width:${barW}%;height:100%;background:${color};border-radius:2px;"></div>
+                                        </div>
+                                    </td>
+                                    <td style="padding:5px 4px;text-align:right;font-weight:600;color:${color};white-space:nowrap;">${p.tot_benes.toLocaleString()}</td>
+                                    <td style="padding:5px 4px;text-align:right;color:var(--text-muted);white-space:nowrap;">$${p.avg_mdcr_pymt ? Number(p.avg_mdcr_pymt).toFixed(0) : '—'}</td>
+                                </tr>`;
+                            }).join('')}
+                        </table>
+                    </div>`;
+                });
+
+                html += `<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Source: CMS Medicare Physician & Other Practitioners 2024 · Medicare FFS Part B only</div>`;
+                el.innerHTML = html;
+
+            } catch(e) {
+                el.innerHTML = `<em style="color:var(--orange);font-size:12px;">Error: ${e.message}</em>`;
             }
         }
 
