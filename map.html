@@ -549,7 +549,10 @@
             // Check for comma-separated ZIPs like "38017, 38654"
             const commaParts = searchTerm.split(',').map(s => s.trim()).filter(Boolean);
             const allAreZips = commaParts.length > 1 && commaParts.every(p => p.match(/^\d{5}$/));
-            const allAreCities = commaParts.length > 1 && commaParts.every(p => p.length > 2 && !p.match(/^\d+$/));
+            // Multi-city: must have 2+ parts AND each part must contain a space or be > 4 chars
+            // AND not be a single "City, ST" format (exactly 2 parts where second is 2 letters)
+            const isSingleCityST = commaParts.length === 2 && commaParts[1].trim().match(/^[A-Z]{2}$/i);
+            const allAreCities = commaParts.length > 1 && !isSingleCityST && commaParts.every(p => p.length > 2 && !p.match(/^\d+$/));
             if (allAreZips) { await searchMultipleZips(commaParts); return; }
             if (allAreCities) { await searchMultipleCities(commaParts); return; }
 
@@ -1262,6 +1265,33 @@
             });
         }
 
+        const STATE_NEIGHBORS = {
+            'AL':['FL','GA','MS','TN'],'AK':[],'AZ':['CA','CO','NM','NV','UT'],
+            'AR':['LA','MO','MS','OK','TN','TX'],'CA':['AZ','NV','OR'],
+            'CO':['AZ','KS','NE','NM','OK','UT','WY'],'CT':['MA','NY','RI'],
+            'DE':['MD','NJ','PA'],'DC':['MD','VA'],'FL':['AL','GA'],
+            'GA':['AL','FL','NC','SC','TN'],'HI':[],'ID':['MT','NV','OR','UT','WA','WY'],
+            'IL':['IN','IA','KY','MO','WI'],'IN':['IL','KY','MI','OH'],
+            'IA':['IL','MN','MO','NE','SD','WI'],'KS':['CO','MO','NE','OK'],
+            'KY':['IL','IN','MO','OH','TN','VA','WV'],'LA':['AR','MS','TX'],
+            'ME':['NH'],'MD':['DC','DE','PA','VA','WV'],'MA':['CT','NH','NY','RI','VT'],
+            'MI':['IN','OH','WI'],'MN':['IA','ND','SD','WI'],'MS':['AL','AR','LA','TN'],
+            'MO':['AR','IL','IA','KS','KY','NE','OK','TN'],'MT':['ID','ND','SD','WY'],
+            'NE':['CO','IA','KS','MO','SD','WY'],'NV':['AZ','CA','ID','OR','UT'],
+            'NH':['MA','ME','VT'],'NJ':['DE','NY','PA'],'NM':['AZ','CO','OK','TX','UT'],
+            'NY':['CT','MA','NJ','PA','VT'],'NC':['GA','SC','TN','VA'],
+            'ND':['MN','MT','SD'],'OH':['IN','KY','MI','PA','WV'],
+            'OK':['AR','CO','KS','MO','NM','TX'],'OR':['CA','ID','NV','WA'],
+            'PA':['DE','MD','NJ','NY','OH','WV'],'RI':['CT','MA'],
+            'SC':['GA','NC'],'SD':['IA','MN','MT','ND','NE','WY'],
+            'TN':['AL','AR','GA','KY','MS','MO','NC','VA'],
+            'TX':['AR','LA','NM','OK'],'UT':['AZ','CO','ID','NV','NM','WY'],
+            'VT':['MA','NH','NY'],'VA':['DC','KY','MD','NC','TN','WV'],
+            'WA':['ID','OR'],'WV':['KY','MD','OH','PA','VA'],
+            'WI':['IA','IL','MI','MN'],'WY':['CO','ID','MT','NE','SD','UT'],
+            'PR':[]
+        };
+
         async function loadNeighboringZips() {
             if (!lockedZip && neighborZipSet.size === 0) return;
 
@@ -1269,16 +1299,44 @@
             const seedPadded = String(seedZip).padStart(5, '0');
             const statusEl = document.getElementById('dbStatus');
 
-            // Find seed ZIP boundary layer
+            // Find seed ZIP boundary layer and which state it's in
             let seedBounds = null;
+            let seedState = null;
             zipGeoJSONLayer.eachLayer(l => {
                 const z = String(l.feature.properties.ZCTA5CE10).padStart(5, '0');
-                if (z === seedPadded) seedBounds = l.getBounds();
+                if (z === seedPadded) {
+                    seedBounds = l.getBounds();
+                }
             });
 
             if (!seedBounds) {
                 statusEl.textContent = '❌ ZIP boundary not visible';
                 return;
+            }
+
+            // Detect seed state from Supabase
+            statusEl.textContent = '🔄 Detecting state and loading neighboring boundaries...';
+            try {
+                const stateRes = await fetch(
+                    `${SUPABASE_URL}/rest/v1/clinics?zip=eq.${seedPadded}&select=state&limit=1`,
+                    { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                );
+                const stateData = stateRes.ok ? await stateRes.json() : [];
+                if (stateData.length > 0) seedState = stateData[0].state;
+            } catch(e) {}
+
+            // Load neighboring state boundaries
+            if (seedState && STATE_NEIGHBORS[seedState]) {
+                const neighborStates = STATE_NEIGHBORS[seedState];
+                neighborStates.forEach(st => {
+                    if (!loadedStates.has(st)) {
+                        loadState(st);
+                    }
+                });
+                // Wait for boundaries to load
+                if (neighborStates.some(st => !loadedStates.has(st))) {
+                    await new Promise(resolve => setTimeout(resolve, 2500));
+                }
             }
 
             statusEl.textContent = '🔄 Finding neighboring ZIPs...';
@@ -1295,7 +1353,7 @@
             });
 
             if (foundNeighbors.length === 0) {
-                statusEl.textContent = '❌ No neighboring ZIPs found in loaded boundaries';
+                statusEl.textContent = '❌ No neighboring ZIPs found';
                 return;
             }
 
