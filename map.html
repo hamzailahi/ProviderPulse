@@ -298,6 +298,11 @@
             </div>
 
             <div id="procedures-panel" style="display:none;flex:1;overflow-y:auto;padding:14px;background:var(--bg-base);">
+                <div style="margin-bottom:10px;position:sticky;top:0;background:var(--bg-base);padding-bottom:8px;z-index:10;border-bottom:1px solid var(--border);">
+                    <input id="proceduresSearch" type="text" placeholder="Search by HCPCS code, description, or specialty..." 
+                        style="width:100%;box-sizing:border-box;padding:7px 10px;font-size:11px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'DM Sans',sans-serif;outline:none;"
+                        oninput="filterProcedures(this.value)">
+                </div>
                 <div id="proceduresContent">
                     <em style="color:var(--text-muted);font-size:12px;">Click a ZIP boundary or search a ZIP to load Medicare procedure data.</em>
                 </div>
@@ -1860,8 +1865,116 @@
         }
 
         // --- MEDICARE PROCEDURES (full dataset) ---
+        let proceduresRawData = {}; // store for search filtering
+
+        function filterProcedures(query) {
+            if (!proceduresRawData || Object.keys(proceduresRawData).length === 0) return;
+            const q = query.trim().toLowerCase();
+            renderProceduresHTML(proceduresRawData, q);
+        }
+
+        function renderProceduresHTML(bySpec, filter) {
+            const el = document.getElementById('proceduresContent');
+            const fmt  = v => v != null ? Math.round(v).toLocaleString() : '—';
+            const fmtD = v => v != null ? '$' + Number(v).toFixed(2) : '—';
+
+            let html = '';
+            let totalShown = 0;
+
+            const sortedSpecs = Object.keys(bySpec).sort();
+
+            sortedSpecs.forEach(specialty => {
+                // Filter by specialty name or procedure
+                const specMatch = !filter || specialty.toLowerCase().includes(filter);
+                let procs = Object.values(bySpec[specialty])
+                    .map(p => ({
+                        ...p,
+                        avg_sbmtd_chrg:    p.count > 0 ? p.avg_sbmtd_chrg / p.count : 0,
+                        avg_mdcr_alowd_amt: p.count > 0 ? p.avg_mdcr_alowd_amt / p.count : 0,
+                        avg_mdcr_pymt_amt:  p.count > 0 ? p.avg_mdcr_pymt_amt / p.count : 0,
+                    }))
+                    .filter(p => {
+                        if (!filter) return true;
+                        if (specMatch) return true;
+                        return p.hcpcs_cd.toLowerCase().includes(filter) ||
+                               (p.hcpcs_desc || '').toLowerCase().includes(filter);
+                    })
+                    .sort((a, b) => b.tot_benes - a.tot_benes);
+
+                if (!procs.length) return;
+                totalShown += procs.length;
+
+                const color = getSpecColor(specialty);
+                const maxBenes = procs[0]?.tot_benes || 1;
+
+                html += `
+                <div style="margin-bottom:18px;">
+                    <div style="font-size:11px;font-weight:600;color:${color};text-transform:uppercase;
+                        letter-spacing:0.05em;margin-bottom:6px;padding-bottom:4px;
+                        border-bottom:1px solid ${color}44;display:flex;justify-content:space-between;align-items:center;">
+                        <span>${specialty}</span>
+                        <span style="font-weight:400;font-size:10px;color:var(--text-muted);">${procs.length} procedure${procs.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:480px;">
+                        <thead>
+                            <tr style="background:var(--bg-surface);">
+                                <th style="text-align:left;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);">Procedure</th>
+                                <th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Pts</th>
+                                <th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Svcs</th>
+                                <th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Avg Billed</th>
+                                <th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Avg Allowed</th>
+                                <th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Avg Paid</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        ${procs.map(p => {
+                            const barW = Math.min(Math.round((p.tot_benes / maxBenes) * 100), 100);
+                            const highlight = filter && !specialty.toLowerCase().includes(filter);
+                            const cdHighlight = highlight && p.hcpcs_cd.toLowerCase().includes(filter)
+                                ? `background:rgba(88,166,255,0.15);border-radius:2px;` : '';
+                            return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg-elevated)'" onmouseout="this.style.background=''">
+                                <td style="padding:5px 4px;max-width:180px;">
+                                    <div style="color:var(--text-muted);font-size:9px;${cdHighlight}">${p.hcpcs_cd}</div>
+                                    <div style="color:var(--text-secondary);line-height:1.3;">${p.hcpcs_desc || '—'}</div>
+                                    <div style="background:var(--bg-elevated);border-radius:2px;height:2px;margin-top:3px;overflow:hidden;">
+                                        <div style="width:${barW}%;height:100%;background:${color};border-radius:2px;"></div>
+                                    </div>
+                                </td>
+                                <td style="padding:5px 4px;text-align:right;font-weight:600;color:${color};white-space:nowrap;">${fmt(p.tot_benes)}</td>
+                                <td style="padding:5px 4px;text-align:right;color:var(--text-secondary);white-space:nowrap;">${fmt(p.tot_srvcs)}</td>
+                                <td style="padding:5px 4px;text-align:right;color:var(--text-muted);white-space:nowrap;">${fmtD(p.avg_sbmtd_chrg)}</td>
+                                <td style="padding:5px 4px;text-align:right;color:var(--text-muted);white-space:nowrap;">${fmtD(p.avg_mdcr_alowd_amt)}</td>
+                                <td style="padding:5px 4px;text-align:right;color:#3fb950;white-space:nowrap;">${fmtD(p.avg_mdcr_pymt_amt)}</td>
+                            </tr>`;
+                        }).join('')}
+                        </tbody>
+                    </table>
+                    </div>
+                </div>`;
+            });
+
+            if (!html) {
+                el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">No results for "${filter}".</em>`;
+                return;
+            }
+
+            const summary = filter
+                ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${totalShown} results for "${filter}" — <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div>`
+                : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">${totalShown.toLocaleString()} procedures across ${Object.keys(bySpec).length} specialties · 2024 Medicare FFS Part B</div>`;
+
+            el.innerHTML = summary + html +
+                `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;">
+                    Pts = unique Medicare patients · Svcs = total services · Avg Billed = avg submitted charge ·
+                    Avg Allowed = avg Medicare allowed amount · Avg Paid = avg Medicare payment
+                </div>`;
+        }
         async function fetchProceduresData(zips) {
             const el = document.getElementById('proceduresContent');
+            const searchEl = document.getElementById('proceduresSearch');
+            if (searchEl) searchEl.value = '';
+            proceduresRawData = {};
+
             if (!zips || zips.length === 0) {
                 el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">No ZIPs loaded.</em>';
                 return;
@@ -1871,7 +1984,6 @@
             try {
                 const zipList = zips.map(z => String(z).padStart(5,'0')).join(',');
 
-                // Paginate — may be 1000s of rows
                 let allRows = [];
                 let offset = 0;
                 while (true) {
@@ -1891,7 +2003,6 @@
                     return;
                 }
 
-                // Group by specialty, aggregate across ZIPs
                 const bySpec = {};
                 allRows.forEach(row => {
                     const sp = row.specialty || 'Unknown';
@@ -1899,95 +2010,23 @@
                     const cd = row.hcpcs_cd;
                     if (!bySpec[sp][cd]) {
                         bySpec[sp][cd] = {
-                            hcpcs_cd: cd,
-                            hcpcs_desc: row.hcpcs_desc,
+                            hcpcs_cd: cd, hcpcs_desc: row.hcpcs_desc,
                             tot_benes: 0, tot_srvcs: 0,
                             avg_sbmtd_chrg: 0, avg_mdcr_alowd_amt: 0,
                             avg_mdcr_pymt_amt: 0, count: 0
                         };
                     }
                     const p = bySpec[sp][cd];
-                    p.tot_benes      += parseFloat(row.tot_benes || 0);
-                    p.tot_srvcs      += parseFloat(row.tot_srvcs || 0);
-                    p.avg_sbmtd_chrg += parseFloat(row.avg_sbmtd_chrg || 0);
+                    p.tot_benes          += parseFloat(row.tot_benes || 0);
+                    p.tot_srvcs          += parseFloat(row.tot_srvcs || 0);
+                    p.avg_sbmtd_chrg     += parseFloat(row.avg_sbmtd_chrg || 0);
                     p.avg_mdcr_alowd_amt += parseFloat(row.avg_mdcr_alowd_amt || 0);
                     p.avg_mdcr_pymt_amt  += parseFloat(row.avg_mdcr_pymt_amt || 0);
                     p.count += 1;
                 });
 
-                const fmt  = v => v != null ? Math.round(v).toLocaleString() : '—';
-                const fmtD = v => v != null ? '$' + Number(v).toFixed(2) : '—';
-
-                let html = `<div style="font-size:10px;color:var(--text-muted);margin-bottom:12px;">
-                    ${zips.length} ZIP${zips.length > 1 ? 's' : ''} · ${allRows.length.toLocaleString()} procedure records · 2024 Medicare FFS Part B
-                </div>`;
-
-                const sortedSpecs = Object.keys(bySpec).sort();
-
-                sortedSpecs.forEach(specialty => {
-                    const procs = Object.values(bySpec[specialty])
-                        .map(p => ({
-                            ...p,
-                            avg_sbmtd_chrg:     p.count > 0 ? p.avg_sbmtd_chrg / p.count : 0,
-                            avg_mdcr_alowd_amt:  p.count > 0 ? p.avg_mdcr_alowd_amt / p.count : 0,
-                            avg_mdcr_pymt_amt:   p.count > 0 ? p.avg_mdcr_pymt_amt / p.count : 0,
-                        }))
-                        .sort((a, b) => b.tot_benes - a.tot_benes);
-
-                    const color = getSpecColor(specialty);
-                    const maxBenes = procs[0]?.tot_benes || 1;
-
-                    html += `
-                    <div style="margin-bottom:18px;">
-                        <div style="font-size:11px;font-weight:600;color:${color};text-transform:uppercase;
-                            letter-spacing:0.05em;margin-bottom:6px;padding-bottom:4px;
-                            border-bottom:1px solid ${color}44;display:flex;justify-content:space-between;align-items:center;">
-                            <span>${specialty}</span>
-                            <span style="font-weight:400;font-size:10px;color:var(--text-muted);">${procs.length} procedures</span>
-                        </div>
-                        <div style="overflow-x:auto;">
-                        <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:480px;">
-                            <thead>
-                                <tr style="background:var(--bg-surface);">
-                                    <th style="text-align:left;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);">Procedure</th>
-                                    <th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Pts</th>
-                                    <th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Svcs</th>
-                                    <th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Avg Billed</th>
-                                    <th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Avg Allowed</th>
-                                    <th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">Avg Paid</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            ${procs.map(p => {
-                                const barW = Math.min(Math.round((p.tot_benes / maxBenes) * 100), 100);
-                                return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg-elevated)'" onmouseout="this.style.background=''">
-                                    <td style="padding:5px 4px;max-width:180px;">
-                                        <div style="color:var(--text-muted);font-size:9px;">${p.hcpcs_cd}</div>
-                                        <div style="color:var(--text-secondary);line-height:1.3;">${p.hcpcs_desc || '—'}</div>
-                                        <div style="background:var(--bg-elevated);border-radius:2px;height:2px;margin-top:3px;overflow:hidden;">
-                                            <div style="width:${barW}%;height:100%;background:${color};border-radius:2px;"></div>
-                                        </div>
-                                    </td>
-                                    <td style="padding:5px 4px;text-align:right;font-weight:600;color:${color};white-space:nowrap;">${fmt(p.tot_benes)}</td>
-                                    <td style="padding:5px 4px;text-align:right;color:var(--text-secondary);white-space:nowrap;">${fmt(p.tot_srvcs)}</td>
-                                    <td style="padding:5px 4px;text-align:right;color:var(--text-muted);white-space:nowrap;">${fmtD(p.avg_sbmtd_chrg)}</td>
-                                    <td style="padding:5px 4px;text-align:right;color:var(--text-muted);white-space:nowrap;">${fmtD(p.avg_mdcr_alowd_amt)}</td>
-                                    <td style="padding:5px 4px;text-align:right;color:#3fb950;white-space:nowrap;">${fmtD(p.avg_mdcr_pymt_amt)}</td>
-                                </tr>`;
-                            }).join('')}
-                            </tbody>
-                        </table>
-                        </div>
-                    </div>`;
-                });
-
-                html += `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;">
-                    Source: CMS Medicare Physician & Other Practitioners 2024 · Medicare FFS Part B only ·
-                    Pts = unique Medicare patients · Svcs = total services · Avg Billed = avg submitted charge ·
-                    Avg Allowed = avg Medicare allowed amount · Avg Paid = avg Medicare payment
-                </div>`;
-
-                el.innerHTML = html;
+                proceduresRawData = bySpec;
+                renderProceduresHTML(bySpec, '');
 
             } catch(e) {
                 el.innerHTML = `<em style="color:var(--orange);font-size:12px;">Error: ${e.message}</em>`;
