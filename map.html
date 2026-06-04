@@ -2175,14 +2175,16 @@
                     rows.push({
                         specialty,
                         hcpcs_cd: p.hcpcs_cd,
-                        hcpcs_desc: p.hcpcs_desc,
+                        hcpcs_desc: p.hcpcs_desc ? p.hcpcs_desc.substring(0, 60) : '',
                         tot_benes: Math.round(p.tot_benes),
                         tot_srvcs: Math.round(p.tot_srvcs),
                         avg_mdcr_pymt: p.count > 0 ? Math.round(p.avg_mdcr_pymt_amt / p.count) : 0
                     });
                 });
             });
-            return rows.length > 0 ? rows : null;
+            // Sort by tot_benes desc, cap at 500 rows to stay within token limit
+            rows.sort((a, b) => b.tot_benes - a.tot_benes);
+            return rows.length > 0 ? rows.slice(0, 500) : null;
         }
 
         async function sendAIQuery() {
