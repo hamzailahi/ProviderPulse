@@ -1487,7 +1487,6 @@
                 const rows = await response.json();
 
                 if (!rows || rows.length === 0) {
-                    placesRawData = null;
                     document.getElementById('placesMetrics').innerHTML = '<em style="color: var(--text-muted);">No PLACES data found for these ZIPs.</em>';
                     return;
                 }
@@ -1546,19 +1545,6 @@
                 // Sort each category by value descending
                 Object.values(byCategory).forEach(arr => arr.sort((a, b) => b.value - a.value));
 
-                // Store raw computed data for AI context
-                placesRawData = [];
-                Object.entries(byCategory).forEach(([category, measures]) => {
-                    measures.forEach(m => {
-                        placesRawData.push({
-                            category: category,
-                            measure: m.short || m.measure,
-                            value: parseFloat(m.value.toFixed(1)),
-                            unit: m.unit
-                        });
-                    });
-                });
-
                 // Color code value based on severity (higher = worse for most measures)
                 function valueColor(v) {
                     if (v >= 40) return '#f85149';
@@ -1605,6 +1591,14 @@
                 });
 
                 html += `<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Source: CDC PLACES 2024 release (2022 BRFSS data)</div>`;
+                // Cache for AI context
+                window.placesDataCache = {};
+                Object.keys(byCategory || {}).forEach(cat => {
+                    (byCategory[cat] || []).forEach(m => {
+                        window.placesDataCache[m.short || m.measure] = m.value;
+                    });
+                });
+
                 document.getElementById('placesMetrics').innerHTML = html;
 
             } catch (err) {
@@ -1630,33 +1624,28 @@
                 );
                 const data = await res.json();
                 if (!data || data.length === 0) {
-                    cmsRawData = null;
                     el.innerHTML = '<em style="color:var(--text-muted);">No CMS data found for this county.</em>';
                     return;
                 }
                 const d = data[0];
+                const fmt = v => v != null ? Number(v).toLocaleString() : 'N/A';
+                const fmtR = (v, dec=1) => v != null ? Number(v).toFixed(dec) : 'N/A';
 
-                // Store raw data for AI context
-                cmsRawData = {
-                    county: countyName,
-                    fips: fips,
+                // Cache for AI context
+                window.cmsDataCache = {
+                    county: d.county_name,
                     total_beneficiaries: d.total_beneficiaries,
-                    per_capita_payment: d.per_capita_payment,
                     er_visits: d.er_visits,
                     er_visits_per_1000: d.er_visits_per_1000,
                     ip_stays: d.ip_stays,
-                    ip_stays_per_1000: d.ip_stays_per_1000,
                     readmissions: d.readmissions,
                     readmission_rate: d.readmission_rate,
                     dialysis_users: d.dialysis_users,
-                    dialysis_visits_per_1000: d.dialysis_visits_per_1000,
-                    home_health_users: d.home_health_users,
                     snf_users: d.snf_users,
-                    hospice_users: d.hospice_users
+                    home_health_users: d.home_health_users,
+                    hospice_users: d.hospice_users,
+                    per_capita_payment: d.per_capita_payment
                 };
-
-                const fmt = v => v != null ? Number(v).toLocaleString() : 'N/A';
-                const fmtR = (v, dec=1) => v != null ? Number(v).toFixed(dec) : 'N/A';
 
                 el.innerHTML = `
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
@@ -1901,8 +1890,6 @@
 
         // --- MEDICARE PROCEDURES (full dataset) ---
         let proceduresRawData = {}; // store for search filtering
-        let placesRawData = null;   // store for AI context
-        let cmsRawData = null;      // store for AI context
 
         function filterProcedures(query) {
             if (!proceduresRawData || Object.keys(proceduresRawData).length === 0) return;
@@ -2170,31 +2157,31 @@
         }
 
         function buildPLACESContext() {
-            return placesRawData && placesRawData.length > 0 ? placesRawData : null;
+            if (!window.placesDataCache || Object.keys(window.placesDataCache).length === 0) return null;
+            return Object.entries(window.placesDataCache).map(([measure, value]) => ({ measure, value }));
         }
 
         function buildCMSContext() {
-            return cmsRawData || null;
+            if (!window.cmsDataCache || Object.keys(window.cmsDataCache).length === 0) return null;
+            return window.cmsDataCache;
         }
 
         function buildProceduresContext() {
             if (!proceduresRawData || Object.keys(proceduresRawData).length === 0) return null;
-            const procedures = [];
+            const rows = [];
             Object.entries(proceduresRawData).forEach(([specialty, procs]) => {
-                procs.forEach(p => {
-                    procedures.push({
-                        specialty: specialty,
-                        hcpcs_cd: p.hcpcs_cd || '',
-                        hcpcs_desc: p.hcpcs_desc || '',
-                        tot_benes: p.tot_benes || 0,
-                        tot_srvcs: p.tot_srvcs || 0,
-                        avg_submitted_charge: p.avg_sbmtd_chrg || 0,
-                        avg_medicare_allowed: p.avg_mdcr_alowd_amt || 0,
-                        avg_medicare_payment: p.avg_mdcr_pymt_amt || 0
+                Object.values(procs).forEach(p => {
+                    rows.push({
+                        specialty,
+                        hcpcs_cd: p.hcpcs_cd,
+                        hcpcs_desc: p.hcpcs_desc,
+                        tot_benes: Math.round(p.tot_benes),
+                        tot_srvcs: Math.round(p.tot_srvcs),
+                        avg_mdcr_pymt: p.count > 0 ? Math.round(p.avg_mdcr_pymt_amt / p.count) : 0
                     });
                 });
             });
-            return procedures.length > 0 ? procedures : null;
+            return rows.length > 0 ? rows : null;
         }
 
         async function sendAIQuery() {
@@ -2227,25 +2214,25 @@ You have access ONLY to the data currently loaded on the user's screen. Do not m
 
 DATA AVAILABLE:
 1. CLINICS: ${contextClinics.length} providers currently on the map${truncated ? ' (showing first 2,000 of ' + clinics.length + ' total)' : ''}. Each has: name, npi, taxonomy (specialty), address, zip, state.
-2. ZIP DEMOGRAPHICS: Population and insurance data for ${demographics ? demographics.length : 0} loaded ZIP codes. Each ZIP has: total_population, adult_population_18plus, insured_population, insured_pct.
-3. CDC PLACES HEALTH METRICS: ${places ? places.length + ' measures loaded (category, measure name, value, unit). County-level averages from 2022 BRFSS data.' : 'Not loaded — user must click a county or ZIP first.'} 
-4. CMS MEDICARE UTILIZATION: ${cms ? 'Loaded for ' + (cms.county || 'selected county') + '. Includes: total_beneficiaries, per_capita_payment, er_visits, er_visits_per_1000, ip_stays, ip_stays_per_1000, readmissions, readmission_rate, dialysis_users, home_health_users, snf_users, hospice_users.' : 'Not loaded — user must click a county boundary first.'}
-5. MEDICARE PROCEDURE DATA: ${procedures ? procedures.length + ' procedure records for selected ZIP(s). Each has: specialty, hcpcs_cd, hcpcs_desc, tot_benes, tot_srvcs, avg_submitted_charge, avg_medicare_allowed, avg_medicare_payment.' : 'Not loaded — user must click a ZIP boundary first.'}
+2. ZIP DEMOGRAPHICS: Population and insurance data for ${demographics ? demographics.length : 0} loaded ZIP codes. Each ZIP has: total_population, adult_population_18plus (18+ population), insured_population, insured_pct.
+3. CDC PLACES HEALTH METRICS: ${places ? places.length + ' health measures loaded' : 'Not loaded — user must click a county or ZIP first'}.
+4. CMS MEDICARE UTILIZATION: ${cms ? 'County-level Medicare utilization loaded' : 'Not loaded — user must click a county first'}.
+5. MEDICARE PROCEDURES: ${procedures ? procedures.length + ' procedure records across ' + Object.keys(proceduresRawData).length + ' specialties' : 'Not loaded — user must click a ZIP or county first'}. Each row has: specialty, hcpcs_cd, hcpcs_desc, tot_benes (unique Medicare patients), tot_srvcs (total services), avg_mdcr_pymt (avg Medicare payment in USD).
 
 RESPONSE RULES:
 - For provider lists use markdown pipe tables: | Name | NPI | Taxonomy | Address | ZIP |
-- For procedure lookups match hcpcs_cd exactly or hcpcs_desc partially.
-- CMS and PLACES data are county-level. Procedure and demographic data are ZIP-level.
-- For complementary specialties think referral relationships: primary care → cardiology, endocrinology, nephrology, orthopedics, psychiatry, neurology etc.
-- If data is not loaded tell the user exactly what to click to load it.
-- Keep responses concise and actionable.`;
+- For procedure questions search by hcpcs_cd or hcpcs_desc and sum tot_benes across all specialties.
+- For per-capita rates use adult_population_18plus from demographics.
+- For complementary specialties think referral relationships: primary care → cardiology, endocrinology, nephrology, orthopedics, psychiatry, neurology.
+- Give the number first then details. Be concise.
+- If data isn't loaded, tell the user exactly what to click to load it.`;
 
                 const contextParts = [
                     `CLINICS ON MAP:\n${JSON.stringify(contextClinics)}`,
                     demographics ? `\nZIP DEMOGRAPHICS:\n${JSON.stringify(demographics)}` : '',
                     places ? `\nCDC PLACES HEALTH METRICS:\n${JSON.stringify(places)}` : '',
                     cms ? `\nCMS MEDICARE UTILIZATION:\n${JSON.stringify(cms)}` : '',
-                    procedures ? `\nMEDICARE PROCEDURE DATA:\n${JSON.stringify(procedures)}` : '',
+                    procedures ? `\nMEDICARE PROCEDURES:\n${JSON.stringify(procedures)}` : '',
                     `\nUSER QUESTION: ${query}`
                 ].filter(Boolean).join('\n');
 
