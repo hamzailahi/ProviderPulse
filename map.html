@@ -1487,6 +1487,7 @@
                 const rows = await response.json();
 
                 if (!rows || rows.length === 0) {
+                    placesRawData = null;
                     document.getElementById('placesMetrics').innerHTML = '<em style="color: var(--text-muted);">No PLACES data found for these ZIPs.</em>';
                     return;
                 }
@@ -1544,6 +1545,19 @@
 
                 // Sort each category by value descending
                 Object.values(byCategory).forEach(arr => arr.sort((a, b) => b.value - a.value));
+
+                // Store raw computed data for AI context
+                placesRawData = [];
+                Object.entries(byCategory).forEach(([category, measures]) => {
+                    measures.forEach(m => {
+                        placesRawData.push({
+                            category: category,
+                            measure: m.short || m.measure,
+                            value: parseFloat(m.value.toFixed(1)),
+                            unit: m.unit
+                        });
+                    });
+                });
 
                 // Color code value based on severity (higher = worse for most measures)
                 function valueColor(v) {
@@ -1616,10 +1630,31 @@
                 );
                 const data = await res.json();
                 if (!data || data.length === 0) {
+                    cmsRawData = null;
                     el.innerHTML = '<em style="color:var(--text-muted);">No CMS data found for this county.</em>';
                     return;
                 }
                 const d = data[0];
+
+                // Store raw data for AI context
+                cmsRawData = {
+                    county: countyName,
+                    fips: fips,
+                    total_beneficiaries: d.total_beneficiaries,
+                    per_capita_payment: d.per_capita_payment,
+                    er_visits: d.er_visits,
+                    er_visits_per_1000: d.er_visits_per_1000,
+                    ip_stays: d.ip_stays,
+                    ip_stays_per_1000: d.ip_stays_per_1000,
+                    readmissions: d.readmissions,
+                    readmission_rate: d.readmission_rate,
+                    dialysis_users: d.dialysis_users,
+                    dialysis_visits_per_1000: d.dialysis_visits_per_1000,
+                    home_health_users: d.home_health_users,
+                    snf_users: d.snf_users,
+                    hospice_users: d.hospice_users
+                };
+
                 const fmt = v => v != null ? Number(v).toLocaleString() : 'N/A';
                 const fmtR = (v, dec=1) => v != null ? Number(v).toFixed(dec) : 'N/A';
 
@@ -1866,6 +1901,8 @@
 
         // --- MEDICARE PROCEDURES (full dataset) ---
         let proceduresRawData = {}; // store for search filtering
+        let placesRawData = null;   // store for AI context
+        let cmsRawData = null;      // store for AI context
 
         function filterProcedures(query) {
             if (!proceduresRawData || Object.keys(proceduresRawData).length === 0) return;
@@ -2133,38 +2170,31 @@
         }
 
         function buildPLACESContext() {
-            // Extract PLACES data from the rendered HTML in the sidebar
-            const el = document.getElementById('placesMetrics');
-            if (!el || el.querySelector('em')) return null;
-            // Get all measure rows from rendered tables
-            const rows = el.querySelectorAll('tr');
-            const measures = [];
-            rows.forEach(row => {
-                const cells = row.querySelectorAll('td');
-                if (cells.length >= 2) {
-                    const measure = cells[0].textContent.trim();
-                    const value = cells[cells.length - 1].textContent.trim();
-                    if (measure && value) measures.push({ measure, value });
-                }
-            });
-            return measures.length > 0 ? measures : null;
+            return placesRawData && placesRawData.length > 0 ? placesRawData : null;
         }
 
         function buildCMSContext() {
-            // Extract CMS Medicare data from the rendered sidebar
-            const el = document.getElementById('cmsMetrics');
-            if (!el || el.querySelector('em')) return null;
-            const rows = el.querySelectorAll('tr');
-            const metrics = [];
-            rows.forEach(row => {
-                const cells = row.querySelectorAll('td');
-                if (cells.length >= 2) {
-                    const label = cells[0].textContent.trim();
-                    const value = cells[1].textContent.trim();
-                    if (label && value) metrics.push({ label, value });
-                }
+            return cmsRawData || null;
+        }
+
+        function buildProceduresContext() {
+            if (!proceduresRawData || Object.keys(proceduresRawData).length === 0) return null;
+            const procedures = [];
+            Object.entries(proceduresRawData).forEach(([specialty, procs]) => {
+                procs.forEach(p => {
+                    procedures.push({
+                        specialty: specialty,
+                        hcpcs_cd: p.hcpcs_cd || '',
+                        hcpcs_desc: p.hcpcs_desc || '',
+                        tot_benes: p.tot_benes || 0,
+                        tot_srvcs: p.tot_srvcs || 0,
+                        avg_submitted_charge: p.avg_sbmtd_chrg || 0,
+                        avg_medicare_allowed: p.avg_mdcr_alowd_amt || 0,
+                        avg_medicare_payment: p.avg_mdcr_pymt_amt || 0
+                    });
+                });
             });
-            return metrics.length > 0 ? metrics : null;
+            return procedures.length > 0 ? procedures : null;
         }
 
         async function sendAIQuery() {
@@ -2190,21 +2220,24 @@
                 const demographics = buildDemographicsContext();
                 const places = buildPLACESContext();
                 const cms = buildCMSContext();
+                const procedures = buildProceduresContext();
 
                 const systemPrompt = `You are a healthcare market intelligence assistant embedded in a provider mapping tool called ProviderPulse.
 You have access ONLY to the data currently loaded on the user's screen. Do not make up data or reference anything outside what is provided below.
 
 DATA AVAILABLE:
 1. CLINICS: ${contextClinics.length} providers currently on the map${truncated ? ' (showing first 2,000 of ' + clinics.length + ' total)' : ''}. Each has: name, npi, taxonomy (specialty), address, zip, state.
-2. ZIP DEMOGRAPHICS: Population and insurance data for ${demographics ? demographics.length : 0} loaded ZIP codes. Each ZIP has: total_population, adult_population_18plus (sum of all age groups 18+), insured_population, insured_pct. Use adult_population_18plus when calculating per-capita rates for adults.
-3. CDC PLACES HEALTH METRICS: ${places ? places.length + ' health measures for the selected county/ZIP' : 'Not loaded (user must click a county or ZIP first)'}.
-4. CMS MEDICARE UTILIZATION: ${cms ? cms.length + ' Medicare utilization metrics for the selected county' : 'Not loaded (user must click a county first)'}.
+2. ZIP DEMOGRAPHICS: Population and insurance data for ${demographics ? demographics.length : 0} loaded ZIP codes. Each ZIP has: total_population, adult_population_18plus, insured_population, insured_pct.
+3. CDC PLACES HEALTH METRICS: ${places ? places.length + ' measures loaded (category, measure name, value, unit). County-level averages from 2022 BRFSS data.' : 'Not loaded — user must click a county or ZIP first.'} 
+4. CMS MEDICARE UTILIZATION: ${cms ? 'Loaded for ' + (cms.county || 'selected county') + '. Includes: total_beneficiaries, per_capita_payment, er_visits, er_visits_per_1000, ip_stays, ip_stays_per_1000, readmissions, readmission_rate, dialysis_users, home_health_users, snf_users, hospice_users.' : 'Not loaded — user must click a county boundary first.'}
+5. MEDICARE PROCEDURE DATA: ${procedures ? procedures.length + ' procedure records for selected ZIP(s). Each has: specialty, hcpcs_cd, hcpcs_desc, tot_benes, tot_srvcs, avg_submitted_charge, avg_medicare_allowed, avg_medicare_payment.' : 'Not loaded — user must click a ZIP boundary first.'}
 
 RESPONSE RULES:
-- For provider lists/tables use markdown pipe tables: | Name | NPI | Taxonomy | Address | ZIP |
+- For provider lists use markdown pipe tables: | Name | NPI | Taxonomy | Address | ZIP |
+- For procedure lookups match hcpcs_cd exactly or hcpcs_desc partially.
+- CMS and PLACES data are county-level. Procedure and demographic data are ZIP-level.
 - For complementary specialties think referral relationships: primary care → cardiology, endocrinology, nephrology, orthopedics, psychiatry, neurology etc.
-- For counts give the number first then details.
-- If data isn't loaded tell the user what to do (e.g. "click a county to load PLACES data").
+- If data is not loaded tell the user exactly what to click to load it.
 - Keep responses concise and actionable.`;
 
                 const contextParts = [
@@ -2212,6 +2245,7 @@ RESPONSE RULES:
                     demographics ? `\nZIP DEMOGRAPHICS:\n${JSON.stringify(demographics)}` : '',
                     places ? `\nCDC PLACES HEALTH METRICS:\n${JSON.stringify(places)}` : '',
                     cms ? `\nCMS MEDICARE UTILIZATION:\n${JSON.stringify(cms)}` : '',
+                    procedures ? `\nMEDICARE PROCEDURE DATA:\n${JSON.stringify(procedures)}` : '',
                     `\nUSER QUESTION: ${query}`
                 ].filter(Boolean).join('\n');
 
