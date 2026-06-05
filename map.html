@@ -77,7 +77,7 @@
         /* Sidebar & Dashboards */
         #sidebar { width: 440px; display: flex; flex-direction: column; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; position: relative; }
         
-        #legend-section { flex: 0 0 auto; max-height: 120px; overflow-y: auto; padding: 14px; border-bottom: 1px solid var(--border); background: var(--bg-surface); }
+        #legend-section { flex: 0 0 auto; max-height: 260px; overflow-y: auto; padding: 14px; border-bottom: 1px solid var(--border); background: var(--bg-surface); }
         #legend-section::-webkit-scrollbar { width: 4px; }
         #legend-section::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
         #legend-section h3 { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
@@ -878,8 +878,19 @@
             if (latLngs.length > 0) {
                 map.fitBounds(latLngs, { padding: [30, 30], maxZoom: 12 });
             }
-            
+
             renderMap();
+
+            // Auto-load PLACES and procedures for all loaded ZIPs — no click required
+            const allLoadedZips = [...new Set(
+                Object.values(groupedData).flatMap(g =>
+                    g.practices.map(p => String(p['ZIP Code'] || '').padStart(5, '0'))
+                ).filter(z => z && z !== '00000')
+            )];
+            if (allLoadedZips.length > 0) {
+                fetchPLACESData(allLoadedZips);
+                fetchProceduresData(allLoadedZips);
+            }
         }
 
         // Dedicated state loader bypassing map movement logic
@@ -1030,11 +1041,35 @@
         }
 
         function updateLegend() {
-            const legendDiv = document.getElementById('legend'); legendDiv.innerHTML = '';
-            for (let t in taxonomyColors) {
-                const active = selectedTaxonomies.size === 0 || selectedTaxonomies.has(t);
-                legendDiv.innerHTML += `<div class="legend-item ${active?'':'dimmed'}"><span class="legend-color" style="background-color:${taxonomyColors[t]}"></span><span>${t}</span></div>`;
+            const legendDiv = document.getElementById('legend');
+            legendDiv.innerHTML = '';
+
+            // When filtered, reassign colors across only active taxonomies for max distinction
+            const allTax = Object.keys(taxonomyColors);
+            const activeTax = allTax.filter(t => selectedTaxonomies.size === 0 || selectedTaxonomies.has(t));
+            const isFiltered = selectedTaxonomies.size > 0 && selectedTaxonomies.size < allTax.length;
+
+            // Build display color map — use dynamic colors when filtered
+            const displayColors = {};
+            if (isFiltered && activeTax.length > 0) {
+                activeTax.forEach((t, i) => {
+                    displayColors[t] = getColor(i, activeTax.length);
+                });
+                allTax.forEach(t => { if (!displayColors[t]) displayColors[t] = '#444'; });
+            } else {
+                allTax.forEach(t => { displayColors[t] = taxonomyColors[t]; });
             }
+
+            // Update marker colors to match display
+            window._displayColors = displayColors;
+
+            allTax.forEach(t => {
+                const active = selectedTaxonomies.size === 0 || selectedTaxonomies.has(t);
+                legendDiv.innerHTML += `<div class="legend-item ${active ? '' : 'dimmed'}">
+                    <span class="legend-color" style="background-color:${displayColors[t]}"></span>
+                    <span>${t}</span>
+                </div>`;
+            });
         }
 
         // --- Radius Tools ---
@@ -1134,7 +1169,10 @@
                 popupHtml += `</div>`;
                 
                 let uniqueTaxs = [...new Set(items.map(i => i.practice['Primary Taxonomy']))];
-                let gradientStr = uniqueTaxs.length === 1 ? (taxonomyColors[uniqueTaxs[0]] || '#3b82f6') : `conic-gradient(${uniqueTaxs.map((t, idx) => `${taxonomyColors[t] || '#3b82f6'} ${idx * (100/uniqueTaxs.length)}% ${(idx + 1) * (100/uniqueTaxs.length)}%`).join(', ')})`;
+                const colorMap = window._displayColors || taxonomyColors;
+                let gradientStr = uniqueTaxs.length === 1 
+                    ? (colorMap[uniqueTaxs[0]] || '#3b82f6') 
+                    : `conic-gradient(${uniqueTaxs.map((t, idx) => `${colorMap[t] || '#3b82f6'} ${idx * (100/uniqueTaxs.length)}% ${(idx + 1) * (100/uniqueTaxs.length)}%`).join(', ')})`;
                 const iconHtml = `<div style="width:14px; height:14px; border-radius:50%; background:${gradientStr}; border: 1.5px solid #0d1117; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`;
                 
                 const marker = L.marker([group.lat, group.lng], { icon: L.divIcon({ className: 'multi-tax-icon', html: iconHtml, iconSize: [14, 14], iconAnchor: [7, 7] }) })
