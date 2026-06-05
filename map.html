@@ -2194,67 +2194,55 @@
 
             const clinics = buildClinicContext();
             if (clinics.length === 0) {
-                appendAIMessage('ai', 'No clinics are currently loaded. Search for a location first, then ask me about the results.');
+                appendAIMessage('ai', 'No clinics are currently loaded. Search for a location first.');
                 return;
             }
 
             appendAIMessage('user', query);
             input.value = '';
             document.getElementById('ai-send').disabled = true;
-
-            const loadingId = appendAIMessage('ai', '⏳ Analyzing loaded data...');
+            const loadingId = appendAIMessage('ai', '⏳ Thinking...');
 
             try {
-                const contextClinics = clinics.length > 2000 ? clinics.slice(0, 2000) : clinics;
-                const truncated = clinics.length > 2000;
+                const contextClinics = clinics.length > 3000 ? clinics.slice(0, 3000) : clinics;
                 const demographics = buildDemographicsContext();
-                const places = buildPLACESContext();
-                const cms = buildCMSContext();
-                const procedures = buildProceduresContext();
 
-                const systemPrompt = `You are a healthcare market intelligence assistant embedded in a provider mapping tool called ProviderPulse.
-You have access ONLY to the data currently loaded on the user's screen. Do not make up data or reference anything outside what is provided below.
+                const systemPrompt = `You are a healthcare market intelligence assistant embedded in ProviderPulse, a provider mapping tool.
 
-DATA AVAILABLE:
-1. CLINICS: ${contextClinics.length} providers currently on the map${truncated ? ' (showing first 2,000 of ' + clinics.length + ' total)' : ''}. Each has: name, npi, taxonomy (specialty), address, zip, state.
-2. ZIP DEMOGRAPHICS: Population and insurance data for ${demographics ? demographics.length : 0} loaded ZIP codes. Each ZIP has: total_population, adult_population_18plus (18+ population), insured_population, insured_pct.
-3. CDC PLACES HEALTH METRICS: ${places ? places.length + ' health measures loaded' : 'Not loaded — user must click a county or ZIP first'}.
-4. CMS MEDICARE UTILIZATION: ${cms ? 'County-level Medicare utilization loaded' : 'Not loaded — user must click a county first'}.
-5. MEDICARE PROCEDURES: ${procedures ? procedures.length + ' procedure records across ' + Object.keys(proceduresRawData).length + ' specialties' : 'Not loaded — user must click a ZIP or county first'}. Each row has: specialty, hcpcs_cd, hcpcs_desc, tot_benes (unique Medicare patients), tot_srvcs (total services), avg_mdcr_pymt (avg Medicare payment in USD).
+You have tools to query data loaded on the user's map. Always use tools to answer — never guess or make up numbers.
 
-RESPONSE RULES:
-- For provider lists use markdown pipe tables: | Name | NPI | Taxonomy | Address | ZIP |
-- For procedure questions search by hcpcs_cd or hcpcs_desc and sum tot_benes across all specialties.
-- For per-capita rates use adult_population_18plus from demographics.
-- For complementary specialties think referral relationships: primary care → cardiology, endocrinology, nephrology, orthopedics, psychiatry, neurology.
-- Give the number first then details. Be concise.
-- If data isn't loaded, tell the user exactly what to click to load it.`;
+Available data:
+- CLINICS: ${contextClinics.length} providers (name, npi, taxonomy, address, zip, state)
+- DEMOGRAPHICS: ${demographics ? demographics.length + ' ZIPs with population data' : 'not loaded'}
+- PROCEDURES: ${proceduresRawData && Object.keys(proceduresRawData).length > 0 ? Object.keys(proceduresRawData).length + ' specialties loaded' : 'not loaded — user must click a ZIP first'}
+- PLACES: ${window.placesDataCache && Object.keys(window.placesDataCache).length > 0 ? Object.keys(window.placesDataCache).length + ' health metrics loaded' : 'not loaded — user must click a county or ZIP first'}
+- CMS: ${window.cmsDataCache && Object.keys(window.cmsDataCache).length > 0 ? 'county utilization loaded' : 'not loaded — user must click a county first'}
 
-                const contextParts = [
-                    `CLINICS ON MAP:\n${JSON.stringify(contextClinics)}`,
-                    demographics ? `\nZIP DEMOGRAPHICS:\n${JSON.stringify(demographics)}` : '',
-                    places ? `\nCDC PLACES HEALTH METRICS:\n${JSON.stringify(places)}` : '',
-                    cms ? `\nCMS MEDICARE UTILIZATION:\n${JSON.stringify(cms)}` : '',
-                    procedures ? `\nMEDICARE PROCEDURES:\n${JSON.stringify(procedures)}` : '',
-                    `\nUSER QUESTION: ${query}`
-                ].filter(Boolean).join('\n');
+For tables use markdown pipe format. Be concise. Always use tools for any count, ranking, or calculation.`;
+
+                const clientData = {
+                    clinics: contextClinics,
+                    demographics: demographics || [],
+                    procedures: proceduresRawData || {},
+                    places: window.placesDataCache || {},
+                    cms: window.cmsDataCache || {}
+                };
 
                 const response = await fetch('/.netlify/functions/ai-query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         system: systemPrompt,
-                        messages: [{ role: 'user', content: contextParts }]
+                        messages: [{ role: 'user', content: query }],
+                        clientData
                     })
                 });
 
                 const data = await response.json();
-                const text = data.content?.[0]?.text || 'No response received.';
+                const text = data.content?.find(b => b.type === 'text')?.text || 'No response received.';
 
-                // Replace loading message
                 const loadingEl = document.getElementById(loadingId);
                 if (loadingEl) loadingEl.remove();
-
                 appendAIMessage('ai', text);
 
             } catch(e) {

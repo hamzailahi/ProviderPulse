@@ -1,19 +1,8 @@
 [build]
   functions = "netlify/functions"
 
-[[redirects]]
-  from = "/"
-  to = "/index.html"
-  status = 200
+[functions]
+  node_bundler = "esbuild"
 
-[[headers]]
-  for = "/map.html"
-  [headers.values]
-    X-Robots-Tag = "noindex, nofollow"
-    Cache-Control = "no-store"
-
-[[headers]]
-  for = "/admin.html"
-  [headers.values]
-    X-Robots-Tag = "noindex, nofollow"
-    Cache-Control = "no-store"
+[functions."ai-query"]
+  timeout = 26
