@@ -1162,21 +1162,53 @@
 
             for (let key in coordGroups) {
                 const group = coordGroups[key], items = group.items;
-                let popupHtml = `<div class="popup-content"><b>${items.length === 1 ? items[0].address : 'Multiple Practices at this Location'}</b><hr style="margin:5px 0;border-color:#2a3444;"/>`;
+
+                // Build popup with NPPES enrichment placeholder
+                const firstNPI = items[0]?.practice['NPI'] || '';
+                const popupId = `popup-${firstNPI}-${Date.now()}`;
+
+                let popupHtml = `<div class="popup-content" style="min-width:220px;">
+                    <b style="font-size:12px;">${items.length === 1 ? items[0].address : 'Multiple Practices at this Location'}</b>
+                    <hr style="margin:5px 0;border-color:#2a3444;"/>`;
+
                 items.forEach(item => {
-                    popupHtml += `<div style="margin-bottom:8px;"><strong>${item.practice['Name']}</strong><br/><span style="color:#8b949e;font-size:11px;">${item.practice['Primary Taxonomy']}</span><br/>${items.length > 1 ? `<span style="color:#6e7681;font-size:10px;">${item.address}</span>` : ''}</div>`;
+                    const npi = item.practice['NPI'] || '';
+                    popupHtml += `
+                    <div style="margin-bottom:10px;" id="clinic-${npi}">
+                        <strong style="font-size:12px;">${item.practice['Name'] || '—'}</strong><br/>
+                        <span style="color:#8b949e;font-size:11px;">${item.practice['Primary Taxonomy'] || '—'}</span><br/>
+                        ${items.length > 1 ? `<span style="color:#6e7681;font-size:10px;">${item.address}</span><br/>` : ''}
+                        <span style="color:#484f58;font-size:10px;">NPI: ${npi}</span><br/>
+                        <div id="nppes-${npi}" style="margin-top:4px;font-size:11px;color:#8b949e;">
+                            <em>Loading contact info...</em>
+                        </div>
+                    </div>`;
                 });
                 popupHtml += `</div>`;
-                
+
                 let uniqueTaxs = [...new Set(items.map(i => i.practice['Primary Taxonomy']))];
                 const colorMap = window._displayColors || taxonomyColors;
-                let gradientStr = uniqueTaxs.length === 1 
-                    ? (colorMap[uniqueTaxs[0]] || '#3b82f6') 
+                let gradientStr = uniqueTaxs.length === 1
+                    ? (colorMap[uniqueTaxs[0]] || '#3b82f6')
                     : `conic-gradient(${uniqueTaxs.map((t, idx) => `${colorMap[t] || '#3b82f6'} ${idx * (100/uniqueTaxs.length)}% ${(idx + 1) * (100/uniqueTaxs.length)}%`).join(', ')})`;
                 const iconHtml = `<div style="width:14px; height:14px; border-radius:50%; background:${gradientStr}; border: 1.5px solid #0d1117; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`;
-                
-                const marker = L.marker([group.lat, group.lng], { icon: L.divIcon({ className: 'multi-tax-icon', html: iconHtml, iconSize: [14, 14], iconAnchor: [7, 7] }) })
-                    .bindTooltip(items.length === 1 ? items[0].practice['Name'] : `${items.length} Providers Here`, { direction: 'top', offset: [0, -8], opacity: 0.9 }).bindPopup(popupHtml).addTo(map);
+
+                const marker = L.marker([group.lat, group.lng], {
+                    icon: L.divIcon({ className: 'multi-tax-icon', html: iconHtml, iconSize: [14, 14], iconAnchor: [7, 7] })
+                })
+                .bindTooltip(items.length === 1 ? items[0].practice['Name'] : `${items.length} Providers Here`, { direction: 'top', offset: [0, -8], opacity: 0.9 })
+                .bindPopup(popupHtml, { maxWidth: 280 })
+                .addTo(map);
+
+                // Fetch NPPES data for each NPI when popup opens
+                marker.on('popupopen', () => {
+                    items.forEach(item => {
+                        const npi = item.practice['NPI'];
+                        if (!npi) return;
+                        enrichWithNPPES(npi);
+                    });
+                });
+
                 markers.push(marker);
             }
 
@@ -1927,7 +1959,83 @@
             }
         }
 
-        // --- MEDICARE PROCEDURES (full dataset) ---
+        // --- NPPES ENRICHMENT ---
+        const nppesCache = {}; // cache by NPI to avoid repeat calls
+
+        async function enrichWithNPPES(npi) {
+            const el = document.getElementById(`nppes-${npi}`);
+            if (!el) return;
+
+            // Use cache if available
+            if (nppesCache[npi]) {
+                renderNPPESData(el, nppesCache[npi]);
+                return;
+            }
+
+            try {
+                const res = await fetch(`/.netlify/functions/nppes-lookup?npi=${npi}`);
+                const data = await res.json();
+                const result = data?.results?.[0];
+
+                if (!result) {
+                    el.innerHTML = '<em style="color:#484f58;">No NPPES record found</em>';
+                    return;
+                }
+
+                // Extract useful fields
+                const basic = result.basic || {};
+                const addresses = result.addresses || [];
+                const practiceAddr = addresses.find(a => a.address_purpose === 'LOCATION') || addresses[0] || {};
+                const mailingAddr = addresses.find(a => a.address_purpose === 'MAILING') || {};
+
+                const info = {
+                    npi,
+                    type: result.enumeration_type === 'NPI-1' ? 'Individual Provider' : 'Organization',
+                    name: basic.name || `${basic.first_name || ''} ${basic.last_name || ''}`.trim(),
+                    credential: basic.credential || null,
+                    gender: basic.gender || null,
+                    authorized_official: basic.authorized_official_first_name
+                        ? `${basic.authorized_official_first_name} ${basic.authorized_official_last_name}${basic.authorized_official_credential ? ', ' + basic.authorized_official_credential : ''}`
+                        : null,
+                    authorized_title: basic.authorized_official_title_or_position || null,
+                    phone: practiceAddr.telephone_number || null,
+                    fax: practiceAddr.fax_number || null,
+                    last_updated: result.last_updated || null,
+                    status: basic.status || null,
+                };
+
+                nppesCache[npi] = info;
+                renderNPPESData(el, info);
+
+            } catch(e) {
+                if (el) el.innerHTML = `<em style="color:#484f58;">Contact info unavailable</em>`;
+            }
+        }
+
+        function renderNPPESData(el, info) {
+            if (!el) return;
+            let html = '';
+            if (info.phone) html += `📞 <a href="tel:${info.phone}" style="color:#58a6ff;text-decoration:none;">${info.phone}</a><br/>`;
+            if (info.fax) html += `🖷 ${info.fax}<br/>`;
+            if (info.authorized_official) html += `👤 ${info.authorized_official}${info.authorized_title ? ` · ${info.authorized_title}` : ''}<br/>`;
+            if (info.type) html += `<span style="color:#484f58;font-size:10px;">${info.type}${info.status ? ' · ' + info.status : ''}</span>`;
+            if (!html) html = '<em style="color:#484f58;font-size:10px;">No additional contact info</em>';
+            el.innerHTML = html;
+        }
+
+        // Add NPPES tool to AI
+        function buildNPPESContext() {
+            if (Object.keys(nppesCache).length === 0) return null;
+            return Object.values(nppesCache).map(info => ({
+                npi: info.npi,
+                type: info.type,
+                phone: info.phone,
+                fax: info.fax,
+                authorized_official: info.authorized_official,
+                authorized_title: info.authorized_title,
+                status: info.status
+            }));
+        }
         let proceduresRawData = {}; // store for search filtering
 
         function filterProcedures(query) {
@@ -2255,6 +2363,7 @@ Available data:
 - PROCEDURES: ${proceduresRawData && Object.keys(proceduresRawData).length > 0 ? Object.keys(proceduresRawData).length + ' specialties loaded' : 'not loaded — user must click a ZIP first'}
 - PLACES: ${window.placesDataCache && Object.keys(window.placesDataCache).length > 0 ? Object.keys(window.placesDataCache).length + ' health metrics loaded' : 'not loaded — user must click a county or ZIP first'}
 - CMS: ${window.cmsDataCache && Object.keys(window.cmsDataCache).length > 0 ? 'county utilization loaded' : 'not loaded — user must click a county first'}
+- NPPES CONTACT INFO: ${Object.keys(nppesCache).length > 0 ? Object.keys(nppesCache).length + ' providers enriched (phone, fax, authorized official)' : 'not loaded — user must click clinic markers to load contact info'}
 
 For tables use markdown pipe format. Be concise. Always use tools for any count, ranking, or calculation.`;
 
@@ -2263,7 +2372,8 @@ For tables use markdown pipe format. Be concise. Always use tools for any count,
                     demographics: demographics || [],
                     procedures: proceduresRawData || {},
                     places: window.placesDataCache || {},
-                    cms: window.cmsDataCache || {}
+                    cms: window.cmsDataCache || {},
+                    nppes: buildNPPESContext() || []
                 };
 
                 const response = await fetch('/.netlify/functions/ai-query', {

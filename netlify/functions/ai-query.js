@@ -63,7 +63,17 @@ const TOOLS = [
         }
     },
     {
-        name: "compare_disease_vs_provider_density",
+        name: "get_provider_contact_info",
+        description: "Get contact information (phone, fax, authorized official) for specific providers enriched from NPPES. Only available for clinics the user has clicked on.",
+        input_schema: {
+            type: "object",
+            properties: {
+                npi: { type: "string", description: "The NPI number to look up contact info for" },
+                name_keyword: { type: "string", description: "Optional: filter by provider name keyword" }
+            },
+            required: []
+        }
+    },
         description: "Compare CDC PLACES disease prevalence with provider density for a condition. Identifies potential unmet need.",
         input_schema: {
             type: "object",
@@ -178,6 +188,27 @@ function callTool(toolName, toolInput, clientData) {
             adult_population: Math.round(demSummary),
             clinics_per_10000_adults: Math.round(rate * 100) / 100
         };
+    }
+
+    if (toolName === "get_provider_contact_info") {
+        const nppes = clientData.nppes || [];
+        if (!nppes.length) return { loaded: false, message: "No NPPES contact data loaded yet. Click on clinic markers on the map to load their contact info." };
+        const npi = toolInput.npi;
+        const keyword = (toolInput.name_keyword || '').toLowerCase();
+        let results = nppes;
+        if (npi) results = results.filter(r => r.npi === npi);
+        if (keyword) {
+            const clinics = clientData.clinics || [];
+            const matchingNPIs = clinics.filter(c => (c.name || '').toLowerCase().includes(keyword)).map(c => c.npi);
+            results = results.filter(r => matchingNPIs.includes(r.npi));
+        }
+        if (!results.length) return { found: false, message: `No contact info found for ${npi || keyword || 'that provider'}. Try clicking their marker on the map first.` };
+        // Join with clinic names
+        const clinics = clientData.clinics || [];
+        return results.map(r => {
+            const clinic = clinics.find(c => c.npi === r.npi);
+            return { ...r, clinic_name: clinic?.name, taxonomy: clinic?.taxonomy, address: clinic?.address };
+        });
     }
 
     if (toolName === "compare_disease_vs_provider_density") {
