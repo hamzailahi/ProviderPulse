@@ -74,6 +74,8 @@ const TOOLS = [
             required: []
         }
     },
+    {
+        name: "compare_disease_vs_provider_density",
         description: "Compare CDC PLACES disease prevalence with provider density for a condition. Identifies potential unmet need.",
         input_schema: {
             type: "object",
