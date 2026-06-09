@@ -1762,6 +1762,20 @@
             }
         }
 
+        const STATE_NAMES = {
+            'AL':'Alabama','AK':'Alaska','AZ':'Arizona','AR':'Arkansas','CA':'California',
+            'CO':'Colorado','CT':'Connecticut','DE':'Delaware','DC':'District of Columbia',
+            'FL':'Florida','GA':'Georgia','HI':'Hawaii','ID':'Idaho','IL':'Illinois',
+            'IN':'Indiana','IA':'Iowa','KS':'Kansas','KY':'Kentucky','LA':'Louisiana',
+            'ME':'Maine','MD':'Maryland','MA':'Massachusetts','MI':'Michigan','MN':'Minnesota',
+            'MS':'Mississippi','MO':'Missouri','MT':'Montana','NE':'Nebraska','NV':'Nevada',
+            'NH':'New Hampshire','NJ':'New Jersey','NM':'New Mexico','NY':'New York',
+            'NC':'North Carolina','ND':'North Dakota','OH':'Ohio','OK':'Oklahoma','OR':'Oregon',
+            'PA':'Pennsylvania','RI':'Rhode Island','SC':'South Carolina','SD':'South Dakota',
+            'TN':'Tennessee','TX':'Texas','UT':'Utah','VT':'Vermont','VA':'Virginia',
+            'WA':'Washington','WV':'West Virginia','WI':'Wisconsin','WY':'Wyoming','PR':'Puerto Rico'
+        };
+
         // --- HPSA SHORTAGE AREA DATA ---
         async function fetchHPSAData(countyName, stateName) {
             const el = document.getElementById('hpsaMetrics');
@@ -1769,10 +1783,10 @@
             el.innerHTML = '<em style="color:var(--text-muted);font-size:11px;">Loading shortage area data...</em>';
 
             try {
-                // Query by county + state
                 const county = countyName.replace(/ County.*$/, '').trim();
+                const fullState = STATE_NAMES[stateName] || stateName;
                 const res = await fetch(
-                    `${SUPABASE_URL}/rest/v1/hpsa_designations?county=eq.${encodeURIComponent(county)}&state=eq.${encodeURIComponent(stateName)}&select=*`,
+                    `${SUPABASE_URL}/rest/v1/hpsa_designations?county=eq.${encodeURIComponent(county)}&state=eq.${encodeURIComponent(fullState)}&select=*`,
                     { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
                 );
                 const data = await res.json();
