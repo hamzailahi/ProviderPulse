@@ -169,6 +169,11 @@
             <div id="search-wrapper">
                 <input type="text" id="searchInput" placeholder="Address, Name, or County..." />
             </div>
+            <div id="address-search-wrapper" style="margin-top:6px;display:flex;gap:6px;align-items:center;">
+                <input type="text" id="addressInput" placeholder="Go to address..." style="flex:1;background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text-primary);font-size:11px;outline:none;" />
+                <button class="control-btn" id="addressGoBtn" style="white-space:nowrap;padding:5px 10px;font-size:11px;">📍 Go</button>
+            </div>
+            <div id="addressStatus" style="font-size:10px;color:var(--text-muted);margin-top:3px;display:none;"></div>
         </div>
         <div>
             <strong>Filter Taxonomy</strong>
@@ -2148,7 +2153,73 @@
             el.innerHTML = html;
         }
 
-        // Add NPPES tool to AI
+        // --- ADDRESS SEARCH ---
+        let addressPin = null;
+
+        async function goToAddress(query) {
+            const statusEl = document.getElementById('addressStatus');
+            const btn = document.getElementById('addressGoBtn');
+            if (!query.trim()) return;
+
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--text-muted)';
+            statusEl.textContent = '⏳ Searching...';
+            btn.disabled = true;
+
+            try {
+                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1&lang=en`;
+                const res = await fetch(url);
+                const data = await res.json();
+                const features = data?.features;
+
+                if (!features || features.length === 0) {
+                    statusEl.style.color = 'var(--orange)';
+                    statusEl.textContent = 'Address not found. Try adding city or ZIP.';
+                    btn.disabled = false;
+                    return;
+                }
+
+                const [lng, lat] = features[0].geometry.coordinates;
+                const props = features[0].properties;
+                const label = [props.name, props.street, props.city, props.state, props.country]
+                    .filter(Boolean).join(', ');
+
+                // Remove existing pin
+                if (addressPin) map.removeLayer(addressPin);
+
+                // Drop a pin and fly to it
+                const pinIcon = L.divIcon({
+                    className: '',
+                    html: `<div style="font-size:24px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">📍</div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 24]
+                });
+
+                addressPin = L.marker([lat, lng], { icon: pinIcon })
+                    .addTo(map)
+                    .bindPopup(`<div style="font-size:11px;max-width:200px;"><strong>📍 Address</strong><br>${label}</div>`)
+                    .openPopup();
+
+                map.flyTo([lat, lng], 16, { animate: true, duration: 1.2 });
+
+                statusEl.style.color = 'var(--accent)';
+                statusEl.textContent = `📍 ${label}`;
+
+            } catch(e) {
+                statusEl.style.color = 'var(--orange)';
+                statusEl.textContent = `Error: ${e.message}`;
+            }
+
+            btn.disabled = false;
+        }
+
+        document.getElementById('addressGoBtn').addEventListener('click', () => {
+            goToAddress(document.getElementById('addressInput').value);
+        });
+
+        document.getElementById('addressInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') goToAddress(document.getElementById('addressInput').value);
+        });
         function buildNPPESContext() {
             if (Object.keys(nppesCache).length === 0) return null;
             return Object.values(nppesCache).map(info => ({
