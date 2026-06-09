@@ -1,33 +1,54 @@
 const https = require('https');
 
 const DATASET_ID = 'fb3a65aa-c901-4a38-a813-b04b00dfa2a9';
-const BASE_URL = `https://openpaymentsdata.cms.gov/api/1/datastore/query/${DATASET_ID}/0`;
 
-// Research payments dataset 2024
-const RESEARCH_DATASET_ID = '77ab1ae8-09c5-4e44-9c12-b3a68c05ac49';
-
-function fetchPayments(npi, dataset, limit = 500) {
+function fetchPayments(npi) {
     return new Promise((resolve, reject) => {
-        const params = new URLSearchParams({
-            'conditions[0][property]': 'covered_recipient_npi',
-            'conditions[0][value]': npi,
-            'conditions[0][operator]': '=',
-            'limit': limit,
-            'offset': 0,
-            'count': 'true',
-            'results': 'true',
-            'schema': 'false',
-            'keys': 'false'
-        });
-        const url = `https://openpaymentsdata.cms.gov/api/1/datastore/query/${dataset}/0?${params}`;
-        https.get(url, { headers: { 'Accept': 'application/json' } }, res => {
+        // Build query string manually — URLSearchParams encodes brackets wrong for DKAN
+        const qs = [
+            'conditions%5B0%5D%5Bproperty%5D=covered_recipient_npi',
+            `conditions%5B0%5D%5Bvalue%5D=${npi}`,
+            'conditions%5B0%5D%5Boperator%5D=%3D',
+            'limit=500',
+            'offset=0',
+            'results=true',
+            'count=true',
+            'schema=false',
+            'keys=false',
+            'properties%5B%5D=covered_recipient_npi',
+            'properties%5B%5D=applicable_manufacturer_or_applicable_gpo_making_payment_name',
+            'properties%5B%5D=applicable_manufacturer_or_applicable_gpo_making_payment_state',
+            'properties%5B%5D=total_amount_of_payment_usdollars',
+            'properties%5B%5D=date_of_payment',
+            'properties%5B%5D=nature_of_payment_or_transfer_of_value',
+            'properties%5B%5D=form_of_payment_or_transfer_of_value',
+            'properties%5B%5D=name_of_drug_or_biological_or_device_or_medical_supply_1',
+            'properties%5B%5D=product_category_or_therapeutic_area_1',
+            'properties%5B%5D=indicate_drug_or_biological_or_device_or_medical_supply_1',
+            'properties%5B%5D=name_of_drug_or_biological_or_device_or_medical_supply_2',
+            'properties%5B%5D=product_category_or_therapeutic_area_2',
+            'properties%5B%5D=name_of_drug_or_biological_or_device_or_medical_supply_3',
+            'properties%5B%5D=product_category_or_therapeutic_area_3',
+            'properties%5B%5D=program_year',
+            'properties%5B%5D=physician_ownership_indicator',
+            'properties%5B%5D=city_of_travel',
+            'properties%5B%5D=country_of_travel',
+        ].join('&');
+
+        const url = `https://openpaymentsdata.cms.gov/api/1/datastore/query/${DATASET_ID}/0?${qs}`;
+        console.log('Fetching:', url.substring(0, 120));
+
+        const req = https.get(url, { headers: { 'Accept': 'application/json' } }, res => {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
+                console.log('Status:', res.statusCode, 'Body length:', data.length);
                 try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
-                catch(e) { resolve({ status: res.statusCode, data: null }); }
+                catch(e) { resolve({ status: res.statusCode, data: null, raw: data.substring(0, 200) }); }
             });
-        }).on('error', reject);
+        });
+        req.on('error', e => { console.log('Request error:', e.message); reject(e); });
+        req.setTimeout(20000, () => { req.destroy(); reject(new Error('Request timeout')); });
     });
 }
 
@@ -37,23 +58,29 @@ exports.handler = async function(event, context) {
     const npi = event.queryStringParameters?.npi;
     if (!npi) return { statusCode: 400, body: JSON.stringify({ error: 'NPI required' }) };
 
-    try {
-        // Fetch general payments (2023 is the most recent complete year in this dataset)
-        const general = await fetchPayments(npi, DATASET_ID);
-        const results = general.data?.results || [];
+    console.log('Looking up NPI:', npi);
 
-        // Parse into clean records
+    try {
+        const general = await fetchPayments(npi);
+
+        if (!general.data) {
+            console.log('No data returned, raw:', general.raw);
+            return { statusCode: 200, headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ npi, total_payments: 0, total_amount: 0, by_company: [], all_payments: [], program_years: [] }) };
+        }
+
+        const results = general.data?.results || [];
+        console.log('Records found:', results.length, 'Count:', general.data?.count);
+
         const payments = results.map(r => {
-            // Collect up to 5 associated products
             const products = [];
-            for (let i = 1; i <= 5; i++) {
+            for (let i = 1; i <= 3; i++) {
                 const name = r[`name_of_drug_or_biological_or_device_or_medical_supply_${i}`];
-                const type = r[`indicate_drug_or_biological_or_device_or_medical_supply_${i}`];
                 const area = r[`product_category_or_therapeutic_area_${i}`];
+                const type = r[`indicate_drug_or_biological_or_device_or_medical_supply_${i}`];
                 if (name) products.push({ name, type, area });
             }
             return {
-                record_id: r.record_id,
                 company: r.applicable_manufacturer_or_applicable_gpo_making_payment_name || '',
                 company_state: r.applicable_manufacturer_or_applicable_gpo_making_payment_state || '',
                 amount: parseFloat(r.total_amount_of_payment_usdollars || 0),
@@ -62,19 +89,14 @@ exports.handler = async function(event, context) {
                 form: r.form_of_payment_or_transfer_of_value || '',
                 products,
                 program_year: r.program_year || '',
-                physician_ownership: r.physician_ownership_indicator || 'No',
-                city_of_travel: r.city_of_travel || '',
-                state_of_travel: r.state_of_travel || '',
-                country_of_travel: r.country_of_travel || '',
             };
         });
 
-        // Summarize by company
         const byCompany = {};
         payments.forEach(p => {
             if (!byCompany[p.company]) byCompany[p.company] = { company: p.company, total: 0, count: 0, payments: [], products: new Set() };
             byCompany[p.company].total += p.amount;
-            byCompany[p.company].count += 1;
+            byCompany[p.company].count++;
             byCompany[p.company].payments.push(p);
             p.products.forEach(pr => byCompany[p.company].products.add(pr.name));
         });
@@ -83,7 +105,7 @@ exports.handler = async function(event, context) {
             .map(c => ({ ...c, products: [...c.products], total: Math.round(c.total * 100) / 100 }))
             .sort((a, b) => b.total - a.total);
 
-        const totalAmount = payments.reduce((s, p) => s + p.amount, 0);
+        const totalAmount = Math.round(payments.reduce((s, p) => s + p.amount, 0) * 100) / 100;
 
         return {
             statusCode: 200,
@@ -91,7 +113,7 @@ exports.handler = async function(event, context) {
             body: JSON.stringify({
                 npi,
                 total_payments: payments.length,
-                total_amount: Math.round(totalAmount * 100) / 100,
+                total_amount: totalAmount,
                 program_years: [...new Set(payments.map(p => p.program_year).filter(Boolean))].sort().reverse(),
                 by_company: companySummary,
                 all_payments: payments.sort((a, b) => b.amount - a.amount)
@@ -99,6 +121,7 @@ exports.handler = async function(event, context) {
         };
 
     } catch(e) {
+        console.log('Error:', e.message);
         return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
     }
 };
