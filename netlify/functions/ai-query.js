@@ -246,76 +246,102 @@ async function callAnthropic(payload, apiKey) {
         }, res => {
             let data = '';
             res.on('data', chunk => data += chunk);
-            res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(data) }));
+            res.on('end', () => {
+                try {
+                    resolve({ status: res.statusCode, body: JSON.parse(data) });
+                } catch(e) {
+                    console.log('JSON parse error, raw response:', data.substring(0, 300));
+                    resolve({ status: res.statusCode, body: { error: 'Invalid JSON from Anthropic', raw: data.substring(0, 200) } });
+                }
+            });
         });
-        req.on('error', reject);
+        req.on('error', e => {
+            console.log('Anthropic request error:', e.message);
+            reject(e);
+        });
+        req.setTimeout(22000, () => {
+            req.destroy();
+            reject(new Error('Anthropic API timeout after 22s'));
+        });
         req.write(body);
         req.end();
     });
 }
 
 exports.handler = async function(event, context) {
-    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method not allowed' };
+    try {
+        if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method not allowed' };
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return { statusCode: 500, body: JSON.stringify({ error: 'API key not configured' }) };
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) return { statusCode: 500, body: JSON.stringify({ error: 'API key not configured' }) };
 
-    let parsed;
-    try { parsed = JSON.parse(event.body); }
-    catch(e) { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
+        let parsed;
+        try { parsed = JSON.parse(event.body); }
+        catch(e) { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON in request body' }) }; }
 
-    const { system, messages, clientData } = parsed;
+        const { system, messages, clientData } = parsed;
 
-    // Agentic tool loop — max 5 iterations
-    let currentMessages = [...messages];
-    let iterations = 0;
+        // Log payload size for debugging
+        console.log('Payload size:', Buffer.byteLength(event.body), 'bytes');
+        console.log('Clinics:', clientData?.clinics?.length, '| Procedures:', Object.keys(clientData?.procedures || {}).length, 'specialties');
 
-    while (iterations < 5) {
-        iterations++;
-        const result = await callAnthropic({
-            model: 'claude-sonnet-4-5',
-            max_tokens: 2000,
-            system,
-            tools: TOOLS,
-            messages: currentMessages
-        }, apiKey);
+        // Agentic tool loop — max 5 iterations
+        let currentMessages = [...messages];
+        let iterations = 0;
 
-        if (result.status !== 200) {
-            return { statusCode: result.status, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result.body) };
+        while (iterations < 5) {
+            iterations++;
+            const result = await callAnthropic({
+                model: 'claude-sonnet-4-5',
+                max_tokens: 2000,
+                system,
+                tools: TOOLS,
+                messages: currentMessages
+            }, apiKey);
+
+            console.log('Anthropic response status:', result.status, '| stop_reason:', result.body?.stop_reason);
+
+            if (result.status !== 200) {
+                return { statusCode: result.status, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result.body) };
+            }
+
+            const response = result.body;
+
+            if (response.stop_reason === 'end_turn') {
+                return {
+                    statusCode: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(response)
+                };
+            }
+
+            if (response.stop_reason === 'tool_use') {
+                const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
+                if (!toolUseBlocks.length) break;
+
+                currentMessages.push({ role: 'assistant', content: response.content });
+
+                const toolResults = toolUseBlocks.map(block => ({
+                    type: 'tool_result',
+                    tool_use_id: block.id,
+                    content: JSON.stringify(callTool(block.name, block.input, clientData))
+                }));
+
+                currentMessages.push({ role: 'user', content: toolResults });
+                continue;
+            }
+
+            break;
         }
 
-        const response = result.body;
+        return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Max iterations reached' }) };
 
-        // If stop reason is end_turn or no tool use, return the text response
-        if (response.stop_reason === 'end_turn') {
-            return {
-                statusCode: 200,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(response)
-            };
-        }
-
-        // Process tool calls
-        if (response.stop_reason === 'tool_use') {
-            const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
-            if (!toolUseBlocks.length) break;
-
-            // Add assistant response to messages
-            currentMessages.push({ role: 'assistant', content: response.content });
-
-            // Execute all tool calls and build tool results
-            const toolResults = toolUseBlocks.map(block => ({
-                type: 'tool_result',
-                tool_use_id: block.id,
-                content: JSON.stringify(callTool(block.name, block.input, clientData))
-            }));
-
-            currentMessages.push({ role: 'user', content: toolResults });
-            continue;
-        }
-
-        break;
+    } catch(e) {
+        console.log('Handler error:', e.message);
+        return {
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: e.message })
+        };
     }
-
-    return { statusCode: 500, body: JSON.stringify({ error: 'Max iterations reached' }) };
 };

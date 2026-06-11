@@ -2546,27 +2546,74 @@
             const loadingId = appendAIMessage('ai', '⏳ Thinking...');
 
             try {
-                const contextClinics = clinics.length > 3000 ? clinics.slice(0, 3000) : clinics;
-                const demographics = buildDemographicsContext();
+                // Hard caps to keep payload under 50KB
+                const contextClinics = clinics.slice(0, 500).map(c => ({
+                    npi: c.npi, name: c.name, taxonomy: c.taxonomy,
+                    zip: c.zip, city: c.city, state: c.state
+                }));
+
+                // Demographics as summary totals only — not per-ZIP array
+                const demRows = buildDemographicsContext() || [];
+                const demSummary = demRows.reduce((acc, d) => ({
+                    total_population: acc.total_population + (d.total_population || 0),
+                    adult_population: acc.adult_population + (d.adult_population_18plus || 0),
+                    insured_population: acc.insured_population + (d.insured_population || 0),
+                    zip_count: acc.zip_count + 1
+                }), { total_population: 0, adult_population: 0, insured_population: 0, zip_count: 0 });
+                if (demSummary.total_population > 0) {
+                    demSummary.insured_pct = Math.round((demSummary.insured_population / demSummary.total_population) * 100);
+                }
+
+                // Procedures — top 100 by patient volume only
+                const procRows = [];
+                if (proceduresRawData) {
+                    Object.entries(proceduresRawData).forEach(([specialty, procs]) => {
+                        Object.values(procs).forEach(p => {
+                            procRows.push({
+                                specialty,
+                                hcpcs_cd: p.hcpcs_cd,
+                                hcpcs_desc: (p.hcpcs_desc || '').substring(0, 50),
+                                tot_benes: Math.round(p.tot_benes),
+                                avg_mdcr_pymt: p.count > 0 ? Math.round(p.avg_mdcr_pymt_amt / p.count) : 0
+                            });
+                        });
+                    });
+                    procRows.sort((a, b) => b.tot_benes - a.tot_benes);
+                    procRows.splice(100);
+                }
+
+                // Restructure procedures as specialty-keyed object for tools
+                const procBySpec = {};
+                procRows.forEach(p => {
+                    if (!procBySpec[p.specialty]) procBySpec[p.specialty] = {};
+                    procBySpec[p.specialty][p.hcpcs_cd] = {
+                        hcpcs_cd: p.hcpcs_cd,
+                        hcpcs_desc: p.hcpcs_desc,
+                        tot_benes: p.tot_benes,
+                        tot_srvcs: p.tot_benes,
+                        avg_mdcr_pymt_amt: p.avg_mdcr_pymt,
+                        count: 1
+                    };
+                });
 
                 const systemPrompt = `You are a healthcare market intelligence assistant embedded in ProviderPulse, a provider mapping tool.
 
 You have tools to query data loaded on the user's map. Always use tools to answer — never guess or make up numbers.
 
 Available data:
-- CLINICS: ${contextClinics.length} providers (name, npi, taxonomy, address, zip, state)
-- DEMOGRAPHICS: ${demographics ? demographics.length + ' ZIPs with population data' : 'not loaded'}
-- PROCEDURES: ${proceduresRawData && Object.keys(proceduresRawData).length > 0 ? Object.keys(proceduresRawData).length + ' specialties loaded' : 'not loaded — user must click a ZIP first'}
-- PLACES: ${window.placesDataCache && Object.keys(window.placesDataCache).length > 0 ? Object.keys(window.placesDataCache).length + ' health metrics loaded' : 'not loaded — user must click a county or ZIP first'}
-- CMS: ${window.cmsDataCache && Object.keys(window.cmsDataCache).length > 0 ? 'county utilization loaded' : 'not loaded — user must click a county first'}
-- NPPES CONTACT INFO: ${Object.keys(nppesCache).length > 0 ? Object.keys(nppesCache).length + ' providers enriched (phone, fax, authorized official)' : 'not loaded — user must click clinic markers to load contact info'}
+- CLINICS: ${contextClinics.length} providers (capped at 500 of ${clinics.length} total; name, npi, taxonomy, zip, state)
+- DEMOGRAPHICS: ${demSummary.zip_count} ZIPs · Pop ${demSummary.total_population?.toLocaleString()} · ${demSummary.insured_pct}% insured
+- PROCEDURES: ${procRows.length} top procedures across ${Object.keys(procBySpec).length} specialties
+- PLACES: ${window.placesDataCache && Object.keys(window.placesDataCache).length > 0 ? Object.keys(window.placesDataCache).length + ' health metrics loaded' : 'not loaded'}
+- CMS: ${window.cmsDataCache && Object.keys(window.cmsDataCache).length > 0 ? 'county utilization loaded' : 'not loaded'}
+- NPPES: ${Object.keys(nppesCache).length > 0 ? Object.keys(nppesCache).length + ' providers enriched' : 'none — click markers to load'}
 
-For tables use markdown pipe format. Be concise. Always use tools for any count, ranking, or calculation.`;
+For tables use markdown pipe format. Be concise. Always use tools for counts, rankings, calculations.`;
 
                 const clientData = {
                     clinics: contextClinics,
-                    demographics: demographics || [],
-                    procedures: proceduresRawData || {},
+                    demographics: demRows.slice(0, 50),
+                    procedures: procBySpec,
                     places: window.placesDataCache || {},
                     cms: window.cmsDataCache || {},
                     nppes: buildNPPESContext() || []
