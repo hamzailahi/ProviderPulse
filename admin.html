@@ -265,44 +265,22 @@
     btn.textContent = 'Approving...';
 
     try {
-      // Check for existing active code for this email — prevent duplicates
-      const existing = await sbFetch(
-        `access_codes?email=eq.${encodeURIComponent(email.toLowerCase())}&used=eq.false&select=id,expires_at`
-      );
-      const hasActive = existing.some(c => new Date(c.expires_at) > new Date());
-      if (hasActive) {
+      const res = await fetch('/.netlify/functions/admin-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve', password: ADMIN_PASSWORD, id, email, name, days })
+      });
+      const data = await res.json();
+
+      if (data.error === 'active_code_exists') {
         showToast(`⚠ ${email} already has an active code`, '#e3b341');
         btn.disabled = false;
         btn.textContent = 'Approve';
         return;
       }
+      if (!data.ok) throw new Error(data.error || 'Approval failed');
 
-      const code = generateCode();
-      const expires_at = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-
-      // Insert code
-      await sbFetch('access_codes', {
-        method: 'POST',
-        body: JSON.stringify({ request_id: id, email: email.toLowerCase(), code, expires_at })
-      });
-
-      // Update request status to approved — removes from pending
-      await sbFetch(`access_requests?id=eq.${id}`, {
-        method: 'PATCH',
-        headers: { 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ status: 'approved' })
-      });
-
-      // Send email
-      fetch('/.netlify/functions/send-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name, code, expires_at, days })
-      }).catch(e => console.error('Email error:', e));
-
-      showToast(`✓ Approved ${email} for ${days} day${days > 1 ? 's' : ''} — email sent`);
-
-      // Remove row immediately without full reload
+      showToast(`✓ Approved ${email} for ${days} day${days > 1 ? 's' : ''}${data.email_sent ? ' — email sent' : ' — email failed, check logs'}`);
       const row = document.getElementById(`req-row-${id}`);
       if (row) row.remove();
       await loadAll();
@@ -315,23 +293,25 @@
   }
 
   async function deny(id) {
-    await sbFetch(`access_requests?id=eq.${id}`, {
-      method: 'PATCH',
-      headers: { 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ status: 'denied' })
+    const res = await fetch('/.netlify/functions/admin-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deny', password: ADMIN_PASSWORD, id })
     });
-    showToast('Request denied');
-    await loadAll();
+    const data = await res.json();
+    if (data.ok) { showToast('Request denied'); await loadAll(); }
+    else showToast(`✗ ${data.error}`, '#da3633');
   }
 
   async function revoke(id) {
-    await sbFetch(`access_codes?id=eq.${id}`, {
-      method: 'PATCH',
-      headers: { 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ used: true })
+    const res = await fetch('/.netlify/functions/admin-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'revoke', password: ADMIN_PASSWORD, id })
     });
-    showToast('Code revoked');
-    await loadAll();
+    const data = await res.json();
+    if (data.ok) { showToast('Code revoked'); await loadAll(); }
+    else showToast(`✗ ${data.error}`, '#da3633');
   }
 
   window.addEventListener('load', () => {
