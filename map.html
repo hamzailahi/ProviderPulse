@@ -1152,6 +1152,37 @@
             renderMap();
         });
 
+        // Find the state of the clinic nearest to a given lat/lng — used to ensure
+        // ZIP boundaries are loaded for whatever state(s) a catchment circle covers.
+        function findNearestState(latlng) {
+            let best = null, bestDist = Infinity;
+            for (let addr in groupedData) {
+                const node = groupedData[addr];
+                if (node.lat === null || node.lng === null) continue;
+                const d = map.distance(latlng, L.latLng(node.lat, node.lng));
+                if (d < bestDist) {
+                    bestDist = d;
+                    const st = String(node.practices[0]?.['State'] || '').trim().toUpperCase();
+                    if (st) best = st;
+                }
+            }
+            return best;
+        }
+
+        // Ensure ZIP boundaries exist for the state under the circle center plus its
+        // bordering states, since a circle can span further than the originally loaded CSV's states.
+        async function ensureCircleStatesLoaded(center) {
+            const centerState = findNearestState(center);
+            if (!centerState) return;
+            const statesToLoad = [centerState, ...(STATE_NEIGHBORS[centerState] || [])];
+            const loadPromises = statesToLoad
+                .filter(st => STATE_FILES[st] && !loadedStates.has(st))
+                .map(st => loadState(st));
+            if (loadPromises.length > 0) {
+                await Promise.all(loadPromises);
+            }
+        }
+
         map.on('click', function(e) {
             if (!isPlacingCircle) return;
             isPlacingCircle = false; document.getElementById('map').style.cursor = '';
@@ -1168,6 +1199,14 @@
             lockedZip = null; lockedLayer = null;
 
             renderMap();
+
+            const statusEl = document.getElementById('dbStatus');
+            const prevStatus = statusEl ? statusEl.textContent : null;
+            if (statusEl) statusEl.textContent = '🔄 Loading boundaries for catchment area...';
+            ensureCircleStatesLoaded(circleCenter).then(() => {
+                if (statusEl) statusEl.textContent = prevStatus || 'Type a city, state, or ZIP';
+                if (searchCircle) updateDemographics();
+            });
         });
 
         document.getElementById('exportCsvBtn').addEventListener('click', () => {
