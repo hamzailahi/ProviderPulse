@@ -1319,6 +1319,40 @@
         }
 
         // --- DASHBOARD ROUTING LOGIC ---
+        // Fetch demographics_raw rows for any ZIPs not already cached in zipDemographics.
+        // Mirrors the same fetch pattern used by the initial load and the neighbors flow,
+        // since the radius circle can capture ZIPs that have no clinic (and so were never fetched).
+        async function ensureDemographicsLoaded(zipList) {
+            const missing = [...zipList].filter(z => {
+                const padded = String(z).padStart(5, '0');
+                return !zipDemographics[z] && !zipDemographics[padded];
+            });
+            if (missing.length === 0) return false;
+
+            const zipVariants = [...new Set(missing.flatMap(z => [String(z).padStart(5, '0'), String(parseInt(z, 10))]))];
+            let fetchedAny = false;
+            for (let i = 0; i < zipVariants.length; i += 50) {
+                const batch = zipVariants.slice(i, i + 50);
+                try {
+                    const res = await fetch(
+                        `${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${batch.join(',')})&select=*`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                    );
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    data.forEach(d => {
+                        const z = String(d.zip).padStart(5, '0');
+                        zipDemographics[z] = d;
+                        zipDemographics[d.zip] = d;
+                        fetchedAny = true;
+                    });
+                } catch (e) {
+                    console.warn('Demographics fetch failed for batch', batch, e);
+                }
+            }
+            return fetchedAny;
+        }
+
         function updateDemographics() {
             if (lockedZip) {
                 const inCircle = !!searchCircle;
@@ -1331,6 +1365,11 @@
                 document.getElementById('closePanelBtn').textContent = backLabel + ' ✕';
                 const r = zipDemographics[lockedZip] || zipDemographics[String(lockedZip).padStart(5,'0')] || null;
                 renderDashboard(r);
+                if (!r) {
+                    ensureDemographicsLoaded([lockedZip]).then(fetchedAny => {
+                        if (fetchedAny && lockedZip) updateDemographics();
+                    });
+                }
                 // Load PLACES data for this ZIP
                 const zipPadded = String(lockedZip).padStart(5,'0');
                 fetchPLACESData([zipPadded]);
@@ -1380,6 +1419,10 @@
                 document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span><br/>Capturing ${capturedZips.size} intersecting ZIP codes.<br/><span style="color:var(--text-muted);font-size:10px;">Click any ZIP for its individual demographics.</span>`;
                 renderDashboard(agg);
 
+                ensureDemographicsLoaded(capturedZips).then(fetchedAny => {
+                    if (fetchedAny && searchCircle) updateDemographics();
+                });
+
             } else if (neighborZipSet.size > 0) {
                 if (zipGeoJSONLayer) {
                     zipGeoJSONLayer.eachLayer(l => {
@@ -1398,6 +1441,10 @@
                 document.getElementById('dashboard-title').textContent = "NEIGHBOR AREA";
                 document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span><br/>Covering ${allZips.size} ZIP codes (seed + neighbors).<br/><span style="color:var(--text-muted);font-size:10px;">Click any ZIP for its individual demographics.</span>`;
                 renderDashboard(agg);
+
+                ensureDemographicsLoaded(allZips).then(fetchedAny => {
+                    if (fetchedAny && neighborZipSet.size > 0) updateDemographics();
+                });
 
             } else {
                 if (zipGeoJSONLayer) { zipGeoJSONLayer.eachLayer(l => zipGeoJSONLayer.resetStyle(l)); }
