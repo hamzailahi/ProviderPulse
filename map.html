@@ -1282,9 +1282,14 @@
         // --- DASHBOARD ROUTING LOGIC ---
         function updateDemographics() {
             if (lockedZip) {
+                const inCircle = !!searchCircle;
+                const inNeighbors = neighborZipSet.size > 0;
+                const backLabel = inCircle ? 'Back to Catchment Area' : (inNeighbors ? 'Back to Neighbor Area' : 'Clear ZIP');
+
                 document.getElementById('dashboard-title').textContent = `ZIP CODE ${lockedZip}`;
                 document.getElementById('dashboard-context').textContent = "Isolated Demographic View";
                 document.getElementById('closePanelBtn').style.display = 'block';
+                document.getElementById('closePanelBtn').textContent = backLabel + ' ✕';
                 const r = zipDemographics[lockedZip] || zipDemographics[String(lockedZip).padStart(5,'0')] || null;
                 renderDashboard(r);
                 // Load PLACES data for this ZIP
@@ -1301,13 +1306,28 @@
             document.getElementById('hpsaMetrics').innerHTML = '<em style="color:var(--text-muted);">Click a county to load shortage area data.</em>';
             document.getElementById('proceduresContent').innerHTML = '<em style="color:var(--text-muted);font-size:12px;">Click a ZIP boundary or search a ZIP to load Medicare procedure data.</em>';
 
+            function aggregateZips(zipList) {
+                let agg = {};
+                zipList.forEach(z => {
+                    let row = zipDemographics[z] || zipDemographics[String(z).padStart(5,'0')];
+                    if (row) {
+                        for (let key in row) {
+                            if (key.includes('Total') || key.includes('Insured')) {
+                                agg[key] = (agg[key] || 0) + safeParseNum(row[key]);
+                            }
+                        }
+                    }
+                });
+                return agg;
+            }
+
             if (searchCircle) {
                 const circleBounds = searchCircle.getBounds();
                 let capturedZips = new Set();
 
                 if (zipGeoJSONLayer) {
                     zipGeoJSONLayer.eachLayer(layer => {
-                        zipGeoJSONLayer.resetStyle(layer); 
+                        zipGeoJSONLayer.resetStyle(layer);
                         if (circleBounds.intersects(layer.getBounds())) {
                             capturedZips.add(layer.feature.properties.ZCTA5CE10);
                             layer.setStyle({ weight: 2, color: '#f0883e', fillOpacity: 0.15, fillColor: '#f0883e' });
@@ -1315,38 +1335,37 @@
                     });
                 }
 
-                let agg = {};
-                capturedZips.forEach(z => {
-                    let row = zipDemographics[z] || zipDemographics[String(z).padStart(5,'0')];
-                    if (row) {
-                        for(let key in row) {
-                            if(key.includes('Total') || key.includes('Insured')) {
-                                agg[key] = (agg[key] || 0) + safeParseNum(row[key]);
-                            }
-                        }
-                    }
-                });
+                const agg = aggregateZips(capturedZips);
 
                 document.getElementById('dashboard-title').textContent = "CATCHMENT AREA";
-                document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span><br/>Capturing ${capturedZips.size} intersecting ZIP codes.`;
+                document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span><br/>Capturing ${capturedZips.size} intersecting ZIP codes.<br/><span style="color:var(--text-muted);font-size:10px;">Click any ZIP for its individual demographics.</span>`;
+                renderDashboard(agg);
+
+            } else if (neighborZipSet.size > 0) {
+                if (zipGeoJSONLayer) {
+                    zipGeoJSONLayer.eachLayer(l => {
+                        zipGeoJSONLayer.resetStyle(l);
+                        const z = String(l.feature.properties.ZCTA5CE10).padStart(5, '0');
+                        if (neighborZipSet.has(z)) {
+                            l.setStyle({ weight: 2, color: '#3fb950', fillOpacity: 0.2, fillColor: '#3fb950' });
+                        }
+                    });
+                }
+
+                const allZips = new Set(neighborZipSet);
+                if (neighborSeedZip) allZips.add(String(neighborSeedZip).padStart(5, '0'));
+                const agg = aggregateZips(allZips);
+
+                document.getElementById('dashboard-title').textContent = "NEIGHBOR AREA";
+                document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span><br/>Covering ${allZips.size} ZIP codes (seed + neighbors).<br/><span style="color:var(--text-muted);font-size:10px;">Click any ZIP for its individual demographics.</span>`;
                 renderDashboard(agg);
 
             } else {
                 if (zipGeoJSONLayer) { zipGeoJSONLayer.eachLayer(l => zipGeoJSONLayer.resetStyle(l)); }
-                
+
                 const uniqueZips = [...new Set(currentlyVisiblePractices.map(p => String(p['ZIP Code'] || p['Zipcode'] || '').trim().split('-')[0].padStart(5, '0')))].filter(z => z !== '00000' && (zipDemographics[z] || zipDemographics[String(z).padStart(5,'0')]));
-                
-                let agg = {};
-                uniqueZips.forEach(z => {
-                    let row = zipDemographics[z] || zipDemographics[String(z).padStart(5,'0')];
-                    if(row) {
-                        for(let key in row) {
-                            if(key.includes('Total') || key.includes('Insured')) {
-                                agg[key] = (agg[key] || 0) + safeParseNum(row[key]);
-                            }
-                        }
-                    }
-                });
+
+                const agg = aggregateZips(uniqueZips);
 
                 document.getElementById('dashboard-title').textContent = "MARKET OVERVIEW";
                 document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span> visible on map.`;
@@ -1357,6 +1376,7 @@
         // --- ZIP HOVER & CLICK LOGIC ---
         // Simple logic: click ZIP = isolate demographics. Show Neighbors button loads adjacent ZIPs.
         let neighborZipSet = new Set(); // Currently loaded neighbor ZIPs
+        let neighborSeedZip = null; // The ZIP that neighbors were loaded around
 
         function showNeighborButtons(show) {
             document.getElementById('neighborsBtn').style.display = show ? 'inline-block' : 'none';
@@ -1365,6 +1385,7 @@
 
         function clearNeighbors() {
             neighborZipSet.clear();
+            neighborSeedZip = null;
             lockedZip = null; lockedLayer = null;
             if (zipGeoJSONLayer) zipGeoJSONLayer.eachLayer(l => zipGeoJSONLayer.resetStyle(l));
             showNeighborButtons(false);
@@ -1375,7 +1396,7 @@
         function attachZipHover(feature, layer) {
             const zip = feature.properties.ZCTA5CE10;
             layer.on('click', function() {
-                // If clicking the already-locked ZIP, unlock
+                // If clicking the already-locked ZIP, unlock back to whichever aggregate is active
                 if (lockedZip === zip) {
                     lockedZip = null; lockedLayer = null;
                     zipGeoJSONLayer.resetStyle(layer);
@@ -1441,6 +1462,7 @@
             if (!lockedZip && neighborZipSet.size === 0) return;
 
             const seedZip = lockedZip;
+            neighborSeedZip = seedZip;
             const seedPadded = String(seedZip).padStart(5, '0');
             const statusEl = document.getElementById('dbStatus');
 
