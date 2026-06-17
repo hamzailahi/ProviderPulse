@@ -3,7 +3,11 @@ const https = require('https');
 const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
 const SUPABASE_SECRET = process.env.SUPABASE_SECRET_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Password12@$#";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_PASSWORD) {
+    throw new Error('ADMIN_PASSWORD environment variable is not set');
+}
 
 function supabaseFetch(path, method, body) {
     return new Promise((resolve, reject) => {
