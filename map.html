@@ -1192,8 +1192,8 @@
             if (searchCircle) map.removeLayer(searchCircle);
             if (centerMarker) map.removeLayer(centerMarker);
             circleCenter = e.latlng;
-            searchCircle = L.circle(circleCenter, { color: '#f0883e', fillColor: '#f0883e', fillOpacity: 0.1, radius: circleRadiusMiles * 1609.34, weight: 2, dashArray: '5, 5' }).addTo(map);
-            centerMarker = L.circleMarker(circleCenter, { radius: 5, color: '#fff', fillColor: '#f0883e', fillOpacity: 1, weight: 2 }).addTo(map);
+            searchCircle = L.circle(circleCenter, { color: '#f0883e', fillColor: '#f0883e', fillOpacity: 0.1, radius: circleRadiusMiles * 1609.34, weight: 2, dashArray: '5, 5', interactive: false }).addTo(map);
+            centerMarker = L.circleMarker(circleCenter, { radius: 5, color: '#fff', fillColor: '#f0883e', fillOpacity: 1, weight: 2, interactive: false }).addTo(map);
             
             if (lockedLayer) zipGeoJSONLayer.resetStyle(lockedLayer);
             lockedZip = null; lockedLayer = null;
@@ -1327,19 +1327,26 @@
                 const padded = String(z).padStart(5, '0');
                 return !zipDemographics[z] && !zipDemographics[padded];
             });
-            if (missing.length === 0) return false;
+            console.log('[ensureDemographicsLoaded] input zipList:', [...zipList]);
+            console.log('[ensureDemographicsLoaded] missing (not yet cached):', missing);
+            if (missing.length === 0) {
+                console.log('[ensureDemographicsLoaded] nothing missing, skipping fetch');
+                return false;
+            }
 
             const zipVariants = [...new Set(missing.flatMap(z => [String(z).padStart(5, '0'), String(parseInt(z, 10))]))];
+            console.log('[ensureDemographicsLoaded] zipVariants to fetch:', zipVariants);
             let fetchedAny = false;
             for (let i = 0; i < zipVariants.length; i += 50) {
                 const batch = zipVariants.slice(i, i + 50);
+                const url = `${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${batch.join(',')})&select=*`;
+                console.log('[ensureDemographicsLoaded] fetching:', url);
                 try {
-                    const res = await fetch(
-                        `${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${batch.join(',')})&select=*`,
-                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
-                    );
-                    if (!res.ok) continue;
+                    const res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                    console.log('[ensureDemographicsLoaded] response status:', res.status, res.ok);
+                    if (!res.ok) { console.warn('[ensureDemographicsLoaded] response not ok, body:', await res.text()); continue; }
                     const data = await res.json();
+                    console.log('[ensureDemographicsLoaded] rows returned:', data.length, data);
                     data.forEach(d => {
                         const z = String(d.zip).padStart(5, '0');
                         zipDemographics[z] = d;
@@ -1350,6 +1357,7 @@
                     console.warn('Demographics fetch failed for batch', batch, e);
                 }
             }
+            console.log('[ensureDemographicsLoaded] fetchedAny:', fetchedAny);
             return fetchedAny;
         }
 
@@ -1364,9 +1372,12 @@
                 document.getElementById('closePanelBtn').style.display = 'block';
                 document.getElementById('closePanelBtn').textContent = backLabel + ' ✕';
                 const r = zipDemographics[lockedZip] || zipDemographics[String(lockedZip).padStart(5,'0')] || null;
+                console.log('[updateDemographics] lockedZip:', lockedZip, '| found in cache:', !!r, '| cache value:', r);
                 renderDashboard(r);
                 if (!r) {
+                    console.log('[updateDemographics] not in cache, calling ensureDemographicsLoaded for', lockedZip);
                     ensureDemographicsLoaded([lockedZip]).then(fetchedAny => {
+                        console.log('[updateDemographics] ensureDemographicsLoaded resolved, fetchedAny:', fetchedAny, '| lockedZip still:', lockedZip);
                         if (fetchedAny && lockedZip) updateDemographics();
                     });
                 }
@@ -1482,6 +1493,7 @@
         function attachZipHover(feature, layer) {
             const zip = feature.properties.ZCTA5CE10;
             layer.on('click', function() {
+                console.log('[attachZipHover] ZIP clicked:', zip, '| searchCircle active:', !!searchCircle, '| neighborZipSet size:', neighborZipSet.size);
                 // If clicking the already-locked ZIP, unlock back to whichever aggregate is active
                 if (lockedZip === zip) {
                     lockedZip = null; lockedLayer = null;
