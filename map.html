@@ -406,6 +406,7 @@
         let groupedData = {}, markers = [], currentlyVisiblePractices = [];
         let taxonomies = new Set(), taxonomyColors = {};
         let zipDemographics = {}, zipGeoJSONLayer = null;
+        let zipsWithClinics = new Set(); // Tracks which ZIPs have at least one clinic (for boundary styling only — NOT demographic data)
         let lockedZip = null, lockedLayer = null;
         let selectedTaxonomies = new Set();
         let dashCharts = { rawAge: null, rawInc: null, age: null, inc: null, race: null };
@@ -847,7 +848,7 @@
         }
 
         async function processData(data) {
-            groupedData = {}; taxonomies.clear(); zipDemographics = {};
+            groupedData = {}; taxonomies.clear(); zipDemographics = {}; zipsWithClinics.clear();
             activeStatesInCSV = new Set(); // Reset global
             
             if (!data || data.length === 0) return alert("Empty CSV file.");
@@ -887,7 +888,12 @@
                 if (rawZip) {
                     let zipStr = rawZip.split('-')[0].padStart(5, '0');
                     if (zipStr !== '00000') {
-                        zipDemographics[zipStr] = row;
+                        zipsWithClinics.add(zipStr);
+                        // Only store if this row actually carries demographic fields (avoid overwriting
+                        // a good cached row with a bare clinic record that has no demographics merged in)
+                        if (row['Total Population'] !== undefined || !zipDemographics[zipStr]) {
+                            zipDemographics[zipStr] = row;
+                        }
                     }
                 }
             });
@@ -906,7 +912,7 @@
                 zipGeoJSONLayer = L.geoJSON(null, { 
                     style: f => {
                         const z = f.properties.ZCTA5CE10;
-                        const hasData = !!(zipDemographics[z] || zipDemographics[String(z).padStart(5,'0')]);
+                        const hasData = zipsWithClinics.has(z) || zipsWithClinics.has(String(z).padStart(5,'0'));
                         return hasData 
                             ? { color: '#3b82f6', weight: 1, fillOpacity: 0.04, fillColor: '#3b82f6' }
                             : { color: 'transparent', weight: 0, fillOpacity: 0, fillColor: 'transparent' };
@@ -1325,7 +1331,8 @@
         async function ensureDemographicsLoaded(zipList) {
             const missing = [...zipList].filter(z => {
                 const padded = String(z).padStart(5, '0');
-                return !zipDemographics[z] && !zipDemographics[padded];
+                const row = zipDemographics[z] || zipDemographics[padded];
+                return !row || row['Total Population'] === undefined;
             });
             console.log('[ensureDemographicsLoaded] input zipList:', [...zipList]);
             console.log('[ensureDemographicsLoaded] missing (not yet cached):', missing);
@@ -1371,11 +1378,12 @@
                 document.getElementById('dashboard-context').textContent = "Isolated Demographic View";
                 document.getElementById('closePanelBtn').style.display = 'block';
                 document.getElementById('closePanelBtn').textContent = backLabel + ' ✕';
-                const r = zipDemographics[lockedZip] || zipDemographics[String(lockedZip).padStart(5,'0')] || null;
-                console.log('[updateDemographics] lockedZip:', lockedZip, '| found in cache:', !!r, '| cache value:', r);
-                renderDashboard(r);
-                if (!r) {
-                    console.log('[updateDemographics] not in cache, calling ensureDemographicsLoaded for', lockedZip);
+                let r = zipDemographics[lockedZip] || zipDemographics[String(lockedZip).padStart(5,'0')] || null;
+                const hasRealData = r && r['Total Population'] !== undefined;
+                console.log('[updateDemographics] lockedZip:', lockedZip, '| has real demographic data:', hasRealData, '| cache value:', r);
+                renderDashboard(hasRealData ? r : null);
+                if (!hasRealData) {
+                    console.log('[updateDemographics] missing population data, calling ensureDemographicsLoaded for', lockedZip);
                     ensureDemographicsLoaded([lockedZip]).then(fetchedAny => {
                         console.log('[updateDemographics] ensureDemographicsLoaded resolved, fetchedAny:', fetchedAny, '| lockedZip still:', lockedZip);
                         if (fetchedAny && lockedZip) updateDemographics();
