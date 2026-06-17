@@ -52,8 +52,6 @@
 </div>
 
 <script>
-  const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
 
   async function login() {
     const email = document.getElementById('email').value.trim().toLowerCase();
@@ -71,30 +69,21 @@
     btn.textContent = 'Verifying...';
 
     try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/access_codes?email=eq.${encodeURIComponent(email)}&code=eq.${code}&used=eq.false&select=*`,
-        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
-      );
+      const res = await fetch('/.netlify/functions/validate-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
+      });
       const data = await res.json();
 
-      if (!data || data.length === 0) {
-        throw new Error('Invalid code or email');
-      }
-
-      const record = data[0];
-      const now = new Date();
-      const expires = new Date(record.expires_at);
-
-      if (now > expires) {
-        throw new Error('This code has expired. Please request a new one.');
-      }
+      if (!data.ok) throw new Error(data.error || 'Invalid code or email');
 
       // Store session in localStorage
       const session = {
         email,
         code,
-        expires_at: record.expires_at,
-        granted_at: now.toISOString()
+        expires_at: data.expires_at,
+        granted_at: new Date().toISOString()
       };
       localStorage.setItem('map_session', JSON.stringify(session));
 

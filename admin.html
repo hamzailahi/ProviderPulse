@@ -119,23 +119,29 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
-  const ADMIN_PASSWORD = "Password12@$#";
+  let ADMIN_PASSWORD = ''; // held in memory only after a successful login — never hardcoded
 
-  function adminLogin() {
+  async function adminLogin() {
     const pwd = document.getElementById('adminPwd').value;
-    if (pwd === ADMIN_PASSWORD) {
+    const loginBtn = document.querySelector('#loginScreen .btn-approve');
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Signing in...';
+
+    const ok = await tryLoadAll(pwd);
+
+    if (ok) {
+      ADMIN_PASSWORD = pwd;
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('adminScreen').style.display = 'block';
-      sessionStorage.setItem('admin_auth', '1');
-      loadAll();
+      sessionStorage.setItem('admin_pwd', pwd);
     } else {
       document.getElementById('loginErr').style.display = 'block';
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Sign In';
     }
   }
 
-  function logout() { sessionStorage.removeItem('admin_auth'); location.reload(); }
+  function logout() { sessionStorage.removeItem('admin_pwd'); ADMIN_PASSWORD = ''; location.reload(); }
 
   function showToast(msg, color = '#238636') {
     const t = document.getElementById('toast');
@@ -168,25 +174,25 @@
     return `${hrs}h ${mins}m`;
   }
 
-  async function sbFetch(path, opts = {}) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-      ...opts,
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        ...(opts.headers || {})
-      }
-    });
-    if (opts.method === 'PATCH' || opts.method === 'DELETE') return res;
-    return res.json();
+  async function loadAll() {
+    return tryLoadAll(ADMIN_PASSWORD);
   }
 
-  async function loadAll() {
-    const [requests, codes] = await Promise.all([
-      sbFetch('access_requests?order=created_at.desc'),
-      sbFetch('access_codes?order=created_at.desc')
-    ]);
+  async function tryLoadAll(password) {
+    const res = await fetch('/.netlify/functions/admin-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const result = await res.json();
+
+    if (!result.ok) {
+      if (res.status !== 401) showToast(`✗ ${result.error || 'Failed to load admin data'}`, '#da3633');
+      return false;
+    }
+
+    const requests = result.requests;
+    const codes = result.codes;
 
     // Only show truly pending (not yet approved or denied)
     const pending = requests.filter(r => r.status === 'pending');
@@ -256,6 +262,8 @@
           <td><span class="badge ${r.status}">${r.status}</span></td>
           <td>${timeAgo(r.created_at)}</td>
         </tr>`).join('');
+
+    return true;
   }
 
   async function approve(id, email, name) {
@@ -314,11 +322,17 @@
     else showToast(`✗ ${data.error}`, '#da3633');
   }
 
-  window.addEventListener('load', () => {
-    if (sessionStorage.getItem('admin_auth') === '1') {
+  window.addEventListener('load', async () => {
+    const storedPwd = sessionStorage.getItem('admin_pwd');
+    if (!storedPwd) return;
+
+    const ok = await tryLoadAll(storedPwd);
+    if (ok) {
+      ADMIN_PASSWORD = storedPwd;
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('adminScreen').style.display = 'block';
-      loadAll();
+    } else {
+      sessionStorage.removeItem('admin_pwd');
     }
   });
 </script>
