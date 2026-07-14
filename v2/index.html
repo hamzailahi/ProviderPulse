@@ -366,16 +366,6 @@
         }
         @media (min-width: 769px) { #sheet-toggle-btn { display: none !important; } #sheet-drag-pill { display: none; } }
     </style>
-<script>
-  // Session guard — must run before anything else
-  (function() {
-    const session = JSON.parse(localStorage.getItem('map_session') || 'null');
-    if (!session || new Date(session.expires_at) <= new Date()) {
-      localStorage.removeItem('map_session');
-      window.location.href = '/login.html';
-    }
-  })();
-</script>
 </head>
 <body>
     <h2>Provider Market Strategy Dashboard</h2>
