@@ -42,6 +42,15 @@
   /* Sign in panel */
   #signinPanel { display: none; }
   #requestPanel { display: block; }
+
+  @media (max-width: 480px) {
+    body { padding: 16px; justify-content: flex-start; padding-top: 40px; }
+    .card { padding: 28px 20px; border-radius: 10px; }
+    h1 { font-size: 20px; }
+    input, textarea { font-size: 16px; } /* prevents iOS zoom */
+    button.primary { padding: 14px; font-size: 15px; }
+    .signin-toggle button { font-size: 11px; padding: 5px 10px; }
+  }
 </style>
 </head>
 <body>
