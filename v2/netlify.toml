@@ -1,0 +1,11 @@
+[build]
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[functions."ai-query"]
+  timeout = 26
+
+[functions."report-generate"]
+  timeout = 26
