@@ -3192,7 +3192,7 @@
 
             try {
                 // Hard caps to keep payload under 50KB
-                const contextClinics = clinics.slice(0, 500).map(c => ({
+                const contextClinics = clinics.slice(0, 100).map(c => (
                     npi: c.npi, name: c.name, taxonomy: c.taxonomy,
                     zip: c.zip, city: c.city, state: c.state
                 }));
@@ -3246,7 +3246,7 @@
 You have tools to query data loaded on the user's map. Always use tools to answer — never guess or make up numbers.
 
 Available data:
-- CLINICS: ${contextClinics.length} providers (capped at 500 of ${clinics.length} total; name, npi, taxonomy, zip, state)
+- CLINICS: ${contextClinics.length} providers (sampled from ${clinics.length} total; name, npi, taxonomy, zip, state)
 - DEMOGRAPHICS: ${demSummary.zip_count} ZIPs · Pop ${demSummary.total_population?.toLocaleString()} · ${demSummary.insured_pct}% insured
 - PROCEDURES: ${procRows.length} top procedures across ${Object.keys(procBySpec).length} specialties
 - PLACES: ${window.placesDataCache && Object.keys(window.placesDataCache).length > 0 ? Object.keys(window.placesDataCache).length + ' health metrics loaded' : 'not loaded'}
