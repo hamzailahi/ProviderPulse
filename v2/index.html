@@ -3061,23 +3061,14 @@
                 // Pull demographics directly scoped to loaded zips
                 const demScoped = zips.map(z => zipDemographics[z] || zipDemographics[String(parseInt(z))]).filter(Boolean);
 
-                const procScoped = {};
-                const _procs = (typeof proceduresRawData !== 'undefined') ? proceduresRawData : (window.proceduresRawData || {});
-                if (_procs) {
-                    Object.entries(_procs).forEach(([specialty, procs]) => {
-                        procScoped[specialty] = procs;
-                    });
-                }
-
                 const res = await fetch('/.netlify/functions/report-generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         question,
                         zips,
-                        clinics: allClinics,  // Send all clinics for these ZIPs; function will filter if needed
+                        clinics: allClinics,
                         demographics: demScoped.slice(0, 30),
-                        procedures: procScoped,
                         places: window.placesDataCache || {},
                         cms: window.cmsDataCache || {}
                     })
