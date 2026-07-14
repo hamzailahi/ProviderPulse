@@ -13,22 +13,22 @@
     
     <style>
         :root {
-            --bg-base:       #0d1117;
-            --bg-surface:    #161b22;
-            --bg-elevated:   #1c2330;
-            --bg-hover:      #21293a;
-            --border:        #2a3444;
-            --border-light:  #1e2836;
-            --accent:        #3b82f6;
-            --accent-dim:    rgba(59,130,246,0.15);
-            --accent-glow:   rgba(59,130,246,0.35);
-            --text-primary:  #e6edf3;
-            --text-secondary:#8b949e;
-            --text-muted:    #484f58;
+            --bg-base:       #0f1520;
+            --bg-surface:    #1a2235;
+            --bg-elevated:   #222d42;
+            --bg-hover:      #283350;
+            --border:        #2e3d5a;
+            --border-light:  #243048;
+            --accent:        #4c8dff;
+            --accent-dim:    rgba(76,141,255,0.15);
+            --accent-glow:   rgba(76,141,255,0.35);
+            --text-primary:  #f0f4fa;
+            --text-secondary:#b8c5d6;
+            --text-muted:    #7a8fa8;
             --green:         #3fb950;
             --orange:        #f0883e;
             --red:           #f85149;
-            --cyan:          #58a6ff;
+            --cyan:          #79c0ff;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -445,14 +445,16 @@
 
         <div id="map-column">
             <div id="omnibar-row">
-                <div id="controls">
-                    <div>
-                        <strong>Search Map</strong>
-                        <div id="search-wrapper">
-                            <input type="text" id="searchInput" placeholder="Address, Name, or County..." />
+                <div id="controls" style="flex:1;">
+                    <div style="flex:1;max-width:700px;">
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="text" id="addressInput" placeholder="Go to an address, ZIP code, city, or county..." style="flex:1;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:9px 14px;color:var(--text-primary);font-size:13px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')goToAddress(this.value)" />
+                            <button class="control-btn" id="addressGoBtn" style="padding:9px 16px;font-size:13px;background:var(--accent);color:#fff;border-color:var(--accent);">📍 Go</button>
                         </div>
                         <div id="addressStatus" style="font-size:10px;color:var(--text-muted);margin-top:3px;display:none;"></div>
                     </div>
+                    <!-- hidden search input kept for JS compatibility -->
+                    <input type="text" id="searchInput" style="display:none;" />
                     <span id="zip-loading">⏳ Loading ZIP Boundaries…</span>
                     <span id="county-loading" style="display:none;color:var(--orange);font-size:11px;font-family:'DM Mono',monospace;background:rgba(240,136,62,0.08);border:1px solid rgba(240,136,62,0.2);padding:4px 10px;border-radius:4px;">⏳ Loading County Boundaries…</span>
                 </div>
@@ -1931,6 +1933,11 @@
                 renderDashboard(agg);
                 renderMap();
 
+                // Auto-load procedures and PLACES for all loaded ZIPs
+                const allNeighborZips = [seedPadded, ...neighborZipList];
+                fetchProceduresData(allNeighborZips);
+                fetchPLACESData(allNeighborZips);
+
                 statusEl.textContent = `✅ Loaded ${clinicData.length} clinics from ${neighborZipList.length} neighboring ZIPs`;
                 document.getElementById('clearZipsBtn').style.display = 'inline-block';
                 document.getElementById('neighborsBtn').style.display = 'none';
@@ -3055,8 +3062,9 @@
                 const demScoped = zips.map(z => zipDemographics[z] || zipDemographics[String(parseInt(z))]).filter(Boolean);
 
                 const procScoped = {};
-                if (proceduresRawData) {
-                    Object.entries(proceduresRawData).forEach(([specialty, procs]) => {
+                const _procs = (typeof proceduresRawData !== 'undefined') ? proceduresRawData : (window.proceduresRawData || {});
+                if (_procs) {
+                    Object.entries(_procs).forEach(([specialty, procs]) => {
                         procScoped[specialty] = procs;
                     });
                 }
