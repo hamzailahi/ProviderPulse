@@ -22,7 +22,7 @@ function callAnthropic(payload, apiKey) {
             });
         });
         req.on('error', reject);
-        req.setTimeout(22000, () => { req.destroy(); reject(new Error('Anthropic API timeout after 22s')); });
+        req.setTimeout(15000, () => { req.destroy(); reject(new Error('Anthropic API timeout after 15s')); });
         req.write(body);
         req.end();
     });
@@ -65,9 +65,14 @@ exports.handler = async function(event) {
         procRows.splice(60);
     }
 
-    const clinicSummary = (clinics || []).slice(0, 300).map(c => ({
-        name: c.name, taxonomy: c.taxonomy, zip: c.zip
-    }));
+    // Filter clinics to those in scope ZIPs only; cap at 500 to prevent payload bloat
+    const zipSet = new Set(zips.map(z => String(z).padStart(5, '0')));
+    const clinicSummary = (clinics || [])
+        .filter(c => zipSet.has(String(c.zip || '').padStart(5, '0')))
+        .slice(0, 500)
+        .map(c => ({
+            name: c.name, taxonomy: c.taxonomy, zip: c.zip
+        }));
 
     const dataPacket = {
         zip_codes_in_scope: zips,
