@@ -9,3 +9,6 @@
 
 [functions."report-generate"]
   timeout = 26
+
+[functions."cms-provider"]
+  timeout = 10
