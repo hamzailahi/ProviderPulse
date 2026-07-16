@@ -2583,7 +2583,7 @@
             if (data.telehealth) badges.push('<span style="background:#1a2a3a;color:#58a6ff;padding:1px 5px;border-radius:3px;font-size:10px;">📹 Telehealth</span>');
             let html = badges.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:3px;">${badges.join('')}</div>` : '';
             if (data.facility) html += `<span style="color:#8b949e;font-size:10px;">🏥 ${data.facility}</span><br/>`;
-            if (data.medical_school) html += `<span style="color:#8b949e;font-size:10px;">🎓 ${data.medical_school}${data.graduation_year ? ' ''+String(data.graduation_year).slice(-2) : ''}</span><br/>`;
+            if (data.medical_school) html += `<span style="color:#8b949e;font-size:10px;">🎓 ${data.medical_school}${data.graduation_year ? ' (' + data.graduation_year + ')' : ''}</span><br/>`;
             if (data.secondary_specialties?.length) html += `<span style="color:#6e7681;font-size:10px;">Also: ${data.secondary_specialties.slice(0,2).join(', ')}</span><br/>`;
             if (html) el.innerHTML = html;
         }
