@@ -182,7 +182,18 @@ exports.handler = async (event) => {
     for (const batch of batches) for (const pr of batch) {
       if (!seen.has(pr.npi)) { seen.add(pr.npi); providers.push(pr); }
     }
-    providers = providers.slice(0, 15);
+    // Rank by ZIP closeness: exact match first, then same 3-digit prefix
+    providers.sort((a, b) => {
+      const ax = a.zip === effectiveZip ? 0 : (a.zip.startsWith(zip3) ? 1 : 2);
+      const bx = b.zip === effectiveZip ? 0 : (b.zip.startsWith(zip3) ? 1 : 2);
+      return ax - bx;
+    });
+    providers = providers.slice(0, 3);
+    // Geocode the 3 in parallel so exact map coordinates are ready before Claude answers
+    const coords = await Promise.all(providers.map(geocode));
+    for (let i = 0; i < providers.length; i++) {
+      if (coords[i]) { providers[i].lat = coords[i].lat; providers[i].lng = coords[i].lng; }
+    }
   }
 
   // 4) Ask Claude to present the matches
@@ -199,13 +210,13 @@ exports.handler = async (event) => {
 PATIENT (greet them by first name):
 ${JSON.stringify(patientContext)}
 
-PROVIDERS FOUND NEAR THEM in the national registry, already filtered to their area (${effectiveZip ? 'ZIP ' + effectiveZip : 'no ZIP on file'}) and relevant specialties (${terms.join(', ')}). This is the COMPLETE list, never invent others:
+PROVIDERS FOUND NEAR THEM in the national registry, already filtered to their area (${effectiveZip ? 'ZIP ' + effectiveZip : 'no ZIP on file'}) and relevant specialties (${terms.join(', ')}). This is the COMPLETE list, use ALL of them and never invent others:
 ${JSON.stringify(providers)}
 
 Rules:
 - On the first message, greet the patient by first name and briefly, kindly acknowledge the health concerns they listed. One sentence, no drama.
-- Recommend the top 3 best-fitting providers. For each: name, specialty, city, and phone.
-- Clickable "Show on map" links appear automatically under your reply for every provider you mention, so don't tell them to look for a button, just list the providers.
+- Present ALL providers in the list above, in the exact order given. For each: name, specialty, city, and phone.
+- Clickable "Show on map" links appear automatically under your reply for every provider, in the same order.
 - If the list is empty AND no ZIP is on file, ask them to share their 5-digit ZIP so you can search.
 - If the list is empty AND a ZIP was provided, tell them there are no matches in that area for that specialty and offer to try a different specialty or nearby area.
 - Insurance acceptance is not in this data, so advise calling ahead to confirm the provider takes ${patientContext.insurance}.
@@ -239,13 +250,7 @@ Rules:
     const aiData = await aiRes.json();
     if (!aiRes.ok) throw new Error(aiData.error && aiData.error.message);
     const reply = (aiData.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
-    // Geocode top 3 in parallel so the frontend has exact coordinates for map pins
-    const top = providers.slice(0, 3);
-    const coords = await Promise.all(top.map(geocode));
-    for (let i = 0; i < top.length; i++) {
-      if (coords[i]) { top[i].lat = coords[i].lat; top[i].lng = coords[i].lng; }
-    }
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply, providers: top }) };
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply, providers }) };
   } catch (e) {
     return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'The assistant is unavailable right now, please try again in a moment.' }) };
   }
