@@ -66,13 +66,30 @@ function taxonomyTerms(conditions, latestUserText, concernDescription) {
   return [...terms].slice(0, 3);
 }
 
-async function nppesSearch(zip3, taxonomy) {
-  const url = `https://npiregistry.cms.hhs.gov/api/?version=2.1&postal_code=${zip3}*&taxonomy_description=${encodeURIComponent(taxonomy)}&limit=8`;
-  try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
-    const data = await r.json();
-    return data.results || [];
-  } catch { return []; }
+async function nppesSearch(zip, taxonomy) {
+  // NPPES accepts a full 5-digit ZIP OR a 5-digit + wildcard. Full ZIP is more reliable.
+  // Try full ZIP first, then broaden to state if empty.
+  const tryUrl = async (url) => {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const data = await r.json();
+      return data.results || [];
+    } catch { return []; }
+  };
+  const enc = encodeURIComponent(taxonomy);
+  const zip5 = zip.length === 5 ? zip : '';
+  let results = [];
+  if (zip5) {
+    results = await tryUrl(`https://npiregistry.cms.hhs.gov/api/?version=2.1&postal_code=${zip5}&taxonomy_description=${enc}&limit=15`);
+  }
+  if (results.length < 3 && zip.length >= 3) {
+    // Broaden to prefix wildcard (NPPES supports one wildcard at the end)
+    const zipStar = zip.slice(0, 3) + '*';
+    const extra = await tryUrl(`https://npiregistry.cms.hhs.gov/api/?version=2.1&postal_code=${zipStar}&taxonomy_description=${enc}&limit=15`);
+    const seen = new Set(results.map(r => r.number));
+    for (const r of extra) if (!seen.has(r.number)) results.push(r);
+  }
+  return results.slice(0, 8);
 }
 
 function compact(rec, taxonomy) {
@@ -124,15 +141,20 @@ exports.handler = async (event) => {
   });
   const profRows = await profRes.json();
   const p = (Array.isArray(profRows) && profRows[0]) || {};
-  const zip3 = (p.zip || '').slice(0, 3);
+
+  // Extract ZIP from chat if patient typed one, overrides missing profile ZIP
+  const allChatText = history.map(m => String(m.content || '')).join(' ');
+  const zipInChat = (allChatText.match(/\b\d{5}\b/g) || []).pop();
+  const effectiveZip = (p.zip && /^\d{5}$/.test(p.zip)) ? p.zip : (zipInChat || '');
+  const zip3 = effectiveZip.slice(0, 3);
 
   // 3) Live NPPES search by ZIP area + taxonomy
   const latestUser = [...history].reverse().find(m => m.role === 'user');
   const terms = taxonomyTerms(p.conditions || [], String((latestUser || {}).content || ''), p.concern_description || '');
 
   let providers = [];
-  if (zip3) {
-    const batches = await Promise.all(terms.map(t => nppesSearch(zip3, t).then(rs => rs.map(r => compact(r, t)))));
+  if (effectiveZip) {
+    const batches = await Promise.all(terms.map(t => nppesSearch(effectiveZip, t).then(rs => rs.map(r => compact(r, t)))));
     const seen = new Set();
     for (const batch of batches) for (const pr of batch) {
       if (!seen.has(pr.npi)) { seen.add(pr.npi); providers.push(pr); }
@@ -154,14 +176,15 @@ exports.handler = async (event) => {
 PATIENT (greet them by first name):
 ${JSON.stringify(patientContext)}
 
-PROVIDERS FOUND NEAR THEM in the national registry, already filtered to their area (${zip3 ? 'ZIP prefix ' + zip3 : 'no ZIP on file'}) and relevant specialties (${terms.join(', ')}). This is the COMPLETE list, never invent others:
+PROVIDERS FOUND NEAR THEM in the national registry, already filtered to their area (${effectiveZip ? 'ZIP ' + effectiveZip : 'no ZIP on file'}) and relevant specialties (${terms.join(', ')}). This is the COMPLETE list, never invent others:
 ${JSON.stringify(providers)}
 
 Rules:
 - On the first message, greet the patient by first name and briefly, kindly acknowledge the health concerns they listed. One sentence, no drama.
 - Recommend the top 3 best-fitting providers. For each: name, specialty, city, and phone.
-- After the recommendations, mention they can tap "Show on map" below to see these locations.
-- If the list is empty, say no matches were found in their immediate area yet and suggest they try the map search or ask you for a different specialty. If no ZIP is on file, ask them to add their ZIP code to their profile.
+- Clickable "Show on map" links appear automatically under your reply for every provider you mention, so don't tell them to look for a button, just list the providers.
+- If the list is empty AND no ZIP is on file, ask them to share their 5-digit ZIP so you can search.
+- If the list is empty AND a ZIP was provided, tell them there are no matches in that area for that specialty and offer to try a different specialty or nearby area.
 - Insurance acceptance is not in this data, so advise calling ahead to confirm the provider takes ${patientContext.insurance}.
 - You are not a doctor. Never diagnose, never recommend treatments or medications. If asked for medical advice, gently redirect to seeing a provider.
 - If the patient describes an emergency (chest pain, difficulty breathing, stroke signs, suicidal thoughts), tell them to call 911 or go to the nearest emergency room immediately.
