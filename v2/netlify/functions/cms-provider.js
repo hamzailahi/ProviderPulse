@@ -40,6 +40,30 @@ function fetchFromCMS(npi) {
     });
 }
 
+function fetchFromCMSGet(npi) {
+    return new Promise((resolve) => {
+        const path = '/provider-data/api/1/datastore/query/mj5m-pzi6/0?limit=1&offset=0'
+            + '&conditions[0][property]=NPI&conditions[0][value]=' + npi + '&conditions[0][operator]=%3D';
+        const req = https.request({ hostname: 'data.cms.gov', path, method: 'GET' }, res => {
+            let data = '';
+            res.on('data', c => data += c);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    console.log(`[CMS-GET] NPI ${npi} status:${res.statusCode} results:${parsed?.results?.length || 0}`);
+                    resolve(parsed?.results?.[0] || null);
+                } catch (e) {
+                    console.log(`[CMS-GET] parse error: ${e.message} raw: ${data.substring(0,200)}`);
+                    resolve(null);
+                }
+            });
+        });
+        req.on('error', e => { console.log(`[CMS-GET] error: ${e.message}`); resolve(null); });
+        req.setTimeout(7000, () => { req.destroy(); resolve(null); });
+        req.end();
+    });
+}
+
 exports.handler = async function(event) {
     if (event.httpMethod !== 'GET') return { statusCode: 405, body: 'Method not allowed' };
 
@@ -49,7 +73,13 @@ exports.handler = async function(event) {
     }
 
     try {
-        const r = await fetchFromCMS(npi);
+        let r = null;
+        try {
+            r = await fetchFromCMS(npi);
+        } catch (postErr) {
+            console.log(`[CMS] POST failed, trying GET: ${postErr.message}`);
+        }
+        if (!r) r = await fetchFromCMSGet(npi);
 
         if (!r) {
             return {
@@ -91,11 +121,12 @@ exports.handler = async function(event) {
         };
 
     } catch(e) {
+        // Enrichment is optional: degrade quietly so the popup still renders
         console.log(`[CMS] Handler error: ${e.message}`);
         return {
-            statusCode: 500,
+            statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: e.message })
+            body: JSON.stringify({ found: false, npi, unavailable: true })
         };
     }
 };

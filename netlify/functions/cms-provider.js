@@ -2,7 +2,6 @@ const https = require('https');
 
 function fetchFromCMS(npi) {
     return new Promise((resolve, reject) => {
-        // Query the National Downloadable File by NPI
         const body = JSON.stringify({
             conditions: [
                 { property: 'NPI', value: npi, operator: '=' }
@@ -25,16 +24,42 @@ function fetchFromCMS(npi) {
             res.on('end', () => {
                 try {
                     const parsed = JSON.parse(data);
+                    console.log(`[CMS] NPI ${npi} status:${res.statusCode} results:${parsed?.results?.length || 0}`);
                     resolve(parsed?.results?.[0] || null);
                 } catch(e) {
+                    console.log(`[CMS] JSON parse error: ${e.message} raw: ${data.substring(0,200)}`);
                     resolve(null);
                 }
             });
         });
 
-        req.on('error', reject);
+        req.on('error', e => { console.log(`[CMS] Request error: ${e.message}`); reject(e); });
         req.setTimeout(8000, () => { req.destroy(); reject(new Error('CMS API timeout')); });
         req.write(body);
+        req.end();
+    });
+}
+
+function fetchFromCMSGet(npi) {
+    return new Promise((resolve) => {
+        const path = '/provider-data/api/1/datastore/query/mj5m-pzi6/0?limit=1&offset=0'
+            + '&conditions[0][property]=NPI&conditions[0][value]=' + npi + '&conditions[0][operator]=%3D';
+        const req = https.request({ hostname: 'data.cms.gov', path, method: 'GET' }, res => {
+            let data = '';
+            res.on('data', c => data += c);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    console.log(`[CMS-GET] NPI ${npi} status:${res.statusCode} results:${parsed?.results?.length || 0}`);
+                    resolve(parsed?.results?.[0] || null);
+                } catch (e) {
+                    console.log(`[CMS-GET] parse error: ${e.message} raw: ${data.substring(0,200)}`);
+                    resolve(null);
+                }
+            });
+        });
+        req.on('error', e => { console.log(`[CMS-GET] error: ${e.message}`); resolve(null); });
+        req.setTimeout(7000, () => { req.destroy(); resolve(null); });
         req.end();
     });
 }
@@ -48,9 +73,15 @@ exports.handler = async function(event) {
     }
 
     try {
-        const record = await fetchFromCMS(npi);
+        let r = null;
+        try {
+            r = await fetchFromCMS(npi);
+        } catch (postErr) {
+            console.log(`[CMS] POST failed, trying GET: ${postErr.message}`);
+        }
+        if (!r) r = await fetchFromCMSGet(npi);
 
-        if (!record) {
+        if (!r) {
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
@@ -58,43 +89,44 @@ exports.handler = async function(event) {
             };
         }
 
-        // Return only the fields we care about, cleanly named
+        // Exact field names from CMS Data Dictionary
         const result = {
             found: true,
             npi,
-            name: [record.frst_nm, record.mid_nm, record.lst_nm].filter(Boolean).join(' ') || record.org_nm || null,
-            organization: record.org_nm || null,
-            facility: record.facility_name || null,
-            primary_specialty: record.pri_spec || null,
-            secondary_specialties: [
-                record.sec_spec_1,
-                record.sec_spec_2,
-                record.sec_spec_3,
-                record.sec_spec_4
-            ].filter(Boolean),
-            medical_school: record.med_sch || null,
-            graduation_year: record.grd_yr || null,
-            medicare_participant: record.ind_assgn === 'Y',
-            telehealth: record.telehlth === 'Y',
-            accepts_medicare_assignment: record.ind_assgn === 'Y',
-            address: [record.adr_ln_1, record.cty, record.st, record.zip].filter(Boolean).join(', ') || null,
-            phone: record.phn_numbr || null,
+            first_name: r['Provider First Name'] || null,
+            last_name: r['Provider Last Name'] || null,
+            credential: r['Cred'] || null,
+            gender: r['gndr'] || null,
+            primary_specialty: r['Pri_spec'] || null,
+            secondary_specialties: [r['Sec_spec_1'], r['Sec_spec_2'], r['Sec_spec_3'], r['Sec_spec_4']].filter(Boolean),
+            medical_school: r['Med_sch'] || null,
+            graduation_year: r['Grd_yr'] || null,
+            telehealth: r['Telehlth'] === 'Y',
+            facility: r['Facility Name'] || null,
+            org_pac_id: r['Org_PAC_ID'] || null,
+            group_size: r['num_org_mem'] || null,
+            address: [r['adr_ln_1'], r['City/Town'], r['State'], r['ZIP Code']].filter(Boolean).join(', ') || null,
+            phone: r['Telephone Number'] || null,
+            medicare_participant: r['ind_assgn'] === 'Y' || r['ind_assgn'] === 'M',
+            medicare_assignment: r['ind_assgn'] || null,  // Y=accepts full, M=may accept
         };
 
         return {
             statusCode: 200,
             headers: {
                 'Content-Type': 'application/json',
-                'Cache-Control': 'public, max-age=86400' // cache 24h per NPI
+                'Cache-Control': 'public, max-age=86400'
             },
             body: JSON.stringify(result)
         };
 
     } catch(e) {
+        // Enrichment is optional: degrade quietly so the popup still renders
+        console.log(`[CMS] Handler error: ${e.message}`);
         return {
-            statusCode: 500,
+            statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: e.message })
+            body: JSON.stringify({ found: false, npi, unavailable: true })
         };
     }
 };
