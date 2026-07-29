@@ -2725,10 +2725,27 @@
             if (isMobile()) toggleBottomSheet(true);
         }
 
-        // Deep link from care navigator: index.html#goto=<address or zip>
+        // Deep link from care navigator: #goto=<address> or #pin=<lat>,<lng>,<name>
         window.addEventListener('load', () => {
-            const m = location.hash.match(/^#goto=(.+)$/);
-            if (m) setTimeout(() => goToAddress(decodeURIComponent(m[1])), 1200);
+            const pin = location.hash.match(/^#pin=(-?\d+\.?\d*),(-?\d+\.?\d*),?(.*)$/);
+            const goto = location.hash.match(/^#goto=(.+)$/);
+            if (!pin && !goto) return;
+            const waitForMap = (fn, tries = 0) => {
+                if (typeof L !== 'undefined' && typeof map !== 'undefined' && map && typeof map.setView === 'function') return fn();
+                if (tries > 40) return;
+                setTimeout(() => waitForMap(fn, tries + 1), 150);
+            };
+            if (pin) {
+                const lat = parseFloat(pin[1]), lng = parseFloat(pin[2]);
+                const name = decodeURIComponent(pin[3] || 'Provider');
+                waitForMap(() => {
+                    map.setView([lat, lng], 16);
+                    L.marker([lat, lng]).addTo(map)
+                        .bindPopup('<b>' + name.replace(/</g,'&lt;') + '</b>').openPopup();
+                });
+            } else if (goto) {
+                waitForMap(() => goToAddress(decodeURIComponent(goto[1])));
+            }
         });
         window.addEventListener('load', () => {
             initSheetDrag();

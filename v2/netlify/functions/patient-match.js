@@ -111,6 +111,29 @@ function compact(rec, taxonomy) {
   };
 }
 
+// Server-side geocoding, Nominatim first (accurate for US), Photon fallback
+async function geocode(provider) {
+  const query = `${provider.address}, ${provider.city}, ${provider.state} ${provider.zip}`;
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=1&q=${encodeURIComponent(query)}`,
+      { headers: { 'User-Agent': 'ProviderPulse/1.0 (healthcare provider directory)' }, signal: AbortSignal.timeout(5000) }
+    );
+    const data = await r.json();
+    if (Array.isArray(data) && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch { /* try photon */ }
+  try {
+    const r = await fetch(
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1&lang=en`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    const data = await r.json();
+    const c = data && data.features && data.features[0] && data.features[0].geometry && data.features[0].geometry.coordinates;
+    if (c) return { lat: c[1], lng: c[0] };
+  } catch { /* give up */ }
+  return null;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'POST only' }) };
@@ -216,7 +239,13 @@ Rules:
     const aiData = await aiRes.json();
     if (!aiRes.ok) throw new Error(aiData.error && aiData.error.message);
     const reply = (aiData.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply, providers: providers.slice(0, 3) }) };
+    // Geocode top 3 in parallel so the frontend has exact coordinates for map pins
+    const top = providers.slice(0, 3);
+    const coords = await Promise.all(top.map(geocode));
+    for (let i = 0; i < top.length; i++) {
+      if (coords[i]) { top[i].lat = coords[i].lat; top[i].lng = coords[i].lng; }
+    }
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply, providers: top }) };
   } catch (e) {
     return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'The assistant is unavailable right now, please try again in a moment.' }) };
   }

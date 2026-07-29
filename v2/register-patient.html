@@ -249,9 +249,11 @@ async function askNavigator() {
         const links = document.createElement('div');
         links.className = 'bubble bot';
         links.innerHTML = data.providers.map(pr => {
-          const q = encodeURIComponent(`${pr.address} ${pr.city} ${pr.state} ${pr.zip}`.trim());
           const label = (pr.name || 'Provider').replace(/</g, '&lt;');
-          return `<a href="index.html#goto=${q}" target="_blank" style="color:var(--accent);display:block;padding:2px 0">📍 Show ${label} on map</a>`;
+          const hash = (pr.lat && pr.lng)
+            ? `#pin=${pr.lat},${pr.lng},${encodeURIComponent(pr.name || '')}`
+            : `#goto=${encodeURIComponent(`${pr.address} ${pr.city} ${pr.state} ${pr.zip}`.trim())}`;
+          return `<a href="index.html${hash}" target="_blank" style="color:var(--accent);display:block;padding:2px 0">📍 Show ${label} on map</a>`;
         }).join('');
         $('chatLog').appendChild(links);
         $('chatLog').scrollTop = $('chatLog').scrollHeight;
