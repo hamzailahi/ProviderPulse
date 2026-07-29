@@ -2725,6 +2725,11 @@
             if (isMobile()) toggleBottomSheet(true);
         }
 
+        // Deep link from care navigator: index.html#goto=<address or zip>
+        window.addEventListener('load', () => {
+            const m = location.hash.match(/^#goto=(.+)$/);
+            if (m) setTimeout(() => goToAddress(decodeURIComponent(m[1])), 1200);
+        });
         window.addEventListener('load', () => {
             initSheetDrag();
         });
