@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProviderPulse · Provider registration</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #121821; --line: #1f2937; --text: #e5eaf0;
+    --muted: #8b98a9; --accent: #2dd4bf; --accent-dim: #14b8a6;
+    --danger: #f87171; --ok: #4ade80;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh; display: flex; align-items: flex-start; justify-content: center;
+    padding: 48px 16px;
+  }
+  .card { width: 100%; max-width: 560px; }
+  .brand { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
+  .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .brand a { color: var(--accent); font-size: 13px; text-decoration: none; }
+  .eyebrow { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  form, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  .hidden { display: none; }
+  label, .grouplabel { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  label:first-of-type { margin-top: 0; }
+  input, textarea, select {
+    width: 100%; padding: 10px 12px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; font: inherit;
+  }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-dim); outline-offset: 0; border-color: transparent; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 8px; }
+  .checks label {
+    display: flex; align-items: center; gap: 8px; margin: 0; text-transform: none;
+    letter-spacing: 0; font-size: 14px; color: var(--text); cursor: pointer;
+  }
+  .checks input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
+  .submit {
+    width: 100%; margin-top: 22px; padding: 12px; border: 0; border-radius: 8px;
+    background: var(--accent); color: #04211d; font: inherit; font-weight: 700; cursor: pointer;
+  }
+  .submit:disabled { opacity: 0.5; cursor: wait; }
+  .msg { margin-top: 14px; font-size: 14px; }
+  .msg.err { color: var(--danger); }
+  .msg.ok { color: var(--ok); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <h1>ProviderPulse</h1>
+    <a href="#" id="toggleLogin">Already registered? Sign in</a>
+  </div>
+  <div class="eyebrow">Provider registration · verified against the NPPES registry</div>
+
+  <form id="formRegister">
+    <label for="pNpi">NPI number</label>
+    <input id="pNpi" inputmode="numeric" maxlength="10" required placeholder="10-digit NPI">
+    <div class="hint">For organizations, enter the authorized official's name below.</div>
+
+    <div class="row">
+      <div><label for="pFirst">First name</label><input id="pFirst" autocomplete="given-name"></div>
+      <div><label for="pLast">Last name</label><input id="pLast" required autocomplete="family-name"></div>
+    </div>
+
+    <label for="pAddr">Practice address</label>
+    <input id="pAddr" placeholder="Street address" autocomplete="street-address">
+    <div class="row3" style="margin-top:12px">
+      <div><label for="pCity" style="margin-top:0">City</label><input id="pCity"></div>
+      <div><label for="pState" style="margin-top:0">State</label><input id="pState" maxlength="2" placeholder="AR"></div>
+      <div><label for="pZip" style="margin-top:0">ZIP</label><input id="pZip" inputmode="numeric" maxlength="5"></div>
+    </div>
+    <div class="hint">Leave blank to use the practice location on file with NPPES.</div>
+
+    <div class="grouplabel">Insurance accepted</div>
+    <div class="checks" id="insChecks"></div>
+    <input id="insOther" placeholder="Other payers, comma separated" style="margin-top:10px">
+
+    <label for="pEmail">Work email</label>
+    <input id="pEmail" type="email" required autocomplete="email">
+    <label for="pPass">Password</label>
+    <input id="pPass" type="password" required minlength="12" autocomplete="new-password">
+    <div class="hint">At least 12 characters.</div>
+
+    <button class="submit" type="submit">Verify NPI and create account</button>
+    <div class="msg" id="rMsg"></div>
+  </form>
+
+  <form id="formLogin" class="hidden">
+    <label for="lEmail">Email</label>
+    <input id="lEmail" type="email" required autocomplete="email">
+    <label for="lPass">Password</label>
+    <input id="lPass" type="password" required autocomplete="current-password">
+    <button class="submit" type="submit">Sign in</button>
+    <div class="msg" id="lMsg"></div>
+  </form>
+
+  <div id="account" class="panel hidden">
+    <div id="acctBody"></div>
+    <button class="submit" id="acctSave">Save changes</button>
+    <div class="msg" id="aMsg"></div>
+  </div>
+</div>
+
+<script>
+const FN = '/.netlify/functions';
+const $ = id => document.getElementById(id);
+let session = null;
+
+// Standardized payer list
+const PAYERS = [
+  'Medicare', 'Medicaid', 'Aetna', 'Anthem',
+  'Blue Cross Blue Shield', 'Cigna', 'Humana', 'Kaiser Permanente',
+  'Molina Healthcare', 'Oscar Health', 'TRICARE', 'UnitedHealthcare',
+  'WellCare', 'Ambetter', 'Self-pay accepted'
+];
+$('insChecks').innerHTML = PAYERS.map(p =>
+  `<label><input type="checkbox" value="${p}">${p}</label>`).join('');
+
+function selectedPayers() {
+  const checked = [...document.querySelectorAll('#insChecks input:checked')].map(c => c.value);
+  const other = $('insOther').value.split(',').map(s => s.trim()).filter(Boolean);
+  return [...checked, ...other];
+}
+
+$('toggleLogin').onclick = e => {
+  e.preventDefault();
+  $('formRegister').classList.toggle('hidden');
+  $('formLogin').classList.toggle('hidden');
+  $('account').classList.add('hidden');
+  $('toggleLogin').textContent = $('formLogin').classList.contains('hidden')
+    ? 'Already registered? Sign in' : 'Need an account? Register';
+};
+
+function setMsg(id, text, ok) { const m = $(id); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); }
+function busy(form, on) { form.querySelector('.submit').disabled = on; }
+
+$('formRegister').onsubmit = async e => {
+  e.preventDefault(); busy(e.target, true); setMsg('rMsg', 'Checking NPPES registry…', true);
+  const r = await fetch(FN + '/auth-register-provider', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      npi: $('pNpi').value.trim(),
+      first_name: $('pFirst').value,
+      last_name: $('pLast').value,
+      address_line: $('pAddr').value.trim(),
+      city: $('pCity').value.trim(),
+      state: $('pState').value.trim().toUpperCase(),
+      zip: $('pZip').value.trim(),
+      email: $('pEmail').value,
+      password: $('pPass').value,
+      insurances: selectedPayers()
+    })
+  });
+  const data = await r.json().catch(() => ({}));
+  setMsg('rMsg', r.ok ? data.message : (data.error || 'Registration failed'), r.ok);
+  busy(e.target, false);
+};
+
+$('formLogin').onsubmit = async e => {
+  e.preventDefault(); busy(e.target, true);
+  const r = await fetch(FN + '/auth-login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: $('lEmail').value, password: $('lPass').value })
+  });
+  const data = await r.json().catch(() => ({}));
+  busy(e.target, false);
+  if (!r.ok) return setMsg('lMsg', data.error || 'Sign in failed', false);
+  if (data.role !== 'provider') return setMsg('lMsg', 'This account is not a provider account. Use the patient page.', false);
+  session = data;
+  sessionStorage.setItem('pp_token', data.access_token);
+  loadAccount();
+};
+
+async function loadAccount() {
+  const r = await fetch(FN + '/profile', { headers: { Authorization: 'Bearer ' + session.access_token } });
+  if (!r.ok) return setMsg('lMsg', 'Could not load profile', false);
+  const { profile, insurance } = await r.json();
+  const p = profile || {};
+  $('formLogin').classList.add('hidden');
+  $('account').classList.remove('hidden');
+  const mine = new Set((insurance || []).map(i => i.payer_name));
+  $('acctBody').innerHTML = `
+    <label>NPI</label><input value="${p.npi || ''}" disabled>
+    <label for="aPhone">Phone</label><input id="aPhone" value="${p.phone || ''}">
+    <label for="aAddr">Practice address</label><input id="aAddr" value="${p.address_line || ''}">
+    <div class="row3" style="margin-top:12px">
+      <div><label style="margin-top:0" for="aCity">City</label><input id="aCity" value="${p.city || ''}"></div>
+      <div><label style="margin-top:0" for="aState">State</label><input id="aState" maxlength="2" value="${p.state || ''}"></div>
+      <div><label style="margin-top:0" for="aZip">ZIP</label><input id="aZip" value="${p.zip || ''}"></div>
+    </div>
+    <label for="aBio">About the practice</label><textarea id="aBio" rows="3">${p.bio || ''}</textarea>
+    <div class="grouplabel">Insurance accepted</div>
+    <div class="checks" id="aChecks">${PAYERS.map(x =>
+      `<label><input type="checkbox" value="${x}" ${mine.has(x) ? 'checked' : ''}>${x}</label>`).join('')}</div>
+    <input id="aInsOther" placeholder="Other payers, comma separated" style="margin-top:10px"
+      value="${[...mine].filter(x => !PAYERS.includes(x)).join(', ')}">`;
+  $('acctSave').onclick = async () => {
+    const checked = [...document.querySelectorAll('#aChecks input:checked')].map(c => c.value);
+    const other = $('aInsOther').value.split(',').map(s => s.trim()).filter(Boolean);
+    const r2 = await fetch(FN + '/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({
+        phone: $('aPhone').value,
+        address_line: $('aAddr').value,
+        city: $('aCity').value,
+        state: $('aState').value.toUpperCase(),
+        zip: $('aZip').value,
+        bio: $('aBio').value,
+        insurances: [...checked, ...other]
+      })
+    });
+    setMsg('aMsg', r2.ok ? 'Saved' : 'Save failed', r2.ok);
+  };
+}
+</script>
+</body>
+</html>

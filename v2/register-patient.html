@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProviderPulse · Patient registration</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #121821; --line: #1f2937; --text: #e5eaf0;
+    --muted: #8b98a9; --accent: #2dd4bf; --accent-dim: #14b8a6;
+    --danger: #f87171; --ok: #4ade80;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh; display: flex; align-items: flex-start; justify-content: center;
+    padding: 48px 16px;
+  }
+  .card { width: 100%; max-width: 560px; }
+  .brand { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
+  .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .brand a { color: var(--accent); font-size: 13px; text-decoration: none; }
+  .eyebrow { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  form, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  .hidden { display: none; }
+  label, .grouplabel { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  label:first-of-type { margin-top: 0; }
+  input, textarea, select {
+    width: 100%; padding: 10px 12px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; font: inherit;
+  }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-dim); outline-offset: 0; border-color: transparent; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 8px; }
+  .checks label {
+    display: flex; align-items: center; gap: 8px; margin: 0; text-transform: none;
+    letter-spacing: 0; font-size: 14px; color: var(--text); cursor: pointer;
+  }
+  .checks input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
+  .submit {
+    width: 100%; margin-top: 22px; padding: 12px; border: 0; border-radius: 8px;
+    background: var(--accent); color: #04211d; font: inherit; font-weight: 700; cursor: pointer;
+  }
+  .submit:disabled { opacity: 0.5; cursor: wait; }
+  .msg { margin-top: 14px; font-size: 14px; }
+  .msg.err { color: var(--danger); }
+  .msg.ok { color: var(--ok); }
+  .phi-note {
+    margin-top: 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+    font-size: 12px; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <h1>ProviderPulse</h1>
+    <a href="#" id="toggleLogin">Already registered? Sign in</a>
+  </div>
+  <div class="eyebrow">Patient registration · find providers near you who take your insurance</div>
+
+  <form id="formRegister">
+    <div class="row">
+      <div><label for="tFirst">First name</label><input id="tFirst" required autocomplete="given-name"></div>
+      <div><label for="tLast">Last name</label><input id="tLast" required autocomplete="family-name"></div>
+    </div>
+    <div class="row">
+      <div><label for="tDob">Date of birth</label><input id="tDob" type="date"></div>
+      <div><label for="tZip">ZIP code</label><input id="tZip" inputmode="numeric" maxlength="5"></div>
+    </div>
+
+    <label for="tPayer">Insurance plan</label>
+    <select id="tPayer"></select>
+    <input id="tPayerOther" class="hidden" placeholder="Name of your insurance plan" style="margin-top:10px">
+
+    <div class="grouplabel">Health concerns</div>
+    <div class="checks" id="condChecks"></div>
+    <label for="tDesc">Describe your health concern (optional)</label>
+    <textarea id="tDesc" rows="3" maxlength="1000" placeholder="Anything you'd like providers or our matching tools to know"></textarea>
+
+    <label for="tEmail">Email</label>
+    <input id="tEmail" type="email" required autocomplete="email">
+    <label for="tPass">Password</label>
+    <input id="tPass" type="password" required minlength="12" autocomplete="new-password">
+    <div class="hint">At least 12 characters.</div>
+
+    <button class="submit" type="submit">Create account</button>
+    <div class="msg" id="rMsg"></div>
+    <div class="phi-note">Your health information is encrypted, visible only to you, and never sold or shared without your consent.</div>
+  </form>
+
+  <form id="formLogin" class="hidden">
+    <label for="lEmail">Email</label>
+    <input id="lEmail" type="email" required autocomplete="email">
+    <label for="lPass">Password</label>
+    <input id="lPass" type="password" required autocomplete="current-password">
+    <button class="submit" type="submit">Sign in</button>
+    <div class="msg" id="lMsg"></div>
+  </form>
+
+  <div id="account" class="panel hidden">
+    <div id="acctBody"></div>
+    <button class="submit" id="acctSave">Save changes</button>
+    <div class="msg" id="aMsg"></div>
+  </div>
+</div>
+
+<script>
+const FN = '/.netlify/functions';
+const $ = id => document.getElementById(id);
+let session = null;
+
+const PAYERS = [
+  'Medicare', 'Medicaid', 'Aetna', 'Anthem',
+  'Blue Cross Blue Shield', 'Cigna', 'Humana', 'Kaiser Permanente',
+  'Molina Healthcare', 'Oscar Health', 'TRICARE', 'UnitedHealthcare',
+  'WellCare', 'Ambetter', 'Uninsured / self-pay', 'Other'
+];
+const CONDITIONS = [
+  'Diabetes', 'High blood pressure', 'Heart disease', 'Asthma / COPD',
+  'Mental health', 'Arthritis', 'Back or joint pain', 'Cancer care',
+  'Kidney disease', 'Pregnancy / prenatal', 'Pediatric care', 'Weight management',
+  'Sleep disorders', 'Preventive care / checkup'
+];
+
+$('tPayer').innerHTML = '<option value="">Select your insurance</option>' +
+  PAYERS.map(p => `<option>${p}</option>`).join('');
+$('tPayer').onchange = () => $('tPayerOther').classList.toggle('hidden', $('tPayer').value !== 'Other');
+$('condChecks').innerHTML = CONDITIONS.map(c =>
+  `<label><input type="checkbox" value="${c}">${c}</label>`).join('');
+
+$('toggleLogin').onclick = e => {
+  e.preventDefault();
+  $('formRegister').classList.toggle('hidden');
+  $('formLogin').classList.toggle('hidden');
+  $('account').classList.add('hidden');
+  $('toggleLogin').textContent = $('formLogin').classList.contains('hidden')
+    ? 'Already registered? Sign in' : 'Need an account? Register';
+};
+
+function setMsg(id, text, ok) { const m = $(id); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); }
+function busy(form, on) { form.querySelector('.submit').disabled = on; }
+const payerValue = () => $('tPayer').value === 'Other' ? $('tPayerOther').value.trim() : $('tPayer').value;
+
+$('formRegister').onsubmit = async e => {
+  e.preventDefault(); busy(e.target, true); setMsg('rMsg', 'Creating account…', true);
+  const r = await fetch(FN + '/auth-register-patient', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      first_name: $('tFirst').value,
+      last_name: $('tLast').value,
+      date_of_birth: $('tDob').value,
+      zip: $('tZip').value,
+      insurance_payer: payerValue(),
+      conditions: [...document.querySelectorAll('#condChecks input:checked')].map(c => c.value),
+      concern_description: $('tDesc').value.trim(),
+      email: $('tEmail').value,
+      password: $('tPass').value
+    })
+  });
+  const data = await r.json().catch(() => ({}));
+  setMsg('rMsg', r.ok ? data.message : (data.error || 'Registration failed'), r.ok);
+  busy(e.target, false);
+};
+
+$('formLogin').onsubmit = async e => {
+  e.preventDefault(); busy(e.target, true);
+  const r = await fetch(FN + '/auth-login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: $('lEmail').value, password: $('lPass').value })
+  });
+  const data = await r.json().catch(() => ({}));
+  busy(e.target, false);
+  if (!r.ok) return setMsg('lMsg', data.error || 'Sign in failed', false);
+  if (data.role !== 'patient') return setMsg('lMsg', 'This account is not a patient account. Use the provider page.', false);
+  session = data;
+  sessionStorage.setItem('pp_token', data.access_token);
+  loadAccount();
+};
+
+async function loadAccount() {
+  const r = await fetch(FN + '/profile', { headers: { Authorization: 'Bearer ' + session.access_token } });
+  if (!r.ok) return setMsg('lMsg', 'Could not load profile', false);
+  const { profile } = await r.json();
+  const p = profile || {};
+  $('formLogin').classList.add('hidden');
+  $('account').classList.remove('hidden');
+  const mine = new Set(p.conditions || []);
+  const payerKnown = PAYERS.includes(p.insurance_payer);
+  $('acctBody').innerHTML = `
+    <div class="row">
+      <div><label for="aFirst">First name</label><input id="aFirst" value="${p.first_name || ''}"></div>
+      <div><label for="aLast">Last name</label><input id="aLast" value="${p.last_name || ''}"></div>
+    </div>
+    <div class="row">
+      <div><label for="aDob">Date of birth</label><input id="aDob" type="date" value="${p.date_of_birth || ''}"></div>
+      <div><label for="aZip">ZIP</label><input id="aZip" maxlength="5" value="${p.zip || ''}"></div>
+    </div>
+    <label for="aPayer">Insurance plan</label>
+    <select id="aPayer"><option value="">Select your insurance</option>${PAYERS.map(x =>
+      `<option ${x === (payerKnown ? p.insurance_payer : (p.insurance_payer ? 'Other' : '')) ? 'selected' : ''}>${x}</option>`).join('')}</select>
+    <input id="aPayerOther" class="${payerKnown || !p.insurance_payer ? 'hidden' : ''}"
+      placeholder="Name of your insurance plan" style="margin-top:10px" value="${payerKnown ? '' : (p.insurance_payer || '')}">
+    <div class="grouplabel">Health concerns</div>
+    <div class="checks" id="aChecks">${CONDITIONS.map(x =>
+      `<label><input type="checkbox" value="${x}" ${mine.has(x) ? 'checked' : ''}>${x}</label>`).join('')}</div>
+    <label for="aDesc">Describe your health concern</label>
+    <textarea id="aDesc" rows="3" maxlength="1000">${p.concern_description || ''}</textarea>`;
+  $('aPayer').onchange = () => $('aPayerOther').classList.toggle('hidden', $('aPayer').value !== 'Other');
+  $('acctSave').onclick = async () => {
+    const payer = $('aPayer').value === 'Other' ? $('aPayerOther').value.trim() : $('aPayer').value;
+    const r2 = await fetch(FN + '/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({
+        first_name: $('aFirst').value,
+        last_name: $('aLast').value,
+        date_of_birth: $('aDob').value,
+        zip: $('aZip').value,
+        insurance_payer: payer,
+        conditions: [...document.querySelectorAll('#aChecks input:checked')].map(c => c.value),
+        concern_description: $('aDesc').value.trim()
+      })
+    });
+    setMsg('aMsg', r2.ok ? 'Saved' : 'Save failed', r2.ok);
+  };
+}
+</script>
+</body>
+</html>
