@@ -2727,24 +2727,37 @@
 
         // Deep link from care navigator: #goto=<address> or #pin=<lat>,<lng>,<name>
         window.addEventListener('load', () => {
-            const pin = location.hash.match(/^#pin=(-?\d+\.?\d*),(-?\d+\.?\d*),?(.*)$/);
-            const goto = location.hash.match(/^#goto=(.+)$/);
-            if (!pin && !goto) return;
-            const waitForMap = (fn, tries = 0) => {
-                if (typeof L !== 'undefined' && typeof map !== 'undefined' && map && typeof map.setView === 'function') return fn();
-                if (tries > 40) return;
-                setTimeout(() => waitForMap(fn, tries + 1), 150);
+            const h = location.hash || '';
+            const isPin = h.indexOf('#pin=') === 0;
+            const isGoto = h.indexOf('#goto=') === 0;
+            if (!isPin && !isGoto) return;
+            console.log('[deeplink] hash detected:', h);
+
+            const whenReady = (fn, tries) => {
+                tries = tries || 0;
+                if (typeof L !== 'undefined' && typeof map !== 'undefined' && map && map.setView) {
+                    try { fn(); } catch (err) { console.error('[deeplink] failed:', err); }
+                    return;
+                }
+                if (tries > 60) { console.warn('[deeplink] map never became ready'); return; }
+                setTimeout(() => whenReady(fn, tries + 1), 150);
             };
-            if (pin) {
-                const lat = parseFloat(pin[1]), lng = parseFloat(pin[2]);
-                const name = decodeURIComponent(pin[3] || 'Provider');
-                waitForMap(() => {
+
+            if (isPin) {
+                const parts = h.slice(5).split(',');
+                const lat = parseFloat(parts[0]);
+                const lng = parseFloat(parts[1]);
+                const name = decodeURIComponent(parts.slice(2).join(',') || 'Provider');
+                if (isNaN(lat) || isNaN(lng)) { console.warn('[deeplink] bad coords:', h); return; }
+                whenReady(() => {
                     map.setView([lat, lng], 16);
-                    L.marker([lat, lng]).addTo(map)
-                        .bindPopup('<b>' + name.replace(/</g,'&lt;') + '</b>').openPopup();
+                    const mk = L.marker([lat, lng]).addTo(map);
+                    mk.bindPopup('<b>' + name.replace(/</g, '&lt;') + '</b>').openPopup();
+                    console.log('[deeplink] pin placed at', lat, lng, name);
                 });
-            } else if (goto) {
-                waitForMap(() => goToAddress(decodeURIComponent(goto[1])));
+            } else {
+                const addr = decodeURIComponent(h.slice(6));
+                whenReady(() => goToAddress(addr));
             }
         });
         window.addEventListener('load', () => {
