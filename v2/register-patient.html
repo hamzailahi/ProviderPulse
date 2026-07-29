@@ -245,16 +245,15 @@ async function askNavigator() {
     thinking.textContent = r.ok ? data.reply : (data.error || 'Something went wrong, try again.');
     if (r.ok) {
       chatHistory.push({ role: 'assistant', content: data.reply });
-      if (Array.isArray(data.providers) && data.providers.length) {
+      if (Array.isArray(data.providers) && data.providers.length && data.zip) {
+        // One action for the whole area: the map plots every clinic in this ZIP
+        // matching the searched specialties and highlights the recommended NPIs.
+        const tax = (data.taxonomies || []).join(',');
+        const rec = data.providers.map(pr => pr.npi).filter(Boolean).join(',');
+        const hash = `#zip=${encodeURIComponent(data.zip)}&tax=${encodeURIComponent(tax)}&rec=${encodeURIComponent(rec)}`;
         const links = document.createElement('div');
         links.className = 'bubble bot';
-        links.innerHTML = data.providers.map(pr => {
-          const label = (pr.name || 'Provider').replace(/</g, '&lt;');
-          const hash = (pr.lat && pr.lng)
-            ? `#pin=${pr.lat},${pr.lng},${encodeURIComponent(pr.name || '')}`
-            : `#goto=${encodeURIComponent(`${pr.address} ${pr.city} ${pr.state} ${pr.zip}`.trim())}`;
-          return `<a href="index.html${hash}" target="_blank" style="color:var(--accent);display:block;padding:2px 0">📍 Show ${label} on map</a>`;
-        }).join('');
+        links.innerHTML = `<a href="index.html${hash}" target="_blank" style="color:var(--accent);display:block;padding:2px 0">🗺️ Open these on the map</a>`;
         $('chatLog').appendChild(links);
         $('chatLog').scrollTop = $('chatLog').scrollHeight;
       }

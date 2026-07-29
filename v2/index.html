@@ -1489,8 +1489,12 @@
                 filtered.forEach(p => coordGroups[coordKey].items.push({ practice: p, address: addr }));
             }
 
+            // NPIs the care navigator recommended, when arrived via an area deep link
+            const recSet = window._recommendedNPIs || new Set();
+
             for (let key in coordGroups) {
                 const group = coordGroups[key], items = group.items;
+                const isRecommended = items.some(i => recSet.has(String(i.practice['NPI'] || '')));
 
                 // Build popup with NPPES enrichment placeholder
                 const firstNPI = items[0]?.practice['NPI'] || '';
@@ -1502,8 +1506,12 @@
 
                 items.forEach(item => {
                     const npi = item.practice['NPI'] || '';
+                    const recBadge = recSet.has(String(npi))
+                        ? `<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:#f0883e;color:#0d1117;font-size:9px;font-weight:700;">★ RECOMMENDED FOR YOU</div><br/>`
+                        : '';
                     popupHtml += `
                     <div style="margin-bottom:10px;" id="clinic-${npi}">
+                        ${recBadge}
                         <strong style="font-size:12px;">${item.practice['Name'] || '—'}</strong><br/>
                         <span style="color:#8b949e;font-size:11px;">${item.practice['Primary Taxonomy'] || '—'}</span><br/>
                         ${items.length > 1 ? `<span style="color:#6e7681;font-size:10px;">${item.address}</span><br/>` : ''}
@@ -1521,10 +1529,14 @@
                 let gradientStr = uniqueTaxs.length === 1
                     ? (colorMap[uniqueTaxs[0]] || '#3b82f6')
                     : `conic-gradient(${uniqueTaxs.map((t, idx) => `${colorMap[t] || '#3b82f6'} ${idx * (100/uniqueTaxs.length)}% ${(idx + 1) * (100/uniqueTaxs.length)}%`).join(', ')})`;
-                const iconHtml = `<div style="width:14px; height:14px; border-radius:50%; background:${gradientStr}; border: 1.5px solid #0d1117; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`;
+                // Recommended locations keep their taxonomy color but get a larger amber ring
+                const dotSize = isRecommended ? 20 : 14;
+                const iconHtml = isRecommended
+                    ? `<div style="width:20px; height:20px; border-radius:50%; background:${gradientStr}; border: 2.5px solid #f0883e; box-shadow: 0 0 8px 2px rgba(240,136,62,0.75);"></div>`
+                    : `<div style="width:14px; height:14px; border-radius:50%; background:${gradientStr}; border: 1.5px solid #0d1117; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`;
 
                 const marker = L.marker([group.lat, group.lng], {
-                    icon: L.divIcon({ className: 'multi-tax-icon', html: iconHtml, iconSize: [14, 14], iconAnchor: [7, 7] })
+                    icon: L.divIcon({ className: 'multi-tax-icon', html: iconHtml, iconSize: [dotSize, dotSize], iconAnchor: [dotSize / 2, dotSize / 2] })
                 })
                 .bindTooltip(items.length === 1 ? items[0].practice['Name'] : `${items.length} Providers Here`, { direction: 'top', offset: [0, -8], opacity: 0.9 })
                 .bindPopup(popupHtml, { maxWidth: 280 })
@@ -2725,12 +2737,14 @@
             if (isMobile()) toggleBottomSheet(true);
         }
 
-        // Deep link from care navigator: #goto=<address> or #pin=<lat>,<lng>,<name>
+        // Deep link from care navigator: #goto=<address>, #pin=<lat>,<lng>,<name>,
+        // or #zip=<zip>&tax=<taxonomy,list>&rec=<npi,list> for a whole search area
         window.addEventListener('load', () => {
             const h = location.hash || '';
             const isPin = h.indexOf('#pin=') === 0;
             const isGoto = h.indexOf('#goto=') === 0;
-            if (!isPin && !isGoto) return;
+            const isArea = h.indexOf('#zip=') === 0;
+            if (!isPin && !isGoto && !isArea) return;
             console.log('[deeplink] hash detected:', h);
 
             const whenReady = (fn, tries) => {
@@ -2742,6 +2756,18 @@
                 if (tries > 60) { console.warn('[deeplink] map never became ready'); return; }
                 setTimeout(() => whenReady(fn, tries + 1), 150);
             };
+
+            if (isArea) {
+                const params = new URLSearchParams(h.slice(1));
+                const zip = (params.get('zip') || '').trim();
+                const wantTax = (params.get('tax') || '').split(',').map(s => s.trim()).filter(Boolean);
+                const recNPIs = (params.get('rec') || '').split(',').map(s => s.trim()).filter(Boolean);
+                if (!/^\d{5}$/.test(zip)) { console.warn('[deeplink] bad zip:', h); return; }
+                // renderMap reads this to badge/enlarge the navigator's picks
+                window._recommendedNPIs = new Set(recNPIs);
+                whenReady(() => runAreaDeepLink(zip, wantTax));
+                return;
+            }
 
             if (isPin) {
                 const parts = h.slice(5).split(',');
@@ -2760,6 +2786,60 @@
                 whenReady(() => goToAddress(addr));
             }
         });
+
+        // Care-navigator area deep link: run the normal ZIP search, then narrow the
+        // taxonomy filter to the specialties the navigator searched with, so the map
+        // shows every matching clinic in the area rather than only the recommended few.
+        async function runAreaDeepLink(zip, wantTax) {
+            document.getElementById('dbSearchInput').value = zip;
+            document.getElementById('dbSearchBtn').click();
+
+            // The search is an async Supabase fetch (clinics, then demographics per ZIP),
+            // so wait for processData to land instead of assuming a fixed delay.
+            const loaded = await new Promise(resolve => {
+                let tries = 0;
+                const poll = () => {
+                    if (Object.keys(groupedData).length > 0 && taxonomies.size > 0) return resolve(true);
+                    if (++tries > 140) return resolve(false);
+                    setTimeout(poll, 150);
+                };
+                poll();
+            });
+            if (!loaded) { console.warn('[deeplink] clinics never loaded for ZIP', zip); return; }
+
+            applyNavigatorTaxonomyFilter(wantTax);
+        }
+
+        // The navigator searches NPPES by taxonomy description ("Internal Medicine"),
+        // while clinics.primary_taxonomy stores a role-suffixed form of the same value
+        // ("Internal Medicine Physician"), so match by containment in either direction.
+        function applyNavigatorTaxonomyFilter(wantTax) {
+            const norm = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+            const wanted = wantTax.map(norm).filter(Boolean);
+            const matched = new Set();
+            for (const t of taxonomies) {
+                const nt = norm(t);
+                if (wanted.some(w => nt.includes(w) || (nt.length >= 5 && w.includes(nt)))) matched.add(t);
+            }
+
+            if (matched.size === 0) {
+                // Never leave the map blank: fall back to every taxonomy in the area
+                console.warn('[deeplink] no stored taxonomy matched', wantTax, '- showing all');
+            } else {
+                selectedTaxonomies = matched;
+                const boxes = document.querySelectorAll('.tax-chk');
+                boxes.forEach(chk => { chk.checked = matched.has(chk.value); });
+                document.getElementById('chk-all').checked = matched.size === boxes.length;
+                updateDropdownLabel(); updateLegend();
+            }
+
+            renderMap();
+
+            // Frame whatever ended up visible after filtering
+            const pts = markers.map(m => m.getLatLng()).map(p => [p.lat, p.lng]);
+            if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 13 });
+        }
+
         window.addEventListener('load', () => {
             initSheetDrag();
         });

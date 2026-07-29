@@ -2,7 +2,8 @@
 // AI care navigator for signed-in patients. Maps the patient's stated conditions
 // (and any specialty mentioned in chat) to NPPES taxonomy searches scoped to their
 // ZIP area, then has Claude present the top matches. Also returns the raw provider
-// list so the frontend can offer "show on map" links.
+// list plus the ZIP and taxonomy terms used, so the frontend can deep link the map
+// to the whole search area with these providers highlighted.
 // Env vars: SUPABASE_URL, SUPABASE_ANON_KEY, ANTHROPIC_API_KEY
 
 const CORS = {
@@ -216,7 +217,7 @@ ${JSON.stringify(providers)}
 Rules:
 - On the first message, greet the patient by first name and briefly, kindly acknowledge the health concerns they listed. One sentence, no drama.
 - Present ALL providers in the list above, in the exact order given. For each: name, specialty, city, and phone.
-- Clickable "Show on map" links appear automatically under your reply for every provider, in the same order.
+- A single "Open these on the map" link appears automatically under your reply, which shows their whole area on the map with these providers highlighted. Do not list URLs yourself.
 - If the list is empty AND no ZIP is on file, ask them to share their 5-digit ZIP so you can search.
 - If the list is empty AND a ZIP was provided, tell them there are no matches in that area for that specialty and offer to try a different specialty or nearby area.
 - Insurance acceptance is not in this data, so advise calling ahead to confirm the provider takes ${patientContext.insurance}.
@@ -250,7 +251,9 @@ Rules:
     const aiData = await aiRes.json();
     if (!aiRes.ok) throw new Error(aiData.error && aiData.error.message);
     const reply = (aiData.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply, providers }) };
+    // zip + taxonomies let the frontend deep link the map to the whole search area,
+    // not just the recommended three.
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply, providers, zip: effectiveZip, taxonomies: terms }) };
   } catch (e) {
     return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'The assistant is unavailable right now, please try again in a moment.' }) };
   }
