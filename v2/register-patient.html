@@ -362,9 +362,18 @@ async function askNavigator(opts) {
       if (Array.isArray(data.providers) && data.providers.length && data.zip) {
         // One action for the whole area: the map plots every clinic in this ZIP
         // matching the searched specialties and highlights the recommended NPIs.
-        const tax = (data.taxonomies || []).join(',');
+        // map_taxonomies is the map's vocabulary; taxonomies is NPPES's and will
+        // under-match the clinics table, so only fall back to it on an old response.
+        const tax = (data.map_taxonomies || data.taxonomies || []).join(',');
         const rec = data.providers.map(pr => pr.npi).filter(Boolean).join(',');
-        const hash = `#zip=${encodeURIComponent(data.zip)}&tax=${encodeURIComponent(tax)}&rec=${encodeURIComponent(rec)}`;
+        // These came from NPPES and may have no row in the clinics table, so send
+        // their coordinates and let the map pin them regardless of what it loaded.
+        const pins = data.providers
+          .filter(pr => pr.lat && pr.lng)
+          .map(pr => [pr.lat, pr.lng, pr.npi || '', String(pr.name || '').replace(/[|,]/g, ' ')].join(','))
+          .join('|');
+        const hash = `#zip=${encodeURIComponent(data.zip)}&tax=${encodeURIComponent(tax)}`
+          + `&rec=${encodeURIComponent(rec)}&pins=${encodeURIComponent(pins)}`;
         const links = document.createElement('div');
         links.className = 'bubble bot';
         links.innerHTML = `<a href="index.html${hash}" target="_blank" style="color:var(--accent);display:block;padding:2px 0">🗺️ Open these on the map</a>`;

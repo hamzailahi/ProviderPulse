@@ -50,6 +50,50 @@ const KEYWORD_TAXONOMY = {
   'physical therap': 'Physical Therapist', 'podiat': 'Podiatrist', 'foot': 'Podiatrist'
 };
 
+// NPPES search terms do not match what the map filters on. The map compares against
+// clinics.primary_taxonomy, which uses role-suffixed and facility-style values, so
+// "Family Medicine" finds nothing even where primary care clearly exists (the column
+// holds "General Practice Physician", "Primary Care Clinic/Center", ...). Expand each
+// search term into the forms that column actually stores. Terms absent from this table
+// pass through unchanged, which is correct when both vocabularies already agree.
+const MAP_TAXONOMY = {
+  'Family Medicine': 'Family Medicine Physician,General Practice Physician,Internal Medicine Physician,Primary Care Clinic/Center,Federally Qualified Health Center,Family Nurse Practitioner,Adult Health Nurse Practitioner,Community Health Clinic/Center',
+  'Internal Medicine': 'Internal Medicine Physician,General Practice Physician,Primary Care Clinic/Center,Federally Qualified Health Center',
+  'Pediatrics': 'Pediatrics Physician,Pediatric Nurse Practitioner,Pediatric Adolescent Medicine',
+  'Obstetrics & Gynecology': 'Obstetrics & Gynecology Physician,Obstetrics Physician,Gynecology Physician,Advanced Practice Midwife',
+  'Psychiatry': 'Psychiatry Physician,Psychologist,Neuropsychologist,Counselor,Clinical Social Worker,Marriage & Family Therapist,Mental Health,Behavioral Health',
+  'Counselor': 'Counselor,Clinical Social Worker,Psychologist,Marriage & Family Therapist,Mental Health,Behavioral Health',
+  'Dentist': 'Dentist,Dentistry,Dental Clinic/Center',
+  'Optometrist': 'Optometrist,Ophthalmology Physician,Eyewear Supplier',
+  'Ophthalmology': 'Ophthalmology Physician,Optometrist',
+  'Physical Therapist': 'Physical Therapist,Physical Therapy Clinic/Center,Occupational Therapist,Physical Medicine & Rehabilitation Physician',
+  'Orthopaedic Surgery': 'Orthopaedic Surgery Physician,Sports Medicine',
+  'Cardiovascular Disease': 'Cardiovascular Disease Physician,Cardiology',
+  'Oncology': 'Oncology,Hematology',
+  'Hematology & Oncology': 'Hematology & Oncology Physician,Oncology',
+  'Obesity Medicine': 'Obesity Medicine,Registered Dietitian,Nutritionist,Bariatric',
+  'Sleep Medicine': 'Sleep Medicine,Sleep Disorder,Pulmonary Disease Physician',
+  'Emergency Medicine': 'Emergency Medicine Physician,Urgent Care Clinic/Center,Emergency Care Clinic/Center,General Acute Care Hospital',
+  'Radiology': 'Diagnostic Radiology Physician,Radiology Clinic/Center,Body Imaging',
+  'Home Health': 'Home Health Agency,Home Health Aide,In Home Supportive Care Agency,Nursing Care Agency',
+  'Dietitian': 'Registered Dietitian,Nutritionist',
+  'Pain Medicine': 'Pain Medicine Physician,Pain Medicine (Anesthesiology) Physician',
+  'Plastic Surgery': 'Plastic Surgery Physician,Plastic and Reconstructive Surgery Physician',
+  'Speech-Language Pathologist': 'Speech-Language Pathologist,Audiologist,Hearing and Speech Clinic/Center'
+};
+
+// Terms the map should filter on, given what the navigator searched NPPES for.
+function mapTaxonomies(terms) {
+  const out = [];
+  for (const t of terms) {
+    for (const part of String(MAP_TAXONOMY[t] || t).split(',')) {
+      const v = part.trim();
+      if (v && !out.includes(v)) out.push(v);
+    }
+  }
+  return out;
+}
+
 function taxonomyTerms(conditions, latestUserText, concernDescription) {
   const terms = new Set();
   const text = (latestUserText + ' ' + concernDescription).toLowerCase();
@@ -271,9 +315,13 @@ ${specialty
     const aiData = await aiRes.json();
     if (!aiRes.ok) throw new Error(aiData.error && aiData.error.message);
     const reply = (aiData.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
-    // zip + taxonomies let the frontend deep link the map to the whole search area,
-    // not just the recommended three.
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply, providers, zip: effectiveZip, taxonomies: terms }) };
+    // zip + map_taxonomies let the frontend deep link the map to the whole search
+    // area. map_taxonomies (not taxonomies) is what the map must filter on.
+    return {
+      statusCode: 200,
+      headers: CORS,
+      body: JSON.stringify({ reply, providers, zip: effectiveZip, taxonomies: terms, map_taxonomies: mapTaxonomies(terms) })
+    };
   } catch (e) {
     return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'The assistant is unavailable right now, please try again in a moment.' }) };
   }
