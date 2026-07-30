@@ -24,6 +24,35 @@ function validNpi(npi) {
   return (10 - (sum % 10)) % 10 === parseInt(npi[9], 10);
 }
 
+// OIG exclusion check (HHS Office of Inspector General, LEIE list).
+// NPPES only proves an NPI exists; it says nothing about whether that provider has
+// been excluded from federal healthcare programs. Listing an excluded provider to
+// patients is a materially worse failure than listing an unverified one.
+//
+// Reads an optional `leie_exclusions` table. If that table has not been imported
+// yet the check is skipped rather than blocking every registration — so an empty
+// or missing table must be read as "unknown", never as "cleared".
+//
+// Caveat worth knowing: the published LEIE file leaves NPI blank for many
+// individual exclusions, so an NPI match is a high-confidence positive but not
+// exhaustive. Name/DOB matching is OIG's own recommended verification step.
+async function isExcluded(env, npi) {
+  try {
+    const r = await fetch(`${env.SUPABASE_URL}/rest/v1/leie_exclusions?npi=eq.${npi}&select=npi&limit=1`, {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
+      },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!r.ok) return false; // table absent or unreachable -> unknown, do not block
+    const rows = await r.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function audit(env, row) {
   try {
     await fetch(`${env.SUPABASE_URL}/rest/v1/audit_log`, {
@@ -79,6 +108,17 @@ exports.handler = async (event) => {
 
   // 2) Name match: NPI-1 -> provider name; NPI-2 -> authorized official
   const basic = record.basic || {};
+
+  // Deactivated NPIs stay in the registry forever, so "exists in NPPES" is not the
+  // same as "currently valid". Without this a retired or revoked NPI verifies fine.
+  if (String(basic.status || 'A').toUpperCase() === 'D') {
+    await audit(env, { action: 'provider_register_deactivated_npi', target: npi, ip, detail: { email } });
+    return {
+      statusCode: 403,
+      headers: CORS,
+      body: JSON.stringify({ error: 'This NPI is listed as deactivated in the NPPES registry and cannot be registered.' })
+    };
+  }
   const entityType = record.enumeration_type === 'NPI-2' ? 2 : 1;
   const registryLast = entityType === 2 ? basic.authorized_official_last_name : basic.last_name;
   const registryFirst = entityType === 2 ? basic.authorized_official_first_name : basic.first_name;
@@ -90,7 +130,17 @@ exports.handler = async (event) => {
     return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'Name does not match the NPPES record for this NPI. For organizations, use the authorized official name.' }) };
   }
 
-  // 3) Reject if NPI already claimed
+  // 3) Reject providers excluded from federal healthcare programs
+  if (await isExcluded(env, npi)) {
+    await audit(env, { action: 'provider_register_oig_excluded', target: npi, ip, detail: { email } });
+    return {
+      statusCode: 403,
+      headers: CORS,
+      body: JSON.stringify({ error: 'This NPI appears on the OIG exclusion list and cannot be registered. Contact support if you believe this is an error.' })
+    };
+  }
+
+  // 4) Reject if NPI already claimed
   const claimed = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=eq.${npi}&select=id`, {
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` }
   }).then(r => r.json());

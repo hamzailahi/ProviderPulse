@@ -1189,6 +1189,9 @@
                 fetchPLACESData(allLoadedZips);
                 fetchProceduresData(allLoadedZips);
             }
+
+            // Claimed-listing details; re-renders itself if any are found
+            loadRegisteredProviders();
         }
 
         // Dedicated state loader bypassing map movement logic
@@ -1446,6 +1449,48 @@
             });
         });
 
+        // --- REGISTERED PROVIDERS (claimed listings) ---
+        // Clinics come from bulk NPPES data, which cannot say whether a practice is
+        // taking new patients or which payers it accepts. Providers who registered and
+        // verified their NPI supply that themselves; join it in by NPI at render time
+        // so the clinics table stays untouched.
+        let registeredProviders = {};
+
+        async function loadRegisteredProviders() {
+            try {
+                const res = await fetch('/.netlify/functions/providers-public?all=1');
+                if (!res.ok) return;
+                const data = await res.json();
+                registeredProviders = data.providers || {};
+                const n = Object.keys(registeredProviders).length;
+                if (n) { console.log(`[providers] ${n} registered listing(s) loaded`); renderMap(); }
+            } catch (e) {
+                console.warn('[providers] enrichment unavailable', e);
+            }
+        }
+
+        // Extra popup detail for a claimed listing. Returns '' for unregistered NPIs,
+        // so unclaimed clinics render exactly as before.
+        function registeredPopupHtml(npi) {
+            const p = registeredProviders[npi];
+            if (!p) return '';
+            const chip = (text, bg, fg) =>
+                `<span style="display:inline-block;margin:2px 3px 0 0;padding:1px 6px;border-radius:8px;background:${bg};color:${fg};font-size:9px;font-weight:700;">${text}</span>`;
+            let html = '<div style="margin-top:5px;padding-top:5px;border-top:1px solid #2a3444;">';
+            html += chip('✓ VERIFIED PROVIDER', '#2dd4bf', '#04211d');
+            if (p.accepting_new_patients === true) html += chip('ACCEPTING PATIENTS', '#4ade80', '#04211d');
+            if (p.accepting_new_patients === false) html += chip('NOT ACCEPTING', '#484f58', '#e5eaf0');
+            if (p.telehealth) html += chip('TELEHEALTH', '#3b82f6', '#fff');
+            if (p.payers && p.payers.length) {
+                html += `<div style="margin-top:5px;font-size:10px;color:#8b949e;">Accepts: <span style="color:#e5eaf0;">${
+                    p.payers.slice(0, 8).map(x => String(x).replace(/</g, '&lt;')).join(', ')
+                }${p.payers.length > 8 ? ` +${p.payers.length - 8} more` : ''}</span></div>`;
+            }
+            if (p.bio) html += `<div style="margin-top:4px;font-size:10px;color:#8b949e;">${String(p.bio).slice(0, 220).replace(/</g, '&lt;')}</div>`;
+            html += '</div>';
+            return html;
+        }
+
         // --- MAP RENDER & MULTI-TAXONOMY PINS ---
         function renderMap() {
             markers.forEach(m => map.removeLayer(m)); markers = []; currentlyVisiblePractices = [];
@@ -1520,6 +1565,9 @@
                             <em>Loading contact info...</em>
                         </div>
                         <div id="cms-${npi}" style="margin-top:3px;font-size:11px;"></div>
+                        ${registeredPopupHtml(npi) || (npi ? `<div style="margin-top:5px;font-size:10px;">
+                            <a href="register-provider.html#npi=${npi}" target="_blank" style="color:#58a6ff;">Is this your practice? Claim this listing →</a>
+                        </div>` : '')}
                     </div>`;
                 });
                 popupHtml += `</div>`;
@@ -1529,10 +1577,17 @@
                 let gradientStr = uniqueTaxs.length === 1
                     ? (colorMap[uniqueTaxs[0]] || '#3b82f6')
                     : `conic-gradient(${uniqueTaxs.map((t, idx) => `${colorMap[t] || '#3b82f6'} ${idx * (100/uniqueTaxs.length)}% ${(idx + 1) * (100/uniqueTaxs.length)}%`).join(', ')})`;
-                // Recommended locations keep their taxonomy color but get a larger amber ring
-                const dotSize = isRecommended ? 20 : 14;
+                // Rings, in priority order: amber = recommended to this patient,
+                // teal = a claimed and NPI-verified listing. Both keep the taxonomy fill.
+                const isRegistered = items.some(i => {
+                    const rp = registeredProviders[String(i.practice['NPI'] || '')];
+                    return rp && rp.verified;
+                });
+                const dotSize = isRecommended ? 20 : (isRegistered ? 17 : 14);
                 const iconHtml = isRecommended
                     ? `<div style="width:20px; height:20px; border-radius:50%; background:${gradientStr}; border: 2.5px solid #f0883e; box-shadow: 0 0 8px 2px rgba(240,136,62,0.75);"></div>`
+                    : isRegistered
+                    ? `<div style="width:17px; height:17px; border-radius:50%; background:${gradientStr}; border: 2px solid #2dd4bf; box-shadow: 0 0 6px 1px rgba(45,212,191,0.6);"></div>`
                     : `<div style="width:14px; height:14px; border-radius:50%; background:${gradientStr}; border: 1.5px solid #0d1117; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`;
 
                 const marker = L.marker([group.lat, group.lng], {

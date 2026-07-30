@@ -96,6 +96,23 @@ function selectedPayers() {
   return [...checked, ...other];
 }
 
+// Claim-a-listing: the map links here as register-provider.html#npi=1234567890.
+// Prefill the NPI and say why the page changed, so arriving from a map popup does
+// not look like a plain signup form that happens to be filled in.
+(function claimFromMap() {
+  const npi = (new URLSearchParams((location.hash || '').replace(/^#/, '')).get('npi') || '').trim();
+  if (!/^\d{10}$/.test(npi)) return;
+  $('pNpi').value = npi;
+  const banner = document.createElement('div');
+  banner.className = 'phi-note';
+  banner.style.cssText = 'margin:0 0 18px;border-color:rgba(45,212,191,0.35);background:rgba(45,212,191,0.07);color:var(--text)';
+  banner.innerHTML = `<strong>Claiming NPI ${npi}</strong><br>`
+    + `<span style="color:var(--muted)">We'll verify this NPI against the NPPES registry. `
+    + `Enter the name exactly as it appears there — for organizations, the authorized official's name.</span>`;
+  $('formRegister').prepend(banner);
+  $('pLast').focus();
+})();
+
 $('toggleLogin').onclick = e => {
   e.preventDefault();
   $('formRegister').classList.toggle('hidden');

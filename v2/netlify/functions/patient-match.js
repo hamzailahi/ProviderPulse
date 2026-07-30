@@ -4,7 +4,8 @@
 // ZIP area, then has Claude present the top matches. Also returns the raw provider
 // list plus the ZIP and taxonomy terms used, so the frontend can deep link the map
 // to the whole search area with these providers highlighted.
-// Env vars: SUPABASE_URL, SUPABASE_ANON_KEY, ANTHROPIC_API_KEY
+// Env vars: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY
+// (service role is used only to read published fields of registered providers)
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -156,6 +157,51 @@ function compact(rec, taxonomy) {
   };
 }
 
+// Registered (claimed) listings for these NPIs, keyed by NPI. Providers supply the
+// one thing NPPES cannot: which payers they actually take. Uses the service role
+// because provider_profiles is RLS self-only; only non-identifying, provider-published
+// fields are read, never the account id or anything patient-related.
+async function registeredByNpi(env, npis) {
+  const list = [...new Set((npis || []).filter(n => /^\d{10}$/.test(String(n))))].slice(0, 40);
+  if (!list.length || !env.SUPABASE_SERVICE_ROLE_KEY) return {};
+  const svc = {
+    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
+  };
+  try {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=in.(${list.join(',')})&select=id,npi,accepting_new_patients,telehealth`,
+      { headers: svc, signal: AbortSignal.timeout(5000) }
+    );
+    if (!res.ok) return {};
+    const rows = await res.json();
+    if (!Array.isArray(rows) || !rows.length) return {};
+
+    const byId = {};
+    const out = {};
+    for (const r of rows) {
+      byId[r.id] = r.npi;
+      out[r.npi] = { accepting_new_patients: r.accepting_new_patients, telehealth: r.telehealth, payers: [] };
+    }
+    const ids = Object.keys(byId);
+    if (ids.length) {
+      const insRes = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/provider_insurance?provider_id=in.(${ids.map(i => `"${i}"`).join(',')})&select=provider_id,payer_name`,
+        { headers: svc, signal: AbortSignal.timeout(5000) }
+      );
+      if (insRes.ok) {
+        for (const row of (await insRes.json()) || []) {
+          const npi = byId[row.provider_id];
+          if (npi && row.payer_name) out[npi].payers.push(row.payer_name);
+        }
+      }
+    }
+    return out;
+  } catch {
+    return {}; // enrichment is optional; never fail the whole match on it
+  }
+}
+
 // Server-side geocoding, Nominatim first (accurate for US), Photon fallback
 async function geocode(provider) {
   const query = `${provider.address}, ${provider.city}, ${provider.state} ${provider.zip}`;
@@ -242,6 +288,26 @@ exports.handler = async (event) => {
       const bx = b.zip === effectiveZip ? 0 : (b.zip.startsWith(zip3) ? 1 : 2);
       return ax - bx;
     });
+    // Claimed listings first: a registered provider has actually told us whether they
+    // take this patient's insurance, which NPPES can never say.
+    const claimed = await registeredByNpi(env, providers.map(p => p.npi));
+    const wantPayer = String(p.insurance_payer || '').trim().toLowerCase();
+    for (const pr of providers) {
+      const reg = claimed[pr.npi];
+      if (!reg) continue;
+      pr.registered = true;
+      pr.accepting_new_patients = reg.accepting_new_patients;
+      pr.telehealth = reg.telehealth;
+      pr.payers = reg.payers;
+      if (wantPayer && reg.payers.length) {
+        pr.takes_your_insurance = reg.payers.some(x => String(x).trim().toLowerCase() === wantPayer);
+      }
+    }
+    providers.sort((a, b) => {
+      const score = x => (x.takes_your_insurance ? 0 : 1) + (x.registered ? 0 : 1);
+      return score(a) - score(b);
+    });
+
     providers = providers.slice(0, 3);
     // Geocode the 3 in parallel so exact map coordinates are ready before Claude answers
     const coords = await Promise.all(providers.map(geocode));
@@ -284,7 +350,8 @@ ${specialty
 - A single "Open these on the map" link appears automatically under your reply, which shows their whole area on the map with these providers highlighted. Do not list URLs yourself.
 - If the list is empty AND no ZIP is on file, ask them to share their 5-digit ZIP so you can search.
 - If the list is empty AND a ZIP was provided, tell them there are no matches in that area for that specialty and offer to try a different specialty or nearby area.
-- Insurance acceptance is not in this data, so advise calling ahead to confirm the provider takes ${patientContext.insurance}.
+- Insurance: a provider with "takes_your_insurance": true has confirmed with us that they accept ${patientContext.insurance} — say so plainly and mention they are a verified listing. For anyone with "registered": true, their "payers" list is what they told us they accept. For everyone else insurance is simply unknown, so tell the patient to call ahead and confirm; never guess.
+- If a provider has "accepting_new_patients": false, say they are not currently taking new patients. If true, mention that they are. Say nothing when the field is absent.
 - You are not a doctor. Never diagnose, never recommend treatments or medications. If asked for medical advice, gently redirect to seeing a provider.
 - If the patient describes an emergency (chest pain, difficulty breathing, stroke signs, suicidal thoughts), tell them to call 911 or go to the nearest emergency room immediately.
 - Keep every reply under 150 words. Plain text only, no markdown.`;
