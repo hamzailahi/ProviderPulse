@@ -1,0 +1,38 @@
+name: Import OIG exclusions (LEIE)
+
+# OIG republishes the full exclusions list monthly. Runs on the 8th to stay safely
+# after their update, and can be triggered by hand from the Actions tab.
+on:
+  schedule:
+    - cron: '0 7 8 * *'
+  workflow_dispatch:
+
+# Never expose the service role key to a fork's workflow run
+concurrency: leie-import
+
+jobs:
+  import:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Fails loudly if the secrets were never added, rather than silently
+      # leaving the exclusions table empty and the check inert.
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"
+            exit 1
+          fi
+
+      - name: Import LEIE into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/import-leie.mjs
