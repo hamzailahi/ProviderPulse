@@ -2812,25 +2812,32 @@
 
         // The navigator searches NPPES by taxonomy description ("Internal Medicine"),
         // while clinics.primary_taxonomy stores a role-suffixed form of the same value
-        // ("Internal Medicine Physician"), so match by containment in either direction.
+        // ("Internal Medicine Physician"), so match the term as a prefix of the stored
+        // value. The leading space anchors it to a word boundary, without which
+        // "Urology Physician" would match "NeUROLOGY PHYSICIAN"; the absent trailing
+        // space still lets "Dentist" match "General Practice Dentistry".
         function applyNavigatorTaxonomyFilter(wantTax) {
             const norm = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
             const wanted = wantTax.map(norm).filter(Boolean);
             const matched = new Set();
             for (const t of taxonomies) {
-                const nt = norm(t);
-                if (wanted.some(w => nt.includes(w) || (nt.length >= 5 && w.includes(nt)))) matched.add(t);
+                const nt = ' ' + norm(t);
+                if (wanted.some(w => nt.includes(' ' + w))) matched.add(t);
             }
 
+            const statusEl = document.getElementById('dbStatus');
             if (matched.size === 0) {
-                // Never leave the map blank: fall back to every taxonomy in the area
+                // Never leave the map blank, but say plainly that these are not the
+                // requested specialty — otherwise every clinic in the ZIP reads as one.
                 console.warn('[deeplink] no stored taxonomy matched', wantTax, '- showing all');
+                if (statusEl) statusEl.textContent = `⚠️ No ${wantTax[0] || 'matching'} providers in this ZIP — showing all clinics in the area instead`;
             } else {
                 selectedTaxonomies = matched;
                 const boxes = document.querySelectorAll('.tax-chk');
                 boxes.forEach(chk => { chk.checked = matched.has(chk.value); });
                 document.getElementById('chk-all').checked = matched.size === boxes.length;
                 updateDropdownLabel(); updateLegend();
+                if (statusEl) statusEl.textContent = `✅ Showing ${matched.size} matching provider type${matched.size === 1 ? '' : 's'} in this area`;
             }
 
             renderMap();

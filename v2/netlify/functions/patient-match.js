@@ -148,6 +148,10 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body || '{}'); }
   catch { return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
   const history = Array.isArray(body.messages) ? body.messages.slice(-10) : [];
+  // Specialty browse: the patient picked a type of provider outright, so skip
+  // condition inference entirely and never bring their health history into it.
+  const specialty = String(body.specialty || '').trim().slice(0, 80);
+  const bodyZip = String(body.zip || '').trim();
 
   // 1) Identify caller, must be a patient
   const userRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
@@ -169,12 +173,17 @@ exports.handler = async (event) => {
   // Extract ZIP from chat if patient typed one, overrides missing profile ZIP
   const allChatText = history.map(m => String(m.content || '')).join(' ');
   const zipInChat = (allChatText.match(/\b\d{5}\b/g) || []).pop();
-  const effectiveZip = (p.zip && /^\d{5}$/.test(p.zip)) ? p.zip : (zipInChat || '');
+  // An explicit ZIP from the specialty browser wins over the profile, which would
+  // otherwise pin every search to their home ZIP.
+  const effectiveZip = /^\d{5}$/.test(bodyZip) ? bodyZip
+    : ((p.zip && /^\d{5}$/.test(p.zip)) ? p.zip : (zipInChat || ''));
   const zip3 = effectiveZip.slice(0, 3);
 
   // 3) Live NPPES search by ZIP area + taxonomy
   const latestUser = [...history].reverse().find(m => m.role === 'user');
-  const terms = taxonomyTerms(p.conditions || [], String((latestUser || {}).content || ''), p.concern_description || '');
+  const terms = specialty
+    ? [specialty]
+    : taxonomyTerms(p.conditions || [], String((latestUser || {}).content || ''), p.concern_description || '');
 
   let providers = [];
   if (effectiveZip) {
@@ -198,13 +207,22 @@ exports.handler = async (event) => {
   }
 
   // 4) Ask Claude to present the matches
-  const patientContext = {
-    first_name: p.first_name || 'there',
-    zip: p.zip || 'unknown',
-    insurance: p.insurance_payer || 'not specified',
-    conditions: p.conditions || [],
-    concern_description: p.concern_description || ''
-  };
+  // On a specialty browse the health history is not needed to answer, so it is
+  // left out of the prompt entirely rather than sent and then ignored.
+  const patientContext = specialty
+    ? {
+        first_name: p.first_name || 'there',
+        zip: effectiveZip || 'unknown',
+        insurance: p.insurance_payer || 'not specified',
+        browsing_specialty: specialty
+      }
+    : {
+        first_name: p.first_name || 'there',
+        zip: p.zip || 'unknown',
+        insurance: p.insurance_payer || 'not specified',
+        conditions: p.conditions || [],
+        concern_description: p.concern_description || ''
+      };
 
   const system = `You are the ProviderPulse care navigator, a warm and concise assistant inside a healthcare provider directory.
 
@@ -215,7 +233,9 @@ PROVIDERS FOUND NEAR THEM in the national registry, already filtered to their ar
 ${JSON.stringify(providers)}
 
 Rules:
-- On the first message, greet the patient by first name and briefly, kindly acknowledge the health concerns they listed. One sentence, no drama.
+${specialty
+  ? `- The patient chose to browse "${specialty}" providers directly and has NOT described any symptoms. Greet them by first name in a few words and go straight to the list. Do not mention health conditions, do not ask what is wrong, and do not ask them to describe symptoms.`
+  : '- On the first message, greet the patient by first name and briefly, kindly acknowledge the health concerns they listed. One sentence, no drama.'}
 - Present ALL providers in the list above, in the exact order given. For each: name, specialty, city, and phone.
 - A single "Open these on the map" link appears automatically under your reply, which shows their whole area on the map with these providers highlighted. Do not list URLs yourself.
 - If the list is empty AND no ZIP is on file, ask them to share their 5-digit ZIP so you can search.

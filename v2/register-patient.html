@@ -69,6 +69,18 @@
     display: flex; justify-content: space-between; align-items: center;
   }
   #chatHead b { color: var(--muted); cursor: pointer; font-weight: 600; }
+  #specPick { padding: 12px 14px; border-bottom: 1px solid var(--line); background: rgba(45,212,191,0.05); }
+  #specPick .spechint { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  #specRow { display: grid; grid-template-columns: 1fr 68px; gap: 6px; }
+  #specRow select, #specRow input { padding: 7px 8px; font-size: 13px; }
+  #specBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  #specBtns button {
+    padding: 7px 8px; border: 0; border-radius: 8px; background: var(--accent-dim);
+    color: #04211d; font: inherit; font-weight: 700; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  #specBtns #specAsk { background: transparent; border: 1px solid var(--line); color: var(--text); }
+  #specBtns button:disabled { opacity: 0.5; cursor: wait; }
+  #specMsg { font-size: 12px; color: var(--danger); margin-top: 6px; display: none; }
   #chatLog { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
   .bubble { max-width: 85%; padding: 9px 12px; border-radius: 12px; font-size: 14px; white-space: pre-wrap; }
   .bubble.bot { background: var(--bg); border: 1px solid var(--line); align-self: flex-start; }
@@ -139,6 +151,18 @@
 <button id="chatBubble" title="Care navigator">✚</button>
 <div id="chatPanel">
   <div id="chatHead">Care navigator <b id="chatClose">×</b></div>
+  <div id="specPick">
+    <div class="spechint">Know what you need? Go straight to the map — no health questions.</div>
+    <div id="specRow">
+      <select id="specSel" aria-label="Type of provider"></select>
+      <input id="specZip" maxlength="5" inputmode="numeric" placeholder="ZIP" aria-label="ZIP code">
+    </div>
+    <div id="specBtns">
+      <button type="button" id="specGo">🗺️ Show on map</button>
+      <button type="button" id="specAsk">💬 Ask navigator</button>
+    </div>
+    <div id="specMsg"></div>
+  </div>
   <div id="chatLog"></div>
   <form id="chatForm">
     <input id="chatInput" placeholder="Ask about providers near you" autocomplete="off">
@@ -220,6 +244,95 @@ $('formLogin').onsubmit = async e => {
   initChat();
 };
 
+// ---------- browse by specialty (no symptoms required) ----------
+// Each entry is [label, mapTerms, nppesTerm]. The two vocabularies differ and are
+// NOT interchangeable: mapTerms are matched against clinics.primary_taxonomy, which
+// stores role-suffixed values ("Internal Medicine Physician", "General Practice
+// Dentistry"), while nppesTerm is sent to the NPPES registry, which uses the bare
+// description ("Internal Medicine"). Every nppesTerm below was verified to return
+// results from the live registry.
+const SPECIALTIES = [
+  ['Primary care / family doctor', 'Family Medicine Physician,Internal Medicine Physician,General Practice Physician,Primary Care Clinic/Center,Federally Qualified Health Center,Family Nurse Practitioner,Adult Health Nurse Practitioner,Community Health Clinic/Center', 'Family Medicine'],
+  ['Pediatrics (children)', 'Pediatrics Physician,Pediatric Nurse Practitioner,Pediatric Adolescent Medicine', 'Pediatrics'],
+  ["Women's health / OB-GYN", 'Obstetrics & Gynecology Physician,Obstetrics Physician,Gynecology Physician,Advanced Practice Midwife,Maternal & Fetal Medicine', 'Obstetrics & Gynecology'],
+  ['Mental health & counseling', 'Psychiatry Physician,Psychologist,Neuropsychologist,Counselor,Clinical Social Worker,Marriage & Family Therapist,Mental Health,Behavioral Health,Behavior Analyst,Community/Behavioral Health Agency', 'Psychiatry'],
+  ['Dental', 'Dentist,Dentistry,Dental Clinic/Center,Endodontics', 'Dentist'],
+  ['Eye care', 'Optometrist,Ophthalmology Physician,Eyewear Supplier', 'Optometrist'],
+  ['Chiropractic', 'Chiropractor', 'Chiropractor'],
+  ['Physical & occupational therapy', 'Physical Therapist,Physical Therapy Clinic/Center,Occupational Therapist,Occupational Therapy Assistant,Physical Medicine & Rehabilitation Physician,Rehabilitation Clinic/Center,Rehabilitation Hospital', 'Physical Therapist'],
+  ['Orthopedics & sports injury', 'Orthopaedic Surgery Physician,Sports Medicine,Surgery of the Hand', 'Orthopaedic Surgery'],
+  ['Heart / cardiology', 'Cardiovascular Disease Physician,Cardiology,Thoracic Surgery', 'Cardiovascular Disease'],
+  ['Skin / dermatology', 'Dermatology Physician', 'Dermatology'],
+  ['Allergy & immunology', 'Allergy Physician,Allergy & Immunology Physician', 'Allergy & Immunology'],
+  ['Lung, breathing & sleep', 'Pulmonary Disease Physician,Sleep Disorder Diagnostic Clinic/Center,Sleep Medicine', 'Pulmonary Disease'],
+  ['Digestive / gastroenterology', 'Gastroenterology Physician,Endoscopy Clinic/Center', 'Gastroenterology'],
+  ['Kidney / nephrology', 'Nephrology Physician,End-Stage Renal Disease', 'Nephrology'],
+  ['Diabetes & hormones', 'Endocrinology', 'Endocrinology'],
+  ['Cancer care / oncology', 'Hematology & Oncology Physician,Radiation Oncology Physician,Gynecologic Oncology Physician,Oncology', 'Hematology & Oncology'],
+  ['Arthritis / rheumatology', 'Rheumatology Physician', 'Rheumatology'],
+  ['Brain & nerves / neurology', 'Neurology Physician,Neurological Surgery Physician,Clinical Neurophysiology', 'Neurology'],
+  ['Ear, nose & throat', 'Otolaryngology Physician', 'Otolaryngology'],
+  ['Urology', 'Urology Physician', 'Urology'],
+  ['Foot & ankle / podiatry', 'Podiatrist,Podiatric Clinic/Center', 'Podiatrist'],
+  ['Pain management', 'Pain Medicine Physician,Pain Medicine (Anesthesiology) Physician', 'Pain Medicine'],
+  ['Plastic & reconstructive surgery', 'Plastic Surgery Physician,Plastic and Reconstructive Surgery Physician', 'Plastic Surgery'],
+  ['Speech & hearing', 'Speech-Language Pathologist,Audiologist,Hearing Instrument Specialist,Hearing and Speech Clinic/Center', 'Speech-Language Pathologist'],
+  ['Nutrition & dietitian', 'Registered Dietitian,Nutritionist', 'Dietitian'],
+  ['Acupuncture, massage & naturopathy', 'Acupuncturist,Massage Therapist,Naturopath,Music Therapist', 'Acupuncturist'],
+  ['Urgent care & emergency', 'Urgent Care Clinic/Center,Emergency Care Clinic/Center,Emergency Medicine Physician,General Acute Care Hospital,Critical Access Hospital,Ambulatory Surgical Clinic/Center', 'Emergency Medicine'],
+  ['Imaging & lab', 'Diagnostic Radiology Physician,Radiology Clinic/Center,Body Imaging,Clinical Medical Laboratory,Physiological Laboratory', 'Radiology'],
+  ['Pharmacy', 'Pharmacy,Pharmacist', 'Pharmacy'],
+  ['Home health & in-home care', 'Home Health Agency,Home Health Aide,Home Health Registered Nurse,In Home Supportive Care Agency,Nursing Care Agency,Community Based Hospice Care Agency', 'Home Health'],
+  ['Nursing & assisted living', 'Skilled Nursing Facility,Assisted Living Facility,Adult Care Home Facility', 'Skilled Nursing Facility'],
+  ['Medical equipment & supplies', 'Durable Medical Equipment,Prosthetic/Orthotic Supplier,Customized Equipment,Hearing  Aid Equipment', 'Durable Medical Equipment & Medical Supplies']
+];
+
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+// Option value is the index, so each handler can pick the vocabulary it needs
+$('specSel').innerHTML = '<option value="">Choose a type of provider…</option>' +
+  SPECIALTIES.map(([label], i) => `<option value="${i}">${esc(label)}</option>`).join('');
+
+const specMsg = t => {
+  const m = $('specMsg');
+  m.textContent = t || '';
+  m.style.display = t ? 'block' : 'none';
+};
+const specChoice = () => {
+  const v = $('specSel').value;
+  return v === '' ? null : SPECIALTIES[Number(v)];
+};
+
+// Straight to the map: plots every clinic in the ZIP matching this specialty
+$('specGo').onclick = () => {
+  specMsg('');
+  const choice = specChoice();
+  const zip = $('specZip').value.trim();
+  if (!choice) return specMsg('Pick a type of provider first.');
+  if (!/^\d{5}$/.test(zip)) return specMsg('Enter a 5-digit ZIP code.');
+  // No rec= NPIs: nothing is "recommended" here, so the map just plots the matches
+  window.open(`index.html#zip=${encodeURIComponent(zip)}&tax=${encodeURIComponent(choice[1])}`, '_blank');
+};
+
+// Same choice, conversational answer: the navigator searches NPPES for this
+// specialty without touching the patient's stored conditions.
+$('specAsk').onclick = async () => {
+  specMsg('');
+  const choice = specChoice();
+  const zip = $('specZip').value.trim();
+  if (!choice) return specMsg('Pick a type of provider first.');
+  if (zip && !/^\d{5}$/.test(zip)) return specMsg('Enter a 5-digit ZIP code, or leave it blank.');
+
+  chatStarted = true;
+  $('chatPanel').style.display = 'flex';
+  const text = `I'm looking for ${choice[0].toLowerCase()}${zip ? ` near ${zip}` : ''}.`;
+  addBubble('user', text);
+  chatHistory.push({ role: 'user', content: text });
+
+  $('specAsk').disabled = true;
+  await askNavigator({ specialty: choice[2], zip });
+  $('specAsk').disabled = false;
+};
+
 // ---------- care navigator chat ----------
 const chatHistory = [];
 let chatStarted = false;
@@ -233,13 +346,14 @@ function addBubble(role, text) {
   return div;
 }
 
-async function askNavigator() {
+async function askNavigator(opts) {
+  const { specialty = '', zip = '' } = opts || {};
   const thinking = addBubble('assistant', '…');
   try {
     const r = await fetch(FN + '/patient-match', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
-      body: JSON.stringify({ messages: chatHistory })
+      body: JSON.stringify({ messages: chatHistory, specialty, zip })
     });
     const data = await r.json().catch(() => ({}));
     thinking.textContent = r.ok ? data.reply : (data.error || 'Something went wrong, try again.');
@@ -293,6 +407,8 @@ async function loadAccount() {
   const p = profile || {};
   $('formLogin').classList.add('hidden');
   $('account').classList.remove('hidden');
+  // Seed the specialty browser so most patients never have to retype their ZIP
+  if (p.zip && !$('specZip').value) $('specZip').value = p.zip;
   const mine = new Set(p.conditions || []);
   const payerKnown = PAYERS.includes(p.insurance_payer);
   $('acctBody').innerHTML = `
