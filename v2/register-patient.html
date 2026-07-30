@@ -4,95 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProviderPulse · Patient registration</title>
-<style>
-  :root {
-    --bg: #0b0f14; --panel: #121821; --line: #1f2937; --text: #e5eaf0;
-    --muted: #8b98a9; --accent: #2dd4bf; --accent-dim: #14b8a6;
-    --danger: #f87171; --ok: #4ade80;
-  }
-  * { box-sizing: border-box; margin: 0; }
-  body {
-    background: var(--bg); color: var(--text);
-    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    min-height: 100vh; display: flex; align-items: flex-start; justify-content: center;
-    padding: 48px 16px;
-  }
-  .card { width: 100%; max-width: 560px; }
-  .brand { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
-  .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-  .brand a { color: var(--accent); font-size: 13px; text-decoration: none; }
-  .eyebrow { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
-  form, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
-  .hidden { display: none; }
-  label, .grouplabel { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 5px; text-transform: uppercase; letter-spacing: 0.06em; }
-  label:first-of-type { margin-top: 0; }
-  input, textarea, select {
-    width: 100%; padding: 10px 12px; background: var(--bg); color: var(--text);
-    border: 1px solid var(--line); border-radius: 8px; font: inherit;
-  }
-  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-dim); outline-offset: 0; border-color: transparent; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
-  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 8px; }
-  .checks label {
-    display: flex; align-items: center; gap: 8px; margin: 0; text-transform: none;
-    letter-spacing: 0; font-size: 14px; color: var(--text); cursor: pointer;
-  }
-  .checks input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
-  .submit {
-    width: 100%; margin-top: 22px; padding: 12px; border: 0; border-radius: 8px;
-    background: var(--accent); color: #04211d; font: inherit; font-weight: 700; cursor: pointer;
-  }
-  .submit:disabled { opacity: 0.5; cursor: wait; }
-  .msg { margin-top: 14px; font-size: 14px; }
-  .msg.err { color: var(--danger); }
-  .msg.ok { color: var(--ok); }
-  .phi-note {
-    margin-top: 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
-    font-size: 12px; color: var(--muted);
-  }
-  /* ---- care navigator chat ---- */
-  #chatBubble {
-    position: fixed; bottom: 24px; right: 24px; width: 54px; height: 54px;
-    border-radius: 50%; background: var(--accent); color: #04211d; border: 0;
-    font-size: 22px; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,0.45);
-    display: none; align-items: center; justify-content: center; z-index: 50;
-  }
-  #chatPanel {
-    position: fixed; bottom: 92px; right: 24px; width: 340px; max-width: calc(100vw - 32px);
-    height: 440px; max-height: 70vh; background: var(--panel); border: 1px solid var(--line);
-    border-radius: 14px; display: none; flex-direction: column; overflow: hidden; z-index: 50;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
-  }
-  #chatHead {
-    padding: 12px 16px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 14px;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  #chatHead b { color: var(--muted); cursor: pointer; font-weight: 600; }
-  #specPick { padding: 12px 14px; border-bottom: 1px solid var(--line); background: rgba(45,212,191,0.05); }
-  #specPick .spechint { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-  #specRow { display: grid; grid-template-columns: 1fr 68px; gap: 6px; }
-  #specRow select, #specRow input { padding: 7px 8px; font-size: 13px; }
-  #specBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
-  #specBtns button {
-    padding: 7px 8px; border: 0; border-radius: 8px; background: var(--accent-dim);
-    color: #04211d; font: inherit; font-weight: 700; font-size: 12px; cursor: pointer; white-space: nowrap;
-  }
-  #specBtns #specAsk { background: transparent; border: 1px solid var(--line); color: var(--text); }
-  #specBtns button:disabled { opacity: 0.5; cursor: wait; }
-  #specMsg { font-size: 12px; color: var(--danger); margin-top: 6px; display: none; }
-  #chatLog { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-  .bubble { max-width: 85%; padding: 9px 12px; border-radius: 12px; font-size: 14px; white-space: pre-wrap; }
-  .bubble.bot { background: var(--bg); border: 1px solid var(--line); align-self: flex-start; }
-  .bubble.me { background: var(--accent-dim); color: #04211d; align-self: flex-end; }
-  #chatForm { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
-  #chatForm input { flex: 1; }
-  #chatForm button {
-    padding: 0 16px; border: 0; border-radius: 8px; background: var(--accent);
-    color: #04211d; font: inherit; font-weight: 700; cursor: pointer;
-  }
-  #chatForm button:disabled { opacity: 0.5; }
-</style>
+<link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
 <div class="card">
@@ -103,54 +15,70 @@
   <div class="eyebrow">Patient registration · find providers near you who take your insurance</div>
 
   <form id="formRegister">
-    <div class="row">
-      <div><label for="tFirst">First name</label><input id="tFirst" required autocomplete="given-name"></div>
-      <div><label for="tLast">Last name</label><input id="tLast" required autocomplete="family-name"></div>
-    </div>
-    <div class="row">
-      <div><label for="tDob">Date of birth</label><input id="tDob" type="date"></div>
-      <div><label for="tZip">ZIP code</label><input id="tZip" inputmode="numeric" maxlength="5"></div>
-    </div>
+    <fieldset class="fs">
+      <h2 class="fs-title">About you</h2>
+      <div class="row">
+        <div><label for="tFirst">First name</label><input id="tFirst" required autocomplete="given-name"></div>
+        <div><label for="tLast">Last name</label><input id="tLast" required autocomplete="family-name"></div>
+      </div>
+      <div class="row">
+        <div><label for="tDob">Date of birth</label><input id="tDob" type="date"></div>
+        <div><label for="tZip">ZIP code</label><input id="tZip" inputmode="numeric" maxlength="5" autocomplete="postal-code"></div>
+      </div>
+      <div class="hint">Your ZIP is used to find providers near you.</div>
+    </fieldset>
 
-    <label for="tPayer">Insurance plan</label>
-    <select id="tPayer"></select>
-    <input id="tPayerOther" class="hidden" placeholder="Name of your insurance plan" style="margin-top:10px">
+    <fieldset class="fs">
+      <h2 class="fs-title">Insurance</h2>
+      <label for="tPayer">Insurance plan</label>
+      <select id="tPayer"></select>
+      <input id="tPayerOther" class="hidden" placeholder="Name of your insurance plan" style="margin-top:10px" aria-label="Name of your insurance plan">
+    </fieldset>
 
-    <div class="grouplabel">Health concerns</div>
-    <div class="checks" id="condChecks"></div>
-    <label for="tDesc">Describe your health concern (optional)</label>
-    <textarea id="tDesc" rows="3" maxlength="1000" placeholder="Anything you'd like providers or our matching tools to know"></textarea>
+    <fieldset class="fs">
+      <h2 class="fs-title">Health concerns <span class="opt">Optional</span></h2>
+      <p class="fs-note">Skip this entirely if you prefer — you can browse providers by specialty instead.</p>
+      <div class="checks" id="condChecks"></div>
+      <label for="tDesc">Describe your health concern</label>
+      <textarea id="tDesc" rows="3" maxlength="1000" placeholder="Anything you'd like providers or our matching tools to know"></textarea>
+    </fieldset>
 
-    <label for="tEmail">Email</label>
-    <input id="tEmail" type="email" required autocomplete="email">
-    <label for="tPass">Password</label>
-    <input id="tPass" type="password" required minlength="12" autocomplete="new-password">
-    <div class="hint">At least 12 characters.</div>
+    <fieldset class="fs">
+      <h2 class="fs-title">Account</h2>
+      <label for="tEmail">Email</label>
+      <input id="tEmail" type="email" required autocomplete="email">
+      <label for="tPass">Password</label>
+      <input id="tPass" type="password" required minlength="12" autocomplete="new-password" aria-describedby="passHint">
+      <div class="hint" id="passHint">At least 12 characters.</div>
+    </fieldset>
 
     <button class="submit" type="submit">Create account</button>
-    <div class="msg" id="rMsg"></div>
+    <div class="msg" id="rMsg" role="status" aria-live="polite"></div>
     <div class="phi-note">Your health information is encrypted, visible only to you, and never sold or shared without your consent.</div>
   </form>
 
   <form id="formLogin" class="hidden">
+    <h2 class="fs-title">Sign in</h2>
     <label for="lEmail">Email</label>
     <input id="lEmail" type="email" required autocomplete="email">
     <label for="lPass">Password</label>
     <input id="lPass" type="password" required autocomplete="current-password">
     <button class="submit" type="submit">Sign in</button>
-    <div class="msg" id="lMsg"></div>
+    <div class="msg" id="lMsg" role="status" aria-live="polite"></div>
   </form>
 
   <div id="account" class="panel hidden">
     <div id="acctBody"></div>
     <button class="submit" id="acctSave">Save changes</button>
-    <div class="msg" id="aMsg"></div>
+    <div class="msg" id="aMsg" role="status" aria-live="polite"></div>
   </div>
 </div>
 
-<button id="chatBubble" title="Care navigator">✚</button>
-<div id="chatPanel">
-  <div id="chatHead">Care navigator <b id="chatClose">×</b></div>
+<button id="chatBubble" type="button" title="Care navigator" aria-label="Open the care navigator" aria-expanded="false" aria-controls="chatPanel">✚</button>
+<div id="chatPanel" role="dialog" aria-label="Care navigator">
+  <div id="chatHead"><span>Care navigator</span>
+    <button id="chatClose" type="button" aria-label="Close the care navigator">×</button>
+  </div>
   <div id="specPick">
     <div class="spechint">Know what you need? Go straight to the map — no health questions.</div>
     <div id="specRow">
@@ -161,11 +89,11 @@
       <button type="button" id="specGo">🗺️ Show on map</button>
       <button type="button" id="specAsk">💬 Ask navigator</button>
     </div>
-    <div id="specMsg"></div>
+    <div id="specMsg" role="alert"></div>
   </div>
-  <div id="chatLog"></div>
+  <div id="chatLog" role="log" aria-live="polite" aria-label="Conversation"></div>
   <form id="chatForm">
-    <input id="chatInput" placeholder="Ask about providers near you" autocomplete="off">
+    <input id="chatInput" placeholder="Ask about providers near you" autocomplete="off" aria-label="Message the care navigator">
     <button type="submit">Send</button>
   </form>
 </div>
@@ -388,12 +316,20 @@ async function askNavigator(opts) {
 
 function initChat() {
   $('chatBubble').style.display = 'flex';
+  const setChatOpen = open => {
+    $('chatPanel').style.display = open ? 'flex' : 'none';
+    $('chatBubble').setAttribute('aria-expanded', String(open));
+    if (open) $('specSel').focus(); else $('chatBubble').focus();
+  };
   $('chatBubble').onclick = () => {
     const open = $('chatPanel').style.display === 'flex';
-    $('chatPanel').style.display = open ? 'none' : 'flex';
+    setChatOpen(!open);
     if (!open && !chatStarted) { chatStarted = true; askNavigator(); }
   };
-  $('chatClose').onclick = () => $('chatPanel').style.display = 'none';
+  $('chatClose').onclick = () => setChatOpen(false);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && $('chatPanel').style.display === 'flex') setChatOpen(false);
+  });
   $('chatForm').onsubmit = async e => {
     e.preventDefault();
     const text = $('chatInput').value.trim();

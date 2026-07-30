@@ -4,51 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProviderPulse · Provider registration</title>
-<style>
-  :root {
-    --bg: #0b0f14; --panel: #121821; --line: #1f2937; --text: #e5eaf0;
-    --muted: #8b98a9; --accent: #2dd4bf; --accent-dim: #14b8a6;
-    --danger: #f87171; --ok: #4ade80;
-  }
-  * { box-sizing: border-box; margin: 0; }
-  body {
-    background: var(--bg); color: var(--text);
-    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    min-height: 100vh; display: flex; align-items: flex-start; justify-content: center;
-    padding: 48px 16px;
-  }
-  .card { width: 100%; max-width: 560px; }
-  .brand { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
-  .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-  .brand a { color: var(--accent); font-size: 13px; text-decoration: none; }
-  .eyebrow { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
-  form, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
-  .hidden { display: none; }
-  label, .grouplabel { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 5px; text-transform: uppercase; letter-spacing: 0.06em; }
-  label:first-of-type { margin-top: 0; }
-  input, textarea, select {
-    width: 100%; padding: 10px 12px; background: var(--bg); color: var(--text);
-    border: 1px solid var(--line); border-radius: 8px; font: inherit;
-  }
-  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-dim); outline-offset: 0; border-color: transparent; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
-  .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
-  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 8px; }
-  .checks label {
-    display: flex; align-items: center; gap: 8px; margin: 0; text-transform: none;
-    letter-spacing: 0; font-size: 14px; color: var(--text); cursor: pointer;
-  }
-  .checks input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
-  .submit {
-    width: 100%; margin-top: 22px; padding: 12px; border: 0; border-radius: 8px;
-    background: var(--accent); color: #04211d; font: inherit; font-weight: 700; cursor: pointer;
-  }
-  .submit:disabled { opacity: 0.5; cursor: wait; }
-  .msg { margin-top: 14px; font-size: 14px; }
-  .msg.err { color: var(--danger); }
-  .msg.ok { color: var(--ok); }
-</style>
+<link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
 <div class="card">
@@ -59,51 +15,63 @@
   <div class="eyebrow">Provider registration · verified against the NPPES registry</div>
 
   <form id="formRegister">
-    <label for="pNpi">NPI number</label>
-    <input id="pNpi" inputmode="numeric" maxlength="10" required placeholder="10-digit NPI">
-    <div class="hint">For organizations, enter the authorized official's name below.</div>
+    <fieldset class="fs">
+      <h2 class="fs-title">Your NPI</h2>
+      <label for="pNpi">NPI number</label>
+      <input id="pNpi" inputmode="numeric" maxlength="10" required placeholder="10-digit NPI" aria-describedby="npiHint">
+      <div class="hint" id="npiHint">For organizations, enter the authorized official's name below.</div>
 
-    <div class="row">
-      <div><label for="pFirst">First name</label><input id="pFirst" autocomplete="given-name"></div>
-      <div><label for="pLast">Last name</label><input id="pLast" required autocomplete="family-name"></div>
-    </div>
+      <div class="row">
+        <div><label for="pFirst">First name</label><input id="pFirst" autocomplete="given-name"></div>
+        <div><label for="pLast">Last name</label><input id="pLast" required autocomplete="family-name"></div>
+      </div>
+    </fieldset>
 
-    <label for="pAddr">Practice address</label>
-    <input id="pAddr" placeholder="Street address" autocomplete="street-address">
-    <div class="row3" style="margin-top:12px">
-      <div><label for="pCity" style="margin-top:0">City</label><input id="pCity"></div>
-      <div><label for="pState" style="margin-top:0">State</label><input id="pState" maxlength="2" placeholder="AR"></div>
-      <div><label for="pZip" style="margin-top:0">ZIP</label><input id="pZip" inputmode="numeric" maxlength="5"></div>
-    </div>
-    <div class="hint">Leave blank to use the practice location on file with NPPES.</div>
+    <fieldset class="fs">
+      <h2 class="fs-title">Practice location <span class="opt">Optional</span></h2>
+      <label for="pAddr">Practice address</label>
+      <input id="pAddr" placeholder="Street address" autocomplete="street-address">
+      <div class="row3" style="margin-top:12px">
+        <div><label for="pCity" style="margin-top:0">City</label><input id="pCity" autocomplete="address-level2"></div>
+        <div><label for="pState" style="margin-top:0">State</label><input id="pState" maxlength="2" placeholder="AR" autocomplete="address-level1"></div>
+        <div><label for="pZip" style="margin-top:0">ZIP</label><input id="pZip" inputmode="numeric" maxlength="5" autocomplete="postal-code"></div>
+      </div>
+      <div class="hint">Leave blank to use the practice location on file with NPPES.</div>
+    </fieldset>
 
-    <div class="grouplabel">Insurance accepted</div>
-    <div class="checks" id="insChecks"></div>
-    <input id="insOther" placeholder="Other payers, comma separated" style="margin-top:10px">
+    <fieldset class="fs">
+      <h2 class="fs-title">Insurance accepted</h2>
+      <div class="checks" id="insChecks"></div>
+      <input id="insOther" placeholder="Other payers, comma separated" style="margin-top:10px" aria-label="Other payers, comma separated">
+    </fieldset>
 
-    <label for="pEmail">Work email</label>
-    <input id="pEmail" type="email" required autocomplete="email">
-    <label for="pPass">Password</label>
-    <input id="pPass" type="password" required minlength="12" autocomplete="new-password">
-    <div class="hint">At least 12 characters.</div>
+    <fieldset class="fs">
+      <h2 class="fs-title">Account</h2>
+      <label for="pEmail">Work email</label>
+      <input id="pEmail" type="email" required autocomplete="email">
+      <label for="pPass">Password</label>
+      <input id="pPass" type="password" required minlength="12" autocomplete="new-password" aria-describedby="pPassHint">
+      <div class="hint" id="pPassHint">At least 12 characters.</div>
+    </fieldset>
 
     <button class="submit" type="submit">Verify NPI and create account</button>
-    <div class="msg" id="rMsg"></div>
+    <div class="msg" id="rMsg" role="status" aria-live="polite"></div>
   </form>
 
   <form id="formLogin" class="hidden">
+    <h2 class="fs-title">Sign in</h2>
     <label for="lEmail">Email</label>
     <input id="lEmail" type="email" required autocomplete="email">
     <label for="lPass">Password</label>
     <input id="lPass" type="password" required autocomplete="current-password">
     <button class="submit" type="submit">Sign in</button>
-    <div class="msg" id="lMsg"></div>
+    <div class="msg" id="lMsg" role="status" aria-live="polite"></div>
   </form>
 
   <div id="account" class="panel hidden">
     <div id="acctBody"></div>
     <button class="submit" id="acctSave">Save changes</button>
-    <div class="msg" id="aMsg"></div>
+    <div class="msg" id="aMsg" role="status" aria-live="polite"></div>
   </div>
 </div>
 
