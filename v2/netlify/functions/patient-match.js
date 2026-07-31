@@ -169,10 +169,19 @@ async function registeredByNpi(env, npis) {
     Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
   };
   try {
-    const res = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=in.(${list.join(',')})&select=id,npi,accepting_new_patients,telehealth`,
+    // Listings flagged by OIG exclusion screening must not be recommended to a
+    // patient. Falls back if the review column has not been added yet.
+    const sel = 'select=id,npi,accepting_new_patients,telehealth';
+    let res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=in.(${list.join(',')})&review_status=not.eq.pending&${sel}`,
       { headers: svc, signal: AbortSignal.timeout(5000) }
     );
+    if (!res.ok) {
+      res = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=in.(${list.join(',')})&${sel}`,
+        { headers: svc, signal: AbortSignal.timeout(5000) }
+      );
+    }
     if (!res.ok) return {};
     const rows = await res.json();
     if (!Array.isArray(rows) || !rows.length) return {};

@@ -53,6 +53,48 @@ async function isExcluded(env, npi) {
   }
 }
 
+// Name-based exclusion screening, the other 90% of the LEIE.
+//
+// Only ~10% of exclusion records carry an NPI, so an NPI match alone misses most
+// excluded providers. Names are the fallback, but they are NOT proof: last+first+
+// state collides for over a thousand real combinations (five different MARIA
+// HERNANDEZ in FL). A hit therefore flags the account for review rather than
+// blocking it — wrongly locking out a legitimate provider is its own harm.
+//
+// LEIE stores names uppercase and writes the literal string "NULL" where a name is
+// unknown, which must never be treated as a surname.
+async function exclusionNameHits(env, { entityType, lastName, firstName, orgName, state }) {
+  const up = s => String(s || '').trim().toUpperCase();
+  const st = up(state).slice(0, 2);
+  if (!st) return 0;
+
+  let query;
+  if (entityType === 2) {
+    const org = up(orgName);
+    if (!org || org === 'NULL') return 0;
+    query = `business_name=eq.${encodeURIComponent(org)}&state=eq.${encodeURIComponent(st)}`;
+  } else {
+    const ln = up(lastName), fn = up(firstName);
+    if (!ln || ln === 'NULL' || !fn) return 0;
+    query = `last_name=eq.${encodeURIComponent(ln)}&first_name=eq.${encodeURIComponent(fn)}&state=eq.${encodeURIComponent(st)}`;
+  }
+
+  try {
+    const r = await fetch(`${env.SUPABASE_URL}/rest/v1/leie_exclusions?${query}&select=npi&limit=5`, {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
+      },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!r.ok) return 0; // table absent -> unknown, not cleared
+    const rows = await r.json();
+    return Array.isArray(rows) ? rows.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 async function audit(env, row) {
   try {
     await fetch(`${env.SUPABASE_URL}/rest/v1/audit_log`, {
@@ -140,6 +182,21 @@ exports.handler = async (event) => {
     };
   }
 
+  // 3b) Name-based screening. Suggestive only, so it gates publication, not the
+  // account: the listing stays hidden from patients until a human clears it.
+  const regAddrForScreen = (record.addresses || []).find(a => a.address_purpose === 'LOCATION') || (record.addresses || [])[0] || {};
+  const nameHits = await exclusionNameHits(env, {
+    entityType,
+    lastName: registryLast,
+    firstName: registryFirst,
+    orgName: basic.organization_name,
+    state: userState || regAddrForScreen.state
+  });
+  const reviewStatus = nameHits > 0 ? 'pending' : 'clear';
+  const reviewReason = nameHits > 0
+    ? `OIG name match: ${nameHits} exclusion record(s) share this name and state`
+    : null;
+
   // 4) Reject if NPI already claimed
   const claimed = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=eq.${npi}&select=id`, {
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` }
@@ -171,26 +228,36 @@ exports.handler = async (event) => {
     Prefer: 'return=minimal'
   };
 
-  const profileRes = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_profiles`, {
-    method: 'POST',
-    headers: svcHeaders,
-    body: JSON.stringify({
-      id: userId,
-      npi,
-      npi_verified: true,
-      entity_type: entityType,
-      first_name: registryFirst || firstName || null,
-      last_name: registryLast,
-      org_name: entityType === 2 ? (basic.organization_name || null) : null,
-      phone: addr.telephone_number || null,
-      address_line: userAddr || addr.address_1 || null,
-      city: userCity || addr.city || null,
-      state: userState || (addr.state || '').slice(0, 2) || null,
-      zip: userZip || (addr.postal_code || '').slice(0, 5) || null,
-      taxonomy_code: tax.code || null,
-      taxonomy_desc: tax.desc || null
-    })
+  const profileRow = {
+    id: userId,
+    npi,
+    npi_verified: true,
+    entity_type: entityType,
+    first_name: registryFirst || firstName || null,
+    last_name: registryLast,
+    org_name: entityType === 2 ? (basic.organization_name || null) : null,
+    phone: addr.telephone_number || null,
+    address_line: userAddr || addr.address_1 || null,
+    city: userCity || addr.city || null,
+    state: userState || (addr.state || '').slice(0, 2) || null,
+    zip: userZip || (addr.postal_code || '').slice(0, 5) || null,
+    taxonomy_code: tax.code || null,
+    taxonomy_desc: tax.desc || null
+  };
+
+  const postProfile = row => fetch(`${env.SUPABASE_URL}/rest/v1/provider_profiles`, {
+    method: 'POST', headers: svcHeaders, body: JSON.stringify(row)
   });
+
+  // The review columns are optional: if the ALTER TABLE has not been run yet, retry
+  // without them so registration keeps working instead of failing after signup.
+  let profileRes = await postProfile({ ...profileRow, review_status: reviewStatus, review_reason: reviewReason });
+  if (!profileRes.ok && reviewStatus === 'clear') {
+    profileRes = await postProfile(profileRow);
+  } else if (!profileRes.ok) {
+    // A flagged provider must never be published just because the column is missing
+    await audit(env, { action: 'provider_register_review_column_missing', target: npi, ip, detail: { hits: nameHits } });
+  }
   if (!profileRes.ok) {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Account created but profile setup failed. Contact support.' }) };
   }
@@ -207,11 +274,21 @@ exports.handler = async (event) => {
     });
   }
 
-  await audit(env, { actor: userId, actor_role: 'provider', action: 'provider_registered', target: npi, ip });
+  await audit(env, {
+    actor: userId, actor_role: 'provider', action: 'provider_registered', target: npi, ip,
+    detail: { review_status: reviewStatus, name_exclusion_hits: nameHits }
+  });
 
   return {
     statusCode: 200,
     headers: CORS,
-    body: JSON.stringify({ ok: true, npi_verified: true, message: 'Registered. Check your email to confirm your account before signing in.' })
+    body: JSON.stringify({
+      ok: true,
+      npi_verified: true,
+      review_pending: reviewStatus === 'pending',
+      message: reviewStatus === 'pending'
+        ? 'Registered. Check your email to confirm your account. Your public listing is held for a short verification review before patients can see it.'
+        : 'Registered. Check your email to confirm your account before signing in.'
+    })
   };
 };

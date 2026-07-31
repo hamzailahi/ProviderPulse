@@ -50,11 +50,22 @@ exports.handler = async (event) => {
   const filter = wantAll ? 'npi=not.is.null&limit=500' : `npi=in.(${npis.join(',')})`;
   const inList = `(${npis.join(',')})`;
 
+  // Listings flagged by exclusion screening stay unpublished until reviewed. If the
+  // review column does not exist yet the query 400s, so fall back to the unfiltered
+  // form — before that migration there is nothing flagged to hide.
+  const REVIEW_FILTER = 'review_status=not.eq.pending';
+
   try {
-    const profRes = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&select=${PUBLIC_COLUMNS}`,
+    let profRes = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&${REVIEW_FILTER}&select=${PUBLIC_COLUMNS}`,
       { headers: svc, signal: AbortSignal.timeout(6000) }
     );
+    if (!profRes.ok) {
+      profRes = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&select=${PUBLIC_COLUMNS}`,
+        { headers: svc, signal: AbortSignal.timeout(6000) }
+      );
+    }
     if (!profRes.ok) throw new Error('profile lookup failed');
     const rows = await profRes.json();
     if (!Array.isArray(rows) || !rows.length) {
