@@ -275,10 +275,14 @@ function locBadge(l) {
 }
 // A saved address with no coordinates never appears on the map. Say which case
 // it is rather than letting the provider assume the pin exists.
+// The column defaults to false, so `geocoded === false` cannot tell "never
+// attempted" from "attempted and failed" -- backfilled rows were wrongly
+// reading "address not found". State only what is certain here; the save
+// response reports a real geocode failure.
 function pinState(l) {
-  if (l.latitude && l.longitude) return '<span class="lb ok">Pinned on the map</span>';
-  if (l.geocoded === false && l.address_line) return '<span class="lb warn">Address not found \u2014 no pin</span>';
-  return '<span class="lb warn">Not geocoded \u2014 save to place the pin</span>';
+  return (l.latitude && l.longitude)
+    ? '<span class="lb ok">Pinned on the map</span>'
+    : '<span class="lb warn">No pin yet — press Save</span>';
 }
 
 function paintLocs() {

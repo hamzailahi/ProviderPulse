@@ -163,7 +163,14 @@ exports.handler = async (event) => {
       if (['address_line', 'city', 'state', 'zip'].some(k => k in row)) {
         const curRes = await fetch(`${BASE}?id=eq.${encodeURIComponent(id)}&provider_id=eq.${user.id}&select=address_line,city,state,zip`, { headers: H });
         const cur = curRes.ok ? ((await curRes.json().catch(() => []))[0] || {}) : {};
-        await withCoords(Object.assign({}, cur, row));
+        // Geocode the MERGED address (a PUT may change only the ZIP), then copy
+        // the result onto `row`, which is what actually gets PATCHed. Geocoding
+        // the merged object alone threw the coordinates away and left every
+        // save reporting "address not found".
+        const geo = await withCoords(Object.assign({}, cur, row));
+        row.latitude = geo.latitude;
+        row.longitude = geo.longitude;
+        row.geocoded = geo.geocoded;
       }
       row.updated_at = new Date().toISOString();
 
