@@ -358,3 +358,26 @@ dl.f dd.m { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   header { padding: 12px 15px; gap: 8px; }
 }
 
+
+/* ---- split view: conversation beside a live map (wide screens only) ------- */
+.split { flex: 1; display: grid; grid-template-columns: minmax(420px, 470px) 1fr; min-height: 0; }
+.split-conv { min-width: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.split-conv .col { max-width: none; padding: 0 20px; }
+.split-map { position: relative; border-left: 1px solid var(--hairline); min-width: 0; }
+.split-map #mapCanvas {
+  position: absolute; inset: 0; height: auto; width: auto;
+  border: 0; border-radius: 0;
+}
+.map-legend {
+  position: absolute; left: 14px; top: 14px; z-index: 500;
+  display: flex; gap: 13px; padding: 7px 12px; border-radius: var(--r-pill);
+  font-size: 11px; color: var(--muted);
+  background: color-mix(in srgb, var(--ground) 84%, transparent);
+  backdrop-filter: blur(12px); border: 1px solid var(--hairline-2);
+}
+.map-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: -1px; }
+.map-legend .pin.rec { background: var(--caution); }
+.map-legend .pin.ver { background: var(--a1); }
+.map-legend .pin.oth { background: var(--unknown); }
+
+@media (max-width: 1099px) { .split { display: block; } .split-map { display: none; } }

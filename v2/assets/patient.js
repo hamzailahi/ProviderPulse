@@ -275,6 +275,12 @@ var mapState = { map: null, focusNpi: null };
 
 function showOnMap(npi) {
   mapState.focusNpi = npi || null;
+  // If the persistent pane is already showing, just fly to the pin rather than
+  // stacking a sheet on top of a map the patient can already see.
+  if (mapState.map && document.querySelector('.split-map #mapCanvas')) {
+    var p = state.results.filter(function (x) { return String(x.npi) === String(npi); })[0];
+    if (p && p.lat && p.lng) { mapState.map.setView([p.lat, p.lng], 15); return; }
+  }
   location.hash = '#/map';
 }
 
@@ -1082,7 +1088,25 @@ function render() {
   }
 
   paintHeader();
-  main.appendChild(state.messages.length || state.pending || state.reviewing ? transcriptEl() : homeEl());
+
+  // Wide screens get a persistent map beside the conversation, so results and
+  // geography are visible together. Narrow screens keep the #/map sheet, which
+  // is the only sensible shape on a phone.
+  var wide = window.matchMedia && window.matchMedia('(min-width: 1100px)').matches;
+  var col = main;
+  if (wide && state.results.length) {
+    var split = h('div', { class: 'split' });
+    col = h('div', { class: 'split-conv' });
+    var pane = h('div', { class: 'split-map' }, h('div', { id: 'mapCanvas' }),
+      h('div', { class: 'map-legend' },
+        h('span', {}, h('i', { class: 'pin rec' }), 'Recommended'),
+        h('span', {}, h('i', { class: 'pin ver' }), 'Verified'),
+        h('span', {}, h('i', { class: 'pin oth' }), 'Other clinics')));
+    split.appendChild(col); split.appendChild(pane);
+    main.appendChild(split);
+    setTimeout(function () { loadRegistered().then(function () { initMap(pane.querySelector('#mapCanvas'), h('span', {})); }); }, 0);
+  }
+  col.appendChild(state.messages.length || state.pending || state.reviewing ? transcriptEl() : homeEl());
 
   if (r.name === 'p' && r.arg) document.body.appendChild(detailSheet(r.arg));
   else if (r.name === 'account') document.body.appendChild(accountSheet());
