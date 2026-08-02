@@ -296,7 +296,12 @@ async function loadAccount() {
         insurances: [...checked, ...other]
       })
     });
-    if (!r2.ok) { setMsg('aMsg', 'Save failed', false); return; }
+    if (!r2.ok) {
+      let why = 'Save failed';
+      try { const e = await r2.json(); if (e && e.error) why = e.error; } catch (x) {}
+      setMsg('aMsg', why, false);
+      return;
+    }
     // Saving is not the end of the job — take them to their market so they can
     // see the listing they just published, in the area they practise in.
     const zip = ($('aZip').value || '').trim();

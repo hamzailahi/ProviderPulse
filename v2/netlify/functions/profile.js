@@ -111,11 +111,26 @@ exports.handler = async (event) => {
         await audit(env, { actor: user.id, actor_role: role, action: 'profile_row_created', ip });
       }
 
-      const upRes = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?id=eq.${user.id}`, {
+      const patch = (body) => fetch(`${env.SUPABASE_URL}/rest/v1/${table}?id=eq.${user.id}`, {
         method: 'PATCH',
         headers: { ...userHeaders, Prefer: 'return=representation' },
-        body: JSON.stringify(updates)
+        body: JSON.stringify(body)
       });
+
+      let upRes = await patch(updates);
+
+      // Availability arrives with migration 005. Until it runs, PostgREST 400s
+      // on the unknown columns and the whole save fails — so a provider editing
+      // their phone number would be told "Save failed" for a field they never
+      // touched. Retry without them and let the rest through.
+      if (!upRes.ok) {
+        const OPTIONAL = ['office_hours', 'appointment_minutes', 'booking_mode', 'booking_url', 'hours_note'];
+        const trimmed = {};
+        for (const k of Object.keys(updates)) if (!OPTIONAL.includes(k)) trimmed[k] = updates[k];
+        if (Object.keys(trimmed).length && Object.keys(trimmed).length !== Object.keys(updates).length) {
+          upRes = await patch(trimmed);
+        }
+      }
       if (!upRes.ok) {
         const detail = await upRes.text().catch(() => '');
         return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Update failed: ' + detail.slice(0, 200) }) };
