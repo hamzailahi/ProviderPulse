@@ -3,6 +3,34 @@
 <head>
     <meta charset="utf-8" />
     <title>Healthcare Provider Map - Demographics & Insurance Analysis</title>
+
+    <!-- ====================================================================
+         SIGN-IN GATE. First script in the document on purpose: it runs before
+         the CDN libraries below and before any Supabase query, so an unsigned
+         visitor never loads the data or sees the page paint.
+
+         READ THIS BEFORE RELYING ON IT. This is a deterrent, not access
+         control. The site is static and SUPABASE_KEY is in this file in plain
+         text, so anyone who views source can query the same tables directly
+         with curl. It stops a shared URL from working; it does not make the
+         data private. Real protection means either moving these reads behind
+         an authenticated Netlify Function, or tightening RLS so the anon role
+         cannot select from clinics/demographics_raw at all.
+         ==================================================================== -->
+    <script>
+    (function requireSession() {
+        var s = null;
+        try {
+            var raw = sessionStorage.getItem('pp.session.v1') || localStorage.getItem('pp.session.v1')
+                   || sessionStorage.getItem('pp.patient.v1') || localStorage.getItem('pp.patient.v1');
+            s = raw ? JSON.parse(raw) : null;
+        } catch (e) { s = null; }
+        if (s && s.access_token && !(s.expiresAt && s.expiresAt < Date.now())) return;
+        // Carry where they were headed so the deep link survives the detour.
+        var back = location.pathname + location.search + location.hash;
+        location.replace('/signin?next=' + encodeURIComponent(back));
+    })();
+    </script>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

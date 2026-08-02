@@ -200,7 +200,22 @@ window.addEventListener('hashchange', paint);
 /* ── where you land after signing in ─────────────────────────────────────── */
 // Routed on the role the SERVER returned, never the toggle above. Picking the
 // wrong tab is a UI preference; it must not decide which product you get.
+// Where the gate sent us from, if anywhere. Same-origin paths only: a bare
+// "/..." that is not "//host" (which the browser reads as protocol-relative
+// and would turn this into an open redirect to someone else's site).
+function safeNext() {
+  try {
+    const n = new URLSearchParams(location.search).get('next');
+    if (n && n[0] === '/' && n[1] !== '/' && n.charCodeAt(1) !== 92) return n;
+  } catch (e) {}
+  return null;
+}
+
 function routeByRole(serverRole) {
+  const next = safeNext();
+  // The destination re-checks the session itself, so if this role does not
+  // belong there it bounces again rather than trusting this hop.
+  if (next && (serverRole === 'provider' || serverRole === 'patient')) { location.href = next; return; }
   if (serverRole === 'provider') { location.href = '/register-provider.html'; return; }
   if (serverRole === 'patient')  { location.href = '/'; return; }
   setMsg('siMsg', 'That account has no role assigned. Contact support.', false);
