@@ -1,0 +1,135 @@
+/* ============================================================================
+   forms.css — centred card form pages (register-provider.html) on the new
+   design system. Load AFTER tokens.css, which owns the palette and the reset.
+
+   Deliberately covers exactly the class names the existing provider markup
+   already uses — card, brand, eyebrow, fs, fs-title, opt, hint, row, row3,
+   checks, grouplabel, submit, msg, panel — so the page gets the new visual
+   language without touching its markup or its JavaScript.
+
+   This replaces assets/app.css for the provider page. app.css remains only for
+   the legacy register-patient.html until that URL redirects to app.html.
+   ============================================================================ */
+
+body {
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 56px 16px 72px; position: relative; z-index: 1;
+}
+
+.card { width: 100%; max-width: 560px; position: relative; z-index: 1; }
+
+.brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.brand h1 {
+  font-size: 21px; font-weight: 660; letter-spacing: -.022em;
+  display: flex; align-items: center; gap: 9px;
+}
+/* the gradient mark, drawn without extra markup */
+.brand h1::before {
+  content: "✚"; width: 27px; height: 27px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff;
+  display: inline-grid; place-items: center; font-size: 15px; font-weight: 700;
+}
+.brand a { color: var(--a1); font-size: 13px; text-decoration: none; white-space: nowrap; }
+.brand a:hover { text-decoration: underline; }
+
+.eyebrow { color: var(--muted); font-size: 13.5px; margin-bottom: 22px; }
+
+form, .panel {
+  background: var(--surface); backdrop-filter: blur(20px);
+  border: 1px solid var(--hairline-2); border-radius: var(--r-lg); padding: 28px;
+}
+
+/* ---- sections ---- */
+.fs { border: 0; padding: 0; margin: 0 0 26px; min-width: 0; }
+.fs:last-of-type { margin-bottom: 0; }
+.fs-title {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 13px; font-weight: 680; letter-spacing: -.005em;
+  padding-bottom: 9px; margin-bottom: 16px; border-bottom: 1px solid var(--hairline);
+}
+.opt {
+  font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--a1); background: color-mix(in srgb, var(--a1) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--a1) 32%, transparent);
+  padding: 2px 8px; border-radius: var(--r-pill);
+}
+
+/* ---- fields ---- */
+label, .grouplabel {
+  display: block; font-size: 11px; color: var(--muted);
+  margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .09em;
+}
+label:first-of-type, .fs label:first-of-type, .fs .grouplabel:first-child { margin-top: 0; }
+
+input, textarea, select {
+  width: 100%; padding: 11px 13px; font: inherit; font-size: 15px;
+  background: var(--ground); color: var(--text);
+  border: 1px solid var(--hairline-2); border-radius: var(--r-sm); outline: none;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+input:hover:not(:disabled), textarea:hover:not(:disabled), select:hover:not(:disabled) { border-color: var(--faint); }
+input:focus, textarea:focus, select:focus {
+  border-color: color-mix(in srgb, var(--a1) 55%, transparent); box-shadow: 0 0 0 3px var(--glow-1);
+}
+input:disabled, textarea:disabled, select:disabled { opacity: .55; cursor: not-allowed; }
+input::placeholder, textarea::placeholder { color: var(--faint); }
+textarea { resize: vertical; min-height: 78px; }
+
+select {
+  appearance: none; -webkit-appearance: none; padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2393a3b8' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+}
+
+.row  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+.hint { font-size: 12.5px; color: var(--muted); margin-top: 7px; }
+
+/* ---- checkbox grid ---- */
+.checks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin-top: 10px; }
+.checks label {
+  display: flex; align-items: center; gap: 9px; margin: 0; min-height: 42px;
+  text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text);
+  cursor: pointer; padding: 8px 11px; border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.checks label:hover { background: var(--surface-2); border-color: var(--hairline); }
+/* the label text is a bare text node, so :has is the only way to style the row */
+.checks label:has(input:checked) {
+  border-color: color-mix(in srgb, var(--a1) 38%, transparent);
+  background: color-mix(in srgb, var(--a1) 8%, transparent);
+}
+.checks input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--a1); flex-shrink: 0; cursor: pointer; }
+
+/* ---- submit ---- */
+.submit {
+  width: 100%; margin-top: 26px; padding: 14px; border: 0; border-radius: var(--r-sm);
+  background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff;
+  font: inherit; font-weight: 660; font-size: 15px; cursor: pointer;
+  transition: filter var(--dur) var(--ease), transform 80ms var(--ease);
+}
+.submit:hover:not(:disabled) { filter: brightness(1.09); }
+.submit:active:not(:disabled) { transform: translateY(1px); }
+.submit:disabled { opacity: .5; cursor: wait; }
+
+/* ---- messages ---- */
+.msg { margin-top: 16px; font-size: 14px; }
+.msg:empty { margin-top: 0; }
+.msg.err { color: var(--danger); }
+.msg.ok  { color: var(--good); }
+
+.phi-note {
+  margin-top: 18px; padding: 12px 14px; border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); font-size: 12px; color: var(--muted); background: var(--surface);
+}
+
+@media (max-width: 640px) {
+  body { padding: 24px 12px 56px; }
+  form, .panel { padding: 20px 17px; border-radius: var(--r-md); }
+  .row, .row3, .checks { grid-template-columns: 1fr; }
+  /* 16px stops iOS zooming the viewport on focus */
+  input, textarea, select { padding: 12px; font-size: 16px; }
+  .submit { padding: 15px; }
+  .brand { margin-bottom: 4px; }
+}
