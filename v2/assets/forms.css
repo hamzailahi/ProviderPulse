@@ -331,3 +331,46 @@ select {
   font-size: 13px; color: var(--muted); cursor: pointer;
 }
 .stay input { width: 16px; height: 16px; accent-color: var(--a1); margin: 0; flex: none; cursor: pointer; }
+
+
+/* ---- practice locations ------------------------------------------------
+   The badges carry the load here: a provider must be able to tell at a glance
+   which sites are registry-verified and which will actually show a pin.
+   ---------------------------------------------------------------------- */
+.loc {
+  border: 1px solid var(--hairline-2); border-radius: var(--r-md);
+  padding: 14px; margin-bottom: 12px; background: var(--surface);
+}
+.loc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.loc-label { flex: 1 1 190px; min-width: 0; margin: 0; font-weight: 560; }
+.loc input { margin-top: 0; }
+.loc .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+
+.loc-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.lb {
+  font-size: 10px; font-weight: 640; letter-spacing: .05em; text-transform: uppercase;
+  padding: 4px 8px; border-radius: var(--r-pill); border: 1px solid; white-space: nowrap;
+}
+.lb.ver  { color: var(--a1);      background: color-mix(in srgb, var(--a1) 12%, transparent); border-color: color-mix(in srgb, var(--a1) 32%, transparent); }
+.lb.self { color: var(--unknown); background: var(--unknown-bg); border-color: color-mix(in srgb, var(--unknown) 30%, transparent); }
+.lb.ok   { color: var(--good);    background: var(--good-bg);    border-color: color-mix(in srgb, var(--good) 30%, transparent); }
+.lb.warn { color: var(--caution); background: var(--caution-bg); border-color: color-mix(in srgb, var(--caution) 32%, transparent); }
+
+.loc-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.loc-primary { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); cursor: pointer; margin-right: auto; }
+.loc-primary input { width: 15px; height: 15px; accent-color: var(--a1); margin: 0; cursor: pointer; }
+.loc-save, .loc-del {
+  padding: 8px 15px; border-radius: var(--r-sm); font: inherit; font-size: 12.5px;
+  font-weight: 560; cursor: pointer; border: 1px solid transparent;
+}
+.loc-save { background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff; }
+.loc-save:hover:not(:disabled) { filter: brightness(1.09); }
+.loc-save:disabled { opacity: .55; cursor: wait; }
+.loc-del { background: none; border-color: var(--hairline-2); color: var(--muted); }
+.loc-del:hover:not(:disabled) { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+
+@media (max-width: 640px) {
+  .loc .row3 { grid-template-columns: 1fr; }
+  .loc-actions { gap: 8px; }
+  .loc-primary { flex: 1 0 100%; margin-bottom: 4px; }
+}

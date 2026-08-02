@@ -123,6 +123,23 @@
       This is what patients see when they search your area. Changes go live immediately.
     </p>
     <div id="acctBody"></div>
+
+    <!-- Practice locations (migration 006). Separate from the profile address
+         above: that one is the account's registry identity, these are the
+         places patients actually visit. -->
+    <fieldset class="fs" id="locWrap" style="margin-top:26px">
+      <h2 class="fs-title">Practice locations</h2>
+      <p class="hint" style="margin:-4px 0 12px">
+        Each location gets its own pin. Only the address in the federal registry
+        can be marked verified &mdash; the rest show as self-reported, which patients see.
+      </p>
+      <div id="locList"></div>
+      <button type="button" class="submit" id="locAdd"
+              style="background:none;border:1px solid var(--hairline-2);color:var(--text);margin-top:12px">
+        + Add a location
+      </button>
+      <div class="msg" id="locMsg" role="status" aria-live="polite"></div>
+    </fieldset>
     <button class="submit" id="acctSave">Save changes</button>
     <button class="submit" id="acctSignOut" type="button"
             style="background:none;border:1px solid var(--hairline-2);color:var(--muted);margin-top:10px">
@@ -245,6 +262,121 @@ $('formRegister').onsubmit = async e => {
 
 // A restored session should land straight on the account panel.
 if (session) loadAccount();
+
+// ---------------------------------------------------------------------------
+// Practice locations
+// ---------------------------------------------------------------------------
+let LOCS = [];
+
+function locBadge(l) {
+  return l.verified
+    ? '<span class="lb ver">\u2713 Registry verified</span>'
+    : '<span class="lb self">Self-reported</span>';
+}
+// A saved address with no coordinates never appears on the map. Say which case
+// it is rather than letting the provider assume the pin exists.
+function pinState(l) {
+  if (l.latitude && l.longitude) return '<span class="lb ok">Pinned on the map</span>';
+  if (l.geocoded === false && l.address_line) return '<span class="lb warn">Address not found \u2014 no pin</span>';
+  return '<span class="lb warn">Not geocoded \u2014 save to place the pin</span>';
+}
+
+function paintLocs() {
+  const wrap = $('locList');
+  if (!LOCS.length) {
+    wrap.innerHTML = '<p class="hint">No locations yet. Add the address patients should visit.</p>';
+    return;
+  }
+  wrap.innerHTML = LOCS.map(function (l, i) {
+    return '<div class="loc" data-i="' + i + '">' +
+      '<div class="loc-head">' +
+        '<input class="loc-label" data-f="label" value="' + escAttr(l.label || '') +
+          '" placeholder="Label, e.g. Main office" aria-label="Location label">' +
+        '<div class="loc-badges">' + locBadge(l) + pinState(l) + '</div>' +
+      '</div>' +
+      '<input data-f="address_line" value="' + escAttr(l.address_line || '') +
+        '" placeholder="Street address" aria-label="Street address">' +
+      '<div class="row3" style="margin-top:10px">' +
+        '<input data-f="city" value="'  + escAttr(l.city || '')  + '" placeholder="City" aria-label="City">' +
+        '<input data-f="state" value="' + escAttr(l.state || '') + '" placeholder="State" maxlength="2" aria-label="State">' +
+        '<input data-f="zip" value="'   + escAttr(l.zip || '')   + '" placeholder="ZIP" maxlength="5" aria-label="ZIP">' +
+      '</div>' +
+      '<div class="loc-actions">' +
+        '<label class="loc-primary"><input type="checkbox" data-f="is_primary"' +
+          (l.is_primary ? ' checked' : '') + '> Primary</label>' +
+        '<button type="button" class="loc-save" data-act="save">Save</button>' +
+        '<button type="button" class="loc-del" data-act="del">Remove</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function readLoc(card) {
+  const out = {};
+  card.querySelectorAll('[data-f]').forEach(function (el) {
+    out[el.dataset.f] = el.type === 'checkbox' ? el.checked : el.value.trim();
+  });
+  return out;
+}
+
+async function loadLocs() {
+  if (!session) return;
+  try {
+    const r = await fetch(FN + '/provider-locations', {
+      headers: { Authorization: 'Bearer ' + session.access_token }
+    });
+    const d = await r.json().catch(function () { return {}; });
+    // Migration 006 not applied: hide the section rather than showing a broken one.
+    if (d.unavailable) { $('locWrap').style.display = 'none'; return; }
+    LOCS = d.locations || [];
+    paintLocs();
+  } catch (e) { setMsg('locMsg', 'Could not load locations', false); }
+}
+
+$('locAdd').onclick = function () {
+  LOCS.push({ label: '', address_line: '', city: '', state: '', zip: '', is_primary: !LOCS.length });
+  paintLocs();
+};
+
+$('locList').addEventListener('click', async function (ev) {
+  const btn = ev.target.closest('[data-act]');
+  if (!btn) return;
+  const card = btn.closest('.loc');
+  const i = +card.dataset.i;
+  const cur = LOCS[i];
+
+  if (btn.dataset.act === 'del') {
+    if (!cur.id) { LOCS.splice(i, 1); paintLocs(); return; }   // never saved
+    btn.disabled = true;
+    const r = await fetch(FN + '/provider-locations?id=' + encodeURIComponent(cur.id), {
+      method: 'DELETE', headers: { Authorization: 'Bearer ' + session.access_token }
+    });
+    if (r.ok) { LOCS.splice(i, 1); paintLocs(); setMsg('locMsg', 'Location removed', true); }
+    else { btn.disabled = false; setMsg('locMsg', 'Could not remove that location', false); }
+    return;
+  }
+
+  const body = readLoc(card);
+  if (!body.address_line) { setMsg('locMsg', 'A street address is required', false); return; }
+  btn.disabled = true; btn.textContent = 'Saving\u2026';
+  try {
+    const saving = cur.id ? Object.assign({ id: cur.id }, body) : body;
+    const r = await fetch(FN + '/provider-locations', {
+      method: cur.id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify(saving)
+    });
+    const d = await r.json().catch(function () { return {}; });
+    if (!r.ok) { setMsg('locMsg', d.error || 'Could not save that location', false); return; }
+    LOCS[i] = d.location || Object.assign(cur, body);
+    paintLocs();
+    setMsg('locMsg', LOCS[i].geocoded === false
+      ? 'Saved, but we could not find that address, so it has no map pin. Check the street and ZIP.'
+      : 'Saved. The pin is on the map.', LOCS[i].geocoded !== false);
+  } catch (e) {
+    setMsg('locMsg', 'Could not reach the server', false);
+  } finally { btn.disabled = false; btn.textContent = 'Save'; }
+});
 
 // ---------------------------------------------------------------------------
 // Live market readout for the pitch.
@@ -412,6 +544,7 @@ async function loadAccount() {
   // than making them scroll past a sales page to reach their own hours.
   $('pitchBody').classList.add('hidden');
   $('account').classList.remove('hidden');
+  loadLocs();
   const mine = new Set((insurance || []).map(i => i.payer_name));
   // The plan list is state-specific and loads asynchronously, so fetch this
   // provider's own state before rendering the checkboxes — otherwise PAYERS is
