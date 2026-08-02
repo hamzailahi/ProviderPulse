@@ -1077,75 +1077,28 @@ function accountSheet() {
 }
 
 /* ---------- auth gate ----------------------------------------------------- */
+// Sign-in and sign-up live on ONE page for both roles (auth.html, served at
+// /signin and /join). A second patient-only copy here is what made a provider
+// signing in on the patient page a dead end: it could only tell them they were
+// on the wrong page. auth.html writes the same session key this app reads, so
+// returning from it lands straight in the app.
 function gateEl(mode) {
-  var isReg = mode === 'register';
-  var email = h('input', { type: 'email', autocomplete: 'email', 'aria-label': 'Email' });
-  var pass = h('input', { type: 'password', autocomplete: isReg ? 'new-password' : 'current-password', 'aria-label': 'Password' });
-  var first = h('input', { autocomplete: 'given-name', 'aria-label': 'First name' });
-  var last = h('input', { autocomplete: 'family-name', 'aria-label': 'Last name' });
-  var zip = h('input', { maxlength: '5', inputmode: 'numeric', autocomplete: 'postal-code', 'aria-label': 'ZIP code' });
-  var stay = h('input', { type: 'checkbox' });
-  var msg = h('div', { class: 'msg' });
-  var btn = h('button', { class: 'btn-full', type: 'submit' }, isReg ? 'Create account' : 'Sign in');
-
-  function fail(t) { msg.className = 'msg err'; msg.textContent = t; btn.disabled = false; }
-
-  function onSubmit(e) {
-    e.preventDefault();
-    btn.disabled = true; msg.className = 'msg'; msg.textContent = '';
-    if (isReg) {
-      api('/auth-register-patient', { auth: false, method: 'POST', body: {
-        email: email.value, password: pass.value, first_name: first.value, last_name: last.value,
-        zip: zip.value, insurance_payer: '', conditions: [], concern_description: ''
-      } }).then(function (d) {
-        // Registration deliberately does NOT sign you in — confirm email first.
-        msg.className = 'msg ok';
-        msg.textContent = d.message || 'Check your email to confirm your account, then sign in.';
-        btn.disabled = false;
-      }).catch(function (err) {
-        fail(err.status === 503 ? 'Sign-up is temporarily closed. If you already have an account, sign in.' : err.message);
-      });
-      return;
-    }
-    api('/auth-login', { auth: false, method: 'POST', body: { email: email.value, password: pass.value } })
-      .then(function (d) {
-        if (d.role !== 'patient') { fail('That\'s a provider account — use the provider page to sign in.'); return; }
-        state.session = {
-          access_token: d.access_token,
-          refresh_token: d.refresh_token,
-          role: d.role,
-          expiresAt: Date.now() + (d.expires_in || 3600) * 1000
-        };
-        state.persist = !!stay.checked;
-        saveSession(state.session, state.persist);
-        scheduleRefresh();
-        return bootstrap().then(function () {
-          var replay = state.replay; state.replay = null;
-          render();
-          if (replay) replay();
-        });
-      }).catch(function (err) { fail(err.message); });
-  }
-
-  var form = h('form', { class: 'gate-card', onsubmit: onSubmit },
-    h('h2', {}, isReg ? 'Create your account' : 'Find care that takes your insurance'),
-    h('p', { class: 'sub' }, isReg ? 'You can add health details later — or never.' : 'Sign in to search verified providers near you.'),
-    isReg ? h('div', { class: 'two' },
-      h('div', { class: 'field' }, h('label', {}, 'First name'), first),
-      h('div', { class: 'field' }, h('label', {}, 'Last name'), last)) : null,
-    isReg ? h('div', { class: 'field' }, h('label', {}, 'ZIP code'), zip) : null,
-    h('div', { class: 'field' }, h('label', {}, 'Email'), email),
-    h('div', { class: 'field' }, h('label', {}, 'Password'), pass),
-    isReg ? h('div', { class: 'sub', style: 'font-size:12.5px;margin:-6px 0 12px' }, 'At least 12 characters.') : null,
-    !isReg ? h('label', { class: 'stay' }, stay, 'Stay signed in on this device') : null,
-    btn, msg,
-    h('p', { class: 'alt' }, isReg ? 'Already registered? ' : 'New here? ',
-      h('a', { role: 'button', tabindex: '0', onclick: function () { location.hash = isReg ? '' : '#/join'; } },
-        isReg ? 'Sign in' : 'Create an account')),
-    h('p', { class: 'alt', style: 'margin-top:8px' }, 'Are you a healthcare provider? ',
-      h('a', { href: 'register-provider.html' }, 'Claim your listing'))
-  );
-  return h('div', { class: 'gate' }, form);
+  var joining = mode === 'register';
+  var go = joining ? '/join' : '/signin';
+  var alt = joining ? '/signin' : '/join';
+  return h('div', { class: 'gate' },
+    h('div', { class: 'gate-card' },
+      h('h2', {}, joining ? 'Create your account' : 'Find care that takes your insurance'),
+      h('p', { class: 'sub' }, joining
+        ? 'One account covers both sides — you choose patient or provider on the next screen.'
+        : 'Sign in to search verified providers near you.'),
+      h('a', {
+        class: 'btn-full', href: go,
+        style: 'display:block;text-align:center;text-decoration:none'
+      }, joining ? 'Create account' : 'Sign in'),
+      h('p', { class: 'alt' },
+        joining ? 'Already registered? ' : 'New here? ',
+        h('a', { href: alt }, joining ? 'Sign in' : 'Create an account'))));
 }
 
 /* ---------- misc ---------------------------------------------------------- */

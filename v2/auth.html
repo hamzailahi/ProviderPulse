@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>ProviderPulse · Sign in</title>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/forms.css">
+</head>
+<body>
+<div class="aurora" aria-hidden="true"></div>
+
+<main class="auth">
+  <div class="auth-head">
+    <div class="auth-mark" aria-hidden="true">✚</div>
+    <h1 class="auth-title" id="authTitle">Welcome back</h1>
+    <p class="auth-sub" id="authSub">Sign in to ProviderPulse</p>
+  </div>
+
+  <!-- The toggle changes which SIGN-UP form you get, and the copy. It does NOT
+       decide what you are on sign-in: the server owns that (see routeByRole). -->
+  <div class="roletabs" role="tablist" aria-label="Account type">
+    <button type="button" class="roletab is-on" id="tabPatient" role="tab" aria-selected="true">I'm a patient</button>
+    <button type="button" class="roletab" id="tabProvider" role="tab" aria-selected="false">I'm a provider</button>
+  </div>
+
+  <!-- ─────────────── SIGN IN (both roles, one form) ─────────────── -->
+  <form id="formSignin" class="authcard">
+    <label for="siEmail">Email</label>
+    <input id="siEmail" type="email" required autocomplete="email">
+    <label for="siPass">Password</label>
+    <input id="siPass" type="password" required autocomplete="current-password">
+    <label class="stay"><input type="checkbox" id="siStay"> Stay signed in on this device</label>
+    <button class="submit" type="submit">Sign in</button>
+    <div class="msg" id="siMsg" role="status" aria-live="polite"></div>
+  </form>
+
+  <!-- ─────────────── CREATE ACCOUNT · PATIENT ─────────────── -->
+  <form id="formJoinPatient" class="authcard hidden">
+    <div class="row">
+      <div><label for="jpFirst">First name</label><input id="jpFirst" required autocomplete="given-name"></div>
+      <div><label for="jpLast">Last name</label><input id="jpLast" required autocomplete="family-name"></div>
+    </div>
+    <label for="jpEmail">Email</label>
+    <input id="jpEmail" type="email" required autocomplete="email">
+    <label for="jpPass">Password</label>
+    <input id="jpPass" type="password" required minlength="12" autocomplete="new-password" aria-describedby="jpPassHint">
+    <div class="hint" id="jpPassHint">At least 12 characters.</div>
+
+    <div class="row" style="margin-top:14px">
+      <div>
+        <label for="jpZip" style="margin-top:0">ZIP code <span class="opt">Optional</span></label>
+        <input id="jpZip" inputmode="numeric" maxlength="5" autocomplete="postal-code">
+      </div>
+      <div>
+        <label for="jpPayer" style="margin-top:0">Insurance <span class="opt">Optional</span></label>
+        <select id="jpPayer"><option value="">Add this later</option></select>
+      </div>
+    </div>
+    <div class="hint" id="jpPayerHint">Your ZIP loads the plans available in your state.</div>
+
+    <button class="submit" type="submit" style="margin-top:18px">Create account</button>
+    <div class="msg" id="jpMsg" role="status" aria-live="polite"></div>
+    <p class="phi-note">
+      Your health information is private. It is never sold, and never shared with providers
+      unless you contact them yourself.
+    </p>
+  </form>
+
+  <!-- ─────────────── CREATE ACCOUNT · PROVIDER ─────────────── -->
+  <form id="formJoinProvider" class="authcard hidden">
+    <label for="jvNpi">NPI number</label>
+    <input id="jvNpi" inputmode="numeric" maxlength="10" required placeholder="10-digit NPI"
+           class="npi-input" aria-describedby="npiSteps">
+    <!-- Only the checksum runs here: it is arithmetic and needs no network. The
+         registry, name match and exclusion screening all happen server-side on
+         submit, so this never implies a verification it has not done. -->
+    <ul class="npi-steps" id="npiSteps">
+      <li id="stepLuhn"><span class="dot"></span>Valid NPI checksum<span class="src">LUHN</span></li>
+      <li class="pend"><span class="dot"></span>Found in federal registry<span class="src">NPPES</span></li>
+      <li class="pend"><span class="dot"></span>Name matches the federal record<span class="src">NPPES</span></li>
+      <li class="pend"><span class="dot"></span>Not on the exclusion list<span class="src">OIG</span></li>
+    </ul>
+    <div class="hint">The last three run when you submit. For organizations, enter the authorized official's name.</div>
+
+    <div class="row" style="margin-top:14px">
+      <div><label for="jvFirst" style="margin-top:0">First name</label><input id="jvFirst" autocomplete="given-name"></div>
+      <div><label for="jvLast" style="margin-top:0">Last name</label><input id="jvLast" required autocomplete="family-name"></div>
+    </div>
+
+    <label for="jvEmail">Work email</label>
+    <input id="jvEmail" type="email" required autocomplete="email">
+    <label for="jvPass">Password</label>
+    <input id="jvPass" type="password" required minlength="12" autocomplete="new-password" aria-describedby="jvPassHint">
+    <div class="hint" id="jvPassHint">At least 12 characters.</div>
+
+    <button class="submit" type="submit" style="margin-top:18px">Verify NPI and create account</button>
+    <div class="msg" id="jvMsg" role="status" aria-live="polite"></div>
+    <p class="phi-note">
+      Screened against the federal NPPES registry and the OIG exclusion list. Screening
+      surfaces records for review — it is not a compliance determination.
+    </p>
+  </form>
+
+  <!-- ─────────────── POST-SIGNUP: confirm your email ─────────────── -->
+  <div id="sent" class="authcard hidden">
+    <h2 class="fs-title">Check your email</h2>
+    <p class="sent-body" id="sentBody"></p>
+    <a class="submit" id="sentGo" href="#/signin" style="display:block;text-align:center;text-decoration:none">Back to sign in</a>
+  </div>
+
+  <p class="auth-swap" id="authSwap"></p>
+
+  <div class="trust">
+    <span class="dot-live" aria-hidden="true"></span>
+    <b>1,903,674</b> providers mapped · insurance and hours come from the providers themselves
+  </div>
+</main>
+
+<script>
+const FN = '/.netlify/functions';
+const $ = id => document.getElementById(id);
+const SESSION_KEY = 'pp.session.v1';
+const ROLE_KEY = 'pp.role';
+
+// NPI Luhn check (with 80840 prefix constant of 24).
+// Copied verbatim from auth-register-provider.js — the two must agree, or the
+// page would green-light an NPI the server then rejects.
+function validNpi(npi) {
+  if (!/^\d{10}$/.test(npi)) return false;
+  let sum = 24;
+  const digits = npi.slice(0, 9).split('').reverse();
+  for (let i = 0; i < 9; i++) {
+    let d = parseInt(digits[i], 10);
+    if (i % 2 === 0) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+  }
+  return (10 - (sum % 10)) % 10 === parseInt(npi[9], 10);
+}
+
+function setMsg(id, text, ok) {
+  const el = $(id);
+  el.textContent = text || '';
+  el.className = 'msg' + (text ? (ok ? ' ok' : ' err') : '');
+}
+function busy(form, on) {
+  const b = form.querySelector('button[type=submit]');
+  if (b) { b.disabled = on; b.dataset.label = b.dataset.label || b.textContent; b.textContent = on ? 'Working…' : b.dataset.label; }
+}
+
+/* ── role + mode ─────────────────────────────────────────────────────────── */
+let role = 'patient';
+try { const r = localStorage.getItem(ROLE_KEY); if (r === 'provider' || r === 'patient') role = r; } catch (e) {}
+
+// /signin and /join are rewrites, so the path survives with no hash — read
+// both. The hash wins when present, since that is what the in-page links set.
+function mode() {
+  if (location.hash === '#/join') return 'join';
+  if (location.hash === '#/signin') return 'signin';
+  return /\/join\/?$/.test(location.pathname) ? 'join' : 'signin';
+}
+
+function paint() {
+  const joining = mode() === 'join';
+  $('tabPatient').classList.toggle('is-on', role === 'patient');
+  $('tabProvider').classList.toggle('is-on', role === 'provider');
+  $('tabPatient').setAttribute('aria-selected', String(role === 'patient'));
+  $('tabProvider').setAttribute('aria-selected', String(role === 'provider'));
+
+  $('sent').classList.add('hidden');
+  $('formSignin').classList.toggle('hidden', joining);
+  $('formJoinPatient').classList.toggle('hidden', !joining || role !== 'patient');
+  $('formJoinProvider').classList.toggle('hidden', !joining || role !== 'provider');
+
+  if (joining) {
+    $('authTitle').textContent = 'Create your account';
+    $('authSub').textContent = role === 'provider'
+      ? 'Claim your listing so patients can see your plans and hours.'
+      : 'Find care that takes your insurance.';
+    $('authSwap').innerHTML = 'Already have an account? <a href="#/signin">Sign in</a>';
+  } else {
+    $('authTitle').textContent = 'Welcome back';
+    // One form for both roles, so the copy must not promise a role-specific door.
+    $('authSub').textContent = 'Sign in to ProviderPulse';
+    $('authSwap').innerHTML = 'New here? <a href="#/join">Create an account</a>';
+  }
+  if (joining && role === 'patient') loadPayers();
+}
+
+function pickRole(next) {
+  role = next;
+  try { localStorage.setItem(ROLE_KEY, next); } catch (e) {}
+  paint();
+}
+$('tabPatient').onclick = () => pickRole('patient');
+$('tabProvider').onclick = () => pickRole('provider');
+window.addEventListener('hashchange', paint);
+
+/* ── where you land after signing in ─────────────────────────────────────── */
+// Routed on the role the SERVER returned, never the toggle above. Picking the
+// wrong tab is a UI preference; it must not decide which product you get.
+function routeByRole(serverRole) {
+  if (serverRole === 'provider') { location.href = '/register-provider.html'; return; }
+  if (serverRole === 'patient')  { location.href = '/'; return; }
+  setMsg('siMsg', 'That account has no role assigned. Contact support.', false);
+}
+
+/* ── payers: state-specific, from the same endpoint the provider form uses ── */
+// Load-bearing: patient-match compares a patient's stored payer against a
+// provider's list by exact string, so both sides must draw from this one list.
+let payersFor = '';
+function loadPayers() {
+  const zip = ($('jpZip').value || '').trim();
+  const q = /^\d{5}$/.test(zip) ? '?zip=' + zip : '';
+  if (q === payersFor) return;
+  payersFor = q;
+  fetch(FN + '/payers' + q)
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      const sel = $('jpPayer');
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">Add this later</option>';
+      (d && d.payers || []).forEach(p => {
+        const o = document.createElement('option');
+        o.value = p.name; o.textContent = p.name;
+        sel.appendChild(o);
+      });
+      if (keep) sel.value = keep;
+      if (d && d.state) $('jpPayerHint').textContent = 'Showing plans available in ' + d.state + '.';
+    })
+    .catch(() => {});   // the field is optional; a failed list must not block signup
+}
+$('jpZip').addEventListener('change', loadPayers);
+
+/* ── NPI checksum, live ──────────────────────────────────────────────────── */
+$('jvNpi').addEventListener('input', () => {
+  const v = $('jvNpi').value.trim();
+  const li = $('stepLuhn');
+  li.classList.remove('ok', 'bad');
+  if (v.length === 10) li.classList.add(validNpi(v) ? 'ok' : 'bad');
+});
+
+/* ── sign in ─────────────────────────────────────────────────────────────── */
+$('formSignin').onsubmit = async e => {
+  e.preventDefault(); busy(e.target, true); setMsg('siMsg', '');
+  try {
+    const r = await fetch(FN + '/auth-login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: $('siEmail').value, password: $('siPass').value })
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { setMsg('siMsg', data.error || 'Sign in failed', false); return; }
+
+    // sessionStorage by default: patient_profiles is PHI and shared devices are
+    // common. localStorage only on an explicit opt-in, and the other store is
+    // cleared either way so one session can never shadow the other.
+    try {
+      const stay = $('siStay').checked;
+      const payload = JSON.stringify({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        role: data.role,
+        expiresAt: Date.now() + (data.expires_in || 3600) * 1000
+      });
+      (stay ? localStorage : sessionStorage).setItem(SESSION_KEY, payload);
+      (stay ? sessionStorage : localStorage).removeItem(SESSION_KEY);
+    } catch (err) {}
+
+    // Say so rather than silently landing them somewhere they did not expect.
+    if (data.role && data.role !== role) {
+      pickRole(data.role);
+      setMsg('siMsg', 'Signed in as a ' + data.role + '. Taking you to your ' + data.role + ' view…', true);
+    }
+    routeByRole(data.role);
+  } catch (err) {
+    setMsg('siMsg', 'Could not reach the server. Try again.', false);
+  } finally { busy(e.target, false); }
+};
+
+/* ── create account · patient ────────────────────────────────────────────── */
+$('formJoinPatient').onsubmit = async e => {
+  e.preventDefault(); busy(e.target, true); setMsg('jpMsg', '');
+  try {
+    const r = await fetch(FN + '/auth-register-patient', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        first_name: $('jpFirst').value, last_name: $('jpLast').value,
+        email: $('jpEmail').value, password: $('jpPass').value,
+        zip: $('jpZip').value.trim() || undefined,
+        insurance_payer: $('jpPayer').value || undefined
+      })
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { setMsg('jpMsg', data.error || 'Could not create the account', false); return; }
+    showSent(data.message);
+  } catch (err) {
+    setMsg('jpMsg', 'Could not reach the server. Try again.', false);
+  } finally { busy(e.target, false); }
+};
+
+/* ── create account · provider ───────────────────────────────────────────── */
+$('formJoinProvider').onsubmit = async e => {
+  e.preventDefault();
+  const npi = $('jvNpi').value.trim();
+  if (!validNpi(npi)) { setMsg('jvMsg', 'That NPI fails its checksum — check the digits.', false); return; }
+
+  busy(e.target, true); setMsg('jvMsg', '');
+  try {
+    const r = await fetch(FN + '/auth-register-provider', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        npi, first_name: $('jvFirst').value, last_name: $('jvLast').value,
+        email: $('jvEmail').value, password: $('jvPass').value
+      })
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { setMsg('jvMsg', data.error || 'Could not verify that NPI', false); return; }
+    document.querySelectorAll('#npiSteps li').forEach(li => { li.classList.remove('pend'); li.classList.add('ok'); });
+    showSent(data.message);
+  } catch (err) {
+    setMsg('jvMsg', 'Could not reach the server. Try again.', false);
+  } finally { busy(e.target, false); }
+};
+
+// Registration does not return a session — both endpoints require the emailed
+// confirmation link first — so there is no auto sign-in to attempt here.
+function showSent(message) {
+  $('formJoinPatient').classList.add('hidden');
+  $('formJoinProvider').classList.add('hidden');
+  $('formSignin').classList.add('hidden');
+  $('sentBody').textContent = message || 'Registered. Confirm your email, then sign in.';
+  $('sent').classList.remove('hidden');
+  $('authTitle').textContent = 'Almost there';
+  $('authSub').textContent = 'One more step before you can sign in.';
+  $('authSwap').innerHTML = '';
+}
+
+// Already signed in? Skip the form entirely.
+(function alreadyIn() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+    const s = raw ? JSON.parse(raw) : null;
+    if (s && s.access_token && s.role && !(s.expiresAt && s.expiresAt < Date.now())) routeByRole(s.role);
+  } catch (e) {}
+})();
+
+paint();
+</script>
+</body>
+</html>

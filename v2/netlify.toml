@@ -42,6 +42,19 @@
   status = 301
   force = true
 
+# One auth surface for both sides. Same page, different starting mode — the
+# role toggle and sign-in/join state live in the hash, so these are rewrites
+# (200) rather than redirects, and the URL the visitor typed is what they keep.
+[[redirects]]
+  from = "/signin"
+  to = "/auth.html"
+  status = 200
+
+[[redirects]]
+  from = "/join"
+  to = "/auth.html"
+  status = 200
+
 # Netlify serves 404.html automatically for unmatched paths; this makes the
 # behaviour explicit and covers deep paths under directories too.
 [[redirects]]
