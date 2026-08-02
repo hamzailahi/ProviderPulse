@@ -114,3 +114,11 @@ body {
     transition-duration: .01ms !important;
   }
 }
+
+
+/* Visually hidden but still announced. For labels whose visible text lives in a
+   placeholder or an adjacent control — a placeholder is not an accessible name. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}

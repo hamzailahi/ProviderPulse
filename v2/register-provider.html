@@ -10,12 +10,53 @@
 </head>
 <body>
 <div class="aurora" aria-hidden="true"></div>
-<div class="card">
+
+<!-- The pitch. Deliberately scarcity-led, not demand-led: no search-history
+     table exists, so any "patients are looking for you" claim would be
+     invented. The figures below are the ones the data can actually support. -->
+<section class="pitch" id="pitch">
   <div class="brand">
     <h1>ProviderPulse</h1>
     <a href="#" id="toggleLogin">Already registered? Sign in</a>
   </div>
-  <div class="eyebrow">Provider registration · verified against the NPPES registry ·
+
+  <div id="pitchBody">
+  <h2 class="pitch-head">The registry proves you exist.<br>It can't tell a patient <em>you're taking them</em>.</h2>
+
+  <p class="pitch-sub">
+    Every NPI in the federal registry is already on our map — including yours. What
+    the registry cannot say is whether you're accepting new patients, which plans you
+    take, or when you're open. Only you can, and until you do, that's blank next to
+    your name.
+  </p>
+
+  <div class="stats" role="list">
+    <div class="stat" role="listitem">
+      <b>1,903,674</b><span>provider records already on the map</span>
+    </div>
+    <div class="stat" role="listitem">
+      <b>20,272</b><span>federally designated primary-care shortage areas</span>
+    </div>
+    <div class="stat" role="listitem">
+      <b>27,927</b><span>ZIP codes with census + coverage data</span>
+    </div>
+  </div>
+
+  <div class="zipcheck">
+    <h3>Check your area</h3>
+    <form class="zipform" id="formZip">
+      <label class="sr-only" for="zipProbe">Practice ZIP code</label>
+      <input id="zipProbe" inputmode="numeric" maxlength="5" placeholder="Practice ZIP"
+             autocomplete="postal-code" aria-describedby="zipReadout">
+      <button type="submit" id="zipGo">Show the data</button>
+    </form>
+    <div class="readout" id="zipReadout" role="status" aria-live="polite"></div>
+  </div>
+  </div><!-- /pitchBody -->
+</section>
+
+<div class="card">
+  <div class="eyebrow">Claim your listing · verified against the NPPES registry ·
     <a href="/" style="color:var(--a1);text-decoration:none">Looking for care instead?</a>
   </div>
 
@@ -205,6 +246,109 @@ $('formRegister').onsubmit = async e => {
 // A restored session should land straight on the account panel.
 if (session) loadAccount();
 
+// ---------------------------------------------------------------------------
+// Live market readout for the pitch.
+//
+// Two calls, both public and unauthenticated, so this works before signup:
+//   market-score      -> supply / payer / shortage for the ZIP
+//   providers-public  -> how many listings in that ZIP are actually claimed
+//
+// The claimed count is the honest version of a demand stat. We cannot say
+// patients searched for you (nothing records that), but we CAN say how many
+// practices nearby have filled in hours and insurance — which is the gap this
+// page is asking them to close.
+// ---------------------------------------------------------------------------
+const fmt = n => Number(n).toLocaleString('en-US');
+// escAttr (declared above) escapes & < ", which is strictly more than text
+// content needs. Every value below reaches innerHTML, so all of them go
+// through it — these strings come from an API, not from literals.
+const esc = escAttr;
+
+function verdictClass(label) {
+  if (/UNDERSERVED/i.test(label)) return 'under';
+  if (/BALANCED/i.test(label)) return 'bal';
+  return 'well';
+}
+
+async function claimedInZip(zip) {
+  try {
+    const r = await fetch(FN + '/providers-public?all=1');
+    if (!r.ok) return null;
+    const { providers } = await r.json();
+    return Object.values(providers || {})
+      .filter(p => String(p.zip || '').padStart(5, '0') === zip).length;
+  } catch (e) { return null; }   // never let this block the score
+}
+
+$('formZip').onsubmit = async e => {
+  e.preventDefault();
+  const zip = $('zipProbe').value.trim();
+  const out = $('zipReadout');
+  if (!/^\d{5}$/.test(zip)) { out.innerHTML = '<div class="err">Enter a 5-digit ZIP code.</div>'; return; }
+
+  $('zipGo').disabled = true;
+  out.textContent = 'Reading the data for ' + zip + '…';
+  try {
+    const [scoreRes, claimed] = await Promise.all([
+      fetch(FN + '/market-score?zip=' + zip).then(r => r.json()).catch(() => null),
+      claimedInZip(zip)
+    ]);
+
+    if (!scoreRes || scoreRes.available === false) {
+      // Deliberately not spun as good news — market-score refuses to score a ZIP
+      // it has no population for, and inventing a verdict would defeat that.
+      out.innerHTML = '<div class="note">' +
+        esc(((scoreRes && scoreRes.reason) || 'No data for that ZIP').replace(/\.?$/, '.')) +
+        ' You can still register — the ZIP only changes what we can show you here.</div>';
+      return;
+    }
+
+    const m = scoreRes.metrics || {};
+    const total = m.total_listings != null ? m.total_listings : m.providers;
+    const unclaimed = (total != null && claimed != null) ? Math.max(0, total - claimed) : null;
+
+    let html = '<div class="verdict">' +
+      '<span class="chip ' + verdictClass(scoreRes.label) + '">' + esc(scoreRes.label) + '</span>' +
+      '<span class="zip">' + esc(zip) + (scoreRes.state ? ' · ' + esc(scoreRes.state) : '') + '</span>' +
+      '</div><div class="figs">';
+
+    if (m.providers_per_1k != null) {
+      html += '<div class="fig"><b>' + m.providers_per_1k.toFixed(1) + '</b>' +
+        '<span>providers per 1,000 residents' +
+        (m.benchmark_per_1k ? ' · national ' + m.benchmark_per_1k : '') + '</span></div>';
+    }
+    if (m.population != null) {
+      html += '<div class="fig"><b>' + fmt(m.population) + '</b><span>residents in this ZIP</span></div>';
+    }
+    if (unclaimed !== null) {
+      html += '<div class="fig lead"><b>' + fmt(unclaimed) + ' of ' + fmt(total) + '</b>' +
+        '<span>listings here have no hours or insurance on file</span></div>';
+    }
+    if (m.hpsa_score != null) {
+      html += '<div class="fig"><b>' + m.hpsa_score + '<span style="font-size:11px;color:var(--faint)"> / 25</span></b>' +
+        '<span>HRSA shortage score for this area</span></div>';
+    }
+    html += '</div>';
+
+    if (scoreRes.finding) html += '<div class="note">' + esc(scoreRes.finding) + '</div>';
+    if (Array.isArray(scoreRes.sources)) {
+      html += '<div class="src">Sources: ' + esc(scoreRes.sources.join(' · ')) + '</div>';
+    }
+    out.innerHTML = html;
+  } catch (err) {
+    out.innerHTML = '<div class="err">Could not load the data just now. Registration still works.</div>';
+  } finally {
+    $('zipGo').disabled = false;
+  }
+};
+
+// Typing a practice ZIP in the form below fills the checker, so the number they
+// came here to see matches the address they are registering.
+$('pZip').addEventListener('change', () => {
+  const z = $('pZip').value.trim();
+  if (/^\d{5}$/.test(z) && !$('zipProbe').value.trim()) $('zipProbe').value = z;
+});
+
 $('formLogin').onsubmit = async e => {
   e.preventDefault(); busy(e.target, true);
   const r = await fetch(FN + '/auth-login', {
@@ -264,6 +408,9 @@ async function loadAccount() {
   $('formLogin').classList.add('hidden');
   $('formRegister').classList.add('hidden');
   $('toggleLogin').classList.add('hidden');
+  // The pitch argues for claiming a listing. They already have — drop it rather
+  // than making them scroll past a sales page to reach their own hours.
+  $('pitchBody').classList.add('hidden');
   $('account').classList.remove('hidden');
   const mine = new Set((insurance || []).map(i => i.payer_name));
   // The plan list is state-specific and loads asynchronously, so fetch this
