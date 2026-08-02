@@ -84,3 +84,7 @@
 # Reads an uploaded document with Claude; the slowest call in the app.
 [functions."doc-extract"]
   timeout = 26
+
+# Geocodes on save: Nominatim (5s) then Photon (5s), plus Supabase round trips.
+[functions."provider-locations"]
+  timeout = 26

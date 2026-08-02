@@ -18,11 +18,16 @@ const CORS = {
 };
 
 // Safe to publish. `id` is deliberately absent: it is the auth user id.
-const PUBLIC_COLUMNS = 'npi,npi_verified,accepting_new_patients,telehealth,bio,org_name,first_name,last_name,city,state,zip,phone,taxonomy_desc,office_hours,hours_note,booking_mode,booking_url';
+// address_line is the PRACTICE street address. It is already public in the
+// federal NPPES registry, and without it the map could show a claimed listing's
+// city but not where it actually is. Still business data, never PHI.
+const PUBLIC_COLUMNS = 'npi,npi_verified,accepting_new_patients,telehealth,bio,org_name,first_name,last_name,address_line,city,state,zip,phone,taxonomy_desc,office_hours,hours_note,booking_mode,booking_url';
 // Availability columns arrive with migration 005. Until it runs, selecting them
 // 400s and would take the whole endpoint down with it — including the verified
 // badge, which already works. Fall back to the columns that definitely exist.
 const BASE_COLUMNS = 'npi,npi_verified,accepting_new_patients,telehealth,bio,org_name,first_name,last_name,city,state,zip,phone,taxonomy_desc';
+// Locations arrive with migration 006; absent until it runs.
+const LOCATION_COLUMNS = 'provider_id,npi,label,address_line,city,state,zip,latitude,longitude,verified,is_primary,phone,accepting_new_patients,telehealth,office_hours,hours_note';
 
 const MAX_NPIS = 80;
 
@@ -110,6 +115,29 @@ exports.handler = async (event) => {
       }
     }
 
+    // Practice locations (migration 006). A provider can list more than one
+    // site, and only the one tied to the registered NPI is NPPES-verified --
+    // `verified` per location is what lets the map ring them differently.
+    // Missing table means the migration has not run: publish none rather than
+    // failing the whole overlay, which still carries the verified badge.
+    const locsByNpi = {};
+    if (ids.length) {
+      try {
+        const locRes = await fetch(
+          `${env.SUPABASE_URL}/rest/v1/provider_locations?provider_id=in.(${ids.map(i => `"${i}"`).join(',')})&select=${LOCATION_COLUMNS}`,
+          { headers: svc, signal: AbortSignal.timeout(6000) }
+        );
+        if (locRes.ok) {
+          for (const row of (await locRes.json()) || []) {
+            const npi = npiById[row.provider_id];
+            if (!npi) continue;
+            const { provider_id, ...pub } = row;   // never publish the auth user id
+            (locsByNpi[npi] = locsByNpi[npi] || []).push(pub);
+          }
+        }
+      } catch (e) { /* locations are additive; the overlay stands without them */ }
+    }
+
     const providers = {};
     for (const r of rows) {
       providers[r.npi] = {
@@ -125,7 +153,9 @@ exports.handler = async (event) => {
         zip: r.zip || null,
         phone: r.phone || null,
         specialty: r.taxonomy_desc || null,
+        address_line: r.address_line || null,
         bio: r.bio || null,
+        locations: locsByNpi[r.npi] || [],
         office_hours: r.office_hours || null,
         hours_note: r.hours_note || null,
         booking_mode: r.booking_mode || 'phone',
