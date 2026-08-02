@@ -74,8 +74,19 @@
   </form>
 
   <div id="account" class="panel hidden">
+    <div class="fs-title" style="margin-bottom:16px">
+      Your listing
+      <span class="opt" id="verifiedChip" style="background:color-mix(in srgb,var(--a1) 14%,transparent);border-color:color-mix(in srgb,var(--a1) 32%,transparent)">✓ Verified</span>
+    </div>
+    <p style="font-size:12.5px;color:var(--muted);margin:-8px 0 18px">
+      This is what patients see when they search your area. Changes go live immediately.
+    </p>
     <div id="acctBody"></div>
     <button class="submit" id="acctSave">Save changes</button>
+    <button class="submit" id="acctSignOut" type="button"
+            style="background:none;border:1px solid var(--hairline-2);color:var(--muted);margin-top:10px">
+      Sign out
+    </button>
     <div class="msg" id="aMsg" role="status" aria-live="polite"></div>
   </div>
 </div>
@@ -192,12 +203,29 @@ $('formLogin').onsubmit = async e => {
   loadAccount();
 };
 
+$('acctSignOut').onclick = async () => {
+  try {
+    await fetch(FN + '/auth-logout', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + (session ? session.access_token : '') }
+    });
+  } catch (e) { /* clear locally regardless — sign-out must always work */ }
+  session = null;
+  try { sessionStorage.removeItem('pp_token'); } catch (e) {}
+  location.reload();
+};
+
 async function loadAccount() {
   const r = await fetch(FN + '/profile', { headers: { Authorization: 'Bearer ' + session.access_token } });
   if (!r.ok) return setMsg('lMsg', 'Could not load profile', false);
   const { profile, insurance } = await r.json();
   const p = profile || {};
+  // Hide BOTH forms. Previously only the login form was hidden, so signing in
+  // left the registration form on screen above the account panel and looked as
+  // though nothing had happened.
   $('formLogin').classList.add('hidden');
+  $('formRegister').classList.add('hidden');
+  $('toggleLogin').classList.add('hidden');
   $('account').classList.remove('hidden');
   const mine = new Set((insurance || []).map(i => i.payer_name));
   // The plan list is state-specific and loads asynchronously, so fetch this
