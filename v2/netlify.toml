@@ -33,9 +33,9 @@
   status = 301
   force = true
 
-# map.html is the legacy sibling of index.html. It guards on a `map_session` and
-# redirects to /login.html, which does not exist on this site — so anyone with an
-# old link lands on a 404. Send them to the dashboard it was superseded by.
+# map.html was the legacy sibling of index.html and has been deleted. Old links
+# still exist in the wild, so keep sending them to the dashboard that superseded
+# it rather than letting them hit the 404 page.
 [[redirects]]
   from = "/map.html"
   to = "/dashboard"

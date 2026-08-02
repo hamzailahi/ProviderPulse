@@ -1,213 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>ProviderPulse — Request Access</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>ProviderPulse has moved</title>
+<link rel="canonical" href="https://providerpulse-v2.netlify.app/">
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="5; url=https://providerpulse-v2.netlify.app/">
+<!--
+  The v1 access-request site is retired. This page replaces it rather than the
+  files simply being deleted, so existing links and bookmarks land somewhere
+  useful instead of a 404 while the Netlify site is still published.
+
+  When medicalpracticemap is deleted in the Netlify dashboard, this file and the
+  root netlify.toml can go too. The `access_requests` Supabase table is NOT
+  touched by this — retiring the frontend leaves the data intact.
+-->
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'DM Sans', sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh;
-         display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
-  .card { background: #161b22; border: 1px solid #2a3444; border-radius: 12px; padding: 40px;
-          width: 100%; max-width: 440px; position: relative; }
-  .logo { font-size: 13px; font-weight: 600; color: #58a6ff; letter-spacing: 0.08em;
-          text-transform: uppercase; margin-bottom: 28px; }
-  h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
-  p { font-size: 13px; color: #8b949e; margin-bottom: 28px; line-height: 1.6; }
-  label { font-size: 12px; font-weight: 500; color: #8b949e; display: block; margin-bottom: 6px; }
-  input, textarea { width: 100%; background: #1c2330; border: 1px solid #2a3444; border-radius: 6px;
-                    padding: 10px 12px; font-size: 13px; color: #e6edf3; font-family: 'DM Sans', sans-serif;
-                    margin-bottom: 16px; transition: border-color 0.2s; resize: none; }
-  input:focus, textarea:focus { border-color: #3b82f6; outline: none; }
-  button.primary { width: 100%; background: #3b82f6; color: #fff; border: none; border-radius: 6px;
-           padding: 12px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif;
-           transition: background 0.2s; margin-top: 4px; }
-  button.primary:hover { background: #2563eb; }
-  button.primary:disabled { background: #2a3444; color: #484f58; cursor: not-allowed; }
-  .msg { font-size: 13px; margin-top: 16px; padding: 10px 14px; border-radius: 6px; display: none; }
-  .msg.success { background: #0d2b1d; border: 1px solid #238636; color: #3fb950; display: block; }
-  .msg.error { background: #2d1117; border: 1px solid #da3633; color: #f85149; display: block; }
-
-  /* Toggle icon top right */
-  .signin-toggle { position: absolute; top: 20px; right: 20px; }
-  .signin-toggle button {
-    background: #1c2330; border: 1px solid #2a3444; color: #58a6ff;
-    border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 500;
-    cursor: pointer; font-family: 'DM Sans', sans-serif; display: flex; align-items: center; gap: 6px;
-    transition: background 0.2s; white-space: nowrap;
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: #07090d; color: #f2f6fa; min-height: 100vh;
+    display: grid; place-items: center; padding: 24px; text-align: center;
+    font: 15px/1.6 -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
   }
-  .signin-toggle button:hover { background: #2a3444; }
-
-  /* Sign in panel */
-  #signinPanel { display: none; }
-  #requestPanel { display: block; }
-
-  @media (max-width: 480px) {
-    body { padding: 16px; justify-content: flex-start; padding-top: 40px; }
-    .card { padding: 28px 20px; border-radius: 10px; }
-    h1 { font-size: 20px; }
-    input, textarea { font-size: 16px; } /* prevents iOS zoom */
-    button.primary { padding: 14px; font-size: 15px; }
-    .signin-toggle button { font-size: 11px; padding: 5px 10px; }
+  .glow { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .glow::before, .glow::after {
+    content: ""; position: absolute; width: 60vw; height: 60vw; border-radius: 50%; filter: blur(90px);
   }
+  .glow::before { background: rgba(45,212,191,.18); top: -20vw; left: -12vw; }
+  .glow::after  { background: rgba(99,102,241,.18); bottom: -24vw; right: -14vw; }
+  .box { position: relative; max-width: 440px; }
+  .mark {
+    width: 44px; height: 44px; border-radius: 13px; margin: 0 auto 18px;
+    background: linear-gradient(135deg, #2dd4bf, #6366f1); color: #fff;
+    display: grid; place-items: center; font-size: 22px; font-weight: 700;
+  }
+  h1 {
+    font-family: ui-serif, "Iowan Old Style", Palatino, Georgia, serif;
+    font-weight: 400; font-size: 30px; letter-spacing: -.02em; margin-bottom: 10px;
+  }
+  p { color: #93a3b8; margin-bottom: 22px; }
+  a.go {
+    display: inline-block; padding: 12px 22px; border-radius: 10px; text-decoration: none;
+    background: linear-gradient(135deg, #2dd4bf, #6366f1); color: #fff; font-weight: 650;
+  }
+  .small { margin-top: 16px; font-size: 12.5px; color: #64748b; }
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="signin-toggle">
-    <button onclick="togglePanel()" id="toggleBtn">🔑 Sign In</button>
-  </div>
-
-  <div class="logo">IT Connections LLC</div>
-
-  <!-- REQUEST ACCESS PANEL -->
-  <div id="requestPanel">
-    <h1>Request Map Access</h1>
-    <p>This healthcare provider map is restricted. Fill out the form below to request access. You'll receive a time-limited access code by email once approved.</p>
-
-    <label>Full Name *</label>
-    <input type="text" id="name" placeholder="Jane Smith" />
-
-    <label>Email Address *</label>
-    <input type="email" id="email" placeholder="jane@example.com" />
-
-    <label>Organization</label>
-    <input type="text" id="org" placeholder="Company or institution" />
-
-    <label>Reason for Access</label>
-    <textarea id="reason" rows="3" placeholder="Brief description of how you'll use this map..."></textarea>
-
-    <button class="primary" id="submitBtn" onclick="submitRequest()">Request Access</button>
-    <div id="reqMsg" class="msg"></div>
-  </div>
-
-  <!-- SIGN IN PANEL -->
-  <div id="signinPanel">
-    <h1>Enter Access Code</h1>
-    <p>Enter your email and the access code sent to you. Codes are time-limited.</p>
-
-    <label>Email Address</label>
-    <input type="email" id="siEmail" placeholder="jane@example.com" />
-
-    <label>Access Code</label>
-    <input type="text" id="siCode" placeholder="XXXXXXXX" maxlength="10"
-           oninput="this.value = this.value.toUpperCase()"
-           onkeydown="if(event.key==='Enter')login()" />
-
-    <button class="primary" id="loginBtn" onclick="login()">Access Map</button>
-    <div id="siMsg" class="msg"></div>
-  </div>
+<div class="glow" aria-hidden="true"></div>
+<div class="box">
+  <div class="mark" aria-hidden="true">✚</div>
+  <h1>ProviderPulse has a new home</h1>
+  <p>The access-request site has been retired. Everything now lives in one place —
+     find care, claim a provider listing, or open the market dashboard.</p>
+  <a class="go" href="https://providerpulse-v2.netlify.app/">Go to ProviderPulse →</a>
+  <div class="small">Redirecting automatically in a few seconds.</div>
 </div>
-
-<script>
-  const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
-
-  let showingSignIn = false;
-
-  function togglePanel() {
-    showingSignIn = !showingSignIn;
-    document.getElementById('requestPanel').style.display = showingSignIn ? 'none' : 'block';
-    document.getElementById('signinPanel').style.display = showingSignIn ? 'block' : 'none';
-    document.getElementById('toggleBtn').textContent = showingSignIn ? '← Request Access' : '🔑 Sign In';
-  }
-
-  // Auto-show sign in if ?signin in URL
-  window.addEventListener('load', () => {
-    if (location.search.includes('signin')) togglePanel();
-    // Auto-redirect if already logged in
-    const session = JSON.parse(localStorage.getItem('map_session') || 'null');
-    if (session && new Date(session.expires_at) > new Date()) {
-      window.location.href = '/map.html';
-    }
-  });
-
-  async function submitRequest() {
-    const name = document.getElementById('name').value.trim();
-    const email = document.getElementById('email').value.trim();
-    const org = document.getElementById('org').value.trim();
-    const reason = document.getElementById('reason').value.trim();
-    const btn = document.getElementById('submitBtn');
-    const msg = document.getElementById('reqMsg');
-
-    if (!name || !email) {
-      msg.className = 'msg error';
-      msg.textContent = 'Name and email are required.';
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Submitting...';
-    msg.className = 'msg';
-    msg.style.display = 'none';
-
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/access_requests`, {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ name, email, organization: org, reason, status: 'pending' })
-      });
-      if (!res.ok) throw new Error('Submission failed');
-
-      await fetch('/.netlify/functions/notify-admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, organization: org, reason })
-      });
-
-      msg.className = 'msg success';
-      msg.textContent = '✓ Request submitted! You\'ll receive your access code by email once approved.';
-      btn.textContent = 'Submitted';
-
-    } catch(e) {
-      msg.className = 'msg error';
-      msg.textContent = '✗ Something went wrong. Please try again.';
-      btn.disabled = false;
-      btn.textContent = 'Request Access';
-    }
-  }
-
-  async function login() {
-    const email = document.getElementById('siEmail').value.trim().toLowerCase();
-    const code = document.getElementById('siCode').value.trim().toUpperCase();
-    const btn = document.getElementById('loginBtn');
-    const msg = document.getElementById('siMsg');
-
-    if (!email || !code) {
-      msg.className = 'msg error';
-      msg.textContent = 'Email and code are required.';
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Verifying...';
-
-    try {
-      const res = await fetch('/.netlify/functions/validate-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code })
-      });
-      const data = await res.json();
-
-      if (!data.ok) throw new Error(data.error || 'Invalid code or email.');
-
-      localStorage.setItem('map_session', JSON.stringify({
-        email, code, expires_at: data.expires_at, granted_at: new Date().toISOString()
-      }));
-
-      msg.className = 'msg success';
-      msg.textContent = '✓ Access granted! Redirecting...';
-      setTimeout(() => { window.location.href = '/map.html'; }, 1000);
-
-    } catch(e) {
-      msg.className = 'msg error';
-      msg.textContent = `✗ ${e.message}`;
-      btn.disabled = false;
-      btn.textContent = 'Access Map';
-    }
-  }
-</script>
 </body>
 </html>

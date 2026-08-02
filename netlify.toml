@@ -1,14 +1,12 @@
+# Root site (medicalpracticemap) — RETIRED.
+#
+# index.html is now a forwarding page to providerpulse-v2. There are no
+# functions left here, which is why the [functions] block is gone: the v1 pages
+# that used them are deleted, and every function the live product needs lives in
+# v2/netlify/functions.
+#
+# Once medicalpracticemap is deleted in the Netlify dashboard, this file and
+# index.html can be removed and the repo becomes v2-only.
+
 [build]
-  functions = "netlify/functions"
-
-[functions]
-  node_bundler = "esbuild"
-
-[functions."ai-query"]
-  timeout = 26
-
-[functions."report-generate"]
-  timeout = 26
-
-[functions."cms-provider"]
-  timeout = 10
+  publish = "."
