@@ -263,7 +263,14 @@ async function loadAccount() {
         insurances: [...checked, ...other]
       })
     });
-    setMsg('aMsg', r2.ok ? 'Saved' : 'Save failed', r2.ok);
+    if (!r2.ok) { setMsg('aMsg', 'Save failed', false); return; }
+    // Saving is not the end of the job — take them to their market so they can
+    // see the listing they just published, in the area they practise in.
+    const zip = ($('aZip').value || '').trim();
+    setMsg('aMsg', 'Saved — opening your market…', true);
+    setTimeout(() => {
+      location.href = /^\d{5}$/.test(zip) ? '/dashboard#zip=' + zip : '/dashboard';
+    }, 700);
   };
 }
 </script>

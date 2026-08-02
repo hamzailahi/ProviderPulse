@@ -102,7 +102,7 @@
                 <div id="controls" style="flex:1;">
                     <div style="flex:1;max-width:700px;">
                         <div style="display:flex;gap:8px;align-items:center;">
-                            <input type="text" id="addressInput" placeholder="Go to an address, ZIP code, city, or county..." style="flex:1;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:9px 14px;color:var(--text-primary);font-size:13px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')goToAddress(this.value)" />
+                            <input type="text" id="addressInput" placeholder="Search a ZIP, city or state to load the market — or an address to jump there" style="flex:1;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:9px 14px;color:var(--text-primary);font-size:13px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')omniSearch(this.value)" />
                             <button class="control-btn" id="addressGoBtn" style="padding:9px 16px;font-size:13px;background:var(--accent);color:#fff;border-color:var(--accent);">📍 Go</button>
                         </div>
                         <div id="addressStatus" style="font-size:10px;color:var(--text-muted);margin-top:3px;display:none;"></div>
@@ -2644,6 +2644,17 @@
         function applyNavigatorTaxonomyFilter(wantTax) {
             const norm = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
             const wanted = wantTax.map(norm).filter(Boolean);
+
+            // No terms asked for means "show me this whole market" — a link like
+            // #zip=38017 with no tax=. Without this guard the no-match branch
+            // below fires and hides every clinic, landing the visitor on an
+            // empty map.
+            if (!wanted.length) {
+                renderMap();
+                const el = document.getElementById('dbStatus');
+                if (el) el.textContent = '✅ ' + Object.keys(groupedData).length + ' locations loaded';
+                return;
+            }
             const matched = new Set();
             for (const t of taxonomies) {
                 const nt = ' ' + norm(t);
@@ -2797,6 +2808,7 @@
         }
 
         document.getElementById('addressGoBtn').addEventListener('click', () => {
+            if (typeof omniSearch === 'function') { omniSearch(document.getElementById('addressInput').value); return; }
             goToAddress(document.getElementById('addressInput').value);
         });
 
@@ -3394,6 +3406,31 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
             var row  = document.getElementById('omnibar-row');
             if (slot && row) slot.appendChild(row);
         })();
+
+        // 1b. UNIFIED OMNIBAR.
+        //     There were two search boxes doing different jobs: this one only
+        //     geocoded and panned, while the box that actually loads clinics was
+        //     buried in the filter rail. Typing a ZIP up here moved the map and
+        //     left the welcome screen up, which reads as "search is broken".
+        //     One input now routes by what was typed.
+        function omniSearch(raw) {
+            var q = String(raw || '').trim();
+            if (!q) return;
+            var street     = /^\d+\s+\S/.test(q);                       // "304 Majestic Trail"
+            var zip        = /^\d{5}$/.test(q);
+            var state      = /^[A-Za-z]{2}$/.test(q);
+            var cityState  = /^[A-Za-z .'-]+,\s*[A-Za-z]{2}$/.test(q);
+            var city       = /^[A-Za-z .'-]{3,}$/.test(q);
+            var multiZip   = /^\s*\d{5}(\s*,\s*\d{5})+\s*$/.test(q);
+
+            if (!street && (zip || state || cityState || city || multiZip)) {
+                // Load the market: this is what dismisses the welcome overlay
+                var input = document.getElementById('dbSearchInput');
+                var btn   = document.getElementById('dbSearchBtn');
+                if (input && btn) { input.value = q; btn.click(); return; }
+            }
+            goToAddress(q);   // an address: just fly there
+        }
 
         // 2. Legend chip — shows the six group colours, toggles the full legend.
         function paintLegendChip() {
