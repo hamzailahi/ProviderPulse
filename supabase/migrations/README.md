@@ -38,10 +38,17 @@ feature stays dark regardless. Running `002` in a dev project is fine.
 
 ## After running 003
 
-Review the seeded plan names. They are a confident starting set for the states
-currently in `clinics` (TN, AR, MS, PR) plus national carriers — **not** an
-exhaustive market list, and plan names change. Adding a plan needs no code
-change:
+230 plans are seeded: 13 national carriers plus 217 rows covering **all 50
+states, DC and Puerto Rico** — each state's Blue Cross licensee (they are
+independent companies, not one national insurer), its Medicaid program under its
+own brand (TennCare, Medi-Cal, MassHealth, SoonerCare, Apple Health …), and
+notable regional plans in the larger markets.
+
+**Review the names before launch.** Plan names, Medicaid brands and Blue Cross
+licensees all change, and this is a strong starting set rather than a verified
+market census. A missing plan degrades gracefully — both forms offer "Other" as
+free text — but a *wrong* name looks worse than a missing one. Adding a plan
+needs no code change:
 
 ```sql
 insert into public.insurance_payers (name, state, category, sort_order)
