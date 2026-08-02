@@ -199,7 +199,16 @@ $('formLogin').onsubmit = async e => {
   if (!r.ok) return setMsg('lMsg', data.error || 'Sign in failed', false);
   if (data.role !== 'provider') return setMsg('lMsg', 'This account is not a provider account. Use the patient page.', false);
   session = data;
-  sessionStorage.setItem('pp_token', data.access_token);
+  // Same shape and key the patient app and dashboard use, so a signed-in
+  // provider is recognised everywhere instead of only on this page.
+  try {
+    sessionStorage.setItem('pp.session.v1', JSON.stringify({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      role: data.role,
+      expiresAt: Date.now() + (data.expires_in || 3600) * 1000
+    }));
+  } catch (e) {}
   loadAccount();
 };
 
@@ -211,7 +220,11 @@ $('acctSignOut').onclick = async () => {
     });
   } catch (e) { /* clear locally regardless — sign-out must always work */ }
   session = null;
-  try { sessionStorage.removeItem('pp_token'); } catch (e) {}
+  try {
+    ['pp.session.v1', 'pp.patient.v1', 'pp_token'].forEach(function (k) {
+      sessionStorage.removeItem(k); localStorage.removeItem(k);
+    });
+  } catch (e) {}
   location.reload();
 };
 

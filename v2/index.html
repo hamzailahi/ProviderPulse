@@ -3418,7 +3418,9 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
 
             var s = null;
             try {
-                s = JSON.parse(sessionStorage.getItem('pp.patient.v1')
+                s = JSON.parse(sessionStorage.getItem('pp.session.v1')
+                    || localStorage.getItem('pp.session.v1')
+                    || sessionStorage.getItem('pp.patient.v1')
                     || localStorage.getItem('pp.patient.v1') || 'null');
             } catch (e) { return; }
             if (!s || !s.role || (s.expiresAt && s.expiresAt < Date.now())) return;

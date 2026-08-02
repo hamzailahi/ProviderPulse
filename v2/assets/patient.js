@@ -13,7 +13,11 @@
 'use strict';
 
 var FN = '/.netlify/functions';
-var SESSION_KEY = 'pp.patient.v1';   // namespaced: not the old pp_token, not map_session
+// One session for the whole product. It was 'pp.patient.v1' and the provider
+// page wrote a bare token to 'pp_token', so no surface could read another's
+// session — a signed-in provider looked signed-out to the dashboard.
+var SESSION_KEY = 'pp.session.v1';
+var LEGACY_KEYS = ['pp.patient.v1'];   // read-only, so existing sessions survive
 var REQ_TIMEOUT = 26000;             // matches the function ceiling in netlify.toml
 
 /* ---------- tiny DOM layer ------------------------------------------------ */
@@ -75,7 +79,12 @@ function saveSession(s, persist) {
 }
 function loadSession() {
   var raw = null;
-  try { raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY); } catch (e) {}
+  try {
+    raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+    for (var i = 0; !raw && i < LEGACY_KEYS.length; i++) {
+      raw = sessionStorage.getItem(LEGACY_KEYS[i]) || localStorage.getItem(LEGACY_KEYS[i]);
+    }
+  } catch (e) {}
   if (!raw) return null;
   try {
     var s = JSON.parse(raw);
@@ -89,7 +98,11 @@ function loadSession() {
   } catch (e) { clearSession(); return null; }
 }
 function clearSession() {
-  try { sessionStorage.removeItem(SESSION_KEY); localStorage.removeItem(SESSION_KEY); } catch (e) {}
+  try {
+    [SESSION_KEY].concat(LEGACY_KEYS).forEach(function (k) {
+      sessionStorage.removeItem(k); localStorage.removeItem(k);
+    });
+  } catch (e) {}
 }
 // Revoke server-side first, then clear locally. The local clear runs regardless
 // of whether the revoke succeeded — a user must always be able to sign out.
