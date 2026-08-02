@@ -2448,7 +2448,17 @@
 
         // Deep link from care navigator: #goto=<address>, #pin=<lat>,<lng>,<name>,
         // or #zip=<zip>&tax=<taxonomy,list>&rec=<npi,list> for a whole search area
-        window.addEventListener('load', () => {
+        // Runs on whichever of DOMContentLoaded / load happens first, and guards
+        // against running twice. Binding only to `load` meant a slow or blocked
+        // CDN script (Leaflet, Chart.js, TopoJSON are all third-party) could delay
+        // this for seconds or, if the page was restored from bfcache, skip it —
+        // leaving the visitor staring at an empty search box with no idea a deep
+        // link was ever involved.
+        let deepLinkRan = false;
+        const runDeepLink = () => {
+            if (deepLinkRan) return;
+            deepLinkRan = true;
+
             const h = location.hash || '';
             const isPin = h.indexOf('#pin=') === 0;
             const isGoto = h.indexOf('#goto=') === 0;
@@ -2499,13 +2509,23 @@
                 const addr = decodeURIComponent(h.slice(6));
                 whenReady(() => goToAddress(addr));
             }
-        });
+        };
+
+        if (document.readyState === 'complete' || document.readyState === 'interactive') runDeepLink();
+        else document.addEventListener('DOMContentLoaded', runDeepLink);
+        window.addEventListener('load', runDeepLink);
+        // Arriving at an already-open tab via a new deep link should re-run it
+        window.addEventListener('hashchange', () => { deepLinkRan = false; runDeepLink(); });
 
         // Care-navigator area deep link: run the normal ZIP search, then narrow the
         // taxonomy filter to the specialties the navigator searched with, so the map
         // shows every matching clinic in the area rather than only the recommended few.
         async function runAreaDeepLink(zip, wantTax) {
+            const statusEl = document.getElementById('dbStatus');
             document.getElementById('dbSearchInput').value = zip;
+            // Say what is happening straight away. Without this the visitor sees an
+            // apparently idle page for several seconds and assumes the link did nothing.
+            if (statusEl) statusEl.textContent = '🔗 Opening your results for ' + zip + '…';
             document.getElementById('dbSearchBtn').click();
 
             // The search is an async Supabase fetch (clinics, then demographics per ZIP),
@@ -2519,7 +2539,12 @@
                 };
                 poll();
             });
-            if (!loaded) { console.warn('[deeplink] clinics never loaded for ZIP', zip); return; }
+            if (!loaded) {
+                console.warn('[deeplink] clinics never loaded for ZIP', zip);
+                // Never fail silently: the ZIP is already in the box, so tell them to retry
+                if (statusEl) statusEl.textContent = '⚠️ Could not load ' + zip + ' — press Search to try again';
+                return;
+            }
 
             applyNavigatorTaxonomyFilter(wantTax);
         }
