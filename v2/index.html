@@ -3414,7 +3414,6 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
         (function roleAwareEntry() {
             var hash = location.hash || '';
             var deepLink = /^#(zip|pin|goto)=/.test(hash);
-            if (deepLink) return;
 
             var s = null;
             try {
@@ -3425,7 +3424,17 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
             } catch (e) { return; }
             if (!s || !s.role || (s.expiresAt && s.expiresAt < Date.now())) return;
 
-            if (s.role === 'patient') { location.replace('/'); return; }
+            // Only the PATIENT redirect must stand down for a deep link — that is
+            // how the care navigator hands a patient to the full map, and bouncing
+            // them home would break it. The provider branch below only appends a
+            // link, so it is safe during a deep link and must still run: saving a
+            // provider profile lands on /dashboard#zip=<zip>, so gating on the hash
+            // meant the one path providers actually take never got the link.
+            if (s.role === 'patient') {
+                if (deepLink) return;
+                location.replace('/');
+                return;
+            }
 
             if (s.role === 'provider') {
                 // Signed-in provider: say so, and give them a way back to their listing.

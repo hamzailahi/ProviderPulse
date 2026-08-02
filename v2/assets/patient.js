@@ -266,22 +266,107 @@ function taxMatches(stored, terms) {
   return false;
 }
 
-// Other clinics in the same ZIP matching the searched specialties. Queried
-// straight from PostgREST — no function needed, so this still works when the
-// navigator itself is down.
-function nearbyClinics(zip, terms) {
-  if (!/^\d{5}$/.test(String(zip || '')) || !terms.length) return Promise.resolve([]);
-  var stripped = String(parseInt(zip, 10));
-  var url = SB_URL + '/rest/v1/clinics?or=(zip.eq.' + zip + ',zip.eq.' + stripped + ')' +
+// How far the patient map will look beyond the searched ZIP.
+//
+// The analyst dashboard's "+ Add Neighbors" loads every adjacent ZIP, which is
+// the right tool for sizing a market. It is the wrong one for a patient: it
+// buries the ZIP they asked about under hundreds of pins from places they were
+// never going to drive to. This is capped at the TWO NEAREST ZIPs instead —
+// enough to rescue a sparse rural ZIP, small enough that the map still answers
+// "who is near me". The dashboard's neighbor logic is separate and untouched.
+var PATIENT_NEIGHBOR_ZIPS = 2;
+var NEIGHBOR_BOX_DEG = 0.35;   // ~24 miles; the search box, not the result set
+
+// ZIPs are stored both zero-padded and not, so always ask for both forms.
+function zipOr(zips) {
+  var forms = {};
+  zips.forEach(function (z) {
+    forms['zip.eq.' + z] = true;
+    forms['zip.eq.' + String(parseInt(z, 10))] = true;
+  });
+  return '(' + Object.keys(forms).join(',') + ')';
+}
+
+function clinicsQuery(filter) {
+  var url = SB_URL + '/rest/v1/clinics?' + filter +
     '&select=npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude&limit=1000';
   return fetch(url, { headers: { apikey: SB_KEY, Accept: 'application/json' } })
     .then(function (r) { return r.ok ? r.json() : []; })
-    .then(function (rows) {
-      return (rows || []).filter(function (c) {
-        return c.latitude && c.longitude && taxMatches(c.primary_taxonomy, terms);
-      });
-    })
     .catch(function () { return []; });
+}
+
+// Equirectangular approximation. Over the ~25 miles this ever spans the error
+// against haversine is metres, and we only need to RANK ZIPs, not report a
+// distance to anyone.
+function roughDist(aLat, aLng, bLat, bLng) {
+  var x = (bLng - aLng) * Math.cos((aLat + bLat) * Math.PI / 360);
+  var y = (bLat - aLat);
+  return Math.sqrt(x * x + y * y);
+}
+
+// Other clinics matching the searched specialties, in the searched ZIP plus the
+// two nearest ZIPs. Queried straight from PostgREST — no function needed, so
+// this still works when the navigator itself is down.
+function nearbyClinics(zip, terms) {
+  if (!/^\d{5}$/.test(String(zip || '')) || !terms.length) return Promise.resolve([]);
+
+  return clinicsQuery('or=' + zipOr([zip])).then(function (rows) {
+    var home = (rows || []).filter(function (c) {
+      return c.latitude && c.longitude && taxMatches(c.primary_taxonomy, terms);
+    });
+
+    // Centre the neighbour search on the ZIP's own clinics. Without a ZIP
+    // geodatabase this is the only anchor available, and it is a good one:
+    // it is where the practices actually are.
+    var anchored = (rows || []).filter(function (c) { return c.latitude && c.longitude; });
+    if (!anchored.length) return home;
+    var lat = 0, lng = 0;
+    anchored.forEach(function (c) { lat += +c.latitude; lng += +c.longitude; });
+    lat /= anchored.length; lng /= anchored.length;
+
+    var box = 'latitude=gte.' + (lat - NEIGHBOR_BOX_DEG) + '&latitude=lte.' + (lat + NEIGHBOR_BOX_DEG) +
+              '&longitude=gte.' + (lng - NEIGHBOR_BOX_DEG) + '&longitude=lte.' + (lng + NEIGHBOR_BOX_DEG);
+
+    return clinicsQuery(box).then(function (near) {
+      // Group the surrounding clinics by ZIP so distance is measured between
+      // ZIP centres, not between individual practices — otherwise one clinic
+      // sitting on a boundary would outrank a genuinely closer ZIP.
+      var byZip = {};
+      (near || []).forEach(function (c) {
+        if (!c.latitude || !c.longitude || !c.zip) return;
+        var z = String(c.zip).padStart(5, '0');
+        if (z === String(zip)) return;                       // the home ZIP, already have it
+        if (!byZip[z]) byZip[z] = { lat: 0, lng: 0, n: 0, hit: false };
+        var g = byZip[z];
+        g.lat += +c.latitude; g.lng += +c.longitude; g.n++;
+        if (taxMatches(c.primary_taxonomy, terms)) g.hit = true;
+      });
+
+      var ranked = Object.keys(byZip)
+        // A ZIP with no matching specialty adds pins the patient did not ask
+        // for, so it does not count as one of the two.
+        .filter(function (z) { return byZip[z].hit; })
+        .map(function (z) {
+          var g = byZip[z];
+          return { zip: z, d: roughDist(lat, lng, g.lat / g.n, g.lng / g.n) };
+        })
+        .sort(function (a, b) { return a.d - b.d; })
+        .slice(0, PATIENT_NEIGHBOR_ZIPS);
+
+      var keep = {};
+      ranked.forEach(function (r) { keep[r.zip] = true; });
+
+      var extra = (near || []).filter(function (c) {
+        return c.latitude && c.longitude &&
+               keep[String(c.zip).padStart(5, '0')] &&
+               taxMatches(c.primary_taxonomy, terms);
+      });
+
+      // Tag the borrowed ones so the map can say where they came from.
+      extra.forEach(function (c) { c._neighbor = true; });
+      return home.concat(extra);
+    });
+  });
 }
 
 var mapState = { map: null, focusNpi: null };
@@ -368,9 +453,10 @@ function initMap(canvas, note) {
     nearbyClinics(s.zip, s.mapTerms || []).then(function (list) {
       var recNpis = {};
       recs.forEach(function (p) { recNpis[String(p.npi)] = true; });
-      var added = 0;
+      var added = 0, borrowed = 0, otherZips = {};
       list.forEach(function (c) {
         if (recNpis[String(c.npi)]) return;          // already pinned as a recommendation
+        if (c._neighbor) { borrowed++; otherZips[String(c.zip).padStart(5, '0')] = true; }
         var reg = registeredNpis[String(c.npi)];
         pin(c.latitude, c.longitude, reg ? 'ver' : 'oth', reg ? 15 : 12)
           .addTo(map)
@@ -381,10 +467,18 @@ function initMap(canvas, note) {
           }, false));
         added++;
       });
+      // Say plainly when pins come from outside the searched ZIP — a patient
+      // judging travel needs to know that without clicking every marker.
+      var zipList = Object.keys(otherZips).sort();
+      var from = zipList.length
+        ? ', including ' + borrowed + ' in nearby ZIP' + (zipList.length === 1 ? ' ' : 's ') + zipList.join(' and ')
+        : '';
       note.textContent = recs.length
         ? 'Showing your ' + recs.length + ' recommended provider' + (recs.length === 1 ? '' : 's') +
-          (added ? ' and ' + added + ' other matching clinic' + (added === 1 ? '' : 's') + ' in this ZIP.' : '. No other matching clinics in this ZIP.')
-        : (added ? 'Showing ' + added + ' matching clinics in this ZIP.' : 'No matching clinics found in this ZIP.');
+          (added ? ' and ' + added + ' other matching clinic' + (added === 1 ? '' : 's') + from + '.'
+                 : '. No other matching clinics nearby.')
+        : (added ? 'Showing ' + added + ' matching clinic' + (added === 1 ? '' : 's') + from + '.'
+                 : 'No matching clinics found near ' + (s.zip || 'you') + '.');
     });
   });
 }
