@@ -75,20 +75,37 @@ exports.handler = async (event) => {
     const insured = Number(dem['Insured Population']) || 0;
     const insuredRate = pop ? insured / pop : null;
 
+    // 2,069 of 27,927 ZIPs have a demographics row but a NULL population — PO-box
+    // and non-residential ZIPs, mostly. Every component of the score is per-capita
+    // or population-derived, so without it the sub-scores all fall back to their
+    // neutral 50 and the endpoint used to answer "54 · BALANCED MARKET" with an
+    // empty finding. A confident verdict backed by nothing is worse than no
+    // verdict, so refuse to score instead.
+    if (!pop) {
+      return {
+        statusCode: 200,
+        headers: CORS,
+        body: JSON.stringify({
+          zip, state, available: false,
+          reason: 'No population data for this ZIP, so it cannot be scored'
+        })
+      };
+    }
+
     // 2. Providers here, and the state's ZIP-level demographics for the benchmark
     const stripped = String(parseInt(zip, 10));
     const [clinicRows, stateDem] = await Promise.all([
       get(`clinics?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy&limit=5000`, 8000),
       get(`demographics_raw?state=eq.${encodeURIComponent(state)}&select=zip,%22Total%20Population%22,%22Insured%20Population%22&limit=1000`, 8000)
     ]);
-    // Count CLINICIANS, not listings. Pharmacies, labs, DME suppliers and
-    // medical transport are all rows in `clinics`, and in one tested ZIP they
-    // were 46% of the total — counting them overstated supply by 84% and made
-    // a genuinely underserved market look adequately covered.
+    // Count ALL listings. A clinic, hospital or surgical center is somewhere
+    // care is delivered and doctors practise out of, so it is real capacity —
+    // excluding it understates the market. The clinician/facility split is
+    // still reported below for anyone who wants to break the number down.
     const listings = clinicRows.length;
     const clinicians = clinicRows.filter(r => TaxonomyGroups.isClinician(r.primary_taxonomy)).length;
-    const providers = clinicians;
-    const per1k = pop ? (clinicians / pop) * 1000 : null;
+    const providers = listings;
+    const per1k = pop ? (listings / pop) * 1000 : null;
 
     // 3. State medians. Only ZIPs with a real population count toward density,
     //    or empty rural ZIPs would drag the benchmark to zero.
@@ -102,11 +119,9 @@ exports.handler = async (event) => {
 
     // Density benchmark needs provider counts per ZIP, which is too many queries
     // to do live. Use the national reference instead and say so in the payload.
-    // Benchmark must be like-for-like now that we count clinicians only. Roughly
-    // half of the 1.9M listings are facilities, so the clinician-equivalent
-    // national figure is about half the all-listings one.
-    const NATIONAL_CLINICIANS_PER_1K = 2.9;
-    const benchDensity = NATIONAL_CLINICIANS_PER_1K;
+    // Like-for-like with an all-listings count: 1.9M listings / ~330M people.
+    const NATIONAL_PER_1K = 5.8;
+    const benchDensity = NATIONAL_PER_1K;
 
     // 4. Designated shortage: HPSA is county-level, so match on state and take
     //    the strongest primary-care designation available.
@@ -142,7 +157,7 @@ exports.handler = async (event) => {
       const rel = ratio < 0.9 ? `${(1 / ratio).toFixed(1)}× fewer than the national average`
         : ratio > 1.1 ? `${ratio.toFixed(1)}× more than the national average`
         : 'in line with the national average';
-      parts.push(`${per1k.toFixed(1)} clinicians per 1,000 residents — ${rel}`);
+      parts.push(`${per1k.toFixed(1)} providers per 1,000 residents — ${rel}`);
     }
     if (insuredRate !== null && stateRate !== null) {
       const d = (insuredRate - stateRate) * 100;
@@ -166,6 +181,7 @@ exports.handler = async (event) => {
           insured_population: insured,
           insured_rate: insuredRate,
           state_insured_rate: stateRate,
+          providers: listings,
           clinicians: clinicians,
           total_listings: listings,
           facilities: listings - clinicians,
