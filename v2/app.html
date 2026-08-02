@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>ProviderPulse · Find care near you</title>
+<link rel="stylesheet" href="assets/patient.css">
+</head>
+<body>
+
+<div class="aurora" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header id="hdr" hidden>
+    <div class="brand"><span class="mark" aria-hidden="true">✚</span> ProviderPulse</div>
+    <div class="spacer"></div>
+    <button class="pill" id="zipPill" type="button" title="Change search area">
+      <span class="k">Near</span><span class="v" id="zipVal">—</span>
+    </button>
+    <button class="avatar" id="acctBtn" type="button" title="Your account" aria-label="Your account">·</button>
+  </header>
+
+  <main id="main"></main>
+</div>
+
+<!-- Markup is intentionally minimal: every view is built in patient.js with the
+     h() element helper, so no value from the API or the URL is ever interpolated
+     into innerHTML. See the note at the top of patient.js. -->
+<script src="assets/specialties.js"></script>
+<script src="assets/patient.js"></script>
+</body>
+</html>
