@@ -325,7 +325,12 @@
         Chart.defaults.plugins.tooltip.borderWidth = 1;
 
         let map = L.map('map').setView([39.5, -98.35], 4);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        // Dark tiles under a light UI look broken, so pick the tile set from the
+        // active theme — the explicit toggle wins over the OS preference.
+        var _t = document.documentElement.getAttribute('data-theme');
+        var _light = _t === 'light' || (!_t && window.matchMedia &&
+                     window.matchMedia('(prefers-color-scheme: light)').matches);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/' + (_light ? 'light_all' : 'dark_all') + '/{z}/{x}/{y}{r}.png', {
             maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
@@ -2734,7 +2739,14 @@
             btn.disabled = true;
 
             try {
-                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1&lang=en`;
+                // Bias to the US. Photon is worldwide and unbiased, so a bare
+                // "38017" matched Kocasinan, Kayseri, TURKEY — a 5-digit string
+                // is a valid postcode in dozens of countries. Bias to the
+                // continental US centroid and append the country for ZIPs.
+                const isZip = /^\d{5}$/.test(query.trim());
+                const q = isZip ? query.trim() + ', USA' : query;
+                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}`
+                          + `&limit=5&lang=en&lat=39.5&lon=-98.35`;
                 const res = await fetch(url);
                 const data = await res.json();
                 const features = data?.features;
@@ -2746,8 +2758,12 @@
                     return;
                 }
 
-                const [lng, lat] = features[0].geometry.coordinates;
-                const props = features[0].properties;
+                // Prefer a US hit even if the geocoder ranked something else first
+                const usFirst = features.find(f =>
+                    ['United States', 'United States of America', 'USA'].includes(
+                        (f.properties && f.properties.country) || '')) || features[0];
+                const [lng, lat] = usFirst.geometry.coordinates;
+                const props = usFirst.properties;
                 const label = [props.name, props.street, props.city, props.state, props.country]
                     .filter(Boolean).join(', ');
 

@@ -672,3 +672,81 @@ input[type="file"]::-webkit-file-upload-button {
   }
   #ai-command { bottom: 76px; width: calc(100% - 32px); }
 }
+
+/* ============================================================================
+   LIGHT THEME — the dashboard was built dark-first and every floating panel
+   derives its background from `color-mix(var(--ground), transparent)`. On a
+   near-white ground that produces a near-white translucent panel, so the whole
+   UI rendered as barely-visible ghosts. These overrides give light mode real
+   surfaces: opaque enough to read, with a border and shadow doing the work that
+   translucency does on dark.
+   Applies to BOTH the OS preference and the explicit toggle.
+   ============================================================================ */
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) #topbar-v2,
+  :root:not([data-theme="dark"]) #omnibar-row {
+    background: rgba(255,255,255,.92);
+    border-color: rgba(9,14,22,.12);
+  }
+  :root:not([data-theme="dark"]) #filter-rail,
+  :root:not([data-theme="dark"]) #sidebar,
+  :root:not([data-theme="dark"]) #legend-section,
+  :root:not([data-theme="dark"]) #legend-chip,
+  :root:not([data-theme="dark"]) #compare-tray,
+  :root:not([data-theme="dark"]) #ai-command {
+    background: rgba(255,255,255,.95);
+    border-color: rgba(9,14,22,.14);
+    box-shadow: 0 10px 34px rgba(9,14,22,.16);
+  }
+  :root:not([data-theme="dark"]) #welcome-overlay {
+    background: rgba(246,248,251,.92);
+  }
+  :root:not([data-theme="dark"]) .leaflet-popup-content-wrapper,
+  :root:not([data-theme="dark"]) .leaflet-tooltip,
+  :root:not([data-theme="dark"]) .leaflet-bar a {
+    background: #fff !important;
+    color: #0d151f !important;
+    border-color: rgba(9,14,22,.14) !important;
+  }
+  /* The map itself: dark tiles under a light UI look broken, so the tile layer
+     is swapped to CARTO light in JS — this just matches the container. */
+  :root:not([data-theme="dark"]) #map { background: #eef2f7; }
+}
+
+:root[data-theme="light"] #topbar-v2,
+:root[data-theme="light"] #omnibar-row {
+  background: rgba(255,255,255,.92);
+  border-color: rgba(9,14,22,.12);
+}
+:root[data-theme="light"] #filter-rail,
+:root[data-theme="light"] #sidebar,
+:root[data-theme="light"] #legend-section,
+:root[data-theme="light"] #legend-chip,
+:root[data-theme="light"] #compare-tray,
+:root[data-theme="light"] #ai-command {
+  background: rgba(255,255,255,.95);
+  border-color: rgba(9,14,22,.14);
+  box-shadow: 0 10px 34px rgba(9,14,22,.16);
+}
+:root[data-theme="light"] #welcome-overlay { background: rgba(246,248,251,.92); }
+:root[data-theme="light"] .leaflet-popup-content-wrapper,
+:root[data-theme="light"] .leaflet-tooltip,
+:root[data-theme="light"] .leaflet-bar a {
+  background: #fff !important; color: #0d151f !important; border-color: rgba(9,14,22,.14) !important;
+}
+:root[data-theme="light"] #map { background: #eef2f7; }
+
+/* Cluster bubbles need dark text on the gradient in light mode too */
+:root[data-theme="light"] .pp-cluster,
+:root:not([data-theme="dark"]) .pp-cluster { color: #04211d; }
+
+/* The status message sat loose in the toolbar with no affordance. */
+#dbStatus {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  background: var(--surface); border: 1px solid var(--hairline);
+  font-size: 11px; color: var(--muted); white-space: nowrap;
+  max-width: 320px; overflow: hidden; text-overflow: ellipsis;
+}
+#dbStatus:empty { display: none; }
