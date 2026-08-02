@@ -58,39 +58,45 @@ const KEYWORD_TAXONOMY = {
 // search term into the forms that column actually stores. Terms absent from this table
 // pass through unchanged, which is correct when both vocabularies already agree.
 const MAP_TAXONOMY = {
-  'Family Medicine': 'Family Medicine Physician,General Practice Physician,Internal Medicine Physician,Primary Care Clinic/Center,Federally Qualified Health Center,Family Nurse Practitioner,Adult Health Nurse Practitioner,Community Health Clinic/Center',
-  'Internal Medicine': 'Internal Medicine Physician,General Practice Physician,Primary Care Clinic/Center,Federally Qualified Health Center',
-  'Pediatrics': 'Pediatrics Physician,Pediatric Nurse Practitioner,Pediatric Adolescent Medicine',
-  'Obstetrics & Gynecology': 'Obstetrics & Gynecology Physician,Obstetrics Physician,Gynecology Physician,Advanced Practice Midwife',
-  'Psychiatry': 'Psychiatry Physician,Psychologist,Neuropsychologist,Counselor,Clinical Social Worker,Marriage & Family Therapist,Mental Health,Behavioral Health',
-  'Counselor': 'Counselor,Clinical Social Worker,Psychologist,Marriage & Family Therapist,Mental Health,Behavioral Health',
+  'Family Medicine': 'Family Medicine Physician,General Practice Physician,Internal Medicine Physician,Primary Care Clinic/Center,Federally Qualified Health Center,Family Nurse Practitioner,Adult Health Nurse Practitioner,Community Health Clinic/Center,Family Medicine,Internal Medicine',
+  'Internal Medicine': 'Internal Medicine Physician,General Practice Physician,Primary Care Clinic/Center,Federally Qualified Health Center,Internal Medicine,Family Medicine',
+  'Pediatrics': 'Pediatrics Physician,Pediatric Nurse Practitioner,Pediatric Adolescent Medicine,Pediatrics',
+  'Obstetrics & Gynecology': 'Obstetrics & Gynecology Physician,Obstetrics Physician,Gynecology Physician,Advanced Practice Midwife,Obstetrics & Gynecology',
+  'Psychiatry': 'Psychiatry Physician,Psychologist,Neuropsychologist,Counselor,Clinical Social Worker,Marriage & Family Therapist,Mental Health,Behavioral Health,Psychiatry & Mental Health,Psychiatry',
+  'Counselor': 'Counselor,Clinical Social Worker,Psychologist,Marriage & Family Therapist,Mental Health,Behavioral Health,Psychiatry & Mental Health',
   'Dentist': 'Dentist,Dentistry,Dental Clinic/Center',
-  'Optometrist': 'Optometrist,Ophthalmology Physician,Eyewear Supplier',
-  'Ophthalmology': 'Ophthalmology Physician,Optometrist',
-  'Physical Therapist': 'Physical Therapist,Physical Therapy Clinic/Center,Occupational Therapist,Physical Medicine & Rehabilitation Physician',
-  'Orthopaedic Surgery': 'Orthopaedic Surgery Physician,Sports Medicine',
+  'Optometrist': 'Optometrist,Ophthalmology Physician,Eyewear Supplier,Vision & Eye Care',
+  'Ophthalmology': 'Ophthalmology Physician,Optometrist,Vision & Eye Care',
+  'Physical Therapist': 'Physical Therapist,Physical Therapy Clinic/Center,Occupational Therapist,Physical Medicine & Rehabilitation Physician,Therapy & Rehabilitation',
+  'Orthopaedic Surgery': 'Orthopaedic Surgery Physician,Sports Medicine,Surgery',
   'Cardiovascular Disease': 'Cardiovascular Disease Physician,Cardiology',
   'Oncology': 'Oncology,Hematology',
   'Hematology & Oncology': 'Hematology & Oncology Physician,Oncology',
   'Obesity Medicine': 'Obesity Medicine,Registered Dietitian,Nutritionist,Bariatric',
   'Sleep Medicine': 'Sleep Medicine,Sleep Disorder,Pulmonary Disease Physician',
-  'Emergency Medicine': 'Emergency Medicine Physician,Urgent Care Clinic/Center,Emergency Care Clinic/Center,General Acute Care Hospital',
-  'Radiology': 'Diagnostic Radiology Physician,Radiology Clinic/Center,Body Imaging',
-  'Home Health': 'Home Health Agency,Home Health Aide,In Home Supportive Care Agency,Nursing Care Agency',
-  'Dietitian': 'Registered Dietitian,Nutritionist',
+  'Emergency Medicine': 'Emergency Medicine Physician,Urgent Care Clinic/Center,Emergency Care Clinic/Center,General Acute Care Hospital,Emergency Services',
+  'Radiology': 'Diagnostic Radiology Physician,Radiology Clinic/Center,Body Imaging,Radiology & Imaging',
+  'Home Health': 'Home Health Agency,Home Health Aide,In Home Supportive Care Agency,Nursing Care Agency,Nursing',
+  'Dietitian': 'Registered Dietitian,Nutritionist,Nutrition',
   'Pain Medicine': 'Pain Medicine Physician,Pain Medicine (Anesthesiology) Physician',
   'Plastic Surgery': 'Plastic Surgery Physician,Plastic and Reconstructive Surgery Physician',
   'Speech-Language Pathologist': 'Speech-Language Pathologist,Audiologist,Hearing and Speech Clinic/Center'
 };
 
 // Terms the map should filter on, given what the navigator searched NPPES for.
+//
+// The bare NPPES term is ALWAYS included, not just its expansions. The clinics
+// table holds two different vocabularies depending on the import batch — some
+// ZIPs store "Internal Medicine Physician", others store plain "Internal
+// Medicine" — and matching is prefix-at-a-word-boundary, so the short form
+// matches both while the long form only matches the long one. Dropping the bare
+// term made every clinic in the short-vocabulary ZIPs vanish from the map.
 function mapTaxonomies(terms) {
   const out = [];
+  const add = v => { v = String(v).trim(); if (v && !out.includes(v)) out.push(v); };
   for (const t of terms) {
-    for (const part of String(MAP_TAXONOMY[t] || t).split(',')) {
-      const v = part.trim();
-      if (v && !out.includes(v)) out.push(v);
-    }
+    add(t);
+    if (MAP_TAXONOMY[t]) String(MAP_TAXONOMY[t]).split(',').forEach(add);
   }
   return out;
 }
