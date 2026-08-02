@@ -4,6 +4,35 @@
 [functions]
   node_bundler = "esbuild"
 
+# ---------------------------------------------------------------------------
+# Routing. The site root is the patient app; the analyst dashboard keeps its
+# own URLs. force = true is required on the first rule: without it Netlify
+# serves the static /index.html for "/" and the rule never fires.
+#
+# index.html must stay reachable at that exact path — it is the target of the
+# care-navigator map deep link (index.html#zip=&tax=&rec=&pins=), and patient.js
+# builds that URL relatively. Do not rename it.
+# ---------------------------------------------------------------------------
+
+[[redirects]]
+  from = "/"
+  to = "/app.html"
+  status = 200
+  force = true
+
+# Friendly URL for the analyst tool
+[[redirects]]
+  from = "/dashboard"
+  to = "/index.html"
+  status = 200
+
+# The patient URL that has already been shared externally
+[[redirects]]
+  from = "/register-patient.html"
+  to = "/app.html"
+  status = 301
+  force = true
+
 [functions."ai-query"]
   timeout = 26
 

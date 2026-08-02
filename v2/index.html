@@ -382,6 +382,9 @@
         <div class="subtitle">Market Strategy</div>
         <div class="right">
             <span id="sessionInfo" style="font-size:10px;color:var(--text-muted);"></span>
+            <!-- Patients arrive here from the care navigator's map link; give them
+                 a way back rather than stranding them in the analyst tool. -->
+            <a href="/" style="font-size:10px;color:var(--accent,#58a6ff);text-decoration:none;margin-left:12px;">← Find care</a>
         </div>
     </div>
 
@@ -671,7 +674,9 @@
         // ── Session display & logout ──────────────────────────────
         function logoutMap() {
             localStorage.removeItem('map_session');
-            window.location.href = '/login.html';
+            // There is no /login.html on the v2 site — this used to 404. The root
+            // is the patient app, which is the right place to land.
+            window.location.href = '/';
         }
 
         (function() {

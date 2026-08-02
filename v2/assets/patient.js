@@ -720,7 +720,9 @@ function gateEl(mode) {
     btn, msg,
     h('p', { class: 'alt' }, isReg ? 'Already registered? ' : 'New here? ',
       h('a', { role: 'button', tabindex: '0', onclick: function () { location.hash = isReg ? '' : '#/join'; } },
-        isReg ? 'Sign in' : 'Create an account'))
+        isReg ? 'Sign in' : 'Create an account')),
+    h('p', { class: 'alt', style: 'margin-top:8px' }, 'Are you a healthcare provider? ',
+      h('a', { href: 'register-provider.html' }, 'Claim your listing'))
   );
   return h('div', { class: 'gate' }, form);
 }
