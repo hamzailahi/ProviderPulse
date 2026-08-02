@@ -238,6 +238,8 @@ main { flex: 1; display: flex; flex-direction: column; }
 .legend-row .pin.rec { background: var(--caution); }
 .legend-row .pin.ver { background: var(--a1); }
 .legend-row .pin.oth { background: var(--unknown); }
+/* Hollow teal: same practice, address the registry does not confirm. */
+.legend-row .pin.self { background: color-mix(in srgb, var(--a1) 26%, transparent); box-shadow: inset 0 0 0 1.5px var(--a1); }
 
 /* Leaflet marker bodies, injected via divIcon */
 .mk { border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; }
@@ -379,5 +381,20 @@ dl.f dd.m { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .map-legend .pin.rec { background: var(--caution); }
 .map-legend .pin.ver { background: var(--a1); }
 .map-legend .pin.oth { background: var(--unknown); }
+.map-legend .pin.self { background: color-mix(in srgb, var(--a1) 26%, transparent); box-shadow: inset 0 0 0 1.5px var(--a1); }
 
 @media (max-width: 1099px) { .split { display: block; } .split-map { display: none; } }
+
+
+/* A claimed listing whose address is NOT the one in the federal registry.
+   Hollow rather than solid teal, so at a glance it reads as the same practice
+   but a less-confirmed address. It must never look identical to .mk.ver. */
+.mk.self {
+  background: color-mix(in srgb, var(--a1) 26%, transparent);
+  border-color: var(--a1);
+}
+.mpop .tag.self {
+  color: var(--unknown);
+  background: var(--unknown-bg);
+  border-color: color-mix(in srgb, var(--unknown) 30%, transparent);
+}

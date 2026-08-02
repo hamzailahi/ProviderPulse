@@ -392,6 +392,7 @@ function mapSheet() {
     h('div', { class: 'legend-row' },
       h('span', {}, h('i', { class: 'pin rec' }), 'Recommended for you'),
       h('span', {}, h('i', { class: 'pin ver' }), 'Verified listing'),
+      h('span', {}, h('i', { class: 'pin self' }), 'Self-reported location'),
       h('span', {}, h('i', { class: 'pin oth' }), 'Other clinics nearby')),
     note
   ];
@@ -454,9 +455,18 @@ function initMap(canvas, note) {
       var recNpis = {};
       recs.forEach(function (p) { recNpis[String(p.npi)] = true; });
       var added = 0, borrowed = 0, otherZips = {};
+      // Remember where a pin already exists so a provider's own location does
+      // not double up on the clinics row it corresponds to.
+      var drawnAt = {};
+      var zipsInPlay = {};
+      if (s.zip) zipsInPlay[String(s.zip).padStart(5, '0')] = true;
+      list.forEach(function (c) {
+        if (c.zip) zipsInPlay[String(c.zip).padStart(5, '0')] = true;
+      });
       list.forEach(function (c) {
         if (recNpis[String(c.npi)]) return;          // already pinned as a recommendation
         if (c._neighbor) { borrowed++; otherZips[String(c.zip).padStart(5, '0')] = true; }
+        drawnAt[(+c.latitude).toFixed(4) + ',' + (+c.longitude).toFixed(4)] = true;
         var reg = registeredNpis[String(c.npi)];
         pin(c.latitude, c.longitude, reg ? 'ver' : 'oth', reg ? 15 : 12)
           .addTo(map)
@@ -467,6 +477,41 @@ function initMap(canvas, note) {
           }, false));
         added++;
       });
+      // A claimed listing can publish more than one practice location, and the
+      // clinics table only ever knows the one tied to the NPI. Draw the rest
+      // from what the provider published, ringed by whether the federal
+      // registry actually confirms that address -- a self-reported site must
+      // not wear the same ring as a verified one.
+      var extraSites = 0, selfSites = 0;
+      Object.keys(registeredNpis).forEach(function (npi) {
+        var r = registeredNpis[npi] || {};
+        (r.locations || []).forEach(function (loc) {
+          // No coordinates means the address was never geocoded, or geocoding
+          // failed. There is nowhere to put the pin, so skip it silently.
+          if (!loc.latitude || !loc.longitude) return;
+          // registeredNpis is every claimed listing in the country, so restrict
+          // to the ZIPs this map is actually showing.
+          if (!zipsInPlay[String(loc.zip || '').padStart(5, '0')]) return;
+          var key = (+loc.latitude).toFixed(4) + ',' + (+loc.longitude).toFixed(4);
+          if (drawnAt[key]) return;
+          drawnAt[key] = true;
+          pin(loc.latitude, loc.longitude, loc.verified ? 'ver' : 'self', loc.verified ? 15 : 13)
+            .addTo(map)
+            .bindPopup(popupHtml({
+              npi: npi,
+              name: (r.name || '') + (loc.label ? ' \u2014 ' + loc.label : ''),
+              specialty: r.specialty,
+              address: loc.address_line, city: loc.city, state: loc.state, zip: loc.zip,
+              phone: loc.phone || r.phone,
+              registered: true,
+              self_reported: !loc.verified
+            }, false));
+          extraSites++;
+          if (!loc.verified) selfSites++;
+        });
+      });
+      added += extraSites;
+
       // Say plainly when pins come from outside the searched ZIP — a patient
       // judging travel needs to know that without clicking every marker.
       var zipList = Object.keys(otherZips).sort();
@@ -493,7 +538,12 @@ function popupHtml(p, isRec) {
   var line = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
   return '<div class="mpop">' +
     (isRec ? '<span class="tag rec">★ Recommended for you</span>' : '') +
-    (p.registered && !isRec ? '<span class="tag ver">✓ Verified listing</span>' : '') +
+    (p.registered && !isRec && !p.self_reported
+      ? '<span class="tag ver">✓ Verified listing</span>' : '') +
+    // Claimed, but this particular address is not the one in the federal
+    // registry. Never let it borrow the verified badge.
+    (p.self_reported
+      ? '<span class="tag self">Address self-reported</span>' : '') +
     '<strong>' + esc(p.name || 'Provider') + '</strong>' +
     (p.specialty ? '<span class="sp">' + esc(p.specialty) + '</span>' : '') +
     (line ? '<span class="ad">' + esc(line) + '</span>' : '') +
