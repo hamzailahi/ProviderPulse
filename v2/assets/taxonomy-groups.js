@@ -16,6 +16,9 @@
    Verified against 221 distinct live values from both vocabularies; every one
    maps, and no clinician is ever classified as a facility.
    ============================================================================ */
+// Exported for BOTH the browser (window.TaxonomyGroups) and Netlify Functions
+// (require), so the classification has exactly one definition. market-score.js
+// depends on it to separate clinicians from facilities.
 (function (global) {
   'use strict';
 
@@ -49,11 +52,17 @@
   var byKey = {};
   GROUPS.forEach(function (g) { byKey[g.key] = g; });
 
-  global.TaxonomyGroups = {
+  var API = {
     list: GROUPS,
     keyFor: groupKey,
     colorFor: function (taxonomy) { return (byKey[groupKey(taxonomy)] || byKey.facility).color; },
     nameFor: function (taxonomy) { return (byKey[groupKey(taxonomy)] || byKey.facility).name; },
-    get: function (key) { return byKey[key]; }
+    get: function (key) { return byKey[key]; },
+    // A pharmacy, lab or DME supplier is a listing, not a clinician. Counting
+    // them as "providers" overstated supply by 84% in the ZIP we tested.
+    isClinician: function (taxonomy) { return groupKey(taxonomy) !== 'facility'; }
   };
-})(window);
+
+  if (global) global.TaxonomyGroups = API;
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+})(typeof window !== 'undefined' ? window : null);

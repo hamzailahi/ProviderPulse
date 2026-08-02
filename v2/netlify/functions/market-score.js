@@ -24,6 +24,9 @@ const CORS = {
 
 const WEIGHTS = { supply: 0.40, payer: 0.30, shortage: 0.30 };
 
+// Shared with the map so "provider" means the same thing in both places.
+const TaxonomyGroups = require('../../assets/taxonomy-groups.js');
+
 // hpsa_designations stores FULL state names ("Tennessee") while clinics and
 // demographics_raw use two-letter codes. Querying it with "TN" silently returns
 // nothing, which quietly neutralised the shortage component of every score.
@@ -75,11 +78,17 @@ exports.handler = async (event) => {
     // 2. Providers here, and the state's ZIP-level demographics for the benchmark
     const stripped = String(parseInt(zip, 10));
     const [clinicRows, stateDem] = await Promise.all([
-      get(`clinics?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi&limit=5000`, 8000),
+      get(`clinics?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy&limit=5000`, 8000),
       get(`demographics_raw?state=eq.${encodeURIComponent(state)}&select=zip,%22Total%20Population%22,%22Insured%20Population%22&limit=1000`, 8000)
     ]);
-    const providers = clinicRows.length;
-    const per1k = pop ? (providers / pop) * 1000 : null;
+    // Count CLINICIANS, not listings. Pharmacies, labs, DME suppliers and
+    // medical transport are all rows in `clinics`, and in one tested ZIP they
+    // were 46% of the total — counting them overstated supply by 84% and made
+    // a genuinely underserved market look adequately covered.
+    const listings = clinicRows.length;
+    const clinicians = clinicRows.filter(r => TaxonomyGroups.isClinician(r.primary_taxonomy)).length;
+    const providers = clinicians;
+    const per1k = pop ? (clinicians / pop) * 1000 : null;
 
     // 3. State medians. Only ZIPs with a real population count toward density,
     //    or empty rural ZIPs would drag the benchmark to zero.
@@ -93,8 +102,11 @@ exports.handler = async (event) => {
 
     // Density benchmark needs provider counts per ZIP, which is too many queries
     // to do live. Use the national reference instead and say so in the payload.
-    const NATIONAL_PER_1K = 5.8;   // 1.9M listed provider records / ~330M people
-    const benchDensity = NATIONAL_PER_1K;
+    // Benchmark must be like-for-like now that we count clinicians only. Roughly
+    // half of the 1.9M listings are facilities, so the clinician-equivalent
+    // national figure is about half the all-listings one.
+    const NATIONAL_CLINICIANS_PER_1K = 2.9;
+    const benchDensity = NATIONAL_CLINICIANS_PER_1K;
 
     // 4. Designated shortage: HPSA is county-level, so match on state and take
     //    the strongest primary-care designation available.
@@ -130,7 +142,7 @@ exports.handler = async (event) => {
       const rel = ratio < 0.9 ? `${(1 / ratio).toFixed(1)}× fewer than the national average`
         : ratio > 1.1 ? `${ratio.toFixed(1)}× more than the national average`
         : 'in line with the national average';
-      parts.push(`${per1k.toFixed(1)} providers per 1,000 residents — ${rel}`);
+      parts.push(`${per1k.toFixed(1)} clinicians per 1,000 residents — ${rel}`);
     }
     if (insuredRate !== null && stateRate !== null) {
       const d = (insuredRate - stateRate) * 100;
@@ -154,7 +166,9 @@ exports.handler = async (event) => {
           insured_population: insured,
           insured_rate: insuredRate,
           state_insured_rate: stateRate,
-          providers: providers,
+          clinicians: clinicians,
+          total_listings: listings,
+          facilities: listings - clinicians,
           providers_per_1k: per1k,
           benchmark_per_1k: benchDensity,
           hpsa_score: hpsaScore
