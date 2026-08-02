@@ -271,10 +271,23 @@
 
     <script>
         // Chart.js Dark Mode Defaults
-        Chart.defaults.color = '#8b949e';
-        Chart.defaults.font.family = "'DM Sans', sans-serif";
-        Chart.defaults.plugins.tooltip.backgroundColor = '#1c2330';
-        Chart.defaults.plugins.tooltip.borderColor = '#2a3444';
+        // Chart.js paints to <canvas>, where var() does not resolve — passing it a
+        // CSS variable silently yields an invisible chart. Read the COMPUTED token
+        // values instead, so charts inherit the design system and follow light mode.
+        const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+        const CHART = {
+            a1:    cssVar('--a1')      || '#2dd4bf',
+            a2:    cssVar('--a2')      || '#6366f1',
+            good:  cssVar('--good')    || '#4ade80',
+            bad:   cssVar('--danger')  || '#f87171',
+            muted: cssVar('--muted')   || '#93a3b8',
+            line:  cssVar('--hairline-2') || 'rgba(255,255,255,.16)',
+            surf:  cssVar('--ground-2')   || '#0b0f16'
+        };
+        Chart.defaults.color = CHART.muted;
+        Chart.defaults.font.family = cssVar('--sans') || 'system-ui, sans-serif';
+        Chart.defaults.plugins.tooltip.backgroundColor = CHART.surf;
+        Chart.defaults.plugins.tooltip.borderColor = CHART.line;
         Chart.defaults.plugins.tooltip.borderWidth = 1;
 
         let map = L.map('map').setView([39.5, -98.35], 4);
@@ -2144,12 +2157,12 @@
             const rawAgeData = ageBuckets.map(b => b.keys_t.reduce((s,k)=>s+getV(k),0));
             const rawAgeInst = new Chart(document.getElementById(rawAgeCanvasId), {
                 type: 'bar',
-                data: { labels: ageBuckets.map(b=>b.l), datasets: [{ label: 'Total Population', data: rawAgeData, backgroundColor: '#3b82f6', borderRadius: 3 }] },
+                data: { labels: ageBuckets.map(b=>b.l), datasets: [{ label: 'Total Population', data: rawAgeData, backgroundColor: CHART.a1, borderRadius: 3 }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: {font: {size: 9}} }, y: { grid: { color: '#1e2836' }, ticks: {font: {size: 9}} } } }
             });
 
             // STACKED AGE CHART
-            const ageInst = new Chart(document.getElementById(ageCanvasId), { type: 'bar', data: { labels: ageBuckets.map(b=>b.l), datasets: [ { label: 'Insured', data: ageBuckets.map(b=>b.d.i_pct), backgroundColor: '#3b82f6' }, { label: 'Uninsured', data: ageBuckets.map(b=>b.d.u_pct), backgroundColor: '#f85149' } ] }, options: defaultOpts });
+            const ageInst = new Chart(document.getElementById(ageCanvasId), { type: 'bar', data: { labels: ageBuckets.map(b=>b.l), datasets: [ { label: 'Insured', data: ageBuckets.map(b=>b.d.i_pct), backgroundColor: CHART.a1 }, { label: 'Uninsured', data: ageBuckets.map(b=>b.d.u_pct), backgroundColor: CHART.bad } ] }, options: defaultOpts });
 
             // STACKED INCOME CHART
             const incBuckets = [
@@ -2164,11 +2177,11 @@
             const rawIncData = incBuckets.map(b => b.keys_t.reduce((s,k)=>s+getV(k),0));
             const rawIncInst = new Chart(document.getElementById(rawIncCanvasId), {
                 type: 'bar',
-                data: { labels: incBuckets.map(b=>b.l), datasets: [{ label: 'Total Households', data: rawIncData, backgroundColor: '#3fb950', borderRadius: 3 }] },
+                data: { labels: incBuckets.map(b=>b.l), datasets: [{ label: 'Total Households', data: rawIncData, backgroundColor: CHART.good, borderRadius: 3 }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: {font: {size: 9}} }, y: { grid: { color: '#1e2836' }, ticks: {font: {size: 9}} } } }
             });
 
-            const incInst = new Chart(document.getElementById(incCanvasId), { type: 'bar', data: { labels: incBuckets.map(b=>b.l), datasets: [ { label: 'Insured', data: incBuckets.map(b=>b.d.i_pct), backgroundColor: '#3fb950' }, { label: 'Uninsured', data: incBuckets.map(b=>b.d.u_pct), backgroundColor: '#f85149' } ] }, options: defaultOpts });
+            const incInst = new Chart(document.getElementById(incCanvasId), { type: 'bar', data: { labels: incBuckets.map(b=>b.l), datasets: [ { label: 'Insured', data: incBuckets.map(b=>b.d.i_pct), backgroundColor: CHART.good }, { label: 'Uninsured', data: incBuckets.map(b=>b.d.u_pct), backgroundColor: CHART.bad } ] }, options: defaultOpts });
 
             // RACE CHART
             const races = [
@@ -2179,7 +2192,7 @@
                 { l: 'Native', t: getV('Total: American Indian and Alaska Native alone'), i: getV('Insured: American Indian and Alaska Native alone') }
             ].sort((a,b) => b.t - a.t);
             const raceInst = new Chart(document.getElementById(raceCanvasId), {
-                type: 'bar', data: { labels: races.map(r=>r.l), datasets: [ { label: 'Total Pop', data: races.map(r=>r.t), backgroundColor: '#2a3444', grouped: false, barPercentage: 0.85 }, { label: 'Insured Pop', data: races.map(r=>r.i), backgroundColor: '#58a6ff', grouped: false, barPercentage: 0.5 } ] },
+                type: 'bar', data: { labels: races.map(r=>r.l), datasets: [ { label: 'Total Pop', data: races.map(r=>r.t), backgroundColor: CHART.line, grouped: false, barPercentage: 0.85 }, { label: 'Insured Pop', data: races.map(r=>r.i), backgroundColor: CHART.a2, grouped: false, barPercentage: 0.5 } ] },
                 options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: {size: 9} } } }, scales: { x: { grid: { color: '#1e2836' }, ticks: {font: {size: 9}} }, y: { grid: { display: false }, ticks: {font: {size: 9}} } } }
             });
 

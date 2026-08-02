@@ -33,6 +33,22 @@
   status = 301
   force = true
 
+# map.html is the legacy sibling of index.html. It guards on a `map_session` and
+# redirects to /login.html, which does not exist on this site — so anyone with an
+# old link lands on a 404. Send them to the dashboard it was superseded by.
+[[redirects]]
+  from = "/map.html"
+  to = "/dashboard"
+  status = 301
+  force = true
+
+# Netlify serves 404.html automatically for unmatched paths; this makes the
+# behaviour explicit and covers deep paths under directories too.
+[[redirects]]
+  from = "/*"
+  to = "/404.html"
+  status = 404
+
 [functions."ai-query"]
   timeout = 26
 

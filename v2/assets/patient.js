@@ -55,13 +55,23 @@ var state = {
   replay: null,       // action to re-run after a mid-session re-auth
   documents: [],
   reviewing: null,    // {document_id, document_kind, facts[]}
+  persist: false,     // "stay signed in" -> localStorage instead of sessionStorage
   ctrl: null          // in-flight AbortController
 };
 
 /* ---------- session ------------------------------------------------------- */
+// The refresh token IS persisted, which is a deliberate trade-off. It is a
+// longer-lived credential sitting next to PHI, but Supabase rotates it on every
+// exchange (a stolen one is single-use and detectable), and the default store is
+// sessionStorage, which dies with the tab. localStorage is used only when the
+// patient explicitly ticks "stay signed in on this device".
 function saveSession(s, persist) {
   var raw = JSON.stringify(s);
-  try { (persist ? localStorage : sessionStorage).setItem(SESSION_KEY, raw); } catch (e) {}
+  try {
+    (persist ? localStorage : sessionStorage).setItem(SESSION_KEY, raw);
+    // Never leave a copy in the other store when the choice changes
+    (persist ? sessionStorage : localStorage).removeItem(SESSION_KEY);
+  } catch (e) {}
 }
 function loadSession() {
   var raw = null;
@@ -69,22 +79,64 @@ function loadSession() {
   if (!raw) return null;
   try {
     var s = JSON.parse(raw);
-    // 60s skew so we never send a token that dies in flight
-    if (!s.access_token || !s.expiresAt || s.expiresAt - 60000 < Date.now()) { clearSession(); return null; }
+    if (!s.access_token || !s.expiresAt) { clearSession(); return null; }
+    // An expired access token is recoverable now: if a refresh token came with
+    // it, keep the session and let doRefresh() revive it on load. Only discard
+    // when there is nothing left to refresh with.
+    if (s.expiresAt - 60000 < Date.now() && !s.refresh_token) { clearSession(); return null; }
+    state.persist = (localStorage.getItem(SESSION_KEY) !== null);
     return s;
   } catch (e) { clearSession(); return null; }
 }
 function clearSession() {
   try { sessionStorage.removeItem(SESSION_KEY); localStorage.removeItem(SESSION_KEY); } catch (e) {}
 }
-// Sign-out is client-side only: no auth-logout proxy exists, so the JWT stays
-// valid until it expires. An auth-logout.js mirroring auth-login.js would fix it.
+// Revoke server-side first, then clear locally. The local clear runs regardless
+// of whether the revoke succeeded — a user must always be able to sign out.
 function signOut() {
+  var had = state.session;
+  if (had) api('/auth-logout', { method: 'POST' }).catch(function () {});
   clearSession();
   state.session = null; state.profile = null; state.messages = [];
   state.results = []; state.documents = []; state.reviewing = null;
+  payerCache = {};
   location.hash = '';
   render();
+}
+
+// Exchange the refresh token before the access token dies, so a session does not
+// expire mid-conversation. Supabase ROTATES the refresh token on every exchange,
+// so whatever comes back must replace what we stored or the next refresh fails.
+var refreshTimer = null;
+var refreshing = null;
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  if (!state.session || !state.session.refresh_token) return;
+  var lead = 120000;   // two minutes before expiry
+  var due = state.session.expiresAt - Date.now() - lead;
+  refreshTimer = setTimeout(doRefresh, Math.max(due, 5000));
+}
+function doRefresh() {
+  if (!state.session || !state.session.refresh_token) return Promise.resolve(false);
+  if (refreshing) return refreshing;
+  refreshing = api('/auth-refresh', {
+    auth: false, method: 'POST', body: { refresh_token: state.session.refresh_token }
+  }).then(function (d) {
+    state.session = {
+      access_token: d.access_token,
+      refresh_token: d.refresh_token,
+      role: d.role || state.session.role,
+      expiresAt: Date.now() + (d.expires_in || 3600) * 1000
+    };
+    saveSession(state.session, state.persist);
+    scheduleRefresh();
+    refreshing = null;
+    return true;
+  }).catch(function () {
+    refreshing = null;
+    return false;   // caller falls back to the re-auth sheet
+  });
+  return refreshing;
 }
 
 /* ---------- API ----------------------------------------------------------- */
@@ -114,6 +166,18 @@ function api(path, opts) {
       // Four of the older functions return a bare string on 405, so never assume JSON
       try { data = text ? JSON.parse(text) : {}; } catch (e) { data = { error: text }; }
       if (res.status === 401 && opts.auth !== false) {
+        // One silent refresh-and-retry before surfacing anything to the patient.
+        // _retried guards against a loop when the refresh itself is what failed.
+        if (!opts._retried && state.session && state.session.refresh_token) {
+          return doRefresh().then(function (ok) {
+            if (!ok) {
+              state.session = null; clearSession();
+              throw new ApiError('Your session timed out.', 401, data);
+            }
+            opts._retried = true;
+            return api(path, opts);
+          });
+        }
         state.session = null; clearSession();
         throw new ApiError('Your session timed out.', 401, data);
       }
@@ -913,8 +977,15 @@ function gateEl(mode) {
     api('/auth-login', { auth: false, method: 'POST', body: { email: email.value, password: pass.value } })
       .then(function (d) {
         if (d.role !== 'patient') { fail('That\'s a provider account — use the provider page to sign in.'); return; }
-        state.session = { access_token: d.access_token, role: d.role, expiresAt: Date.now() + (d.expires_in || 3600) * 1000 };
-        saveSession(state.session, stay.checked);
+        state.session = {
+          access_token: d.access_token,
+          refresh_token: d.refresh_token,
+          role: d.role,
+          expiresAt: Date.now() + (d.expires_in || 3600) * 1000
+        };
+        state.persist = !!stay.checked;
+        saveSession(state.session, state.persist);
+        scheduleRefresh();
         return bootstrap().then(function () {
           var replay = state.replay; state.replay = null;
           render();
@@ -1040,7 +1111,15 @@ $('#zipPill').addEventListener('click', function () {
 });
 
 state.session = loadSession();
-if (state.session) bootstrap().then(render);
-else render();
+if (state.session) {
+  // A restored session may already be past expiry; refresh first so the patient
+  // is not bounced to the sign-in gate for a token we can silently renew.
+  var boot = (state.session.expiresAt - 60000 < Date.now())
+    ? doRefresh().then(function (ok) { if (!ok) { state.session = null; clearSession(); } })
+    : Promise.resolve(scheduleRefresh());
+  boot.then(function () { return state.session ? bootstrap() : null; }).then(render);
+} else {
+  render();
+}
 
 })();

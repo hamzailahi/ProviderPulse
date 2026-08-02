@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark light">
+<meta name="robots" content="noindex, nofollow">
+<title>ProviderPulse · Exclusion review</title>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/forms.css">
+<style>
+  .card { max-width: 860px; }
+  .qrow { border: 1px solid var(--hairline-2); border-radius: var(--r-md); padding: 16px; margin-bottom: 14px; background: var(--surface); }
+  .qhead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .qhead h3 { font-size: 16px; font-weight: 620; }
+  .qhead .npi { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .flag { font-size: 11px; color: var(--caution); margin-top: 6px; }
+  .ev { margin-top: 12px; border-top: 1px solid var(--hairline); padding-top: 10px; }
+  .ev h4 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 5px 8px; border-bottom: 1px solid var(--hairline); }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--hairline); color: var(--muted); }
+  td.m { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .acts { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .btn { padding: 8px 14px; border-radius: var(--r-sm); border: 1px solid var(--hairline-2); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+  .btn.ok { background: linear-gradient(135deg, var(--a1), var(--a2)); border-color: transparent; color: #fff; }
+  .btn.no { border-color: color-mix(in srgb, var(--danger) 45%, transparent); color: var(--danger); }
+  .btn:disabled { opacity: .5; cursor: wait; }
+  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; }
+</style>
+</head>
+<body>
+<div class="aurora" aria-hidden="true"></div>
+<div class="card">
+  <div class="brand"><h1>Exclusion review</h1></div>
+  <div class="eyebrow">Providers flagged by OIG name screening · hidden from patients until reviewed</div>
+
+  <form id="gate">
+    <label for="pw">Admin password</label>
+    <input id="pw" type="password" autocomplete="current-password">
+    <button class="submit" type="submit">Open queue</button>
+    <div class="msg" id="gateMsg" role="status" aria-live="polite"></div>
+  </form>
+
+  <div id="queue" class="panel hidden">
+    <div id="list"></div>
+    <div class="msg" id="qMsg" role="status" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+const FN = '/.netlify/functions';
+const $ = id => document.getElementById(id);
+let PW = '';
+
+// Values come from the database and from the LEIE file; build nodes, never
+// interpolate into innerHTML.
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const k in (attrs || {})) {
+    if (k === 'class') n.className = attrs[k];
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), attrs[k]);
+    else if (attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
+  }
+  kids.flat().forEach(c => { if (c !== null && c !== undefined && c !== false)
+    n.appendChild(c instanceof Node ? c : document.createTextNode(String(c))); });
+  return n;
+}
+
+$('gate').onsubmit = async e => {
+  e.preventDefault();
+  PW = $('pw').value;
+  $('gateMsg').className = 'msg'; $('gateMsg').textContent = 'Loading…';
+  try {
+    const r = await fetch(FN + '/admin-review?password=' + encodeURIComponent(PW));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Not authorised');
+    $('gate').classList.add('hidden');
+    $('queue').classList.remove('hidden');
+    paint(d);
+  } catch (err) {
+    $('gateMsg').className = 'msg err';
+    $('gateMsg').textContent = err.message;
+  }
+};
+
+function paint(d) {
+  const list = $('list');
+  list.textContent = '';
+  if (d.unavailable) {
+    list.appendChild(el('div', { class: 'empty' },
+      'Could not read the queue. The review_status column may not exist yet — run migration 004.'));
+    return;
+  }
+  if (!d.pending.length) {
+    list.appendChild(el('div', { class: 'empty' }, 'Nothing awaiting review. Every registered provider is visible to patients.'));
+    return;
+  }
+  d.pending.forEach(p => list.appendChild(row(p)));
+}
+
+function row(p) {
+  const name = p.entity_type === 2
+    ? (p.org_name || 'Organization')
+    : [p.first_name, p.last_name].filter(Boolean).join(' ');
+
+  const table = el('table', {},
+    el('tr', {},
+      ['Name on LEIE', 'Type', 'Specialty', 'City', 'Excluded', 'NPI'].map(t => el('th', {}, t))),
+    (p.matches || []).map(m => el('tr', {},
+      el('td', {}, m.business_name || [m.first_name, m.last_name].filter(Boolean).join(' ')),
+      el('td', {}, m.excl_type || '—'),
+      el('td', {}, m.specialty || m.general || '—'),
+      el('td', {}, [m.city, m.state].filter(Boolean).join(', ')),
+      el('td', { class: 'm' }, m.excl_date || '—'),
+      el('td', { class: 'm' }, m.npi || 'none'))));
+
+  const msg = el('div', { class: 'msg' });
+  const decide = async (action, btn) => {
+    const label = action === 'clear' ? 'publish this provider' : 'permanently block this provider';
+    if (!window.confirm('Are you sure you want to ' + label + '?')) return;
+    btn.disabled = true;
+    try {
+      const r = await fetch(FN + '/admin-review', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: PW, npi: p.npi, action })
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Failed');
+      msg.className = 'msg ok';
+      msg.textContent = action === 'clear' ? 'Cleared — now visible to patients.' : 'Blocked — stays hidden.';
+      wrap.querySelectorAll('.btn').forEach(b => b.disabled = true);
+    } catch (err) {
+      msg.className = 'msg err'; msg.textContent = err.message; btn.disabled = false;
+    }
+  };
+
+  const clearBtn = el('button', { class: 'btn ok', type: 'button' }, 'Not the same person — publish');
+  const blockBtn = el('button', { class: 'btn no', type: 'button' }, 'Confirmed match — block');
+  clearBtn.addEventListener('click', () => decide('clear', clearBtn));
+  blockBtn.addEventListener('click', () => decide('block', blockBtn));
+
+  const wrap = el('div', { class: 'qrow' },
+    el('div', { class: 'qhead' },
+      el('h3', {}, name),
+      el('span', { class: 'npi' }, 'NPI ' + p.npi),
+      el('span', { class: 'npi' }, [p.city, p.state, p.zip].filter(Boolean).join(', '))),
+    el('div', { class: 'flag' }, p.review_reason || 'Flagged by name screening'),
+    el('div', { class: 'ev' },
+      el('h4', {}, 'Matching OIG exclusion records — verify against oig.hhs.gov before deciding'),
+      (p.matches && p.matches.length) ? table
+        : el('div', { class: 'empty' }, 'No matching records found now. The list may have changed since they registered.')),
+    el('div', { class: 'acts' }, clearBtn, blockBtn),
+    msg);
+  return wrap;
+}
+</script>
+</body>
+</html>
