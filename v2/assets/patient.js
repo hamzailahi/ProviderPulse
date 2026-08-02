@@ -769,9 +769,19 @@ var CONDITIONS = [
   'Kidney disease', 'Pregnancy / prenatal', 'Pediatric care', 'Weight management',
   'Sleep disorders', 'Preventive care / checkup'
 ];
-var PAYERS = ['Medicare', 'Medicaid', 'Aetna', 'Anthem', 'Blue Cross Blue Shield', 'Cigna', 'Humana',
-  'Kaiser Permanente', 'Molina Healthcare', 'Oscar Health', 'TRICARE', 'UnitedHealthcare',
-  'WellCare', 'Ambetter', 'Uninsured / self-pay', 'Other'];
+// Insurance plans are loaded from /payers for the patient's own state, because
+// Medicaid is rebranded per state and Blue Cross is a federation of state
+// licensees. Providers pick from the same endpoint, which is what keeps
+// takes_your_insurance an exact match instead of fuzzy string comparison.
+var payerCache = {};          // state key -> [{name, local}]
+function loadPayers(zip) {
+  var key = zip || 'national';
+  if (payerCache[key]) return Promise.resolve(payerCache[key]);
+  var qs = /^\d{5}$/.test(String(zip || '')) ? '?zip=' + encodeURIComponent(zip) : '';
+  return api('/payers' + qs, { auth: false, timeout: 8000 })
+    .then(function (d) { payerCache[key] = d.payers || []; return payerCache[key]; })
+    .catch(function () { return []; });
+}
 
 function accountSheet() {
   var p = state.profile || {};
@@ -784,16 +794,46 @@ function accountSheet() {
   var fDesc  = h('textarea', { maxlength: '1000', 'aria-label': 'Describe your health concern' });
   fDesc.value = p.concern_description || '';
 
-  var known = PAYERS.indexOf(p.insurance_payer) !== -1;
   var fPayer = h('select', { 'aria-label': 'Insurance plan' },
-    h('option', { value: '' }, 'Select your insurance'),
-    PAYERS.map(function (x) {
-      var sel = known ? x === p.insurance_payer : (p.insurance_payer && x === 'Other');
-      return h('option', { value: x, selected: !!sel }, x);
-    }));
-  var fOther = h('input', { value: known ? '' : (p.insurance_payer || ''), placeholder: 'Name of your plan',
-    hidden: known || !p.insurance_payer, 'aria-label': 'Name of your plan', style: 'margin-top:8px' });
+    h('option', { value: '' }, 'Loading plans…'));
+  var fOther = h('input', { value: '', placeholder: 'Name of your plan',
+    hidden: true, 'aria-label': 'Name of your plan', style: 'margin-top:8px' });
   fPayer.addEventListener('change', function () { fOther.hidden = fPayer.value !== 'Other'; });
+
+  // Options depend on the patient's ZIP, so they arrive asynchronously. Any
+  // stored value the list doesn't contain (a plan since renamed, or free text
+  // from before this existed) is preserved via "Other" rather than dropped.
+  function paintPayers(list, zipUsed) {
+    clear(fPayer);
+    fPayer.appendChild(h('option', { value: '' }, 'Select your insurance'));
+    var local = list.filter(function (x) { return x.local; });
+    var national = list.filter(function (x) { return !x.local; });
+    var known = list.some(function (x) { return x.name === p.insurance_payer; });
+
+    function group(label, items) {
+      if (!items.length) return;
+      var g = h('optgroup', { label: label });
+      items.forEach(function (x) {
+        g.appendChild(h('option', { value: x.name, selected: x.name === p.insurance_payer }, x.name));
+      });
+      fPayer.appendChild(g);
+    }
+    group(zipUsed ? 'Plans in your area' : 'Plans', local);
+    group(local.length ? 'National carriers' : 'Plans', national);
+
+    if (!known && p.insurance_payer) {
+      fPayer.appendChild(h('option', { value: 'Other', selected: true }, 'Other'));
+      fOther.value = p.insurance_payer;
+      fOther.hidden = false;
+    }
+  }
+  loadPayers(p.zip).then(function (list) { paintPayers(list, !!p.zip); });
+  // Changing ZIP changes which plans are on offer
+  fZip.addEventListener('change', function () {
+    if (/^\d{5}$/.test(fZip.value.trim())) {
+      loadPayers(fZip.value.trim()).then(function (list) { paintPayers(list, true); });
+    }
+  });
 
   var boxes = CONDITIONS.map(function (c) {
     var cb = h('input', { type: 'checkbox', value: c, checked: !!mine[c] });

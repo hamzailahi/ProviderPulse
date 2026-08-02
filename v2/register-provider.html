@@ -85,15 +85,40 @@ const FN = '/.netlify/functions';
 const $ = id => document.getElementById(id);
 let session = null;
 
-// Standardized payer list
-const PAYERS = [
-  'Medicare', 'Medicaid', 'Aetna', 'Anthem',
-  'Blue Cross Blue Shield', 'Cigna', 'Humana', 'Kaiser Permanente',
-  'Molina Healthcare', 'Oscar Health', 'TRICARE', 'UnitedHealthcare',
-  'WellCare', 'Ambetter', 'Self-pay accepted'
-];
-$('insChecks').innerHTML = PAYERS.map(p =>
-  `<label><input type="checkbox" value="${p}">${p}</label>`).join('');
+// Payers come from /payers, the SAME endpoint the patient app uses. This is
+// load-bearing: patient-match compares a patient's stored payer against this
+// provider's list by exact string, so if the two forms ever drew from different
+// vocabularies, every insurance match would silently fail.
+// The list is state-specific (TennCare, Arkansas Blue Cross, Triple-S ...), so it
+// reloads when the practice ZIP changes.
+let PAYERS = [];
+const escAttr = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+function paintPayers(list) {
+  const checked = new Set(
+    [...document.querySelectorAll('#insChecks input:checked')].map(c => c.value));
+  PAYERS = list.map(x => x.name);
+  const group = (label, items) => items.length
+    ? `<div class="grouplabel" style="grid-column:1/-1;margin:6px 0 2px">${escAttr(label)}</div>` +
+      items.map(x =>
+        `<label><input type="checkbox" value="${escAttr(x.name)}"${checked.has(x.name) ? ' checked' : ''}>${escAttr(x.name)}</label>`
+      ).join('')
+    : '';
+  $('insChecks').innerHTML =
+    group('Plans in your state', list.filter(x => x.local)) +
+    group('National carriers', list.filter(x => !x.local));
+}
+
+function loadPayers(zip) {
+  const qs = /^\d{5}$/.test(String(zip || '')) ? '?zip=' + encodeURIComponent(zip) : '';
+  return fetch(FN + '/payers' + qs)
+    .then(r => r.json())
+    .then(d => paintPayers(d.payers || []))
+    .catch(() => {});
+}
+loadPayers('');
+// The practice ZIP decides which state's plans are on offer
+$('pZip').addEventListener('change', () => loadPayers($('pZip').value.trim()));
 
 function selectedPayers() {
   const checked = [...document.querySelectorAll('#insChecks input:checked')].map(c => c.value);
@@ -175,6 +200,10 @@ async function loadAccount() {
   $('formLogin').classList.add('hidden');
   $('account').classList.remove('hidden');
   const mine = new Set((insurance || []).map(i => i.payer_name));
+  // The plan list is state-specific and loads asynchronously, so fetch this
+  // provider's own state before rendering the checkboxes — otherwise PAYERS is
+  // still empty and every plan they already accept lands in the free-text box.
+  await loadPayers(p.zip || '');
   $('acctBody').innerHTML = `
     <label>NPI</label><input value="${p.npi || ''}" disabled>
     <label for="aPhone">Phone</label><input id="aPhone" value="${p.phone || ''}">
