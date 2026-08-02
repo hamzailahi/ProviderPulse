@@ -423,6 +423,24 @@ function badgesFor(p) {
   return out;
 }
 
+// Collapse the week into something readable on a card: consecutive days that
+// share the same times are grouped ("Mon–Thu 9:00–17:00").
+function summariseHours(h) {
+  var order = [['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat'],['sun','Sun']];
+  var out = [], run = null;
+  order.forEach(function (d) {
+    var v = h && h[d[0]];
+    var key = v ? v.open + '-' + v.close : null;
+    if (run && run.key === key && key) { run.end = d[1]; return; }
+    if (run && run.key) out.push(run);
+    run = key ? { key: key, start: d[1], end: d[1], open: v.open, close: v.close } : null;
+  });
+  if (run && run.key) out.push(run);
+  return out.map(function (r) {
+    return (r.start === r.end ? r.start : r.start + '–' + r.end) + ' ' + r.open + '–' + r.close;
+  }).join(' · ') || 'Not listed';
+}
+
 function providerCard(p, i) {
   var acts = [];
   // Actions are hidden when the data is missing rather than shown disabled:
@@ -444,6 +462,8 @@ function providerCard(p, i) {
       ? h('div', { class: 'payers' }, 'Accepts: ', h('b', {}, p.payers.slice(0, 8).join(', ')),
           p.payers.length > 8 ? ' +' + (p.payers.length - 8) + ' more' : null)
       : null,
+    // "Is it open?" is the most common reason finding a doctor still fails
+    p.office_hours ? h('div', { class: 'payers' }, 'Hours: ', h('b', {}, summariseHours(p.office_hours))) : null,
     h('div', { class: 'addr' },
       p.address ? p.address + ', ' : '',
       [p.city, p.state].filter(Boolean).join(', '), ' ',

@@ -18,7 +18,11 @@ const CORS = {
 };
 
 // Safe to publish. `id` is deliberately absent: it is the auth user id.
-const PUBLIC_COLUMNS = 'npi,npi_verified,accepting_new_patients,telehealth,bio,org_name,first_name,last_name,city,state,zip,phone,taxonomy_desc';
+const PUBLIC_COLUMNS = 'npi,npi_verified,accepting_new_patients,telehealth,bio,org_name,first_name,last_name,city,state,zip,phone,taxonomy_desc,office_hours,hours_note,booking_mode,booking_url';
+// Availability columns arrive with migration 005. Until it runs, selecting them
+// 400s and would take the whole endpoint down with it — including the verified
+// badge, which already works. Fall back to the columns that definitely exist.
+const BASE_COLUMNS = 'npi,npi_verified,accepting_new_patients,telehealth,bio,org_name,first_name,last_name,city,state,zip,phone,taxonomy_desc';
 
 const MAX_NPIS = 80;
 
@@ -63,6 +67,14 @@ exports.handler = async (event) => {
     if (!profRes.ok) {
       profRes = await fetch(
         `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&select=${PUBLIC_COLUMNS}`,
+        { headers: svc, signal: AbortSignal.timeout(6000) }
+      );
+    }
+    // Neither worked: retry without the availability columns, in case migration
+    // 005 has not been applied yet.
+    if (!profRes.ok) {
+      profRes = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&select=${BASE_COLUMNS}`,
         { headers: svc, signal: AbortSignal.timeout(6000) }
       );
     }
@@ -114,6 +126,10 @@ exports.handler = async (event) => {
         phone: r.phone || null,
         specialty: r.taxonomy_desc || null,
         bio: r.bio || null,
+        office_hours: r.office_hours || null,
+        hours_note: r.hours_note || null,
+        booking_mode: r.booking_mode || 'phone',
+        booking_url: r.booking_url || null,
         payers: payersByNpi[r.npi] || []
       };
     }

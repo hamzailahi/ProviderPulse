@@ -12,7 +12,9 @@ const CORS = {
   'Content-Type': 'application/json'
 };
 
-const PROVIDER_FIELDS = ['phone', 'address_line', 'city', 'state', 'zip', 'accepting_new_patients', 'telehealth', 'bio', 'org_name'];
+const PROVIDER_FIELDS = ['phone', 'address_line', 'city', 'state', 'zip', 'accepting_new_patients', 'telehealth', 'bio', 'org_name',
+  // availability (migration 005) — a provider controls their own hours
+  'office_hours', 'appointment_minutes', 'booking_mode', 'booking_url', 'hours_note'];
 const PATIENT_FIELDS = ['first_name', 'last_name', 'date_of_birth', 'zip', 'insurance_payer', 'conditions', 'concern_description'];
 
 function pick(obj, keys) {

@@ -241,12 +241,43 @@ async function loadAccount() {
       <div><label style="margin-top:0" for="aState">State</label><input id="aState" maxlength="2" value="${p.state || ''}"></div>
       <div><label style="margin-top:0" for="aZip">ZIP</label><input id="aZip" value="${p.zip || ''}"></div>
     </div>
-    <label for="aBio">About the practice</label><textarea id="aBio" rows="3">${p.bio || ''}</textarea>
+    <label for="aBio">About the practice</label><textarea id="aBio" rows="3">${escAttr(p.bio || '')}</textarea>
+    <div class="grouplabel">Opening hours</div>
+    <div class="hint" style="margin:-2px 0 8px">Patients see these on your listing. Leave a day blank if you're closed.</div>
+    <div id="aHours"></div>
+    <label for="aHoursNote">Hours note <span style="text-transform:none;letter-spacing:0">(optional)</span></label>
+    <input id="aHoursNote" placeholder="e.g. Closed 12–1 daily" value="${escAttr(p.hours_note || '')}">
     <div class="grouplabel">Insurance accepted</div>
     <div class="checks" id="aChecks">${PAYERS.map(x =>
       `<label><input type="checkbox" value="${x}" ${mine.has(x) ? 'checked' : ''}>${x}</label>`).join('')}</div>
     <input id="aInsOther" placeholder="Other payers, comma separated" style="margin-top:10px"
       value="${[...mine].filter(x => !PAYERS.includes(x)).join(', ')}">`;
+  // --- OPENING HOURS -------------------------------------------------------
+  // Stored as {"mon":{"open":"09:00","close":"17:00"}, ...}; a missing day means
+  // closed. Times are local to the practice — the ZIP on the row resolves that.
+  const DAYS = [['mon','Monday'],['tue','Tuesday'],['wed','Wednesday'],['thu','Thursday'],
+                ['fri','Friday'],['sat','Saturday'],['sun','Sunday']];
+  const hrs = (p.office_hours && typeof p.office_hours === 'object') ? p.office_hours : {};
+  $('aHours').innerHTML = DAYS.map(([k, label]) => {
+    const d = hrs[k] || {};
+    return `<div style="display:grid;grid-template-columns:88px 1fr 1fr;gap:8px;align-items:center;margin-bottom:6px">
+      <span style="font-size:12.5px;color:var(--muted)">${label}</span>
+      <input type="time" data-day="${k}" data-part="open"  value="${escAttr(d.open || '')}" aria-label="${label} opening time">
+      <input type="time" data-day="${k}" data-part="close" value="${escAttr(d.close || '')}" aria-label="${label} closing time">
+    </div>`;
+  }).join('');
+
+  function collectHours() {
+    const out = {};
+    DAYS.forEach(([k]) => {
+      const o = document.querySelector(`#aHours input[data-day="${k}"][data-part="open"]`).value;
+      const c = document.querySelector(`#aHours input[data-day="${k}"][data-part="close"]`).value;
+      // Both ends required — a half-filled row would render as nonsense to a patient
+      if (o && c) out[k] = { open: o, close: c };
+    });
+    return Object.keys(out).length ? out : null;
+  }
+
   $('acctSave').onclick = async () => {
     const checked = [...document.querySelectorAll('#aChecks input:checked')].map(c => c.value);
     const other = $('aInsOther').value.split(',').map(s => s.trim()).filter(Boolean);
@@ -260,6 +291,8 @@ async function loadAccount() {
         state: $('aState').value.toUpperCase(),
         zip: $('aZip').value,
         bio: $('aBio').value,
+        office_hours: collectHours(),
+        hours_note: $('aHoursNote').value.trim(),
         insurances: [...checked, ...other]
       })
     });

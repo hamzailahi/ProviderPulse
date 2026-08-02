@@ -1207,6 +1207,14 @@
                     p.payers.slice(0, 8).map(x => String(x).replace(/</g, '&lt;')).join(', ')
                 }${p.payers.length > 8 ? ` +${p.payers.length - 8} more` : ''}</span></div>`;
             }
+            if (p.office_hours) {
+                var DAY = [['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat'],['sun','Sun']];
+                var open = DAY.filter(function (d) { return p.office_hours[d[0]]; })
+                    .map(function (d) { return d[1] + ' ' + p.office_hours[d[0]].open + '–' + p.office_hours[d[0]].close; });
+                if (open.length) html += '<div style="margin-top:5px;font-size:10px;color:var(--text-secondary);">Hours: <span style="color:var(--text-primary)">' +
+                    open.slice(0, 3).join(' · ').replace(/</g, '&lt;') + (open.length > 3 ? ' …' : '') + '</span></div>';
+            }
+            if (p.hours_note) html += `<div style="margin-top:3px;font-size:10px;color:var(--text-muted);">${String(p.hours_note).slice(0,90).replace(/</g,'&lt;')}</div>`;
             if (p.bio) html += `<div style="margin-top:4px;font-size:10px;color:var(--text-secondary);">${String(p.bio).slice(0, 220).replace(/</g, '&lt;')}</div>`;
             html += '</div>';
             return html;
@@ -3392,6 +3400,43 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
             }
         });
     
+        /* ====================================================================
+           ROLE-AWARE ENTRY
+           The dashboard is the analyst/provider surface. It previously had no
+           auth check at all, so a signed-in patient landing here got a market
+           tool instead of their own app.
+
+           The deep-link exception matters: the care navigator sends patients
+           here with #zip=/#pin=/#goto= to see their results on the map. Those
+           must keep working for everyone, so the redirect only fires when a
+           patient arrives with no deep link — i.e. they navigated here by hand.
+           ==================================================================== */
+        (function roleAwareEntry() {
+            var hash = location.hash || '';
+            var deepLink = /^#(zip|pin|goto)=/.test(hash);
+            if (deepLink) return;
+
+            var s = null;
+            try {
+                s = JSON.parse(sessionStorage.getItem('pp.patient.v1')
+                    || localStorage.getItem('pp.patient.v1') || 'null');
+            } catch (e) { return; }
+            if (!s || !s.role || (s.expiresAt && s.expiresAt < Date.now())) return;
+
+            if (s.role === 'patient') { location.replace('/'); return; }
+
+            if (s.role === 'provider') {
+                // Signed-in provider: say so, and give them a way back to their listing.
+                var right = document.querySelector('#topbar-v2 .right');
+                if (!right) return;
+                var a = document.createElement('a');
+                a.href = 'register-provider.html';
+                a.textContent = 'Your listing';
+                a.style.cssText = 'font-size:11px;color:var(--a1);text-decoration:none;margin-left:12px';
+                right.appendChild(a);
+            }
+        })();
+
         /* ====================================================================
            REDESIGN WIRING
            Kept in one block at the end so it can be read (or reverted) as a
