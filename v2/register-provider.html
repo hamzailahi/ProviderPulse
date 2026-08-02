@@ -94,7 +94,21 @@
 <script>
 const FN = '/.netlify/functions';
 const $ = id => document.getElementById(id);
-let session = null;
+const SESSION_KEY = 'pp.session.v1';
+
+// Restore on load. Without this the session lived only in this variable, so a
+// refresh — or arriving here from the dashboard's "Your listing" link — looked
+// like a signed-out visitor even though the sign-in was still valid.
+let session = (function () {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+    const s = raw ? JSON.parse(raw) : null;
+    if (!s || !s.access_token) return null;
+    if (s.expiresAt && s.expiresAt < Date.now()) return null;   // expired: sign in again
+    if (s.role && s.role !== 'provider') return null;           // patient session: not this page
+    return s;
+  } catch (e) { return null; }
+})();
 
 // Payers come from /payers, the SAME endpoint the patient app uses. This is
 // load-bearing: patient-match compares a patient's stored payer against this
@@ -188,6 +202,9 @@ $('formRegister').onsubmit = async e => {
   busy(e.target, false);
 };
 
+// A restored session should land straight on the account panel.
+if (session) loadAccount();
+
 $('formLogin').onsubmit = async e => {
   e.preventDefault(); busy(e.target, true);
   const r = await fetch(FN + '/auth-login', {
@@ -229,7 +246,15 @@ $('acctSignOut').onclick = async () => {
 };
 
 async function loadAccount() {
+  if (!session) return;
   const r = await fetch(FN + '/profile', { headers: { Authorization: 'Bearer ' + session.access_token } });
+  if (r.status === 401) {
+    // Restored a token the server no longer accepts. Drop it and show the
+    // sign-in form rather than leaving a half-loaded account panel.
+    session = null;
+    try { sessionStorage.removeItem(SESSION_KEY); localStorage.removeItem(SESSION_KEY); } catch (e) {}
+    return;
+  }
   if (!r.ok) return setMsg('lMsg', 'Could not load profile', false);
   const { profile, insurance } = await r.json();
   const p = profile || {};
