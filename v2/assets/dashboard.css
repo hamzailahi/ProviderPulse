@@ -487,3 +487,188 @@ input[type="file"]::-webkit-file-upload-button {
   #sheet-toggle-btn { display: none !important; }
   #sheet-drag-pill { display: none; }
 }
+
+/* ============================================================================
+   REDESIGN — full-bleed map with floating glass panels.
+   Appended deliberately so it overrides the block above without editing it: the
+   DOM barely changed, so the page's ~2,990 lines of JS keep working untouched.
+   ============================================================================ */
+
+/* The icon rail is gone. Reports moved into the panel tabs and Ask AI became
+   the command bar over the map, so it duplicated both. */
+#icon-rail { display: none !important; }
+
+/* ---- topbar: surface switcher + the unified omnibar ---- */
+#surface-switch {
+  display: flex; gap: 2px; padding: 3px; border-radius: var(--r-pill);
+  background: var(--surface); border: 1px solid var(--hairline); font-size: 12px;
+}
+#surface-switch a, #surface-switch .active {
+  padding: 5px 14px; border-radius: var(--r-pill); text-decoration: none;
+  color: var(--muted); white-space: nowrap; transition: color var(--dur) var(--ease);
+}
+#surface-switch a:hover { color: var(--text); }
+#surface-switch .active {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--a1) 26%, transparent),
+                                      color-mix(in srgb, var(--a2) 26%, transparent));
+  border: 1px solid color-mix(in srgb, var(--a1) 36%, transparent);
+  color: var(--text); font-weight: 620; margin: -1px;
+}
+#omnibar-slot { flex: 1; display: flex; justify-content: center; min-width: 0; }
+
+/* JS relocates #omnibar-row into the slot; strip the chrome it had as a row */
+#topbar-v2 #omnibar-row {
+  height: auto; border: 0; background: none; backdrop-filter: none;
+  padding: 0; flex: 1; max-width: 640px; min-width: 0;
+}
+
+/* ---- map stage: everything floats over it ---- */
+#app-body-v2, #map-column, #main-area { position: relative; }
+#map-container { position: absolute; inset: 0; width: 100% !important; }
+
+#filter-rail, #sidebar {
+  position: absolute; z-index: 500;
+  background: color-mix(in srgb, var(--ground) 84%, transparent);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--hairline-2);
+  box-shadow: 0 18px 50px rgba(0,0,0,.45);
+}
+#filter-rail {
+  left: 16px; top: 16px; width: 276px; max-height: calc(100% - 32px);
+  border-radius: var(--r-lg); padding: 16px; overflow-y: auto;
+  display: none; flex-direction: column; gap: 14px;
+}
+#filter-rail.open { display: flex; }
+#sidebar {
+  right: 16px; top: 16px; bottom: 16px; width: 416px !important;
+  border-radius: var(--r-lg); overflow: hidden; border-left: 1px solid var(--hairline-2);
+}
+#handle-right, .width-badge { display: none !important; }
+
+/* ---- legend: a chip, not a column of 19 swatches ---- */
+.legend-toggle { display: none; }
+#legend-section {
+  position: absolute; left: 16px; bottom: 108px; z-index: 501;
+  width: 248px; max-height: 260px; overflow-y: auto;
+  border-radius: var(--r-md); padding: 12px 14px; border-bottom: 0;
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  backdrop-filter: blur(16px); border: 1px solid var(--hairline-2);
+}
+#legend-section.collapsed { display: none; }
+
+#legend-chip {
+  position: absolute; left: 16px; bottom: 66px; z-index: 501;
+  display: flex; align-items: center; gap: 9px; padding: 8px 13px;
+  border-radius: var(--r-pill); cursor: pointer; font: inherit; font-size: 11.5px;
+  color: var(--muted); background: color-mix(in srgb, var(--ground) 84%, transparent);
+  backdrop-filter: blur(14px); border: 1px solid var(--hairline-2);
+}
+#legend-chip:hover { color: var(--text); }
+#legend-chip-dots { display: inline-flex; gap: 4px; }
+#legend-chip-dots i { width: 8px; height: 8px; border-radius: 50%; display: block; }
+
+/* ---- compare tray ---- */
+#compare-tray {
+  position: absolute; left: 16px; bottom: 16px; z-index: 501;
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border-radius: var(--r-md); font-size: 12px;
+  background: color-mix(in srgb, var(--ground) 84%, transparent);
+  backdrop-filter: blur(14px); border: 1px solid var(--hairline-2);
+}
+#compare-tray .ct-label { font: 700 10px var(--mono); letter-spacing: .12em; color: var(--faint); }
+#compare-chips { display: flex; gap: 6px; }
+#compare-chips .cc {
+  padding: 4px 10px; border-radius: 7px; font: 600 11.5px var(--mono); cursor: pointer;
+  background: var(--surface); border: 1px solid var(--hairline); color: var(--muted);
+}
+#compare-chips .cc.on {
+  background: color-mix(in srgb, var(--a1) 16%, transparent);
+  border-color: color-mix(in srgb, var(--a1) 34%, transparent); color: var(--a1);
+}
+#compare-add {
+  padding: 4px 10px; border-radius: 7px; font: inherit; font-size: 11.5px; cursor: pointer;
+  background: none; border: 1px dashed var(--hairline-2); color: var(--faint);
+}
+#compare-add:hover, #compare-add.armed { color: var(--a1); border-color: var(--a1); }
+
+/* ---- AI as the headline interaction, not tab five ---- */
+#ai-command {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 501;
+  display: flex; align-items: center; gap: 12px;
+  width: clamp(320px, calc(100% - 780px), 520px);
+  padding: 12px 15px; border-radius: var(--r-md); cursor: pointer; text-align: left;
+  font: inherit; color: var(--muted);
+  background: color-mix(in srgb, var(--ground) 88%, transparent); backdrop-filter: blur(18px);
+  border: 1px solid color-mix(in srgb, var(--a1) 34%, transparent);
+  box-shadow: 0 8px 40px color-mix(in srgb, var(--a1) 14%, transparent),
+              0 8px 40px color-mix(in srgb, var(--a2) 14%, transparent);
+}
+#ai-command:hover { color: var(--text); }
+#ai-command .ai-mark {
+  width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px; display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff; font-size: 13px;
+  animation: aipulse 3s var(--ease) infinite;
+}
+@keyframes aipulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
+#ai-command .ai-ph { flex: 1; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#ai-command kbd {
+  font: 11px var(--mono); padding: 2px 6px; border-radius: 5px;
+  border: 1px solid var(--hairline-2); color: var(--faint);
+}
+
+/* ---- verdict card: the answer, above the numbers ---- */
+#verdict-card {
+  margin: 0 12px 12px; padding: 15px; border-radius: var(--r-md);
+  display: flex; gap: 15px; align-items: center;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--a1) 13%, transparent),
+                                      color-mix(in srgb, var(--a2) 13%, transparent));
+  border: 1px solid color-mix(in srgb, var(--a1) 30%, transparent);
+}
+#verdict-card[hidden] { display: none; }
+#verdict-card .ring { position: relative; width: 74px; height: 74px; flex-shrink: 0; }
+#verdict-card .ring > span {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+#verdict-card .vscore { font: 800 21px var(--mono); color: var(--a1); font-variant-numeric: tabular-nums; }
+#verdict-card .vcap { font-size: 7.5px; letter-spacing: .1em; color: var(--muted); }
+#verdict-card .vbody { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+#verdict-card .vlabel {
+  align-self: flex-start; padding: 3px 9px; border-radius: 6px;
+  font: 700 10px var(--mono); letter-spacing: .09em;
+}
+#verdict-card .vlabel.under    { background: color-mix(in srgb, var(--good) 18%, transparent);    color: var(--good); }
+#verdict-card .vlabel.balanced { background: color-mix(in srgb, var(--caution) 18%, transparent); color: var(--caution); }
+#verdict-card .vlabel.served   { background: var(--surface-2); color: var(--muted); }
+#verdict-card .vfind { font-size: 12.5px; line-height: 1.45; color: var(--text); }
+#verdict-card .vfind b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+#verdict-card .vsrc { font-size: 9.5px; color: var(--faint); }
+
+/* ---- KPI deltas: no naked numbers ---- */
+.kpi-delta { font: 600 10.5px var(--mono); }
+.kpi-delta.up   { color: var(--good); }
+.kpi-delta.down { color: var(--caution); }
+.kpi-delta.flat { color: var(--muted); }
+
+/* ---- cluster markers ---- */
+.pp-cluster {
+  border-radius: 50%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; color: #04211d; font-weight: 800;
+  background: radial-gradient(circle, color-mix(in srgb, var(--a1) 92%, transparent),
+                                      color-mix(in srgb, var(--a2) 78%, transparent));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--a1) 45%, transparent);
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+}
+.pp-cluster small { font-size: 8.5px; font-weight: 700; letter-spacing: .08em; }
+
+@media (max-width: 1200px) { #sidebar { width: 380px !important; } }
+@media (max-width: 768px) {
+  #surface-switch, #omnibar-slot { display: none; }
+  #filter-rail { display: none !important; }
+  #legend-chip, #compare-tray, #legend-section { display: none !important; }
+  #sidebar {
+    left: 0; right: 0; bottom: 0; top: auto; width: 100% !important;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+  #ai-command { bottom: 76px; width: calc(100% - 32px); }
+}

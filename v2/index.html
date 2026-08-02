@@ -6,6 +6,7 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="assets/taxonomy-groups.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
@@ -22,7 +23,14 @@
             <div class="logo-text">ProviderPulse</div>
         </div>
         <div class="divider"></div>
-        <div class="subtitle">Market Strategy</div>
+        <!-- Surface switcher: the "one product" nav. Makes the two-sided nature
+             visible instead of each surface pretending to be the whole thing. -->
+        <nav id="surface-switch" aria-label="Switch product area">
+            <a href="/">Find care</a>
+            <a href="/register-provider.html">For providers</a>
+            <span class="active" aria-current="page">Market Strategy</span>
+        </nav>
+        <div id="omnibar-slot"></div>
         <div class="right">
             <span id="sessionInfo" style="font-size:10px;color:var(--text-muted);"></span>
             <!-- Patients arrive here from the care navigator's map link; give them
@@ -116,6 +124,28 @@
                            procedure volumes that surround them.</p>
                     </div>
                     <div id="map"></div>
+
+                    <!-- Collapsed legend. The full 6-group legend lives in
+                         #legend-section; this chip keeps it off the panel. -->
+                    <button id="legend-chip" type="button" onclick="toggleLegend()" hidden>
+                        <span id="legend-chip-dots"></span>
+                        <span id="legend-chip-label">6 specialty groups</span>
+                        <span class="chev">▾</span>
+                    </button>
+
+                    <!-- Compare tray: holds ZIPs for side-by-side territory work -->
+                    <div id="compare-tray" hidden>
+                        <span class="ct-label">COMPARE</span>
+                        <span id="compare-chips"></span>
+                        <button type="button" id="compare-add" onclick="armCompareAdd()">+ add</button>
+                    </div>
+
+                    <!-- AI as the primary entry point, not a buried tab -->
+                    <button id="ai-command" type="button" onclick="switchTab('ai')">
+                        <span class="ai-mark">✦</span>
+                        <span class="ai-ph">Ask this market anything — “where should a cardiology clinic open?”</span>
+                        <kbd>⌘K</kbd>
+                    </button>
                 </div>
 
                 <div class="resize-handle" id="handle-right"></div>
@@ -132,6 +162,10 @@
                             <option value="ai">🤖 AI</option>
                         </select>
                     </div>
+
+                    <!-- Verdict first: the answer before the raw numbers.
+                         Filled from /market-score; hidden until a ZIP is chosen. -->
+                    <div id="verdict-card" hidden></div>
 
                     <div id="tab-bar-v2">
                         <button class="tab-btn-v2 active" data-tab="demographics" onclick="switchTab('demographics')">Demographics</button>
@@ -793,10 +827,29 @@
             });
 
             const taxArray = Array.from(taxonomies).sort();
-            taxArray.forEach((t, i) => taxonomyColors[t] = getColor(i, taxArray.length));
+            // Colour by specialty GROUP, not by individual taxonomy. Nineteen
+            // generated hues produced four near-identical greens and an
+            // unreadable legend; six fixed group colours are tellable apart.
+            taxArray.forEach((t, i) => {
+                taxonomyColors[t] = (window.TaxonomyGroups && TaxonomyGroups.colorFor(t)) || getColor(i, taxArray.length);
+            });
             selectedTaxonomies = new Set(taxArray);
             
             buildTaxDropdown(taxArray); updateLegend();
+
+            // Six colour groups replace the 19-swatch legend; the chip keeps it
+            // off the panel entirely. Clustering loads lazily on first search.
+            paintLegendChip();
+            ensureClusterLib().then(function (ok) {
+                if (!ok || window.clusterLayer) { renderMap(); return; }
+                window.clusterLayer = L.markerClusterGroup({
+                    iconCreateFunction: clusterIcon,
+                    showCoverageOnHover: false,
+                    maxClusterRadius: 55,
+                    disableClusteringAtZoom: 15
+                }).addTo(map);
+                renderMap();
+            });
             
             // --- DATA-DRIVEN BOUNDARY LOADING ---
             // Clears any old states/polygons to ensure clean slate if hot-swapping files
@@ -1156,7 +1209,11 @@
 
         // --- MAP RENDER & MULTI-TAXONOMY PINS ---
         function renderMap() {
-            markers.forEach(m => map.removeLayer(m)); markers = []; currentlyVisiblePractices = [];
+            // Markers live in a cluster layer when markercluster is available.
+            // 1,500 individually-placed pins stacked into an unreadable column;
+            // clustering is the single biggest legibility win on this screen.
+            if (window.clusterLayer) { clusterLayer.clearLayers(); }
+            markers.forEach(m => { try { map.removeLayer(m); } catch (e) {} }); markers = []; currentlyVisiblePractices = [];
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
             // Check if search term matches a county name, get its bounds for spatial filter
@@ -1257,8 +1314,8 @@
                     icon: L.divIcon({ className: 'multi-tax-icon', html: iconHtml, iconSize: [dotSize, dotSize], iconAnchor: [dotSize / 2, dotSize / 2] })
                 })
                 .bindTooltip(items.length === 1 ? items[0].practice['Name'] : `${items.length} Providers Here`, { direction: 'top', offset: [0, -8], opacity: 0.9 })
-                .bindPopup(popupHtml, { maxWidth: 280 })
-                .addTo(map);
+                .bindPopup(popupHtml, { maxWidth: 280 });
+                if (!window.clusterLayer) marker.addTo(map);
 
                 // Fetch NPPES data when popup opens
                 marker.on('popupopen', () => {
@@ -1270,6 +1327,7 @@
                     });
                 });
 
+                if (window.clusterLayer) clusterLayer.addLayer(marker); else marker.addTo(map);
                 markers.push(marker);
             }
 
@@ -1642,7 +1700,12 @@
 
                 // Rebuild taxonomy colors to include any new taxonomies from neighbors
                 const taxArray = Array.from(taxonomies).sort();
-                taxArray.forEach((t, i) => taxonomyColors[t] = getColor(i, taxArray.length));
+                // Colour by specialty GROUP, not by individual taxonomy. Nineteen
+            // generated hues produced four near-identical greens and an
+            // unreadable legend; six fixed group colours are tellable apart.
+            taxArray.forEach((t, i) => {
+                taxonomyColors[t] = (window.TaxonomyGroups && TaxonomyGroups.colorFor(t)) || getColor(i, taxArray.length);
+            });
                 selectedTaxonomies = new Set(taxArray);
                 updateLegend();
 
@@ -2122,6 +2185,11 @@
             document.getElementById('kpi-hh').textContent = totalHH >= 10000 ? (totalHH/1000).toFixed(1)+'k' : totalHH.toLocaleString();
 
             dashCharts = drawDashboardCharts(r, 'rawAgeChart', 'rawIncomeChart', 'ageChart', 'incomeChart', 'raceChart', dashCharts);
+
+            // Lead with the verdict for whichever ZIP this panel is showing
+            var vz = (lockedZip || (r['ZIP Code'] || r['zip'] || '')).toString().padStart(5, '0');
+            renderVerdict(vz);
+            if (compareArmed) addCompareZip(vz);
         }
 
         function drawDashboardCharts(r, rawAgeCanvasId, rawIncCanvasId, ageCanvasId, incCanvasId, raceCanvasId, existingInsts) {
@@ -2638,6 +2706,7 @@
                         <span style="color:var(--text-muted);font-size:10px;">NPI: ${p.npi || '—'}</span>
                     </div>`, { maxWidth: 260 })
                     .addTo(map);
+                if (window.clusterLayer) clusterLayer.addLayer(marker); else marker.addTo(map);
                 markers.push(marker);
             });
         }
@@ -3294,6 +3363,165 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
                 sendAIQuery();
             }
         });
+    
+        /* ====================================================================
+           REDESIGN WIRING
+           Kept in one block at the end so it can be read (or reverted) as a
+           unit. It only adds behaviour — no existing function is replaced.
+           ==================================================================== */
+
+        // 1. Relocate the omnibar into the topbar. Doing this in JS rather than
+        //    moving the markup keeps every existing #controls / #dbSearchInput
+        //    reference valid, and leaves the row intact if this block ever fails.
+        (function mountOmnibar() {
+            var slot = document.getElementById('omnibar-slot');
+            var row  = document.getElementById('omnibar-row');
+            if (slot && row) slot.appendChild(row);
+        })();
+
+        // 2. Legend chip — shows the six group colours, toggles the full legend.
+        function paintLegendChip() {
+            var dots = document.getElementById('legend-chip-dots');
+            var chip = document.getElementById('legend-chip');
+            if (!dots || !chip || !window.TaxonomyGroups) return;
+            dots.innerHTML = '';
+            TaxonomyGroups.list.forEach(function (g) {
+                var i = document.createElement('i');
+                i.style.background = g.color;
+                i.title = g.name;
+                dots.appendChild(i);
+            });
+            chip.hidden = false;
+            var sec = document.getElementById('legend-section');
+            if (sec) sec.classList.add('collapsed');   // start collapsed
+        }
+
+        // 3. Compare tray — holds ZIPs for territory comparison.
+        var compareZips = [];
+        var compareArmed = false;
+        function armCompareAdd() {
+            compareArmed = !compareArmed;
+            var b = document.getElementById('compare-add');
+            if (b) b.classList.toggle('armed', compareArmed);
+            if (compareArmed) {
+                var st = document.getElementById('dbStatus');
+                if (st) st.textContent = 'Click a ZIP on the map to add it to the comparison';
+            }
+        }
+        function addCompareZip(zip) {
+            if (!/^\d{5}$/.test(String(zip || ''))) return;
+            if (compareZips.indexOf(zip) === -1) compareZips.push(zip);
+            if (compareZips.length > 4) compareZips.shift();
+            compareArmed = false;
+            var b = document.getElementById('compare-add');
+            if (b) b.classList.remove('armed');
+            paintCompare();
+        }
+        function paintCompare() {
+            var tray = document.getElementById('compare-tray');
+            var wrap = document.getElementById('compare-chips');
+            if (!tray || !wrap) return;
+            wrap.innerHTML = '';
+            compareZips.forEach(function (z, i) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'cc' + (i === compareZips.length - 1 ? ' on' : '');
+                b.textContent = z;
+                b.title = 'Remove ' + z;
+                b.onclick = function () {
+                    compareZips = compareZips.filter(function (x) { return x !== z; });
+                    paintCompare();
+                };
+                wrap.appendChild(b);
+            });
+            tray.hidden = false;
+        }
+
+        // 4. Verdict card — the answer before the numbers. Reads /market-score,
+        //    which computes from real data and refuses to score a ZIP with no
+        //    population rather than inventing a confident-looking number.
+        var verdictReq = 0;
+        function renderVerdict(zip) {
+            var card = document.getElementById('verdict-card');
+            if (!card) return;
+            if (!/^\d{5}$/.test(String(zip || ''))) { card.hidden = true; return; }
+
+            var mine = ++verdictReq;
+            fetch('/.netlify/functions/market-score?zip=' + encodeURIComponent(zip))
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (mine !== verdictReq) return;             // a newer ZIP won
+                    if (!d || !d.available) { card.hidden = true; return; }
+
+                    var cls = d.score >= 70 ? 'under' : d.score >= 50 ? 'balanced' : 'served';
+                    var circ = 2 * Math.PI * 31;
+                    var dash = Math.max(0, Math.min(1, d.score / 100)) * circ;
+
+                    card.innerHTML = '';
+                    var ring = document.createElement('div');
+                    ring.className = 'ring';
+                    ring.innerHTML =
+                        '<svg width="74" height="74" viewBox="0 0 74 74">' +
+                        '<circle cx="37" cy="37" r="31" fill="none" stroke="var(--hairline-2)" stroke-width="6"></circle>' +
+                        '<circle cx="37" cy="37" r="31" fill="none" stroke="var(--a1)" stroke-width="6" stroke-linecap="round"' +
+                        ' stroke-dasharray="' + dash.toFixed(1) + ' ' + circ.toFixed(1) + '" transform="rotate(-90 37 37)"></circle></svg>';
+                    var inner = document.createElement('span');
+                    var sc = document.createElement('span'); sc.className = 'vscore'; sc.textContent = d.score;
+                    var cap = document.createElement('span'); cap.className = 'vcap'; cap.textContent = 'OPPORTUNITY';
+                    inner.appendChild(sc); inner.appendChild(cap);
+                    ring.appendChild(inner);
+
+                    var body = document.createElement('div');
+                    body.className = 'vbody';
+                    var lab = document.createElement('span');
+                    lab.className = 'vlabel ' + cls; lab.textContent = d.label;
+                    var find = document.createElement('div');
+                    find.className = 'vfind'; find.textContent = d.finding || '';
+                    var src = document.createElement('div');
+                    src.className = 'vsrc';
+                    src.textContent = 'Sources: ' + (d.sources || []).join(' · ');
+                    body.appendChild(lab); body.appendChild(find); body.appendChild(src);
+
+                    card.appendChild(ring); card.appendChild(body);
+                    card.hidden = false;
+                })
+                .catch(function () { card.hidden = true; });
+        }
+
+        // 5. Cluster the markers. 1,500 individually-placed pins stacked into an
+        //    unreadable pile; this groups them by proximity and only resolves to
+        //    individual dots once zoomed in. markercluster is loaded lazily so
+        //    the page does not pay for it before a search happens.
+        var clusterLib = null;
+        function ensureClusterLib() {
+            if (window.L && L.markerClusterGroup) return Promise.resolve(true);
+            if (clusterLib) return clusterLib;
+            clusterLib = new Promise(function (resolve) {
+                var css = document.createElement('link');
+                css.rel = 'stylesheet';
+                css.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
+                document.head.appendChild(css);
+                var js = document.createElement('script');
+                js.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
+                js.onload = function () { resolve(!!(window.L && L.markerClusterGroup)); };
+                js.onerror = function () { resolve(false); };   // fall back to plain markers
+                document.head.appendChild(js);
+            });
+            return clusterLib;
+        }
+
+        function clusterIcon(cluster) {
+            var n = cluster.getChildCount();
+            var size = n > 500 ? 74 : n > 100 ? 60 : n > 20 ? 48 : 38;
+            var label = size >= 60 ? '<small>PROVIDERS</small>' : '';
+            return L.divIcon({
+                className: '',
+                iconSize: [size, size],
+                html: '<div class="pp-cluster" style="width:' + size + 'px;height:' + size + 'px;font-size:' +
+                      Math.round(size * 0.26) + 'px">' + n + label + '</div>'
+            });
+        }
+
     </script>
 </body>
 </html>
