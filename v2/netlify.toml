@@ -12,3 +12,17 @@
 
 [functions."cms-provider"]
   timeout = 10
+
+# patient-match chains NPPES (6s) + two geocoder attempts (5s each) + Anthropic
+# (15s abort). On Netlify's 10s default it could be killed mid-flight, returning a
+# 502 for work that was about to succeed.
+[functions."patient-match"]
+  timeout = 26
+
+# NPPES lookup (8s) + two LEIE exclusion queries (5s each) + four Supabase calls.
+[functions."auth-register-provider"]
+  timeout = 26
+
+# Reads an uploaded document with Claude; the slowest call in the app.
+[functions."doc-extract"]
+  timeout = 26
