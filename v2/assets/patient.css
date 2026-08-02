@@ -227,6 +227,53 @@ main { flex: 1; display: flex; flex-direction: column; }
 .doc-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .doc-row .st { font-size: 11.5px; color: var(--muted); font-family: var(--mono); }
 
+/* in-app map -------------------------------------------------------------- */
+#mapCanvas {
+  height: min(52vh, 420px); width: 100%; border-radius: var(--r-md);
+  border: 1px solid var(--hairline); background: var(--ground); overflow: hidden;
+}
+.maphint { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+.legend-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+.legend-row i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+.legend-row .pin.rec { background: var(--caution); }
+.legend-row .pin.ver { background: var(--a1); }
+.legend-row .pin.oth { background: var(--unknown); }
+
+/* Leaflet marker bodies, injected via divIcon */
+.mk { border-radius: 50%; border: 2px solid var(--ground); box-sizing: border-box; }
+.mk.rec { background: var(--caution); box-shadow: 0 0 0 3px color-mix(in srgb, var(--caution) 30%, transparent); }
+.mk.ver { background: var(--a1);      box-shadow: 0 0 0 3px var(--glow-1); }
+.mk.oth { background: var(--unknown); }
+
+/* Leaflet's own chrome, themed */
+.leaflet-container { font-family: var(--sans); background: var(--ground); }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: var(--ground-2); color: var(--text);
+  border: 1px solid var(--hairline-2); box-shadow: 0 12px 36px rgba(0,0,0,.45);
+}
+.leaflet-popup-content-wrapper { border-radius: var(--r-md); }
+.leaflet-popup-content { margin: 12px 14px; font-size: 13px; }
+.leaflet-bar a { background: var(--ground-2); color: var(--text); border-color: var(--hairline); }
+.leaflet-bar a:hover { background: var(--surface-2); }
+.leaflet-control-attribution {
+  background: color-mix(in srgb, var(--ground) 72%, transparent) !important;
+  color: var(--faint) !important; font-size: 10px;
+}
+.leaflet-control-attribution a { color: var(--muted) !important; }
+
+.mpop { display: flex; flex-direction: column; gap: 3px; min-width: 190px; }
+.mpop .tag {
+  align-self: flex-start; font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
+  padding: 2px 7px; border-radius: var(--r-pill); margin-bottom: 3px;
+}
+.mpop .tag.rec { background: var(--caution); color: #241a05; }
+.mpop .tag.ver { background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff; }
+.mpop strong { font-size: 13.5px; font-weight: 620; line-height: 1.3; }
+.mpop .sp { font-size: 12px; color: var(--muted); }
+.mpop .ad { font-size: 11.5px; color: var(--faint); }
+.mpop .tel { font-size: 12.5px; color: var(--a1); text-decoration: none; margin-top: 4px; }
+.mpop .tel:hover { text-decoration: underline; }
+
 /* sheets ------------------------------------------------------------------ */
 .scrim { position: fixed; inset: 0; z-index: 40; background: rgba(3,5,9,.62); backdrop-filter: blur(3px); animation: fade var(--dur) var(--ease) both; }
 @keyframes fade { from { opacity: 0; } }

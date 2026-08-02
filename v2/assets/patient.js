@@ -149,11 +149,187 @@ function mapDeepLink(zip, mapTerms, providers) {
   if (pins) url += '&pins=' + encodeURIComponent(pins);
   return url;
 }
-function openMap() {
-  var s = state.lastSearch;
-  if (!s) return;
-  var url = mapDeepLink(s.zip, s.mapTerms, state.results);
-  if (url) window.open(url, '_blank', 'noopener');
+/* ---------- in-app map ----------------------------------------------------
+   The map is a sheet inside the app, not a jump to the analyst dashboard.
+   Leaflet is loaded on first open so the conversation home pays nothing for it.
+   -------------------------------------------------------------------------- */
+
+// Same publishable key already shipped in index.html. It is anon-level and
+// read-only; RLS governs what it can see.
+var SB_URL = 'https://khkmdultmrggpfvkbfzj.supabase.co';
+var SB_KEY = 'sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ';
+
+var leafletLoading = null;
+function loadLeaflet() {
+  if (window.L) return Promise.resolve(true);
+  if (leafletLoading) return leafletLoading;
+  leafletLoading = new Promise(function (resolve) {
+    var css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+    var js = document.createElement('script');
+    js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    js.onload = function () { resolve(true); };
+    js.onerror = function () { resolve(false); };   // fall back to a list
+    document.head.appendChild(js);
+  });
+  return leafletLoading;
+}
+
+// Copied verbatim from index.html. Both halves are load-bearing: without the
+// leading space "Urology Physician" matches "NeUROLOGY PHYSICIAN"; adding a
+// trailing space stops "Dentist" matching "General Practice Dentistry".
+function taxNorm(s) {
+  return String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+function taxMatches(stored, terms) {
+  var nt = ' ' + taxNorm(stored);
+  for (var i = 0; i < terms.length; i++) if (nt.indexOf(' ' + taxNorm(terms[i])) !== -1) return true;
+  return false;
+}
+
+// Other clinics in the same ZIP matching the searched specialties. Queried
+// straight from PostgREST — no function needed, so this still works when the
+// navigator itself is down.
+function nearbyClinics(zip, terms) {
+  if (!/^\d{5}$/.test(String(zip || '')) || !terms.length) return Promise.resolve([]);
+  var stripped = String(parseInt(zip, 10));
+  var url = SB_URL + '/rest/v1/clinics?or=(zip.eq.' + zip + ',zip.eq.' + stripped + ')' +
+    '&select=npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude&limit=1000';
+  return fetch(url, { headers: { apikey: SB_KEY, Accept: 'application/json' } })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (rows) {
+      return (rows || []).filter(function (c) {
+        return c.latitude && c.longitude && taxMatches(c.primary_taxonomy, terms);
+      });
+    })
+    .catch(function () { return []; });
+}
+
+var mapState = { map: null, focusNpi: null };
+
+function showOnMap(npi) {
+  mapState.focusNpi = npi || null;
+  location.hash = '#/map';
+}
+
+function mapSheet() {
+  var s = state.lastSearch || {};
+  var canvas = h('div', { id: 'mapCanvas' });
+  var note = h('div', { class: 'maphint' }, 'Loading map…');
+
+  var body = [
+    canvas,
+    h('div', { class: 'legend-row' },
+      h('span', {}, h('i', { class: 'pin rec' }), 'Recommended for you'),
+      h('span', {}, h('i', { class: 'pin ver' }), 'Verified listing'),
+      h('span', {}, h('i', { class: 'pin oth' }), 'Other clinics nearby')),
+    note
+  ];
+
+  // Secondary escape hatch to the full analysis dashboard. Keeps the deep-link
+  // contract exercised; everything a patient needs is in this sheet.
+  var deep = mapDeepLink(s.zip, s.mapTerms || [], state.results);
+  if (deep) body.push(h('div', { class: 'actions' },
+    h('a', { class: 'act', href: deep, target: '_blank', rel: 'noopener' }, 'Open the full analysis map ↗')));
+
+  // Render the sheet first so Leaflet has a sized container to attach to
+  var frag = sheet(s.zip ? 'Providers near ' + s.zip : 'Providers near you', body);
+  setTimeout(function () { initMap(canvas, note); }, 0);
+  return frag;
+}
+
+function initMap(canvas, note) {
+  loadLeaflet().then(function (ok) {
+    if (!ok) {
+      note.textContent = 'The map could not load. Your results are listed above.';
+      return;
+    }
+    var s = state.lastSearch || {};
+    var recs = state.results.filter(function (p) { return p.lat && p.lng; });
+    var center = recs.length ? [recs[0].lat, recs[0].lng] : [39.5, -98.35];
+
+    var map = L.map(canvas, { zoomControl: true, attributionControl: true }).setView(center, recs.length ? 12 : 4);
+    mapState.map = map;
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19
+    }).addTo(map);
+
+    var bounds = [];
+    function pin(lat, lng, kind, size) {
+      return L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+          html: '<div class="mk ' + kind + '" style="width:' + size + 'px;height:' + size + 'px"></div>'
+        })
+      });
+    }
+
+    recs.forEach(function (p) {
+      var m = pin(p.lat, p.lng, 'rec', 22).addTo(map);
+      m.bindPopup(popupHtml(p, true));
+      bounds.push([p.lat, p.lng]);
+      if (mapState.focusNpi && String(p.npi) === String(mapState.focusNpi)) {
+        setTimeout(function () { map.setView([p.lat, p.lng], 15); m.openPopup(); }, 250);
+      }
+    });
+
+    if (bounds.length > 1 && !mapState.focusNpi) map.fitBounds(bounds, { padding: [45, 45], maxZoom: 14 });
+
+    note.textContent = recs.length
+      ? 'Showing your ' + recs.length + ' recommended provider' + (recs.length === 1 ? '' : 's') + '. Looking for more nearby…'
+      : 'No mapped coordinates for these results.';
+
+    // Layer in the rest of the area's matching clinics
+    nearbyClinics(s.zip, s.mapTerms || []).then(function (list) {
+      var recNpis = {};
+      recs.forEach(function (p) { recNpis[String(p.npi)] = true; });
+      var added = 0;
+      list.forEach(function (c) {
+        if (recNpis[String(c.npi)]) return;          // already pinned as a recommendation
+        var reg = registeredNpis[String(c.npi)];
+        pin(c.latitude, c.longitude, reg ? 'ver' : 'oth', reg ? 15 : 12)
+          .addTo(map)
+          .bindPopup(popupHtml({
+            npi: c.npi, name: c.name, specialty: c.primary_taxonomy,
+            address: c.address, city: c.city, state: c.state, zip: c.zip,
+            registered: !!reg
+          }, false));
+        added++;
+      });
+      note.textContent = recs.length
+        ? 'Showing your ' + recs.length + ' recommended provider' + (recs.length === 1 ? '' : 's') +
+          (added ? ' and ' + added + ' other matching clinic' + (added === 1 ? '' : 's') + ' in this ZIP.' : '. No other matching clinics in this ZIP.')
+        : (added ? 'Showing ' + added + ' matching clinics in this ZIP.' : 'No matching clinics found in this ZIP.');
+    });
+  });
+}
+
+// Popup markup is a string because Leaflet wants HTML; every interpolated value
+// is escaped first, since these come from the API and the database.
+function esc(v) {
+  return String(v === null || v === undefined ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function popupHtml(p, isRec) {
+  var line = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
+  return '<div class="mpop">' +
+    (isRec ? '<span class="tag rec">★ Recommended for you</span>' : '') +
+    (p.registered && !isRec ? '<span class="tag ver">✓ Verified listing</span>' : '') +
+    '<strong>' + esc(p.name || 'Provider') + '</strong>' +
+    (p.specialty ? '<span class="sp">' + esc(p.specialty) + '</span>' : '') +
+    (line ? '<span class="ad">' + esc(line) + '</span>' : '') +
+    (p.phone ? '<a class="tel" href="tel:' + esc(p.phone) + '">📞 ' + esc(p.phone) + '</a>' : '') +
+    '</div>';
+}
+
+// NPI -> registered listing, loaded once when the map first opens
+var registeredNpis = {};
+function loadRegistered() {
+  return api('/providers-public?all=1', { auth: false })
+    .then(function (d) { registeredNpis = (d && d.providers) || {}; })
+    .catch(function () {});
 }
 
 /* ---------- provider card ------------------------------------------------- */
@@ -182,12 +358,10 @@ function providerCard(p, i) {
   // Actions are hidden when the data is missing rather than shown disabled:
   // phone is '' when NPPES had none, and both geocoders can fail.
   if (p.phone) acts.push(h('a', { class: 'act primary', href: 'tel:' + p.phone }, '📞 Call'));
-  var dest = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
-  if (dest) acts.push(h('a', {
-    class: 'act', target: '_blank', rel: 'noopener',
-    href: 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest)
-  }, 'Directions'));
-  if (p.lat && p.lng) acts.push(h('button', { class: 'act', type: 'button', onclick: openMap }, 'Show on map'));
+  // No Directions button: it handed the patient off to Google Maps, which leaves
+  // the app. Restore it once the Directions API is integrated in-app.
+  if (p.lat && p.lng) acts.push(h('button', { class: 'act', type: 'button',
+    onclick: function () { showOnMap(p.npi); } }, 'Show on map'));
   acts.push(h('button', { class: 'act', type: 'button', onclick: function () { location.hash = '#/p/' + p.npi; } }, 'Details'));
 
   return h('article', { class: 'card', style: '--i:' + i },
@@ -219,7 +393,7 @@ function transcriptEl() {
       h('div', { class: 'bot-body' }, h('p', {}, m.content),
         m.providers ? h('div', { class: 'cards' }, m.providers.map(providerCard)) : null,
         m.providers && m.providers.length
-          ? h('div', { class: 'actions' }, h('button', { class: 'act', type: 'button', onclick: openMap }, '🗺 See these on the map'))
+          ? h('div', { class: 'actions' }, h('button', { class: 'act', type: 'button', onclick: function () { showOnMap(null); } }, '🗺 See these on the map'))
           : null)));
   });
   if (state.pending) wrap.appendChild(pendingEl());
@@ -316,9 +490,12 @@ function showSearchError(err, opts) {
 
   var acts = [h('button', { class: 'act primary', type: 'button', onclick: function () { runSearch(opts); } }, 'Try again')];
   // The deterministic fallback: needs no AI and no backend at all.
-  var url = mapDeepLink(currentZip(), (state.lastSearch && state.lastSearch.mapTerms) || [], []);
-  if (url) acts.push(h('a', { class: 'act', href: url, target: '_blank', rel: 'noopener' },
-    'Browse ' + ((state.lastSearch && state.lastSearch.label) || 'providers') + ' on the map'));
+  // The in-app map reads Supabase directly, so it still works when the navigator
+  // is unavailable — which is precisely when this fallback is offered.
+  if (/^\d{5}$/.test(currentZip()) && (state.lastSearch && (state.lastSearch.mapTerms || []).length)) {
+    acts.push(h('button', { class: 'act', type: 'button', onclick: function () { showOnMap(null); } },
+      'Browse ' + (state.lastSearch.label || 'providers') + ' on the map'));
+  }
 
   var t = document.getElementById('transcript');
   if (!t) return;
@@ -582,7 +759,7 @@ function detailSheet(npi) {
     h('div', { class: 'sec-label' }, 'From Medicare records'), cms,
     h('div', { class: 'actions' },
       p.phone ? h('a', { class: 'act primary', href: 'tel:' + p.phone }, '📞 Call') : null,
-      (p.lat && p.lng) ? h('button', { class: 'act', type: 'button', onclick: openMap }, 'Show on map') : null)
+      (p.lat && p.lng) ? h('button', { class: 'act', type: 'button', onclick: function () { showOnMap(p.npi); } }, 'Show on map') : null)
   ]);
 }
 
@@ -800,6 +977,7 @@ function render() {
   else if (r.name === 'account') document.body.appendChild(accountSheet());
   else if (r.name === 'documents') { document.body.appendChild(documentsSheet()); loadDocuments(); }
   else if (r.name === 'specialties') document.body.appendChild(specialtiesSheet());
+  else if (r.name === 'map') { loadRegistered(); document.body.appendChild(mapSheet()); }
 
   var t = document.getElementById('transcript');
   if (t && (state.pending || state.messages.length)) t.scrollIntoView({ block: 'end', behavior: 'smooth' });
