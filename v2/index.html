@@ -1375,6 +1375,7 @@
             // Re-added on every render because renderMap clears the marker list, and
             // the navigator's picks must survive the user changing the taxonomy filter.
             drawRecommendedPins();
+            drawLocationPins();
 
             if (zipGeoJSONLayer) markers.forEach(m => { if (m && typeof m.bringToFront === 'function') m.bringToFront(); });
             if (countyGeoJSONLayer && showCounties && map.hasLayer(countyGeoJSONLayer)) countyGeoJSONLayer.bringToFront();
@@ -2760,6 +2761,70 @@
                     .addTo(map);
                 if (window.clusterLayer) clusterLayer.addLayer(marker); else marker.addTo(map);
                 markers.push(marker);
+            });
+        }
+
+        // Practice locations published by a claimed listing (migration 006).
+        // The clinics table only knows the address tied to the NPI, so a
+        // provider's other sites exist nowhere else on this map -- which is why
+        // a second office could be entered carefully and still never appear.
+        //
+        // Ring convention extends the existing one: solid teal stays "NPPES
+        // verified", hollow teal is self-reported. They must not look alike or
+        // the verified ring stops carrying information.
+        function drawLocationPins() {
+            if (!Object.keys(registeredProviders || {}).length) return;
+
+            // Which claimed providers are actually on this map, and where a pin
+            // already sits. Same groupedData walk drawRecommendedPins uses.
+            const npisOnMap = new Set();
+            const pinnedAt = new Set();
+            for (const addr in groupedData) {
+                const g = groupedData[addr];
+                if (g.lat && g.lng) pinnedAt.add((+g.lat).toFixed(4) + ',' + (+g.lng).toFixed(4));
+                for (const pr of g.practices) npisOnMap.add(String(pr['NPI'] || ''));
+            }
+            if (!npisOnMap.size) return;
+
+            Object.keys(registeredProviders).forEach(npi => {
+                // registeredProviders is every claimed listing in the country.
+                // Only draw extra sites for a provider already on screen.
+                if (!npisOnMap.has(String(npi))) return;
+                const rp = registeredProviders[npi] || {};
+                (rp.locations || []).forEach(loc => {
+                    // No coordinates means geocoding never ran or failed. There
+                    // is nowhere to put the pin, so skip rather than guess.
+                    if (!loc.latitude || !loc.longitude) return;
+                    const key = (+loc.latitude).toFixed(4) + ',' + (+loc.longitude).toFixed(4);
+                    if (pinnedAt.has(key)) return;   // the clinics row already covers it
+                    pinnedAt.add(key);
+
+                    const verified = !!loc.verified;
+                    const size = verified ? 17 : 15;
+                    const html = verified
+                        ? '<div style="width:17px;height:17px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-base);box-shadow:0 0 6px 1px rgba(45,212,191,0.6);"></div>'
+                        : '<div style="width:15px;height:15px;border-radius:50%;background:transparent;border:2px solid var(--accent);box-shadow:0 0 5px rgba(45,212,191,0.35);"></div>';
+
+                    const esc = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+                    const name = esc(rp.name || 'Claimed listing');
+                    const label = loc.label ? name + ' \u2014 ' + esc(loc.label) : name;
+                    const addr = [loc.address_line, loc.city, loc.state, loc.zip].filter(Boolean).map(esc).join(', ');
+                    const badge = verified
+                        ? '<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:var(--accent);color:#0d1117;font-size:9px;font-weight:700;">&#10003; NPPES VERIFIED</div>'
+                        : '<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:var(--text-muted);color:#0d1117;font-size:9px;font-weight:700;">SELF-REPORTED ADDRESS</div>';
+
+                    const marker = L.marker([loc.latitude, loc.longitude], {
+                        icon: L.divIcon({ className: 'multi-tax-icon', html: html, iconSize: [size, size], iconAnchor: [size / 2, size / 2] })
+                    })
+                    .bindTooltip(label, { direction: 'top', offset: [0, -9], opacity: 0.9 })
+                    .bindPopup('<div class="popup-content" style="min-width:180px;">' + badge +
+                        '<br/><strong style="font-size:12px;">' + label + '</strong><br/>' +
+                        (addr ? '<span style="color:var(--text-muted);font-size:10px;">' + addr + '</span><br/>' : '') +
+                        '<span style="color:var(--text-muted);font-size:10px;">NPI: ' + esc(npi) + '</span></div>', { maxWidth: 260 });
+
+                    if (window.clusterLayer) clusterLayer.addLayer(marker); else marker.addTo(map);
+                    markers.push(marker);
+                });
             });
         }
 
