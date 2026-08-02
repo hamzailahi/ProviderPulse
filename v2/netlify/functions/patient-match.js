@@ -104,8 +104,13 @@ function mapTaxonomies(terms) {
 function taxonomyTerms(conditions, latestUserText, concernDescription) {
   const terms = new Set();
   const text = (latestUserText + ' ' + concernDescription).toLowerCase();
+  // Match on a WORD BOUNDARY, not a bare substring. "ear" -> Otolaryngology was
+  // firing on "searching" and "near", and "ent" fires on "patient", "different",
+  // "recent" — so a plain primary-care question came back full of ENT providers.
+  // Keywords are prefixes of real words, so a leading boundary plus free suffix
+  // still matches "cardiolog" -> "cardiologist".
   for (const [kw, tax] of Object.entries(KEYWORD_TAXONOMY)) {
-    if (text.includes(kw)) terms.add(tax);
+    if (kw.split(' ').every(w => new RegExp('(^|[^a-z])' + w).test(text))) terms.add(tax);
   }
   // Chat/keyword intent wins; fall back to profile conditions
   if (terms.size === 0) {
@@ -217,6 +222,35 @@ async function registeredByNpi(env, npis) {
   }
 }
 
+// Registered providers whose practice is in this ZIP. Uses the service role
+// because provider_profiles is RLS self-only; only published fields are read.
+async function claimedInZip(env, zip) {
+  if (!/^\d{5}$/.test(String(zip || '')) || !env.SUPABASE_SERVICE_ROLE_KEY) return [];
+  try {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/provider_profiles?zip=eq.${zip}&review_status=not.eq.pending` +
+      `&select=npi,org_name,first_name,last_name,address_line,city,state,zip,phone,taxonomy_desc&limit=20`,
+      {
+        headers: {
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
+        },
+        signal: AbortSignal.timeout(5000)
+      }
+    );
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return (Array.isArray(rows) ? rows : []).filter(r => /^\d{10}$/.test(String(r.npi || ''))).map(r => ({
+      npi: String(r.npi),
+      name: r.org_name || [r.first_name, r.last_name].filter(Boolean).join(' ') || 'Provider',
+      specialty: r.taxonomy_desc || '',
+      address: r.address_line || '',
+      city: r.city || '', state: r.state || '', zip: r.zip || '',
+      phone: r.phone || ''
+    }));
+  } catch { return []; }
+}
+
 // Server-side geocoding, Nominatim first (accurate for US), Photon fallback
 async function geocode(provider) {
   const query = `${provider.address}, ${provider.city}, ${provider.state} ${provider.zip}`;
@@ -303,6 +337,15 @@ exports.handler = async (event) => {
       const bx = b.zip === effectiveZip ? 0 : (b.zip.startsWith(zip3) ? 1 : 2);
       return ax - bx;
     });
+    // Claimed listings for this ZIP are pulled in DIRECTLY, not just looked up
+    // among whatever NPPES happened to return. A verified provider is our best
+    // data about a market; making them depend on a federal registry's ranking
+    // meant a claimed listing could silently never appear.
+    const localClaimed = await claimedInZip(env, effectiveZip);
+    for (const c of localClaimed) {
+      if (!seen.has(c.npi)) { seen.add(c.npi); providers.push(c); }
+    }
+
     // Claimed listings first: a registered provider has actually told us whether they
     // take this patient's insurance, which NPPES can never say.
     const claimed = await registeredByNpi(env, providers.map(p => p.npi));
