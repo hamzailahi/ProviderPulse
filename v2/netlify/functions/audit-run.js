@@ -302,26 +302,39 @@ exports.handler = async (event) => {
   const label = String(body.label || '').slice(0, 200) || null;
 
   // ---- resolve the NPI set ------------------------------------------------
+  //
+  // EXPLICIT NPIs ONLY. There was a {state, zip, taxonomy} mode here that
+  // sampled from the `clinics` table; it has been removed because it could not
+  // produce a usable audit.
+  //
+  // `clinics` holds NPI-2 ORGANISATION numbers (20 of 20 sampled). The Medicare
+  // Physician & Other Practitioners PUF is keyed on Rndrng_NPI, a rendering
+  // PRACTITIONER, and PECOS Order & Referring is likewise individuals.
+  // Organisations do not render services, so npi_activity can never join to an
+  // organisational NPI and every sampled audit came back 100% unverifiable at
+  // the 0.35 cap. The same batch of individual NPIs scored 0.66 mean with real
+  // differentiation, so the engine was never the problem.
+  //
+  // Restore a sampling mode only when it draws NPI-1s -- from NPPES by
+  // state/city/taxonomy, or from a payer roster, which is what a real audit
+  // input looks like anyway.
   let npis = [];
   let addressByNpi = new Map();
   if (Array.isArray(body.npis) && body.npis.length) {
     npis = [...new Set(body.npis.map(n => String(n).trim()).filter(n => /^\d{10}$/.test(n)))];
-  } else if (body.state || body.zip || body.taxonomy) {
-    const q = [];
-    if (body.zip) q.push(`zip=eq.${encodeURIComponent(String(body.zip).trim())}`);
-    if (body.state) q.push(`state=eq.${encodeURIComponent(String(body.state).trim().toUpperCase())}`);
-    if (body.taxonomy) q.push(`primary_taxonomy=ilike.${encodeURIComponent('%' + String(body.taxonomy).trim() + '%')}`);
-    q.push(`select=npi,address,city,state,zip`);
-    q.push(`limit=${Math.min(Number(body.limit) || MAX_NPIS, MAX_NPIS)}`);
-    const rows = await sbGet(env, `clinics?${q.join('&')}`);
-    npis = [...new Set((rows || []).map(r => String(r.npi)).filter(n => /^\d{10}$/.test(n)))];
   }
   if (Array.isArray(body.addresses)) {
     for (const a of body.addresses) if (a && a.npi && a.address) addressByNpi.set(String(a.npi), String(a.address));
   }
 
   if (!npis.length) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Supply npis[], or state/zip/taxonomy to sample from clinics' }) };
+    return {
+      statusCode: 400, headers: CORS,
+      body: JSON.stringify({
+        error: 'Supply npis[] (10-digit, max 25 per call).',
+        note: 'Sampling by state/zip/taxonomy was removed: it drew organisational NPIs from clinics, which carry no Medicare or PECOS activity and always score unverifiable. Audit individual practitioner NPIs.'
+      })
+    };
   }
   const requested = npis.length;
   const overflow = npis.slice(MAX_NPIS);
