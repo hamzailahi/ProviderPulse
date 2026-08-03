@@ -132,27 +132,35 @@ function scoreProvider(inputs) {
   // ---- 3. Behavioural activity -------------------------------------------
   const act = i.activity || null;
 
-  // Sanity-check the year before reasoning about it. A stored 0 (or any other
-  // implausible value) previously computed an age of 2026 years, graded a
-  // strong negative, and produced a confident `likely_inactive` verdict on a
-  // provider who was PECOS-enrolled and NPPES-active -- a false positive that
-  // reached a payer-facing report. A value we cannot believe is UNKNOWN, which
-  // is the fail-closed answer, not evidence of inactivity.
-  const rawYear = act ? Number(act.last_medicare_activity_year) : NaN;
-  const plausibleYear = Number.isFinite(rawYear) &&
+  // ABSENT and IMPLAUSIBLE are different, and conflating them was a real bug.
+  //
+  // The original guard was `Number.isFinite(Number(year)) ? Number(year) : null`.
+  // Number(null) is 0 and Number.isFinite(0) is true, so a NULL year sailed
+  // through as year zero, computed an age of 2026 years, graded a strong
+  // negative, and published a confident `likely_inactive` on providers who were
+  // PECOS-enrolled and NPPES-active. It hit 43% of npi_activity -- the O&R-only
+  // rows, which the importer stores with a null year BY DESIGN because they are
+  // enrolled but absent from the claims PUF. The providers most demonstrably
+  // active were exactly the ones being condemned.
+  //
+  // So: check presence first and coerce second, never the other way round.
+  const rawValue = act ? act.last_medicare_activity_year : undefined;
+  const present = rawValue !== null && rawValue !== undefined && rawValue !== '';
+  const rawYear = present ? Number(rawValue) : NaN;
+  const plausibleYear = present && Number.isFinite(rawYear) &&
     rawYear >= MIN_PLAUSIBLE_YEAR && rawYear <= asOf + 1;
   const lastYear = plausibleYear ? rawYear : null;
-  const yearWasGarbage = act != null &&
-    act.last_medicare_activity_year != null && !plausibleYear;
+  // Only a value that IS there but cannot be believed is an import problem.
+  const yearWasGarbage = present && !plausibleYear;
   const pecos = act && typeof act.pecos_enrolled === 'boolean' ? act.pecos_enrolled : null;
 
   let activityNegative = false;
   if (lastYear === null) {
     unknown('medicare_activity',
       yearWasGarbage
-        ? `Activity row records an implausible service year (${act.last_medicare_activity_year}); treated as unknown rather than as evidence of inactivity. The import for this NPI needs re-checking.`
+        ? `Activity row records an implausible service year (${rawValue}); treated as unknown rather than as evidence of inactivity. The import for this NPI needs re-checking.`
         : act
-          ? 'Activity row exists but records no Medicare service year. Many providers legitimately bill no Medicare (paediatrics, OB).'
+          ? 'No Medicare claims year on record. Common and expected: the provider may be PECOS-enrolled without appearing in the claims file, and many bill no Medicare at all (paediatrics, OB). Not evidence of inactivity.'
           : 'No Medicare activity data for this NPI. Absence is not evidence of inactivity.');
   } else {
     const age = asOf - lastYear;

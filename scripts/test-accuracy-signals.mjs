@@ -198,10 +198,24 @@ console.log('\n13. An implausible stored year is unknown, not inactivity');
   const real = scoreProvider({ ...clean, activity: { last_medicare_activity_year: YEAR - 9, pecos_enrolled: true }, claimed: { claimed: false } });
   check('a genuinely old year still reads inactive', real.verdict === 'likely_inactive', `got ${real.verdict}`);
 
-  for (const bad of [null, undefined, -1, 1889, YEAR + 5, NaN, 'abc']) {
+  for (const bad of [null, undefined, -1, 1889, YEAR + 5, NaN, 'abc', '']) {
     const rr = scoreProvider({ ...clean, activity: { last_medicare_activity_year: bad, pecos_enrolled: true }, claimed: { claimed: false } });
     check(`rejects ${JSON.stringify(bad)}`, sig(rr, 'medicare_activity').value === 'unknown');
   }
+
+  // The specific coercion that caused it: Number(null) === 0 and
+  // Number.isFinite(0) === true, so a NULL year became year zero. This is 43%
+  // of npi_activity -- the O&R-only rows, stored null BY DESIGN.
+  const nulled = scoreProvider({ ...clean, activity: { last_medicare_activity_year: null, pecos_enrolled: true }, claimed: { claimed: false } });
+  const ns = sig(nulled, 'medicare_activity');
+  check('a NULL year is absent, NOT year zero', ns.value === 'unknown', `got ${ns.value}`);
+  check('and is not blamed on the import', !/implausible/i.test(ns.detail), ns.detail);
+  check('and explains why absence is normal', /PECOS-enrolled|bill no Medicare/i.test(ns.detail), ns.detail);
+  check('a PECOS-enrolled provider with no claims year is not called inactive',
+    nulled.verdict !== 'likely_inactive', `got ${nulled.verdict}`);
+  // A value that IS present but broken should still point at the import.
+  check('a present-but-broken year still blames the import',
+    /implausible/i.test(sig(scoreProvider({ ...clean, activity: { last_medicare_activity_year: 0, pecos_enrolled: true } }), 'medicare_activity').detail));
   check('a future-adjacent year is allowed (data lag)',
     sig(scoreProvider({ ...clean, activity: { last_medicare_activity_year: YEAR + 1, pecos_enrolled: true } }), 'medicare_activity').value !== 'unknown');
 }
