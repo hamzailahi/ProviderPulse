@@ -88,3 +88,10 @@
 # Geocodes on save: Nominatim (5s) then Photon (5s), plus Supabase round trips.
 [functions."provider-locations"]
   timeout = 26
+
+# Up to 25 NPPES lookups at concurrency 6, batched Supabase reads, and any
+# geocoding that survives the equal-address shortcut. The function stops
+# starting work at 15s and persists what it has, so this ceiling is headroom
+# for the writes rather than a target.
+[functions."audit-run"]
+  timeout = 26
