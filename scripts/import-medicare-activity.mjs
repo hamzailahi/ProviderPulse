@@ -146,6 +146,29 @@ function yearOf(s) {
 }
 
 /**
+ * Pull a full date out of a distribution title or filename as YYYYMMDD.
+ *
+ * Order & Referring is republished WEEKLY, and every snapshot carries the same
+ * year, so a year-only sort cannot order them -- it left selection depending on
+ * the order CMS happened to return, which would silently pick a stale enrolment
+ * file the day they reorder. Enrolment freshness is the whole value of that
+ * signal, so it gets a real comparison.
+ *
+ * Handles "Order and Referring : 2026-07-31" and "OrderReferring_20260730.csv".
+ */
+function dateOf(s) {
+  const t = String(s || '');
+  const dash = t.match(/(20\d{2})-(\d{2})-(\d{2})/);
+  if (dash) return Number(dash[1] + dash[2] + dash[3]);
+  const plain = t.match(/(20\d{2})(\d{2})(\d{2})/);
+  if (plain) {
+    const mm = Number(plain[2]), dd = Number(plain[3]);
+    if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) return Number(plain[1] + plain[2] + plain[3]);
+  }
+  return null;
+}
+
+/**
  * Find one dataset by title and return its newest CSV distribution.
  * Prints every candidate, so a failed match is diagnosable from the log alone
  * rather than requiring another round trip.
@@ -175,7 +198,12 @@ async function resolve(titleRe, label) {
       options.push({
         dataset: ds.title,
         modified: ds.modified || '',
+        // Title before URL, deliberately: the 2024 PUF lives under a /2026-05/
+        // publication path, so reading the URL first would label 2024 data as
+        // 2026 and misdate every activity signal derived from it.
         year: yearOf(d.title) || yearOf(d.url) || yearOf(ds.modified),
+        // Full date where one exists, for weekly-republished datasets.
+        date: dateOf(d.title) || dateOf(d.url) || null,
         ...d
       });
     }
@@ -188,10 +216,16 @@ async function resolve(titleRe, label) {
     );
   }
 
-  // Newest first: explicit year beats modified date.
-  options.sort((a, b) => (b.year || 0) - (a.year || 0) || String(b.modified).localeCompare(String(a.modified)));
+  // Newest first: year, then the full date within that year, then the dataset's
+  // modified stamp as a last resort. Without the date term this fell through to
+  // catalog order for weekly files, which is not an ordering at all.
+  options.sort((a, b) =>
+    (b.year || 0) - (a.year || 0) ||
+    (b.date || 0) - (a.date || 0) ||
+    String(b.modified).localeCompare(String(a.modified))
+  );
   for (const o of options.slice(0, 8)) {
-    console.log(`    ${o.year || '????'}  ${o.title || '(untitled)'}  ${o.url}`);
+    console.log(`    ${o.year || '????'}${o.date ? '-' + String(o.date).slice(4) : '    '}  ${o.title || '(untitled)'}  ${o.url}`);
   }
   const pick = options[0];
   console.log(`${label}: using ${pick.year || 'unknown year'} -> ${pick.url}`);
