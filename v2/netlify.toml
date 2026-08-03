@@ -95,3 +95,9 @@
 # for the writes rather than a target.
 [functions."audit-run"]
   timeout = 26
+
+# One Anthropic call covering the whole batch (15s abort) plus the write-back.
+# Kept out of audit-run because a full 25-NPI audit can already spend its 15s
+# budget, and the two together would exceed the 26s kill.
+[functions."audit-narrate"]
+  timeout = 26
