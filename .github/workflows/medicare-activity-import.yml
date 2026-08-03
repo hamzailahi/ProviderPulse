@@ -12,20 +12,24 @@ on:
     - cron: '0 7 12 * *'
   workflow_dispatch:
     inputs:
+      discover:
+        description: 'DISCOVER ONLY: print the CMS catalog entries that match, then stop. Downloads nothing.'
+        type: boolean
+        default: false
       dry_run:
         description: 'Parse and report totals without writing to Supabase'
         type: boolean
         default: false
       puf_url:
-        description: 'Override the Physician PUF CSV URL (leave blank for the scripted default)'
+        description: 'Direct Physician PUF CSV URL (blank = resolve from the CMS catalog)'
         type: string
         required: false
       or_url:
-        description: 'Override the Order & Referring CSV URL (leave blank for the scripted default)'
+        description: 'Direct Order & Referring CSV URL (blank = resolve from the CMS catalog)'
         type: string
         required: false
       year:
-        description: 'Data year to record for PUF rows (leave blank for the scripted default)'
+        description: 'Data year for PUF rows (blank = take it from the resolved distribution)'
         type: string
         required: false
 
@@ -55,21 +59,35 @@ jobs:
             exit 1
           fi
 
-      # The dataset URLs and column names in the script were written from the
-      # CMS data dictionaries and NOT verified against a live response -- the
-      # environment they were authored in cannot reach data.cms.gov. This step
-      # is that verification. A 404 or a column mismatch fails here with the
-      # actual columns printed, which is the signal to correct the constants.
+      # The dataset URL is resolved from the CMS catalog at run time rather than
+      # pinned, because CMS mints a new UUID per year. The catalog URL, the DCAT
+      # field names and the title patterns are still assumptions written without
+      # access to data.cms.gov, so this step is their verification: run with
+      # `discover` first and the log prints exactly what matched.
+      #
+      # Inputs are passed via env, not interpolated into the shell command, so a
+      # URL containing shell metacharacters cannot break out of the argument.
       - name: Import Medicare activity into Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          IN_DISCOVER: ${{ inputs.discover }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+          IN_PUF_URL: ${{ inputs.puf_url }}
+          IN_OR_URL: ${{ inputs.or_url }}
+          IN_YEAR: ${{ inputs.year }}
         run: |
-          ARGS=""
-          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
-          if [ -n "${{ inputs.puf_url }}" ]; then ARGS="$ARGS --puf-url ${{ inputs.puf_url }}"; fi
-          if [ -n "${{ inputs.or_url }}" ]; then ARGS="$ARGS --or-url ${{ inputs.or_url }}"; fi
-          if [ -n "${{ inputs.year }}" ]; then ARGS="$ARGS --year ${{ inputs.year }}"; fi
-          echo "running: node scripts/import-medicare-activity.mjs $ARGS"
+          set -euo pipefail
+          ARGS=()
+          # `|| true` because a false [ ] test is a non-zero exit, which would
+          # abort the whole step under `set -e` when an input is simply unset.
+          [ "${IN_DISCOVER:-}" = "true" ] && ARGS+=(--discover) || true
+          [ "${IN_DRY_RUN:-}" = "true" ] && ARGS+=(--dry-run) || true
+          [ -n "${IN_PUF_URL:-}" ] && ARGS+=(--puf-url "$IN_PUF_URL") || true
+          [ -n "${IN_OR_URL:-}" ] && ARGS+=(--or-url "$IN_OR_URL") || true
+          [ -n "${IN_YEAR:-}" ] && ARGS+=(--year "$IN_YEAR") || true
+          echo "running: node scripts/import-medicare-activity.mjs ${ARGS[*]-}"
+          # ${ARGS[@]+...} so an EMPTY array expands to nothing at all. The
+          # ":-" form would pass one empty-string argument instead.
           # ~1.5M NPIs held in a Map plus a Set; the default heap is tight.
-          node --max-old-space-size=4096 scripts/import-medicare-activity.mjs $ARGS
+          node --max-old-space-size=4096 scripts/import-medicare-activity.mjs ${ARGS[@]+"${ARGS[@]}"}

@@ -16,40 +16,53 @@
 // Run: node scripts/import-medicare-activity.mjs [options]
 //
 //   --dry-run           parse and report, write nothing
-//   --puf-url <url>     override the Physician & Other Practitioners CSV URL
-//   --or-url <url>      override the Order & Referring CSV URL
+//   --discover          print the matching CMS catalog entries and exit
+//   --puf-url <url>     skip catalog resolution, use this CSV URL
+//   --or-url <url>      skip catalog resolution, use this CSV URL
 //   --puf-file <path>   parse a local PUF CSV instead of downloading
 //   --or-file <path>    parse a local Order & Referring CSV instead
-//   --year <yyyy>       data year to record for PUF rows
+//   --year <yyyy>       override the data year recorded for PUF rows
 //   --skip-or           import PUF only (Order & Referring is the slower file)
 //
 // ---------------------------------------------------------------------------
-// !! EVERY CONSTANT IN THE NEXT BLOCK IS AN UNVERIFIED ASSUMPTION !!
+// WHY THE DATASET URL IS RESOLVED AT RUNTIME
 //
-// data.cms.gov is unreachable from the environment this script was written in,
-// so the URLs, the dataset UUIDs and the column names below were written from
-// the published data dictionaries and NOT confirmed against a live response.
-// GitHub Actions runners CAN reach data.cms.gov, so the first workflow run is
-// the verification step.
+// The first version of this script hardcoded dataset UUIDs. They were guesses
+// -- data.cms.gov is unreachable from the environment this was written in --
+// and the PUF one 404'd on the first Action run.
 //
-// The script is built to fail loudly rather than quietly: a missing column
-// aborts and prints every column that WAS present (see columnIndex in
-// scripts/lib/bulk.mjs), and every URL is overridable from the command line so
-// a wrong guess can be corrected without editing this file.
+// Hardcoding was the wrong shape regardless of the guess: CMS publishes each
+// year as a NEW distribution with a NEW UUID, so a pinned UUID means this job
+// silently stops picking up fresh data every time a year rolls over, which is
+// precisely the staleness the accuracy product exists to detect.
+//
+// So the URL is resolved from the CMS DCAT catalog by title at run time, and
+// the newest distribution wins. --puf-url / --or-url still override for the
+// case where the catalog is down or a specific year is wanted.
+//
+// STILL ASSUMPTIONS, flagged honestly: the catalog URL, the DCAT field names,
+// and the two title patterns below. Run with --discover to have the runner
+// print exactly what it matched; the log is the verification step.
 // ---------------------------------------------------------------------------
 
 import {
   fetchCsvRows, fileCsvRows, columnIndex, cleanNpi, cleanInt, batchWrite
 } from './lib/bulk.mjs';
 
+// The DCAT-US catalog every data.gov-family portal publishes. ASSUMPTION: that
+// data.cms.gov serves it here and uses the standard shape
+// ({ dataset: [{ title, identifier, modified, distribution: [...] }] }).
+const CMS_CATALOG = 'https://data.cms.gov/data.json';
+
 // --- Source 1: Medicare Physician & Other Practitioners - by Provider -------
 // Landing page + data dictionary:
 //   https://data.cms.gov/provider-summary-by-type-of-service/medicare-physician-other-practitioners/medicare-physician-other-practitioners-by-provider
-// CMS serves each year as its own distribution; the UUID below identifies one
-// year's CSV. ASSUMPTION: this UUID and the year it maps to. If the run 404s,
-// open the landing page, copy the current year's CSV link, and pass --puf-url.
-const PUF_YEAR = 2023;
-const PUF_URL = 'https://data.cms.gov/data-api/v1/dataset-distribution/6fea9d79-0129-4e4c-b1b8-23cd86a4ed1b/data?format=csv';
+//
+// Matched on title. Deliberately excludes "by Provider and Service" and "by
+// Geography and Service", which are the same programme sliced differently and
+// are one row per HCPCS code rather than one per NPI -- picking one of those by
+// accident would multiply every provider's service count.
+const PUF_TITLE = /medicare physician .* practitioners\s*[-–]\s*by provider$/i;
 
 // ASSUMPTION: column names, from the "by Provider" data dictionary.
 // Rndrng_NPI is the rendering provider's NPI; Tot_Srvcs is total services.
@@ -62,7 +75,7 @@ const PUF_SERVICES = 'Tot_Srvcs';
 // Presence in this file means the provider is currently enrolled and eligible
 // to order/refer -- a much better "still practising" signal than claims volume
 // alone, because it is a current enrolment status rather than a lagging year.
-const OR_URL = 'https://data.cms.gov/data-api/v1/dataset/d1e97b30-2c9b-4e3a-9d1a-1e5b0a2a6f4b/data?format=csv';
+const OR_TITLE = /^order and referring$/i;
 
 // ASSUMPTION: the Order & Referring file's NPI column is literally "NPI".
 const OR_NPI = 'NPI';
@@ -84,20 +97,112 @@ const flag = n => args.includes(n);
 const opt = (n, d = null) => (args.indexOf(n) !== -1 ? args[args.indexOf(n) + 1] : d);
 
 const dryRun = flag('--dry-run');
+const discover = flag('--discover');
 const skipOr = flag('--skip-or');
-const pufUrl = opt('--puf-url', PUF_URL);
-const orUrl = opt('--or-url', OR_URL);
+const pufUrlArg = opt('--puf-url');
+const orUrlArg = opt('--or-url');
 const pufFile = opt('--puf-file');
 const orFile = opt('--or-file');
-const year = Number(opt('--year', PUF_YEAR));
+const yearArg = opt('--year');
 
 const rowsFrom = (file, url, label) => (file ? fileCsvRows(file) : fetchCsvRows(url, label));
+
+// ---------------------------------------------------------------------------
+// CMS catalog resolution
+// ---------------------------------------------------------------------------
+
+let _catalog = null;
+async function catalog() {
+  if (_catalog) return _catalog;
+  console.log(`catalog: fetching ${CMS_CATALOG}`);
+  const res = await fetch(CMS_CATALOG, { headers: { 'User-Agent': 'ProviderPulse-import' } });
+  if (!res.ok) throw new Error(`catalog: HTTP ${res.status} from ${CMS_CATALOG}. Pass --puf-url/--or-url to bypass.`);
+  const json = await res.json();
+  const sets = Array.isArray(json) ? json : (json.dataset || json.datasets || []);
+  if (!sets.length) throw new Error(`catalog: parsed but found no datasets. Shape may have changed; pass --puf-url/--or-url to bypass.`);
+  console.log(`catalog: ${sets.length.toLocaleString()} datasets`);
+  _catalog = sets;
+  return sets;
+}
+
+const CSV_RE = /\.csv(\?|$)/i;
+
+/** All CSV download URLs on a DCAT dataset entry, newest-looking first. */
+function csvDistributions(ds) {
+  const dists = ds.distribution || ds.distributions || [];
+  return dists
+    .map(d => ({
+      url: d.downloadURL || d.accessURL || d.downloadUrl || null,
+      title: d.title || d.name || '',
+      format: (d.format || d.mediaType || '').toLowerCase()
+    }))
+    .filter(d => d.url && (CSV_RE.test(d.url) || d.format.includes('csv')));
+}
+
+/** Pull a 4-digit year out of a distribution title or URL, if one is there. */
+function yearOf(s) {
+  const m = String(s || '').match(/(20\d{2})/g);
+  return m ? Math.max(...m.map(Number)) : null;
+}
+
+/**
+ * Find one dataset by title and return its newest CSV distribution.
+ * Prints every candidate, so a failed match is diagnosable from the log alone
+ * rather than requiring another round trip.
+ */
+async function resolve(titleRe, label) {
+  const sets = await catalog();
+  const hits = sets.filter(d => titleRe.test(String(d.title || '').trim()));
+
+  if (!hits.length) {
+    // Widen to a substring of the pattern so the log can show near-misses.
+    const loose = titleRe.source.replace(/[\\^$.*+?()[\]{}|]/g, ' ').split(/\s+/).filter(w => w.length > 4)[0] || '';
+    const near = sets
+      .filter(d => loose && String(d.title || '').toLowerCase().includes(loose.toLowerCase()))
+      .slice(0, 15)
+      .map(d => `      - ${d.title}`);
+    throw new Error(
+      `${label}: no catalog entry matched ${titleRe}\n` +
+      (near.length ? `    similar titles present:\n${near.join('\n')}\n` : '') +
+      `    Pass --puf-url/--or-url with a direct CSV link to bypass the catalog.`
+    );
+  }
+
+  console.log(`${label}: ${hits.length} catalog match(es)`);
+  const options = [];
+  for (const ds of hits) {
+    for (const d of csvDistributions(ds)) {
+      options.push({
+        dataset: ds.title,
+        modified: ds.modified || '',
+        year: yearOf(d.title) || yearOf(d.url) || yearOf(ds.modified),
+        ...d
+      });
+    }
+  }
+  if (!options.length) {
+    throw new Error(
+      `${label}: matched "${hits[0].title}" but it exposes no CSV distribution.\n` +
+      `    distributions seen: ${JSON.stringify((hits[0].distribution || []).slice(0, 5))}\n` +
+      `    Pass --puf-url/--or-url to bypass.`
+    );
+  }
+
+  // Newest first: explicit year beats modified date.
+  options.sort((a, b) => (b.year || 0) - (a.year || 0) || String(b.modified).localeCompare(String(a.modified)));
+  for (const o of options.slice(0, 8)) {
+    console.log(`    ${o.year || '????'}  ${o.title || '(untitled)'}  ${o.url}`);
+  }
+  const pick = options[0];
+  console.log(`${label}: using ${pick.year || 'unknown year'} -> ${pick.url}`);
+  return pick;
+}
 
 /**
  * Pass 1 - the PUF. One row per NPI per year in the "by Provider" file, so we
  * take the services count directly. Keyed into a Map so pass 2 can merge.
  */
-async function readPuf() {
+async function readPuf(pufUrl) {
   console.log(`PUF: reading ${pufFile || pufUrl}`);
   const out = new Map();
   let header = null, at = null, n = 0, skipped = 0;
@@ -129,7 +234,7 @@ async function readPuf() {
 }
 
 /** Pass 2 - Order & Referring. Presence is the signal; no other column needed. */
-async function readOrderReferring() {
+async function readOrderReferring(orUrl) {
   console.log(`O&R: reading ${orFile || orUrl}`);
   const enrolled = new Set();
   let header = null, at = null, n = 0;
@@ -151,7 +256,40 @@ async function readOrderReferring() {
 }
 
 async function main() {
-  const puf = await readPuf();
+  // --discover: resolve and report only. Turns the Action log into the probe
+  // for an environment that cannot reach data.cms.gov at authoring time.
+  if (discover) {
+    let bad = 0;
+    for (const [re, label] of [[PUF_TITLE, 'PUF'], [OR_TITLE, 'O&R']]) {
+      try { await resolve(re, label); }
+      catch (e) { bad++; console.error(`\n${e.message}\n`); }
+    }
+    console.log(discover && !bad ? '\ndiscover: both datasets resolved' : '\ndiscover: see errors above');
+    process.exit(bad ? 1 : 0);
+  }
+
+  // A local file needs no URL; an explicit --puf-url skips the catalog.
+  let pufUrl = pufUrlArg, orUrl = orUrlArg;
+  let year = yearArg ? Number(yearArg) : null;
+
+  if (!pufFile && !pufUrl) {
+    const pick = await resolve(PUF_TITLE, 'PUF');
+    pufUrl = pick.url;
+    // Prefer the year the distribution itself declares over any guess.
+    if (!year && pick.year) year = pick.year;
+  }
+  if (!skipOr && !orFile && !orUrl) {
+    orUrl = (await resolve(OR_TITLE, 'O&R')).url;
+  }
+  if (!year) {
+    throw new Error(
+      'Could not determine the PUF data year from the catalog. Pass --year explicitly ' +
+      '(recording the wrong year would misdate every activity signal).'
+    );
+  }
+  console.log(`data year: ${year}\n`);
+
+  const puf = await readPuf(pufUrl);
   if (puf.size < MIN_PUF_NPIS) {
     throw new Error(
       `PUF yielded only ${puf.size.toLocaleString()} distinct NPIs, below the ${MIN_PUF_NPIS.toLocaleString()} floor. ` +
@@ -161,7 +299,7 @@ async function main() {
 
   let enrolled = new Set();
   if (!skipOr) {
-    enrolled = await readOrderReferring();
+    enrolled = await readOrderReferring(orUrl);
     if (enrolled.size < MIN_OR_NPIS) {
       throw new Error(
         `Order & Referring yielded only ${enrolled.size.toLocaleString()} distinct NPIs, below the ${MIN_OR_NPIS.toLocaleString()} floor. ` +
