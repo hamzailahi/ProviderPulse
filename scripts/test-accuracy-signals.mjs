@@ -178,7 +178,35 @@ console.log('\n12. An open exclusion flag is never reported as accurate');
   check('still not "excluded" - the NPI did not match', r.verdict !== 'excluded');
 }
 
-console.log('\n13. Output contract');
+console.log('\n13. An implausible stored year is unknown, not inactivity');
+{
+  // Regression from a live report: npi_activity held last_medicare_activity_year
+  // = 0 for a PECOS-enrolled, NPPES-active provider. The scorer computed an age
+  // of 2026 years, graded a strong negative, and published a confident
+  // likely_inactive verdict. Garbage in must become "unknown", never a finding.
+  const garbage = { last_medicare_activity_year: 0, pecos_enrolled: true };
+  const r = scoreProvider({ ...clean, activity: garbage, claimed: { claimed: false } });
+  const s = sig(r, 'medicare_activity');
+  check('reported as unknown', s.value === 'unknown', `got ${s.value}`);
+  check('contributes no weight', s.weight === 0, `got ${s.weight}`);
+  check('not graded negative', s.direction !== 'negative', `got ${s.direction}`);
+  check('never claims an absurd age', !/\b\d{3,} years\b/.test(s.detail), s.detail);
+  check('the bad value is surfaced for repair', /implausible/i.test(s.detail), s.detail);
+  check('verdict is NOT likely_inactive', r.verdict !== 'likely_inactive', `got ${r.verdict}`);
+
+  // Same shape, but a real year, must still grade as stale.
+  const real = scoreProvider({ ...clean, activity: { last_medicare_activity_year: YEAR - 9, pecos_enrolled: true }, claimed: { claimed: false } });
+  check('a genuinely old year still reads inactive', real.verdict === 'likely_inactive', `got ${real.verdict}`);
+
+  for (const bad of [null, undefined, -1, 1889, YEAR + 5, NaN, 'abc']) {
+    const rr = scoreProvider({ ...clean, activity: { last_medicare_activity_year: bad, pecos_enrolled: true }, claimed: { claimed: false } });
+    check(`rejects ${JSON.stringify(bad)}`, sig(rr, 'medicare_activity').value === 'unknown');
+  }
+  check('a future-adjacent year is allowed (data lag)',
+    sig(scoreProvider({ ...clean, activity: { last_medicare_activity_year: YEAR + 1, pecos_enrolled: true } }), 'medicare_activity').value !== 'unknown');
+}
+
+console.log('\n14. Output contract');
 {
   const r = scoreProvider(clean);
   check('confidence within 0-1', r.confidence >= 0 && r.confidence <= 1, `got ${r.confidence}`);

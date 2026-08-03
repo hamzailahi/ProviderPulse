@@ -59,6 +59,10 @@ const ADDRESS_TOLERANCE_KM = 2;
 const ACCURATE_AT = 0.70;
 const UNKNOWN_CAP = 0.35;
 
+// Medicare claims data does not meaningfully predate this, so anything earlier
+// is a bad import rather than a very old provider.
+const MIN_PLAUSIBLE_YEAR = 1990;
+
 const clamp01 = n => Math.max(0, Math.min(1, n));
 const round2 = n => Math.round(n * 100) / 100;
 
@@ -127,15 +131,29 @@ function scoreProvider(inputs) {
 
   // ---- 3. Behavioural activity -------------------------------------------
   const act = i.activity || null;
-  const lastYear = act && Number.isFinite(Number(act.last_medicare_activity_year))
-    ? Number(act.last_medicare_activity_year) : null;
+
+  // Sanity-check the year before reasoning about it. A stored 0 (or any other
+  // implausible value) previously computed an age of 2026 years, graded a
+  // strong negative, and produced a confident `likely_inactive` verdict on a
+  // provider who was PECOS-enrolled and NPPES-active -- a false positive that
+  // reached a payer-facing report. A value we cannot believe is UNKNOWN, which
+  // is the fail-closed answer, not evidence of inactivity.
+  const rawYear = act ? Number(act.last_medicare_activity_year) : NaN;
+  const plausibleYear = Number.isFinite(rawYear) &&
+    rawYear >= MIN_PLAUSIBLE_YEAR && rawYear <= asOf + 1;
+  const lastYear = plausibleYear ? rawYear : null;
+  const yearWasGarbage = act != null &&
+    act.last_medicare_activity_year != null && !plausibleYear;
   const pecos = act && typeof act.pecos_enrolled === 'boolean' ? act.pecos_enrolled : null;
 
   let activityNegative = false;
   if (lastYear === null) {
-    unknown('medicare_activity', act
-      ? 'Activity row exists but records no Medicare service year. Many providers legitimately bill no Medicare (paediatrics, OB).'
-      : 'No Medicare activity data for this NPI. Absence is not evidence of inactivity.');
+    unknown('medicare_activity',
+      yearWasGarbage
+        ? `Activity row records an implausible service year (${act.last_medicare_activity_year}); treated as unknown rather than as evidence of inactivity. The import for this NPI needs re-checking.`
+        : act
+          ? 'Activity row exists but records no Medicare service year. Many providers legitimately bill no Medicare (paediatrics, OB).'
+          : 'No Medicare activity data for this NPI. Absence is not evidence of inactivity.');
   } else {
     const age = asOf - lastYear;
     if (age <= 2) {

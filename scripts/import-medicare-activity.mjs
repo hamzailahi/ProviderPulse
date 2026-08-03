@@ -351,6 +351,14 @@ async function main() {
   const source = `cms_puf_${year}` + (skipOr ? '' : '+pecos_or');
   const refreshedAt = new Date().toISOString();
 
+  // Belt and braces on the year. The guard above already refuses to run without
+  // a plausible one, but a bad value here misdates every signal derived from it
+  // -- a stored 0 once produced "2026 years before the reference year" and a
+  // confident false-positive `likely_inactive` in a report. Cheap to assert.
+  if (!Number.isInteger(year) || year < 1990 || year > new Date().getUTCFullYear() + 1) {
+    throw new Error(`Refusing to write an implausible data year: ${year}`);
+  }
+
   const records = [];
   for (const npi of npis) {
     const p = puf.get(npi);
