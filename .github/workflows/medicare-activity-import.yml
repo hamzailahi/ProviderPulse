@@ -1,0 +1,75 @@
+name: Import Medicare activity (CMS PUF + PECOS)
+
+# Feeds npi_activity, the behavioural ground truth behind the Directory
+# Accuracy Engine. The Physician & Other Practitioners PUF is annual and the
+# Order & Referring file changes more often, so monthly keeps enrolment fresh
+# without waiting a year for the claims side.
+#
+# Runs on the 12th to stay clear of the LEIE import on the 8th -- two large
+# imports writing to the same project on the same morning is avoidable noise.
+on:
+  schedule:
+    - cron: '0 7 12 * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Parse and report totals without writing to Supabase'
+        type: boolean
+        default: false
+      puf_url:
+        description: 'Override the Physician PUF CSV URL (leave blank for the scripted default)'
+        type: string
+        required: false
+      or_url:
+        description: 'Override the Order & Referring CSV URL (leave blank for the scripted default)'
+        type: string
+        required: false
+      year:
+        description: 'Data year to record for PUF rows (leave blank for the scripted default)'
+        type: string
+        required: false
+
+# Never expose the service role key to a fork's workflow run
+concurrency: medicare-activity-import
+
+jobs:
+  import:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    # The real files are far larger than the LEIE CSV; give the download and
+    # two streaming passes room without letting a hung fetch run all day.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      # Fails loudly if the secrets were never added, rather than parsing two
+      # large files and only then discovering there is nowhere to write them.
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"
+            exit 1
+          fi
+
+      # The dataset URLs and column names in the script were written from the
+      # CMS data dictionaries and NOT verified against a live response -- the
+      # environment they were authored in cannot reach data.cms.gov. This step
+      # is that verification. A 404 or a column mismatch fails here with the
+      # actual columns printed, which is the signal to correct the constants.
+      - name: Import Medicare activity into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          if [ -n "${{ inputs.puf_url }}" ]; then ARGS="$ARGS --puf-url ${{ inputs.puf_url }}"; fi
+          if [ -n "${{ inputs.or_url }}" ]; then ARGS="$ARGS --or-url ${{ inputs.or_url }}"; fi
+          if [ -n "${{ inputs.year }}" ]; then ARGS="$ARGS --year ${{ inputs.year }}"; fi
+          echo "running: node scripts/import-medicare-activity.mjs $ARGS"
+          # ~1.5M NPIs held in a Map plus a Set; the default heap is tight.
+          node --max-old-space-size=4096 scripts/import-medicare-activity.mjs $ARGS
