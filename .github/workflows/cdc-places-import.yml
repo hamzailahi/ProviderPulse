@@ -1,0 +1,82 @@
+name: Import CDC PLACES (ZCTA health measures)
+
+# Feeds cdc_places, the demand side of the per-taxonomy opportunity score.
+#
+# ANNUAL, not monthly -- unlike the LEIE (8th) and Medicare activity (12th)
+# jobs. CDC publishes one PLACES release per year, so a monthly run would
+# re-upload 1.17M unchanged rows eleven times for nothing. The release usually
+# lands in late summer; the 20th of September gives it room to settle, and
+# workflow_dispatch covers an early or late one.
+#
+# If a run finds the data unchanged that is not a failure -- the upsert is
+# idempotent and the log's measure/year table is the evidence either way.
+on:
+  schedule:
+    - cron: '0 7 20 9 *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Fetch and report totals without writing to Supabase'
+        type: boolean
+        default: false
+      dataset:
+        description: 'Socrata dataset id (blank = qnzd-25i4, the ZCTA release)'
+        type: string
+        required: false
+      max_pages:
+        description: 'Stop after N pages -- smoke test only. Skips the volume floors.'
+        type: string
+        required: false
+
+# Never expose the service role key to a fork's workflow run
+concurrency: cdc-places-import
+
+jobs:
+  import:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    # ~24 pages of 50k rows plus the upsert. Generous, but a Socrata rate-limit
+    # backoff should not be able to run all day.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      # Fails loudly if the secrets were never added, rather than pulling 1.17M
+      # rows and only then discovering there is nowhere to write them.
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"
+            exit 1
+          fi
+
+      # SOCRATA_APP_TOKEN is optional. Without it the run is throttled as an
+      # anonymous client, which 24 requests still fits inside; with it, headroom.
+      #
+      # Inputs are passed via env, not interpolated into the shell command, so a
+      # value containing shell metacharacters cannot break out of the argument.
+      - name: Import CDC PLACES into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+          IN_DATASET: ${{ inputs.dataset }}
+          IN_MAX_PAGES: ${{ inputs.max_pages }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          # `|| true` because a false [ ] test is a non-zero exit, which would
+          # abort the whole step under `set -e` when an input is simply unset.
+          [ "${IN_DRY_RUN:-}" = "true" ] && ARGS+=(--dry-run) || true
+          [ -n "${IN_DATASET:-}" ] && ARGS+=(--dataset "$IN_DATASET") || true
+          [ -n "${IN_MAX_PAGES:-}" ] && ARGS+=(--max-pages "$IN_MAX_PAGES") || true
+          echo "running: node scripts/import-cdc-places.mjs ${ARGS[*]-}"
+          # ${ARGS[@]+...} so an EMPTY array expands to nothing at all. The
+          # ":-" form would pass one empty-string argument instead.
+          # One page of 50k JSON rows at a time; the default heap is enough.
+          node scripts/import-cdc-places.mjs ${ARGS[@]+"${ARGS[@]}"}
