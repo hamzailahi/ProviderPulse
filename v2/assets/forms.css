@@ -228,6 +228,18 @@ select {
 .fig span { display: block; font-size: 11px; color: var(--faint); margin-top: 2px; line-height: 1.4; }
 .fig.lead { border-left-color: var(--a1); }
 .fig.lead b { color: var(--a1); }
+/* Real search counts. Sits above the scarcity figures because it is the
+   stronger claim -- but it only ever appears when demand-stats returns a group
+   above the suppression threshold, so most ZIPs will never show it. */
+.demand {
+  margin-bottom: 14px; padding: 12px 14px; border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--a1) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--a1) 26%, transparent);
+}
+.demand-lead { font-size: 13.5px; line-height: 1.5; }
+.demand-lead b { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--a1); font-weight: 600; }
+.demand-rest { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+
 .readout .note { color: var(--muted); font-size: 12.5px; margin-top: 11px; }
 .readout .src  { color: var(--faint); font-size: 11px; margin-top: 9px; }
 .readout .err  { color: var(--danger); }

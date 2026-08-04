@@ -274,6 +274,53 @@ async function geocode(provider) {
   return null;
 }
 
+/**
+ * Record that a search of this SHAPE happened. Never who made it.
+ *
+ * WHAT MAY BE WRITTEN, and nothing else: the ZIP searched, the resolved
+ * taxonomy terms, the payer NAME from the patient's profile, which surface the
+ * search came from, and how many providers matched.
+ *
+ * WHAT MAY NEVER BE WRITTEN: the chat text, conditions, date of birth, name,
+ * user id, session id, IP, or anything else off `patient_profiles`. The table
+ * has no column for any of them (migration 008) and none may be added. The
+ * whole value here is aggregate demand; every one of those fields would turn an
+ * aggregate into a behavioural profile of a named patient, joinable back to PHI.
+ *
+ * The payer name alone is not PHI and is what makes network-adequacy analysis
+ * possible. It is the only thing that crosses over from the patient record.
+ *
+ * Fire-and-forget with a short timeout: a logging failure must never delay or
+ * break a patient's search, exactly as with audit_log.
+ */
+function logDemand(env, { zip, taxonomies, payer, source, matched }) {
+  try {
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) return;
+    if (!/^\d{5}$/.test(String(zip || ''))) return;   // no ZIP, nothing to aggregate by
+
+    const row = {
+      zip: String(zip),
+      taxonomies: Array.isArray(taxonomies) ? taxonomies.slice(0, 12).map(t => String(t).slice(0, 120)) : [],
+      payer: payer ? String(payer).slice(0, 120) : null,
+      source: source === 'specialty_browser' ? 'specialty_browser' : 'navigator',
+      matched_count: Number.isFinite(Number(matched)) ? Number(matched) : null
+    };
+
+    // Not awaited. The response must not wait on analytics.
+    fetch(`${env.SUPABASE_URL}/rest/v1/demand_log`, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      },
+      body: JSON.stringify(row),
+      signal: AbortSignal.timeout(3000)
+    }).catch(() => { /* never surface a logging failure to the patient */ });
+  } catch (e) { /* same */ }
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'POST only' }) };
@@ -441,6 +488,15 @@ ${specialty
     const aiData = await aiRes.json();
     if (!aiRes.ok) throw new Error(aiData.error && aiData.error.message);
     const reply = (aiData.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+    // Record the SHAPE of the search, never the searcher. See logDemand.
+    logDemand(env, {
+      zip: effectiveZip,
+      taxonomies: terms,
+      payer: p.insurance_payer,
+      source: specialty ? 'specialty_browser' : 'navigator',
+      matched: providers.length
+    });
+
     // zip + map_taxonomies let the frontend deep link the map to the whole search
     // area. map_taxonomies (not taxonomies) is what the map must filter on.
     return {

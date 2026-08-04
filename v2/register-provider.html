@@ -416,6 +416,48 @@ async function claimedInZip(zip) {
   } catch (e) { return null; }   // never let this block the score
 }
 
+// Real search counts, or nothing.
+//
+// This page was scarcity-led because nothing recorded searches. demand_log now
+// does, so the claim is available -- but ONLY where it is real. demand-stats
+// suppresses any taxonomy group under 5 searches, and a suppressed group comes
+// back with no count at all. Those are never rendered as a number, never
+// extrapolated, and never turned into a projection: the whole reason this page
+// could be trusted was that every figure on it was independently checkable.
+//
+// When there is no publishable demand, the scarcity readout is left exactly as
+// it was.
+async function demandInZip(zip) {
+  try {
+    const r = await fetch(FN + '/demand-stats?zip=' + encodeURIComponent(zip));
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (!d || d.available === false) return null;
+    const shown = (d.groups || []).filter(g => !g.suppressed && g.count >= (d.min_group || 5));
+    if (!shown.length) return null;
+    return { window: d.window_days || 90, groups: shown.slice(0, 3) };
+  } catch (e) { return null; }   // demand is additive; never break the readout
+}
+
+function demandHtml(demand) {
+  if (!demand) return '';
+  const top = demand.groups[0];
+  const rest = demand.groups.slice(1);
+  let h = '<div class="demand"><div class="demand-lead">' +
+    '<b>' + fmt(top.count) + '</b> patient search' + (top.count === 1 ? '' : 'es') +
+    ' for <b>' + esc(top.taxonomy) + '</b> here in the last ' + demand.window + ' days' +
+    (top.mean_matched != null
+      ? ', returning ' + top.mean_matched + ' provider' + (top.mean_matched === 1 ? '' : 's') + ' on average'
+      : '') +
+    '.</div>';
+  if (rest.length) {
+    h += '<div class="demand-rest">Also searched: ' +
+      rest.map(g => esc(g.taxonomy) + ' (' + fmt(g.count) + ')').join(' · ') + '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
 $('formZip').onsubmit = async e => {
   e.preventDefault();
   const zip = $('zipProbe').value.trim();
@@ -425,15 +467,16 @@ $('formZip').onsubmit = async e => {
   $('zipGo').disabled = true;
   out.textContent = 'Reading the data for ' + zip + '…';
   try {
-    const [scoreRes, claimed] = await Promise.all([
+    const [scoreRes, claimed, demand] = await Promise.all([
       fetch(FN + '/market-score?zip=' + zip).then(r => r.json()).catch(() => null),
-      claimedInZip(zip)
+      claimedInZip(zip),
+      demandInZip(zip)
     ]);
 
     if (!scoreRes || scoreRes.available === false) {
       // Deliberately not spun as good news — market-score refuses to score a ZIP
       // it has no population for, and inventing a verdict would defeat that.
-      out.innerHTML = '<div class="note">' +
+      out.innerHTML = demandHtml(demand) + '<div class="note">' +
         esc(((scoreRes && scoreRes.reason) || 'No data for that ZIP').replace(/\.?$/, '.')) +
         ' You can still register — the ZIP only changes what we can show you here.</div>';
       return;
@@ -443,7 +486,7 @@ $('formZip').onsubmit = async e => {
     const total = m.total_listings != null ? m.total_listings : m.providers;
     const unclaimed = (total != null && claimed != null) ? Math.max(0, total - claimed) : null;
 
-    let html = '<div class="verdict">' +
+    let html = demandHtml(demand) + '<div class="verdict">' +
       '<span class="chip ' + verdictClass(scoreRes.label) + '">' + esc(scoreRes.label) + '</span>' +
       '<span class="zip">' + esc(zip) + (scoreRes.state ? ' · ' + esc(scoreRes.state) : '') + '</span>' +
       '</div><div class="figs">';
