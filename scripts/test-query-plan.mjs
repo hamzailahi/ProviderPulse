@@ -98,6 +98,27 @@ console.log('\n9. Path building');
   check('no raw SQL anywhere', !/select\s|;|--|\bunion\b/i.test(path.replace('select=', '')), path);
 }
 
+console.log('\n9b. Taxonomy is prefiltered in the DATABASE, not only in JS');
+{
+  // Regression: without a pushed-down prefilter the limit applied first, so a
+  // TN primary-care question filtered an arbitrary 2000-row slice of ~100k
+  // clinics and returned zero for a question that has a real answer.
+  const v = validatePlan({ table: 'clinics', select: ['zip'], aggregate: 'count_by', group_by: 'zip', taxonomy: 'Primary Care' });
+  const path = buildPath(v.plan);
+  check('an ilike prefilter is pushed down', /primary_taxonomy=ilike/.test(path), path);
+  // encodeURIComponent leaves * alone, which is what PostgREST wants for ilike.
+  check('only the FIRST word, so long forms still match', /ilike\.\*Primary\*/i.test(path), path);
+  check('the second word is NOT in the prefilter', !/Care/.test(path.split('ilike')[1] || ''), path);
+  check('the exact matcher still governs the answer',
+    taxMatches('Primary Care Clinic/Center', 'Primary Care') && !taxMatches('Internal Medicine', 'Primary Care'));
+  // The prefilter must never be narrower than the rule, or true matches vanish.
+  const stored = ['Primary Care Clinic/Center', 'Primary Care Physician', 'Primary Care'];
+  check('every true match survives the prefilter',
+    stored.every(s => s.toLowerCase().includes('primary') && taxMatches(s, 'Primary Care')));
+  check('a one/two-letter term is not pushed down',
+    !/ilike/.test(buildPath(validatePlan({ table: 'clinics', select: ['zip'], taxonomy: 'ER' }).plan)));
+}
+
 console.log('\n10. Summarising');
 {
   const rows = [

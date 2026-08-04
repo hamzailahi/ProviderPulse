@@ -130,12 +130,34 @@ function validatePlan(raw) {
 const taxNorm = s => String(s || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 const taxMatches = (stored, term) => (' ' + taxNorm(stored)).includes(' ' + taxNorm(term));
 
-/** Build the PostgREST path for a validated plan. */
+/**
+ * Build the PostgREST path for a validated plan.
+ *
+ * The taxonomy term is pushed down as a COARSE `ilike` prefilter, then the exact
+ * word-boundary rule is applied to whatever comes back (see summarise).
+ *
+ * This matters for correctness, not just speed. Filtering in JavaScript alone
+ * meant the limit applied FIRST: a question about primary care in TN fetched an
+ * arbitrary 2000-row slice of ~100k clinics and then filtered it, so the answer
+ * was drawn from a random 2% and came back as zero. `ilike '%term%'` is a strict
+ * superset of the word-boundary match -- it can only over-include -- so nothing
+ * is lost by narrowing with it, and the precise matcher still decides the final
+ * answer. This is a prefilter, never a replacement for the rule.
+ */
 function buildPath(plan) {
   const parts = [`select=${encodeURIComponent(plan.select.join(','))}`];
   for (const f of plan.filters) {
     const v = Array.isArray(f.value) ? `(${f.value.map(x => String(x)).join(',')})` : String(f.value);
     parts.push(`${encodeURIComponent(f.column)}=${f.op}.${encodeURIComponent(v)}`);
+  }
+  if (plan.taxonomy) {
+    // Only the first word: "Primary Care" must still reach
+    // "Primary Care Clinic/Center", and a multi-word ilike would miss
+    // punctuation and word-order variants the exact matcher handles.
+    const head = String(plan.taxonomy).trim().split(/\s+/)[0].replace(/[^A-Za-z0-9]/g, '');
+    if (head.length >= 3) {
+      parts.push(`primary_taxonomy=ilike.${encodeURIComponent('*' + head + '*')}`);
+    }
   }
   parts.push(`limit=${plan.limit}`);
   return `${plan.table}?${parts.join('&')}`;
