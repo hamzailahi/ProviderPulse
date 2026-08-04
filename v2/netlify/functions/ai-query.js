@@ -33,7 +33,25 @@ Plan shape:
 Allowed operators: ${OPS.join(', ')}.
 
 Rules:
-- To filter clinics by specialty use the "taxonomy" field, NOT a filter on primary_taxonomy. Give the SHORT form ("Family Medicine", not "Family Medicine Physician") -- matching is done at a word boundary and the short form matches both.
+- To filter clinics by specialty use the "taxonomy" field, NOT a filter on primary_taxonomy.
+
+- clinics.primary_taxonomy is NOT one controlled vocabulary. Two coexist, from
+  different import batches: a long form ("Family Medicine Physician", "Internal
+  Medicine Physician", "General Practice Dentistry") and a short category form
+  ("Family Medicine", "Internal Medicine", "Dentistry", "Vision & Eye Care").
+  Always give the SHORT form: matching is at a word boundary, so "Family
+  Medicine" finds both, while the long form finds only one.
+
+- There is NO "Primary Care" value in most states. Primary care is spread across
+  "Family Medicine", "Internal Medicine", "General Practice" and "Pediatrics".
+  If asked about primary care, pick ONE of those and name it, or ask about
+  clinics generally -- do not invent a "Primary Care" category.
+
+- Values that really occur include: Family Medicine, Internal Medicine, General
+  Practice, Pediatrics, Cardiology, Dentistry, Vision & Eye Care, Psychiatry &
+  Mental Health, Chiropractic, Pharmacy, Nursing, Emergency Services, Therapy &
+  Rehabilitation, Facility / Clinic, Radiology & Imaging, Surgery, Oncology,
+  Dermatology, Neurology, Obstetrics & Gynecology.
 - Prefer count_by for "how many per X" questions.
 - There is no table of patients, provider accounts, emails, or contact details. If the question asks for any of those, or for anything not answerable from the tables above, return {"refuse":"<one short sentence saying what is unavailable>"}.
 - Return ONLY the JSON object. No prose, no code fence.`;
