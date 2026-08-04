@@ -224,6 +224,39 @@ async function registeredByNpi(env, npis) {
 
 // Registered providers whose practice is in this ZIP. Uses the service role
 // because provider_profiles is RLS self-only; only published fields are read.
+// Normalise a taxonomy string the same way every other surface does:
+// lowercase, & -> and, punctuation to spaces, collapse whitespace.
+const taxNorm = s => String(s || '')
+  .toLowerCase()
+  .replace(/&/g, ' and ')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+/**
+ * Does this provider's recorded specialty match any of the searched terms?
+ *
+ * Same normalise-then-word-boundary rule as everywhere else: both halves are
+ * load-bearing, and it is checked in BOTH directions because the two sides come
+ * from different vocabularies. A listing registered as "Family Medicine
+ * Physician" must match a search for "Family Medicine", and one registered as
+ * "Cardiology" must match a search for "Cardiovascular Disease" only if the
+ * words genuinely overlap -- never by coincidence of substring.
+ *
+ * Empty specialty returns FALSE. Unknown is not a match; that is the same
+ * fail-closed rule the rest of the codebase follows.
+ */
+function practisesAny(specialty, terms) {
+  const s = taxNorm(specialty);
+  if (!s) return false;
+  for (const t of (terms || [])) {
+    const term = taxNorm(t);
+    if (!term) continue;
+    if ((' ' + s).includes(' ' + term) || (' ' + term).includes(' ' + s)) return true;
+  }
+  return false;
+}
+
 async function claimedInZip(env, zip) {
   if (!/^\d{5}$/.test(String(zip || '')) || !env.SUPABASE_SERVICE_ROLE_KEY) return [];
   try {
@@ -388,8 +421,19 @@ exports.handler = async (event) => {
     // among whatever NPPES happened to return. A verified provider is our best
     // data about a market; making them depend on a federal registry's ranking
     // meant a claimed listing could silently never appear.
+    //
+    // BUT ONLY IF THEY PRACTISE WHAT WAS SEARCHED FOR. This injection first
+    // shipped unconditional, so the one claimed Family Medicine practice was
+    // recommended for cardiology, dermatology and everything else in its ZIP --
+    // being registered is not a reason to be the answer to an unrelated
+    // question, and doing that to patients is worse than an empty result.
+    //
+    // A listing with no recorded specialty is NOT injected. It can still appear
+    // through the normal NPPES path if the registry ranks it in; what it cannot
+    // do is bypass relevance entirely.
     const localClaimed = await claimedInZip(env, effectiveZip);
     for (const c of localClaimed) {
+      if (!practisesAny(c.specialty, terms)) continue;
       if (!seen.has(c.npi)) { seen.add(c.npi); providers.push(c); }
     }
 
