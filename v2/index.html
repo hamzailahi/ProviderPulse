@@ -313,6 +313,11 @@
                 <div id="ai-input-area">
                     <textarea id="ai-input" placeholder="Ask about the loaded clinics..." rows="1"></textarea>
                     <button id="ai-send" onclick="sendAIQuery()">Send</button>
+                    <!-- Market memo queries the DATABASE directly through a
+                         validated query plan, rather than reasoning over the
+                         clinics currently loaded in the browser. It therefore
+                         answers questions the loaded set cannot. -->
+                    <button id="ai-memo" onclick="sendMarketMemo()" title="Query the database directly and write a market memo">Memo</button>
                 </div>
             </div>
 
@@ -2772,6 +2777,109 @@
         // Ring convention extends the existing one: solid teal stays "NPPES
         // verified", hollow teal is self-reported. They must not look alike or
         // the verified ring stops carrying information.
+        // ---------------------------------------------------------------
+        // MARKET MEMO
+        //
+        // Unlike sendAIQuery, this does NOT ship the loaded clinics to the
+        // model. It sends the question only; the function turns it into a
+        // validated query plan, runs that server-side against an allowlisted
+        // set of tables, and writes a memo over the summarised results. So it
+        // can answer questions about ZIPs that are not currently on screen --
+        // and it will refuse anything touching patient or account data.
+        // ---------------------------------------------------------------
+        async function sendMarketMemo() {
+            const input = document.getElementById('ai-input');
+            const q = (input.value || '').trim();
+            if (!q) { input.focus(); return; }
+
+            appendAIMessage('user', q);
+            input.value = '';
+            const btn = document.getElementById('ai-memo');
+            const send = document.getElementById('ai-send');
+            btn.disabled = true; send.disabled = true;
+            const label = btn.textContent; btn.textContent = 'Working…';
+
+            try {
+                const r = await fetch('/.netlify/functions/ai-query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: 'market_memo', question: q })
+                });
+                const d = await r.json();
+
+                if (d.refused) {
+                    // Show the validator's own words. A refusal that explains
+                    // itself teaches the next question; a generic one does not.
+                    appendAIMessage('ai', 'I can\'t answer that from the market tables.\n\n' + (d.reason || ''));
+                    return;
+                }
+                if (d.error) { appendAIMessage('ai', d.error); return; }
+
+                const res = d.results || {};
+                const bits = [];
+                bits.push(d.memo || '(no memo)');
+                bits.push('');
+                bits.push('— based on ' + (res.matched != null ? res.matched.toLocaleString() : '?') +
+                          ' matching rows from ' + (res.table || '?') +
+                          (d.plan && d.plan.taxonomy ? ' filtered to ' + d.plan.taxonomy : ''));
+                appendMemoResult(bits.join('\n'), d);
+            } catch (e) {
+                appendAIMessage('ai', 'The memo service is unavailable right now.');
+            } finally {
+                btn.disabled = false; send.disabled = false; btn.textContent = label;
+            }
+        }
+
+        // Memo results get two affordances the chat messages do not: a copy
+        // button, and the query plan that produced them. Showing the plan is
+        // deliberate -- an analyst should see exactly what was run before
+        // quoting the number to anyone.
+        function appendMemoResult(text, detail) {
+            const box = document.getElementById('ai-messages');
+            if (!box) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'ai-msg-ai';
+
+            const body = document.createElement('div');
+            body.textContent = text;              // textContent, never innerHTML
+            wrap.appendChild(body);
+
+            const tools = document.createElement('div');
+            tools.className = 'ai-memo-tools';
+
+            const copy = document.createElement('button');
+            copy.type = 'button';
+            copy.textContent = 'Copy';
+            copy.onclick = function () {
+                navigator.clipboard.writeText(text).then(function () {
+                    copy.textContent = 'Copied';
+                    setTimeout(function () { copy.textContent = 'Copy'; }, 1500);
+                }).catch(function () { copy.textContent = 'Copy failed'; });
+            };
+            tools.appendChild(copy);
+            wrap.appendChild(tools);
+
+            if (detail && detail.plan) {
+                const show = document.createElement('button');
+                show.type = 'button';
+                show.textContent = 'Show query';
+                const pre = document.createElement('pre');
+                pre.className = 'ai-plan';
+                pre.style.display = 'none';
+                pre.textContent = JSON.stringify(detail.plan, null, 2);
+                show.onclick = function () {
+                    const on = pre.style.display === 'none';
+                    pre.style.display = on ? 'block' : 'none';
+                    show.textContent = on ? 'Hide query' : 'Show query';
+                };
+                tools.appendChild(show);
+                wrap.appendChild(pre);
+            }
+
+            box.appendChild(wrap);
+            box.scrollTop = box.scrollHeight;
+        }
+
         function drawLocationPins() {
             if (!Object.keys(registeredProviders || {}).length) return;
 

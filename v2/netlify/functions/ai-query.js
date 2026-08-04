@@ -1,4 +1,147 @@
 const https = require('https');
+const { validatePlan, buildPath, summarise, TABLES, OPS } = require('./lib/query-plan.js');
+
+// ---------------------------------------------------------------------------
+// MARKET MEMO: a two-step agent.
+//
+// Step 1 turns a natural-language market question into a constrained JSON query
+// plan. Step 2 executes the plan server-side -- only if it validates -- and asks
+// the model to write a memo over the pre-summarised results.
+//
+// The model never sees credentials, never emits SQL, and cannot name a table
+// outside the allowlist in lib/query-plan.js. Rejection is the default.
+// ---------------------------------------------------------------------------
+
+const PLANNER_SYSTEM = `You turn a question about healthcare market data into ONE JSON query plan.
+
+Available tables and columns (nothing else exists, and nothing else may be named):
+${Object.entries(TABLES).map(([t, s]) =>
+  `- ${t}${s.aggregatesOnly ? ' (AGGREGATES ONLY: aggregate must be "count" or "count_by")' : ''}: ${s.columns.join(', ')}`
+).join('\n')}
+
+Plan shape:
+{
+  "table": "<one table>",
+  "select": ["<column>", ...],
+  "filters": [{"column":"<column>","op":"<op>","value":<string|number|array>}],
+  "aggregate": "none" | "count" | "count_by",
+  "group_by": "<column, required when aggregate is count_by>",
+  "taxonomy": "<optional specialty term, clinics only>",
+  "limit": <1-2000>
+}
+
+Allowed operators: ${OPS.join(', ')}.
+
+Rules:
+- To filter clinics by specialty use the "taxonomy" field, NOT a filter on primary_taxonomy. Give the SHORT form ("Family Medicine", not "Family Medicine Physician") -- matching is done at a word boundary and the short form matches both.
+- Prefer count_by for "how many per X" questions.
+- There is no table of patients, provider accounts, emails, or contact details. If the question asks for any of those, or for anything not answerable from the tables above, return {"refuse":"<one short sentence saying what is unavailable>"}.
+- Return ONLY the JSON object. No prose, no code fence.`;
+
+const MEMO_SYSTEM = `You write a short market memo for a healthcare strategy analyst, grounded ONLY in the query results supplied.
+
+Format exactly:
+HEADLINE: <one sentence>
+FINDINGS:
+- <finding>
+- <finding>
+- <finding>
+CAVEAT: <one sentence naming the main limitation of this data>
+
+Rules:
+- Use only numbers present in the results. Never estimate, extrapolate, or project.
+- If the results are empty or too thin to support a finding, say so plainly in the headline rather than inventing one.
+- Name the table the numbers came from.
+- No compliance or regulatory claims.`;
+
+function stripFence(t) {
+  let s = String(t || '').trim();
+  const m = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (m) s = m[1].trim();
+  const b = s.indexOf('{');
+  if (b > 0) s = s.slice(b);
+  return s;
+}
+
+async function marketMemo(parsed, apiKey) {
+  const JSONH = { 'Content-Type': 'application/json' };
+  const env = process.env;
+  const question = String(parsed.question || '').trim().slice(0, 500);
+  if (!question) {
+    return { statusCode: 400, headers: JSONH, body: JSON.stringify({ error: 'A question is required' }) };
+  }
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { statusCode: 503, headers: JSONH, body: JSON.stringify({ error: 'Database is not configured' }) };
+  }
+
+  // ---- step 1: plan ------------------------------------------------------
+  const planRes = await callAnthropic({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 700,
+    system: PLANNER_SYSTEM,
+    messages: [{ role: 'user', content: question }]
+  }, apiKey);
+
+  if (planRes.status !== 200) {
+    return { statusCode: 502, headers: JSONH, body: JSON.stringify({ error: 'The planner is unavailable right now.' }) };
+  }
+  const planText = (planRes.body.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
+  let rawPlan;
+  try { rawPlan = JSON.parse(stripFence(planText)); }
+  catch { return { statusCode: 200, headers: JSONH, body: JSON.stringify({ refused: true, reason: 'Could not turn that into a query I can run. Try naming a state, ZIP or specialty.' }) }; }
+
+  if (rawPlan && rawPlan.refuse) {
+    return { statusCode: 200, headers: JSONH, body: JSON.stringify({ refused: true, reason: String(rawPlan.refuse).slice(0, 300) }) };
+  }
+
+  const check = validatePlan(rawPlan);
+  if (!check.ok) {
+    // The validator's message is the honest one; do not soften it.
+    return { statusCode: 200, headers: JSONH, body: JSON.stringify({ refused: true, reason: check.error, plan: rawPlan }) };
+  }
+  const plan = check.plan;
+
+  // ---- step 2: execute, server-side --------------------------------------
+  let rows = [];
+  try {
+    const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${buildPath(plan)}`, {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
+      },
+      signal: AbortSignal.timeout(9000)
+    });
+    if (!r.ok) throw new Error('query failed: HTTP ' + r.status);
+    rows = await r.json();
+  } catch (e) {
+    return { statusCode: 200, headers: JSONH, body: JSON.stringify({ refused: true, reason: 'The query could not be run against the database.', plan }) };
+  }
+
+  const summary = summarise(plan, rows);
+
+  // ---- step 3: memo over the summary only --------------------------------
+  const memoRes = await callAnthropic({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 800,
+    system: MEMO_SYSTEM,
+    messages: [{ role: 'user', content: JSON.stringify({ question, plan, results: summary }) }]
+  }, apiKey);
+
+  const memo = memoRes.status === 200
+    ? (memoRes.body.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim()
+    : '';
+
+  return {
+    statusCode: 200,
+    headers: JSONH,
+    body: JSON.stringify({
+      question,
+      plan,                 // shown in the UI: the analyst can see what was run
+      results: summary,
+      memo: memo || 'The memo could not be generated, but the query results above are complete.'
+    })
+  };
+}
 
 const TOOLS = [
     {
@@ -278,6 +421,12 @@ exports.handler = async function(event, context) {
         let parsed;
         try { parsed = JSON.parse(event.body); }
         catch(e) { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON in request body' }) }; }
+
+        // Market-memo mode: the constrained two-step agent. Branches before the
+        // client-data tool loop below, which is untouched.
+        if (parsed.mode === 'market_memo') {
+            return await marketMemo(parsed, apiKey);
+        }
 
         const { system, messages, clientData } = parsed;
 
