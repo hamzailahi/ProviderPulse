@@ -60,59 +60,25 @@
     <a href="/" style="color:var(--a1);text-decoration:none">Looking for care instead?</a>
   </div>
 
-  <form id="formRegister">
-    <fieldset class="fs">
-      <h2 class="fs-title">Your NPI</h2>
-      <label for="pNpi">NPI number</label>
-      <input id="pNpi" inputmode="numeric" maxlength="10" required placeholder="10-digit NPI" aria-describedby="npiHint">
-      <div class="hint" id="npiHint">For organizations, enter the authorized official's name below.</div>
-
-      <div class="row">
-        <div><label for="pFirst">First name</label><input id="pFirst" autocomplete="given-name"></div>
-        <div><label for="pLast">Last name</label><input id="pLast" required autocomplete="family-name"></div>
-      </div>
-    </fieldset>
-
-    <fieldset class="fs">
-      <h2 class="fs-title">Practice location <span class="opt">Optional</span></h2>
-      <label for="pAddr">Practice address</label>
-      <input id="pAddr" placeholder="Street address" autocomplete="street-address">
-      <div class="row3" style="margin-top:12px">
-        <div><label for="pCity" style="margin-top:0">City</label><input id="pCity" autocomplete="address-level2"></div>
-        <div><label for="pState" style="margin-top:0">State</label><input id="pState" maxlength="2" placeholder="AR" autocomplete="address-level1"></div>
-        <div><label for="pZip" style="margin-top:0">ZIP</label><input id="pZip" inputmode="numeric" maxlength="5" autocomplete="postal-code"></div>
-      </div>
-      <div class="hint">Leave blank to use the practice location on file with NPPES.</div>
-    </fieldset>
-
-    <fieldset class="fs">
-      <h2 class="fs-title">Insurance accepted</h2>
-      <div class="checks" id="insChecks"></div>
-      <input id="insOther" placeholder="Other payers, comma separated" style="margin-top:10px" aria-label="Other payers, comma separated">
-    </fieldset>
-
-    <fieldset class="fs">
-      <h2 class="fs-title">Account</h2>
-      <label for="pEmail">Work email</label>
-      <input id="pEmail" type="email" required autocomplete="email">
-      <label for="pPass">Password</label>
-      <input id="pPass" type="password" required minlength="12" autocomplete="new-password" aria-describedby="pPassHint">
-      <div class="hint" id="pPassHint">At least 12 characters.</div>
-    </fieldset>
-
-    <button class="submit" type="submit">Verify NPI and create account</button>
+  <!-- Sign-in and sign-up live on ONE page for both roles (auth.html, served
+       at /signin and /join). This page keeps the pitch and, once signed in, the
+       provider's own listing -- but it no longer carries a second copy of the
+       auth forms. Two copies is what let the two sides drift apart. -->
+  <div id="cta" class="panel">
+    <h2 class="fs-title">Claim your listing</h2>
+    <p class="hint" style="margin:-4px 0 16px">
+      Free, and verified against the federal NPPES registry. You control what patients see:
+      accepted plans, whether you're taking new patients, hours and locations.
+    </p>
+    <a class="submit" href="/join" style="display:block;text-align:center;text-decoration:none">
+      Create a provider account
+    </a>
+    <a class="submit" href="/signin"
+       style="display:block;text-align:center;text-decoration:none;background:none;border:1px solid var(--hairline-2);color:var(--text);margin-top:10px">
+      Already registered? Sign in
+    </a>
     <div class="msg" id="rMsg" role="status" aria-live="polite"></div>
-  </form>
-
-  <form id="formLogin" class="hidden">
-    <h2 class="fs-title">Sign in</h2>
-    <label for="lEmail">Email</label>
-    <input id="lEmail" type="email" required autocomplete="email">
-    <label for="lPass">Password</label>
-    <input id="lPass" type="password" required autocomplete="current-password">
-    <button class="submit" type="submit">Sign in</button>
-    <div class="msg" id="lMsg" role="status" aria-live="polite"></div>
-  </form>
+  </div>
 
   <div id="account" class="panel hidden">
     <div class="fs-title" style="margin-bottom:16px">
@@ -174,91 +140,28 @@ let session = (function () {
 // vocabularies, every insurance match would silently fail.
 // The list is state-specific (TennCare, Arkansas Blue Cross, Triple-S ...), so it
 // reloads when the practice ZIP changes.
-let PAYERS = [];
 const escAttr = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
-function paintPayers(list) {
-  const checked = new Set(
-    [...document.querySelectorAll('#insChecks input:checked')].map(c => c.value));
-  PAYERS = list.map(x => x.name);
-  const group = (label, items) => items.length
-    ? `<div class="grouplabel" style="grid-column:1/-1;margin:6px 0 2px">${escAttr(label)}</div>` +
-      items.map(x =>
-        `<label><input type="checkbox" value="${escAttr(x.name)}"${checked.has(x.name) ? ' checked' : ''}>${escAttr(x.name)}</label>`
-      ).join('')
-    : '';
-  $('insChecks').innerHTML =
-    group('Plans in your state', list.filter(x => x.local)) +
-    group('National carriers', list.filter(x => !x.local));
-}
+// Still needed by the ACCOUNT panel, which renders a signed-in provider's
+// insurance checkboxes. Only the signup form's copy went away with the form.
+let PAYERS = [];
 
-function loadPayers(zip) {
-  const qs = /^\d{5}$/.test(String(zip || '')) ? '?zip=' + encodeURIComponent(zip) : '';
-  return fetch(FN + '/payers' + qs)
-    .then(r => r.json())
-    .then(d => paintPayers(d.payers || []))
-    .catch(() => {});
-}
-loadPayers('');
-// The practice ZIP decides which state's plans are on offer
-$('pZip').addEventListener('change', () => loadPayers($('pZip').value.trim()));
-
-function selectedPayers() {
-  const checked = [...document.querySelectorAll('#insChecks input:checked')].map(c => c.value);
-  const other = $('insOther').value.split(',').map(s => s.trim()).filter(Boolean);
-  return [...checked, ...other];
+async function loadPayers(zip) {
+  try {
+    const q = /^\d{5}$/.test(String(zip || '').trim()) ? '?zip=' + encodeURIComponent(String(zip).trim()) : '';
+    const r = await fetch(FN + '/payers' + q);
+    if (!r.ok) return;
+    const d = await r.json();
+    PAYERS = (d && d.payers ? d.payers : []).map(x => x.name).filter(Boolean);
+  } catch (e) { /* the account panel still renders; the list is just shorter */ }
 }
 
 // Claim-a-listing: the map links here as register-provider.html#npi=1234567890.
-// Prefill the NPI and say why the page changed, so arriving from a map popup does
-// not look like a plain signup form that happens to be filled in.
-(function claimFromMap() {
-  const npi = (new URLSearchParams((location.hash || '').replace(/^#/, '')).get('npi') || '').trim();
-  if (!/^\d{10}$/.test(npi)) return;
-  $('pNpi').value = npi;
-  const banner = document.createElement('div');
-  banner.className = 'phi-note';
-  banner.style.cssText = 'margin:0 0 18px;border-color:rgba(45,212,191,0.35);background:rgba(45,212,191,0.07);color:var(--text)';
-  banner.innerHTML = `<strong>Claiming NPI ${npi}</strong><br>`
-    + `<span style="color:var(--muted)">We'll verify this NPI against the NPPES registry. `
-    + `Enter the name exactly as it appears there — for organizations, the authorized official's name.</span>`;
-  $('formRegister').prepend(banner);
-  $('pLast').focus();
-})();
 
-$('toggleLogin').onclick = e => {
-  e.preventDefault();
-  $('formRegister').classList.toggle('hidden');
-  $('formLogin').classList.toggle('hidden');
-  $('account').classList.add('hidden');
-  $('toggleLogin').textContent = $('formLogin').classList.contains('hidden')
-    ? 'Already registered? Sign in' : 'Need an account? Register';
-};
 
 function setMsg(id, text, ok) { const m = $(id); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); }
 function busy(form, on) { form.querySelector('.submit').disabled = on; }
 
-$('formRegister').onsubmit = async e => {
-  e.preventDefault(); busy(e.target, true); setMsg('rMsg', 'Checking NPPES registry…', true);
-  const r = await fetch(FN + '/auth-register-provider', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      npi: $('pNpi').value.trim(),
-      first_name: $('pFirst').value,
-      last_name: $('pLast').value,
-      address_line: $('pAddr').value.trim(),
-      city: $('pCity').value.trim(),
-      state: $('pState').value.trim().toUpperCase(),
-      zip: $('pZip').value.trim(),
-      email: $('pEmail').value,
-      password: $('pPass').value,
-      insurances: selectedPayers()
-    })
-  });
-  const data = await r.json().catch(() => ({}));
-  setMsg('rMsg', r.ok ? data.message : (data.error || 'Registration failed'), r.ok);
-  busy(e.target, false);
-};
 
 // A restored session should land straight on the account panel.
 if (session) loadAccount();
@@ -521,36 +424,7 @@ $('formZip').onsubmit = async e => {
   }
 };
 
-// Typing a practice ZIP in the form below fills the checker, so the number they
-// came here to see matches the address they are registering.
-$('pZip').addEventListener('change', () => {
-  const z = $('pZip').value.trim();
-  if (/^\d{5}$/.test(z) && !$('zipProbe').value.trim()) $('zipProbe').value = z;
-});
 
-$('formLogin').onsubmit = async e => {
-  e.preventDefault(); busy(e.target, true);
-  const r = await fetch(FN + '/auth-login', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: $('lEmail').value, password: $('lPass').value })
-  });
-  const data = await r.json().catch(() => ({}));
-  busy(e.target, false);
-  if (!r.ok) return setMsg('lMsg', data.error || 'Sign in failed', false);
-  if (data.role !== 'provider') return setMsg('lMsg', 'This account is not a provider account. Use the patient page.', false);
-  session = data;
-  // Same shape and key the patient app and dashboard use, so a signed-in
-  // provider is recognised everywhere instead of only on this page.
-  try {
-    sessionStorage.setItem('pp.session.v1', JSON.stringify({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      role: data.role,
-      expiresAt: Date.now() + (data.expires_in || 3600) * 1000
-    }));
-  } catch (e) {}
-  loadAccount();
-};
 
 $('acctSignOut').onclick = async () => {
   try {
@@ -584,9 +458,8 @@ async function loadAccount() {
   // Hide BOTH forms. Previously only the login form was hidden, so signing in
   // left the registration form on screen above the account panel and looked as
   // though nothing had happened.
-  $('formLogin').classList.add('hidden');
-  $('formRegister').classList.add('hidden');
-  $('toggleLogin').classList.add('hidden');
+  $('cta').classList.add('hidden');
+  const tl = $('toggleLogin'); if (tl) tl.classList.add('hidden');
   // The pitch argues for claiming a listing. They already have — drop it rather
   // than making them scroll past a sales page to reach their own hours.
   $('pitchBody').classList.add('hidden');
