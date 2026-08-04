@@ -115,6 +115,11 @@ function validatePlan(raw) {
   if (taxonomy && !spec.columns.includes('primary_taxonomy')) {
     return { ok: false, error: `Taxonomy matching is only meaningful on clinics.` };
   }
+  // The column being matched on must actually come back, or summarise() reads
+  // undefined off every row and filters everything to zero. A plan grouping by
+  // zip legitimately selects only zip, so this is not the planner's mistake to
+  // avoid -- same reason group_by is force-added above.
+  if (taxonomy && !select.includes('primary_taxonomy')) select.push('primary_taxonomy');
 
   let limit = Number(raw.limit);
   if (!Number.isFinite(limit) || limit <= 0) limit = DEFAULT_LIMIT;

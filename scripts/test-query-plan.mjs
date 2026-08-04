@@ -117,6 +117,21 @@ console.log('\n9b. Taxonomy is prefiltered in the DATABASE, not only in JS');
     stored.every(s => s.toLowerCase().includes('primary') && taxMatches(s, 'Primary Care')));
   check('a one/two-letter term is not pushed down',
     !/ilike/.test(buildPath(validatePlan({ table: 'clinics', select: ['zip'], taxonomy: 'ER' }).plan)));
+
+  // Regression: a plan grouping by zip selects only zip, so summarise() read
+  // undefined off every row and filtered a real 31,688-row TN result to zero.
+  const grouped = validatePlan({ table: 'clinics', select: ['zip'], aggregate: 'count_by', group_by: 'zip', taxonomy: 'Family Medicine' });
+  check('the matched column is force-selected', grouped.plan.select.includes('primary_taxonomy'), JSON.stringify(grouped.plan.select));
+  check('and reaches the query path', /primary_taxonomy/.test(buildPath(grouped.plan)));
+  check('summarise now counts real rows',
+    summarise(grouped.plan, [
+      { zip: '37027', primary_taxonomy: 'Family Medicine' },
+      { zip: '37027', primary_taxonomy: 'Family Medicine Physician' },
+      { zip: '38201', primary_taxonomy: 'Dentistry' }
+    ]).matched === 2);
+  check('not double-added when already present',
+    validatePlan({ table: 'clinics', select: ['zip', 'primary_taxonomy'], taxonomy: 'Family Medicine' })
+      .plan.select.filter(c => c === 'primary_taxonomy').length === 1);
 }
 
 console.log('\n10. Summarising');
