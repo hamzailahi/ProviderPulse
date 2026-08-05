@@ -26,6 +26,68 @@ const WEIGHTS = { supply: 0.40, payer: 0.30, shortage: 0.30 };
 
 // Shared with the map so "provider" means the same thing in both places.
 const TaxonomyGroups = require('../../assets/taxonomy-groups.js');
+// CDC PLACES -> per-taxonomy need, and the national supply rate. See that file
+// for what the prevalence figures are and, more importantly, what they are not.
+const HealthDemand = require('../../assets/health-demand.js');
+
+// ---------------------------------------------------------------------------
+// THE CATCHMENT, AND WHY THE PER-GROUP SCORE IS NOT A ZIP-LEVEL SCORE
+//
+// A single ZIP cannot carry a per-taxonomy supply verdict. Across the 23,430
+// ZIPs in both clinics and PLACES, the share with ZERO listings in a group runs
+// surgical 64.2%, dental 41.9%, primary 38.0%, behavioral 34.7%, specialty
+// 27.6%. Most ZIPs are small; one practice already puts a ZIP above the 38th
+// percentile for primary care.
+//
+// A ZIP with no dentist is not infinitely underserved -- its residents drive to
+// the next ZIP. So the per-group verdict is computed over a CATCHMENT: the ZIP
+// plus its nearest neighbours by ZCTA centroid.
+//
+// This means the per-group answer describes an AREA, not the ZIP. "The 25-mile
+// area around 38017" and "38017" are different claims and will sometimes
+// disagree. The response labels every group block with the catchment it used so
+// a UI cannot present one as the other.
+//
+// CATCHMENT_MAX_MILES is a judgment call, not a derived figure -- a defensible
+// commute for routine care, with no drive-time data behind it. ZCTA centroids
+// also only approximate adjacency: a large rural ZCTA's centre can sit far from
+// where its people actually live. Both are reasons to treat the radius as a
+// tunable, and to refuse rather than stretch it: past the ceiling a group with
+// no listings reports `unserved`, because widening until a number appears would
+// quietly make rural areas look served.
+// ---------------------------------------------------------------------------
+const CATCHMENT_MAX_MILES = 25;
+const CATCHMENT_MAX_NEIGHBORS = 10;
+// One dense catchment can hold far more listings than one dense ZIP, and every
+// row costs budget. Hitting this is reported, never silently absorbed.
+const CATCHMENT_MAX_CLINIC_ROWS = 12000;
+
+// DENTAL is published for all 32,520 ZCTAs; the 2023 measures cover 29,983. Any
+// measure carries the same centroid and denominator, so pick the widest one or
+// ~2,500 ZIPs lose their catchment for no reason.
+const GEO_MEASURE = 'DENTAL';
+
+const PER_GROUP_WEIGHTS = { need: 0.35, supply: 0.35, payer: 0.15, shortage: 0.15 };
+
+// Great-circle distance in miles. Haversine rather than the equirectangular
+// approximation patient.js uses: at a 25-mile radius the flat-earth error is
+// small, but it grows with latitude and Alaska is in this dataset.
+const milesBetween = (lat1, lon1, lat2, lon2) => {
+  const R = 3958.8, rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+};
+
+// HPSA carries a discipline, so three of the five groups get a shortage signal
+// matched to what they actually practise instead of the state primary-care
+// median. The other two fall back, and say so.
+const HPSA_DISCIPLINE = {
+  primary: /primary/i,
+  dental: /dental/i,
+  behavioral: /mental/i
+};
 
 // hpsa_designations stores FULL state names ("Tennessee") while clinics and
 // demographics_raw use two-letter codes. Querying it with "TN" silently returns
@@ -217,6 +279,175 @@ exports.handler = async (event) => {
       parts.push(`insured rate ${d >= 0 ? '+' : ''}${d.toFixed(1)} pts vs the ${state} median`);
     }
 
+    // =======================================================================
+    // PER-TAXONOMY VERDICT, over a catchment rather than this ZIP alone
+    // =======================================================================
+    // Everything above stays exactly as it was: register-provider.html and the
+    // dashboard read `score`, `label`, `finding`, `components` and `metrics`,
+    // and this block only ADDS `groups`. A consumer that ignores it is
+    // unaffected.
+    let groups = null, catchment = null;
+
+    try {
+      const home = await get(
+        `cdc_places?zip=eq.${zip}&measureid=eq.${GEO_MEASURE}&select=zip,lat,lon,pop_18plus&limit=1`, 5000);
+      const origin = home[0];
+
+      if (!origin || origin.lat === null || origin.lon === null) {
+        // Puerto Rico is the expected case: PLACES publishes 32,520 ZCTAs and
+        // not one begins with "00", while PR ZIPs are a real share of clinics.
+        // Refusing is the point -- a neutral midpoint would rate every Puerto
+        // Rican ZIP as average need, which is a fabricated finding.
+        groups = { available: false, reason: 'CDC PLACES publishes no data for this ZIP (Puerto Rico and some territories are not covered)' };
+      } else {
+        const oLat = Number(origin.lat), oLon = Number(origin.lon);
+        // Bounding box first so Postgres can use the lat/lon index, then an
+        // exact haversine filter -- a box is a square and a radius is a circle.
+        const dLat = CATCHMENT_MAX_MILES / 69;
+        const dLon = CATCHMENT_MAX_MILES / Math.max(1, 69 * Math.cos(oLat * Math.PI / 180));
+        const boxPage = await pagedGet(
+          `cdc_places?measureid=eq.${GEO_MEASURE}` +
+          `&lat=gte.${(oLat - dLat).toFixed(4)}&lat=lte.${(oLat + dLat).toFixed(4)}` +
+          `&lon=gte.${(oLon - dLon).toFixed(4)}&lon=lte.${(oLon + dLon).toFixed(4)}` +
+          `&select=zip,lat,lon,pop_18plus`, 'zip', { cap: 4000, ms: 7000 });
+
+        const near = boxPage.rows
+          .map(r => ({
+            zip: r.zip,
+            pop: Number(r.pop_18plus) || 0,
+            miles: milesBetween(oLat, oLon, Number(r.lat), Number(r.lon))
+          }))
+          .filter(r => r.zip !== zip && r.miles <= CATCHMENT_MAX_MILES)
+          .sort((a, b) => a.miles - b.miles)
+          .slice(0, CATCHMENT_MAX_NEIGHBORS);
+
+        const members = [{ zip, pop: Number(origin.pop_18plus) || 0, miles: 0 }, ...near];
+        const memberZips = members.map(m => m.zip);
+        const catchmentAdults = members.reduce((s, m) => s + m.pop, 0);
+
+        // clinics.zip is not consistently padded, which is why the single-ZIP
+        // query above already asks for both forms. Same problem across a list.
+        const zipVariants = [...new Set(memberZips.flatMap(z => [z, String(parseInt(z, 10))]))];
+
+        const [clinicPage, placesPage] = await Promise.all([
+          pagedGet(`clinics?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy`,
+            'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
+          pagedGet(`cdc_places?zip=in.(${memberZips.join(',')})` +
+            `&measureid=in.(${HealthDemand.measureIds().join(',')})` +
+            `&select=zip,measureid,value,pop_18plus,data_year`, 'zip', { cap: 4000, ms: 7000 })
+        ]);
+
+        // Supply: count listings per group across the catchment.
+        const counts = {};
+        for (const r of clinicPage.rows) {
+          const g = TaxonomyGroups.keyFor(r.primary_taxonomy);
+          counts[g] = (counts[g] || 0) + 1;
+        }
+
+        // Need: compute per ZIP, then population-weight. Averaging the raw
+        // prevalences across ZIPs would let a 400-person ZIP count as much as a
+        // 40,000-person one.
+        const rowsByZip = {};
+        for (const r of placesPage.rows) (rowsByZip[r.zip] = rowsByZip[r.zip] || []).push(r);
+        const needByZip = {};
+        for (const z of Object.keys(rowsByZip)) needByZip[z] = HealthDemand.needByGroup(rowsByZip[z]);
+
+        groups = {};
+        for (const key of Object.keys(HealthDemand.NEED_BY_GROUP)) {
+          let wsum = 0, w = 0, coverage = null;
+          for (const m of members) {
+            const n = needByZip[m.zip] && needByZip[m.zip][key];
+            if (!n || !n.available || n.index == null || !m.pop) continue;
+            wsum += n.index * m.pop; w += m.pop;
+            if (coverage === null || (n.coverage != null && n.coverage < coverage)) coverage = n.coverage;
+          }
+          const needIndex = w ? wsum / w : null;
+          const needPct = HealthDemand.needPercentile(key, needIndex);
+          const clinicians = counts[key] || 0;
+
+          // Discipline-matched shortage where HPSA has one, else the ZIP-level
+          // fallback -- and the response says which was used.
+          const rx = HPSA_DISCIPLINE[key];
+          let shortageScore = shortage, shortageBasis = 'state primary-care median (no discipline match)';
+          if (rx) {
+            const matched = hpsaRows.filter(h => rx.test(h.discipline || ''));
+            const med = median(matched.map(h => Number(h.hpsa_score)).filter(n => isFinite(n)));
+            if (med !== null) {
+              shortageScore = clamp((med / 25) * 100, 0, 100);
+              shortageBasis = `state HPSA median for ${matched.length} ${key} designations`;
+            }
+          }
+
+          if (clinicians === 0) {
+            // Not "maximum opportunity". Nobody practises within the catchment,
+            // so residents already travel further than this radius -- which is a
+            // finding, not a score. Refusing here is the same rule that makes
+            // the ZIP-level branch refuse a ZIP with no population.
+            groups[key] = {
+              available: false, verdict: 'unserved',
+              reason: `no ${key} listings within ${CATCHMENT_MAX_MILES} miles`,
+              need_index: needIndex, need_percentile: needPct,
+              clinicians: 0, confidence: HealthDemand.NEED_BY_GROUP[key].confidence
+            };
+            continue;
+          }
+
+          const supplyPct = HealthDemand.supplyScore(key, clinicians, catchmentAdults);
+          const parts2 = [];
+          let total = 0, wt = 0;
+          const add = (v, weight, name) => {
+            if (v === null || v === undefined) return;
+            total += v * weight; wt += weight; parts2.push(name);
+          };
+          add(needPct, PER_GROUP_WEIGHTS.need, 'need');
+          add(supplyPct, PER_GROUP_WEIGHTS.supply, 'supply');
+          add(payer, PER_GROUP_WEIGHTS.payer, 'payer');
+          add(shortageScore, PER_GROUP_WEIGHTS.shortage, 'shortage');
+
+          const gScore = wt ? Math.round(total / wt) : null;
+          groups[key] = {
+            available: true,
+            score: gScore,
+            label: gScore === null ? null
+              : gScore >= 70 ? 'UNDERSERVED' : gScore >= 50 ? 'BALANCED' : 'WELL SERVED',
+            need_index: needIndex,
+            need_percentile: needPct === null ? null : Math.round(needPct),
+            need_coverage: coverage,
+            clinicians,
+            per_1k_adults: catchmentAdults ? (clinicians / catchmentAdults) * 1000 : null,
+            national_per_1k_adults: HealthDemand.NATIONAL_RATE[key],
+            supply_score: supplyPct === null ? null : Math.round(supplyPct),
+            shortage_score: Math.round(shortageScore),
+            shortage_basis: shortageBasis,
+            // A comparative caseload figure, NOT an unduplicated patient count:
+            // the need index behind it is a weighted mean of overlapping
+            // prevalences, so a comorbid adult is represented more than once.
+            caseload_index: HealthDemand.caseloadPer(
+              { available: true, index: needIndex, adults: catchmentAdults }, clinicians),
+            confidence: HealthDemand.NEED_BY_GROUP[key].confidence,
+            components_used: parts2
+          };
+        }
+
+        catchment = {
+          zips: memberZips,
+          zip_count: memberZips.length,
+          adults_18plus: catchmentAdults,
+          radius_miles: CATCHMENT_MAX_MILES,
+          max_neighbors: CATCHMENT_MAX_NEIGHBORS,
+          furthest_miles: members.length > 1 ? Number(members[members.length - 1].miles.toFixed(1)) : 0,
+          clinic_rows: clinicPage.rows.length,
+          truncated: clinicPage.truncated || placesPage.truncated || boxPage.truncated,
+          basis: 'ZCTA centroid distance; approximates adjacency, not drive time',
+          weights: PER_GROUP_WEIGHTS
+        };
+      }
+    } catch (e) {
+      // The ZIP-level verdict is the product; the per-group breakdown is an
+      // addition. A failure here must not take the whole response down.
+      groups = { available: false, reason: 'Per-specialty breakdown is unavailable right now' };
+    }
+
     return {
       statusCode: 200,
       headers: { ...CORS, 'Cache-Control': 'public, max-age=900' },
@@ -242,8 +473,16 @@ exports.handler = async (event) => {
           benchmark_per_1k: benchDensity,
           hpsa_score: hpsaScore
         },
+        // Per-specialty verdict. NOTE: these describe the CATCHMENT named in
+        // `catchment`, not this ZIP. Do not render a group score under a
+        // ZIP-only heading.
+        groups,
+        catchment,
         // Named so the UI can cite them, and so a missing one is visible
-        sources: ['NPPES via clinics', 'US Census / demographics_raw', 'HRSA HPSA'],
+        sources: [
+          'NPPES via clinics', 'US Census / demographics_raw', 'HRSA HPSA',
+          'CDC PLACES (modelled small-area prevalence, not survey responses)'
+        ],
         omitted: ['patient demand trend — not tracked; no search history exists']
       })
     };

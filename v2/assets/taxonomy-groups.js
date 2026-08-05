@@ -32,14 +32,29 @@
   ];
 
   // Ordered: first match wins.
+  //
+  // `methadone`, `rural health clinic` and `fqhc` are venues, not disciplines,
+  // and sit here rather than in FACILITY on purpose. Both federal designations
+  // are DEFINED by the care they must deliver -- an RHC and an FQHC are
+  // required to provide primary care -- so the venue IS the discipline, the
+  // same reasoning that puts a Dental Clinic/Center in dental. Leaving them to
+  // fall through made the scorer report "no primary care within 25 miles" of
+  // Wolf Point, Montana, whose primary care is three Rural Health Clinics and
+  // an FQHC. That is a false statement about a real place, and it is the kind
+  // this file exists to prevent.
   var RULES = [
-    ['behavioral', /psychiat|psycholog|mental health|behavioral|counsel|social work|marriage|addiction|substance use|behavior analyst|psychoanalyst|neuropsych/],
+    ['behavioral', /psychiat|psycholog|mental health|behavioral|counsel|social work|marriage|addiction|substance use|behavior analyst|psychoanalyst|neuropsych|methadone/],
     ['dental',     /dent(al|ist|istry)|orthodont|endodont|periodont|prosthodont|oral and maxill|optometr|ophthalm|optician|eyewear|vision|hearing aid/],
     ['surgical',   /surger|surgical|surgeon|anesthesiol|anesthetist/],
-    ['primary',    /family medicine|internal medicine|general practice|primary care|pediatric|geriatric|adolescent medicine|preventive medicine|family nurse|adult health nurse|community health/]
+    ['primary',    /family medicine|internal medicine|general practice|primary care|pediatric|geriatric|adolescent medicine|preventive medicine|family nurse|adult health nurse|community health|rural health clinic|federally qualified health center|fqhc/]
   ];
 
-  var FACILITY = /clinic\/center|hospital|facility|agency|pharmacy|equipment|supplier|supplies|laborator|ambulance|transport|nursing (care|facility)|home health|hospice care|residential|organization|preferred provider|exclusive provider|health maintenance|point of service|assisted living|respite|foster|school|education|welfare|case management|\(dme\)|dispensing|physiological/;
+  // NOTE THE DEFAULT BELOW IS `specialty`, so anything this regex misses is
+  // published as a medical specialty. That is how Taxi, Private Vehicle and
+  // Contractor were being counted as specialist physicians -- FACILITY had
+  // `transport` but not the concrete words NPPES actually uses. When adding a
+  // venue or a non-clinical service, add it HERE; the default will not save you.
+  var FACILITY = /clinic\/center|hospital|facility|agency|pharmacy|equipment|supplier|supplies|laborator|ambulance|transport|taxi|private vehicle|contractor|personal care|case manage|care coordinator|health educator|legal medicine|alzheimer|dementia center|nursing (care|facility)|home health|hospice care|residential|organization|preferred provider|exclusive provider|health maintenance|point of service|assisted living|respite|foster|school|education|welfare|\(dme\)|dispensing|physiological/;
 
   function groupKey(taxonomy) {
     var s = String(taxonomy || '').toLowerCase();

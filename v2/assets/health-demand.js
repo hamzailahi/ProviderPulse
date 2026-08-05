@@ -318,6 +318,63 @@
     return 95;
   }
 
+  // --------------------------------------------------------------------------
+  // NATIONAL SUPPLY RATE, population-weighted.
+  //
+  // Derived from a full scan of all 1,901,815 rows in `clinics`, classified
+  // with taxonomy-groups.js, over the 25,230 ZIPs that also have a PLACES adult
+  // denominator -- 254,677,790 adults. Listings per 1,000 adults:
+  //
+  //   specialty  1.5112  (384,859)      dental   0.7871  (200,457)
+  //   behavioral 1.1640  (296,440)      primary  0.6388  (162,684)
+  //   surgical   0.3258  ( 82,964)
+  //
+  // WHY A SINGLE RATE AND NOT PERCENTILES, WHICH IS WHAT NEED USES.
+  // The per-ZIP density distribution is unusable as a benchmark: it is
+  // zero-inflated (p25 = 0.000 in every group, surgical's median is 0), because
+  // most ZIPs are small. Pooling a catchment fixes the zeros -- but then a
+  // catchment's density compared against a per-ZIP distribution compares two
+  // different units, and pooling narrows the spread so every catchment would
+  // drift to the middle percentiles regardless of how well served it is.
+  //
+  // A population-weighted rate has neither problem. ZIP size cannot skew it,
+  // and it applies unchanged to a catchment of any size. Same shape as the
+  // existing NATIONAL_PER_1K = 5.8 constant in market-score.js, but derived
+  // rather than assumed, and per group.
+  //
+  // These count LISTINGS, and `clinics` is entirely NPI-2 organisations -- so
+  // this is organisations per 1,000 adults, not doctors per 1,000 adults. The
+  // benchmark and the thing it scores come from the same table, so the
+  // comparison is like-for-like; quoting either as a physician count is not.
+  // --------------------------------------------------------------------------
+  var NATIONAL_RATE = {
+    primary:    0.6388,
+    specialty:  1.5112,
+    surgical:   0.3258,
+    dental:     0.7871,
+    behavioral: 1.1640
+  };
+
+  /**
+   * Supply sub-score, 0-100, where HIGHER means thinner supply and therefore
+   * more opportunity. Mirrors the shape of market-score's existing supply term:
+   * at the national rate it returns 50, at twice the rate 0, at zero supply 100.
+   *
+   * Returns null when the group is unknown or the inputs are missing -- and,
+   * deliberately, when `clinicians` is 0 with no catchment expansion left. A
+   * bare 100 would read as "maximum opportunity" when the honest reading is
+   * that nobody practises here and residents travel; the caller is expected to
+   * surface that as `unserved` rather than as a score. See needByGroup's
+   * "unknown is never clean" note -- this is the same rule.
+   */
+  function supplyScore(group, clinicians, adults) {
+    var rate = NATIONAL_RATE[group];
+    if (!rate || !isFinite(clinicians) || !isFinite(adults) || adults <= 0) return null;
+    var per1k = (clinicians / adults) * 1000;
+    var s = 100 - (per1k / rate) * 50;
+    return Math.max(0, Math.min(100, s));
+  }
+
   /**
    * Condition-weighted adults per clinician, for one group.
    *
@@ -346,9 +403,11 @@
     MEASURE_MAP: MEASURE_MAP,
     NEED_BY_GROUP: NEED_BY_GROUP,
     NATIONAL_NEED: NATIONAL_NEED,
+    NATIONAL_RATE: NATIONAL_RATE,
     measureIds: measureIds,
     needByGroup: needByGroup,
     needPercentile: needPercentile,
+    supplyScore: supplyScore,
     caseloadPer: caseloadPer
   };
 
