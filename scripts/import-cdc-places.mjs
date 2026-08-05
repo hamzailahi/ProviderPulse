@@ -64,7 +64,12 @@ const SOCRATA_HOST = 'https://data.cdc.gov';
 const FIELDS = [
   'locationid', 'measureid', 'categoryid', 'short_question_text', 'measure',
   'data_value', 'low_confidence_limit', 'high_confidence_limit',
-  'year', 'totalpop18plus', 'totalpopulation', 'datavaluetypeid'
+  'year', 'totalpop18plus', 'totalpopulation', 'datavaluetypeid',
+  // ZCTA centroid (migration 010). Carried on every row already; it was simply
+  // dropped on the first pass. It is what lets market-score pool a catchment
+  // server-side -- see the migration for why a single ZIP cannot carry a
+  // per-taxonomy supply verdict.
+  'geolocation'
 ].join(',');
 
 // ---------------------------------------------------------------------------
@@ -120,6 +125,21 @@ const cleanZip = (v) => {
   return s.padStart(5, '0');
 };
 
+// Socrata point: { type: 'Point', coordinates: [lon, lat] }.
+//
+// GeoJSON orders coordinates LONGITUDE FIRST. Reading them as [lat, lon] puts
+// every US ZIP somewhere off the coast of Somalia, and the failure is silent
+// because both values are plain numbers -- so the order is asserted against the
+// continental-plus-territories bounding box rather than trusted.
+const cleanPoint = (g) => {
+  const c = g && Array.isArray(g.coordinates) ? g.coordinates : null;
+  if (!c || c.length < 2) return { lat: null, lon: null };
+  const lon = Number(c[0]), lat = Number(c[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return { lat: null, lon: null };
+  if (lat < 17 || lat > 72 || lon < -180 || lon > -64) return { lat: null, lon: null };
+  return { lat, lon };
+};
+
 async function fetchPage(offset) {
   const url = `${SOCRATA_HOST}/resource/${DATASET}.json`
     + `?$select=${encodeURIComponent(FIELDS)}`
@@ -159,6 +179,7 @@ async function main() {
   console.log('');
 
   const zips = new Set();
+  const withCoords = new Set();
   const measures = new Map();   // measureid -> { year, count, short }
   const years = new Set();
   const valueTypes = new Set();
@@ -194,6 +215,8 @@ async function main() {
       seen.add(pk);
 
       const dataYear = int(r.year);
+      const pt = cleanPoint(r.geolocation);
+      if (pt.lat !== null) withCoords.add(zip);
       zips.add(zip);
       years.add(dataYear);
       const m = measures.get(measureid) || { year: dataYear, count: 0, short: r.short_question_text };
@@ -212,6 +235,8 @@ async function main() {
         data_year: dataYear,
         pop_18plus: int(r.totalpop18plus),
         total_population: int(r.totalpopulation),
+        lat: pt.lat,
+        lon: pt.lon,
         refreshed_at: new Date().toISOString()
       });
     }
@@ -239,6 +264,7 @@ async function main() {
   console.log(`  rows kept    : ${written.toLocaleString()}`);
   console.log(`  rows skipped : ${skipped.toLocaleString()}`);
   console.log(`  distinct ZIPs: ${zips.size.toLocaleString()}`);
+  console.log(`  ZIPs w/ coords: ${withCoords.size.toLocaleString()}`);
   console.log(`  measures     : ${measures.size}`);
   console.log(`  value types  : ${[...valueTypes].join(', ') || '(none)'}`);
   console.log(`  data years   : ${[...years].filter(y => y !== null).sort().join(', ')}`);
@@ -268,6 +294,16 @@ async function main() {
     if (fetched < MIN_ROWS) problems.push(`only ${fetched.toLocaleString()} rows fetched, floor is ${MIN_ROWS.toLocaleString()}`);
     if (zips.size < MIN_ZIPS) problems.push(`only ${zips.size.toLocaleString()} ZIPs, floor is ${MIN_ZIPS.toLocaleString()}`);
     if (measures.size < MIN_MEASURES) problems.push(`only ${measures.size} measures, floor is ${MIN_MEASURES}`);
+
+    // Centroids are what make catchment pooling possible, and a ZIP without one
+    // silently drops out of every neighbour search rather than erroring. If CDC
+    // renames the field or changes the coordinate order enough to fail the
+    // bounding-box check, this is what says so.
+    if (withCoords.size < zips.size * 0.95) {
+      problems.push(
+        `only ${withCoords.size.toLocaleString()} of ${zips.size.toLocaleString()} ZIPs have usable coordinates. ` +
+        `Check that the geolocation field still exists and is still [lon, lat].`);
+    }
   }
 
   if (problems.length) {
