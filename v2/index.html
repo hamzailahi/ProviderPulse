@@ -3750,6 +3750,74 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
         // 4. Verdict card — the answer before the numbers. Reads /market-score,
         //    which computes from real data and refuses to score a ZIP with no
         //    population rather than inventing a confident-looking number.
+        // Per-specialty breakdown labels/order, matching register-provider.html.
+        // ANALYST-FACING ONLY -- market-score's `groups` is provider/market-
+        // opportunity data. patient.js never calls market-score at all; do not
+        // add that call, and do not move this rendering into any patient-facing
+        // file. This dashboard is already behind requireSession() at the top of
+        // this document.
+        var VGROUP_LABEL = {
+            primary: 'Primary Care', specialty: 'Specialty Medicine', surgical: 'Surgical',
+            dental: 'Dental & Vision', behavioral: 'Behavioral Health'
+        };
+        var VGROUP_ORDER = ['primary', 'specialty', 'surgical', 'dental', 'behavioral'];
+
+        function vgroupClass(score) {
+            return score >= 70 ? 'under' : score >= 50 ? 'balanced' : 'served';
+        }
+
+        // Builds the per-specialty block as DOM nodes, not innerHTML -- every
+        // string here (label, reason) ultimately comes from the API response,
+        // and this file's own rule elsewhere is values are placed with
+        // textContent/DOM methods, never interpolated into innerHTML.
+        function buildVgroups(groups, catchment, zip) {
+            var wrap = document.createElement('div');
+            wrap.className = 'vgroups';
+            if (!groups) return null;
+
+            var note = document.createElement('div');
+            note.className = 'vgroups-note';
+            if (groups.available === false) {
+                note.textContent = groups.reason || 'Per-specialty breakdown unavailable for this ZIP.';
+                wrap.appendChild(note);
+                return wrap;
+            }
+            var radius = catchment ? catchment.radius_miles : null;
+            note.textContent = 'Opportunity by specialty' +
+                (radius ? ', within ' + radius + ' miles of ' + zip : '') +
+                ' — modelled from CDC health-measure prevalence, not patient searches.';
+            wrap.appendChild(note);
+
+            var rows = document.createElement('div');
+            rows.className = 'vgroup-rows';
+            var any = false;
+            VGROUP_ORDER.forEach(function (key) {
+                var g = groups[key];
+                if (!g) return;
+                any = true;
+                var row = document.createElement('div');
+                row.className = 'vgroup-row';
+                var name = document.createElement('span');
+                name.className = 'vgname'; name.textContent = VGROUP_LABEL[key] || key;
+                row.appendChild(name);
+                if (!g.available) {
+                    var unserved = document.createElement('span');
+                    unserved.className = 'vgunserved';
+                    unserved.textContent = g.reason || 'no listings nearby';
+                    row.appendChild(unserved);
+                } else {
+                    var chip = document.createElement('span');
+                    chip.className = 'vgchip ' + vgroupClass(g.score);
+                    chip.textContent = g.label + ' · ' + g.score;
+                    row.appendChild(chip);
+                }
+                rows.appendChild(row);
+            });
+            if (!any) return null;
+            wrap.appendChild(rows);
+            return wrap;
+        }
+
         var verdictReq = 0;
         function renderVerdict(zip) {
             var card = document.getElementById('verdict-card');
@@ -3793,6 +3861,8 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
                     body.appendChild(lab); body.appendChild(find); body.appendChild(src);
 
                     card.appendChild(ring); card.appendChild(body);
+                    var vgroups = buildVgroups(d.groups, d.catchment, zip);
+                    if (vgroups) card.appendChild(vgroups);
                     card.hidden = false;
                 })
                 .catch(function () { card.hidden = true; });
