@@ -287,12 +287,31 @@ function zipOr(zips) {
   return '(' + Object.keys(forms).join(',') + ')';
 }
 
+// PostgREST caps every response at 1000 rows no matter what `limit` says. A
+// single dense ZIP can hold more than that (77036 has 1,626), and a truncated
+// reply looks identical to a complete one — no error, just fewer pins, and the
+// patient has no way to know a practice near them was silently dropped.
+//
+// Paged with offset, not a keyset cursor: the result set here is bounded by one
+// ZIP or one ~24-mile box, so it is at most a few thousand rows, nowhere near
+// the depth where OFFSET on a 1.9M-row table gets expensive (that problem is
+// real, but it lives in market-score.js's scan of the whole `clinics` table,
+// not here).
+var CLINICS_PAGE_CAP = 6000;
 function clinicsQuery(filter) {
-  var url = SB_URL + '/rest/v1/clinics?' + filter +
-    '&select=npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude&limit=1000';
-  return fetch(url, { headers: { apikey: SB_KEY, Accept: 'application/json' } })
-    .then(function (r) { return r.ok ? r.json() : []; })
-    .catch(function () { return []; });
+  var base = SB_URL + '/rest/v1/clinics?' + filter +
+    '&select=npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude';
+  function page(offset, acc) {
+    return fetch(base + '&limit=1000&offset=' + offset, { headers: { apikey: SB_KEY, Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rows) {
+        var next = acc.concat(rows || []);
+        if (!rows || rows.length < 1000 || next.length >= CLINICS_PAGE_CAP) return next;
+        return page(offset + 1000, next);
+      })
+      .catch(function () { return acc; });
+  }
+  return page(0, []);
 }
 
 // Equirectangular approximation. Over the ~25 miles this ever spans the error
@@ -304,67 +323,115 @@ function roughDist(aLat, aLng, bLat, bLng) {
   return Math.sqrt(x * x + y * y);
 }
 
+// CDC PLACES carries a real ZCTA centroid for every ZIP it covers (32,520 of
+// them — see supabase/migrations/010_cdc_places_centroids.sql), including
+// ZIPs with zero clinics. DENTAL is the measure asked for because it is
+// published for all 32,520 ZCTAs; the 2023-only measures cover 29,983, which
+// would silently lose ~2,500 ZIPs' worth of centroids for no reason.
+//
+// This exists so ranking neighbour ZIPs stops depending on averaging the
+// coordinates of whichever clinics happened to be nearby — which cannot work
+// at all for a ZIP with no clinics, is exactly the case that most needs a
+// neighbour search, and was the best available anchor before this table
+// existed (see patient.js's own prior comment on that, now removed because it
+// is no longer true).
+function zctaCentroid(zips) {
+  if (!zips.length) return Promise.resolve({});
+  var url = SB_URL + '/rest/v1/cdc_places?measureid=eq.DENTAL' +
+    '&zip=in.(' + zips.join(',') + ')&select=zip,lat,lon';
+  return fetch(url, { headers: { apikey: SB_KEY, Accept: 'application/json' } })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (rows) {
+      var byZip = {};
+      (rows || []).forEach(function (r) {
+        if (r.lat == null || r.lon == null) return;
+        byZip[String(r.zip).padStart(5, '0')] = { lat: +r.lat, lng: +r.lon };
+      });
+      return byZip;
+    })
+    .catch(function () { return {}; });
+}
+
 // Other clinics matching the searched specialties, in the searched ZIP plus the
 // two nearest ZIPs. Queried straight from PostgREST — no function needed, so
 // this still works when the navigator itself is down.
 function nearbyClinics(zip, terms) {
   if (!/^\d{5}$/.test(String(zip || '')) || !terms.length) return Promise.resolve([]);
+  var homeZip = String(zip).padStart(5, '0');
 
-  return clinicsQuery('or=' + zipOr([zip])).then(function (rows) {
+  return Promise.all([
+    clinicsQuery('or=' + zipOr([zip])),
+    zctaCentroid([homeZip])
+  ]).then(function (res) {
+    var rows = res[0], homeCentroid = res[1][homeZip];
     var home = (rows || []).filter(function (c) {
       return c.latitude && c.longitude && taxMatches(c.primary_taxonomy, terms);
     });
 
-    // Centre the neighbour search on the ZIP's own clinics. Without a ZIP
-    // geodatabase this is the only anchor available, and it is a good one:
-    // it is where the practices actually are.
-    var anchored = (rows || []).filter(function (c) { return c.latitude && c.longitude; });
-    if (!anchored.length) return home;
-    var lat = 0, lng = 0;
-    anchored.forEach(function (c) { lat += +c.latitude; lng += +c.longitude; });
-    lat /= anchored.length; lng /= anchored.length;
+    // Anchor on the ZIP's real centroid. Fall back to averaging its own
+    // clinics only when PLACES has no row for it at all — chiefly Puerto Rico,
+    // which PLACES does not publish (see health-demand.js) — because an
+    // approximate anchor still beats none.
+    var lat, lng;
+    if (homeCentroid) { lat = homeCentroid.lat; lng = homeCentroid.lng; }
+    else {
+      var anchored = (rows || []).filter(function (c) { return c.latitude && c.longitude; });
+      if (!anchored.length) return home;
+      lat = 0; lng = 0;
+      anchored.forEach(function (c) { lat += +c.latitude; lng += +c.longitude; });
+      lat /= anchored.length; lng /= anchored.length;
+    }
 
     var box = 'latitude=gte.' + (lat - NEIGHBOR_BOX_DEG) + '&latitude=lte.' + (lat + NEIGHBOR_BOX_DEG) +
               '&longitude=gte.' + (lng - NEIGHBOR_BOX_DEG) + '&longitude=lte.' + (lng + NEIGHBOR_BOX_DEG);
 
     return clinicsQuery(box).then(function (near) {
-      // Group the surrounding clinics by ZIP so distance is measured between
-      // ZIP centres, not between individual practices — otherwise one clinic
-      // sitting on a boundary would outrank a genuinely closer ZIP.
+      // Which candidate ZIPs actually carry a matching specialty. This stays a
+      // clinics-table question — PLACES has no taxonomy — so the box query and
+      // the "hit" check are unchanged.
       var byZip = {};
       (near || []).forEach(function (c) {
         if (!c.latitude || !c.longitude || !c.zip) return;
         var z = String(c.zip).padStart(5, '0');
-        if (z === String(zip)) return;                       // the home ZIP, already have it
+        if (z === homeZip) return;                            // the home ZIP, already have it
         if (!byZip[z]) byZip[z] = { lat: 0, lng: 0, n: 0, hit: false };
         var g = byZip[z];
         g.lat += +c.latitude; g.lng += +c.longitude; g.n++;
         if (taxMatches(c.primary_taxonomy, terms)) g.hit = true;
       });
 
-      var ranked = Object.keys(byZip)
-        // A ZIP with no matching specialty adds pins the patient did not ask
-        // for, so it does not count as one of the two.
-        .filter(function (z) { return byZip[z].hit; })
-        .map(function (z) {
-          var g = byZip[z];
-          return { zip: z, d: roughDist(lat, lng, g.lat / g.n, g.lng / g.n) };
-        })
-        .sort(function (a, b) { return a.d - b.d; })
-        .slice(0, PATIENT_NEIGHBOR_ZIPS);
+      var candidates = Object.keys(byZip).filter(function (z) { return byZip[z].hit; });
+      // A ZIP with no matching specialty adds pins the patient did not ask
+      // for, so it does not count as one of the two — filtered above, before
+      // spending a request on centroids for ZIPs about to be discarded anyway.
+      return zctaCentroid(candidates).then(function (centroids) {
+        var ranked = candidates
+          .map(function (z) {
+            var c = centroids[z];
+            // Real centroid when PLACES has one; otherwise the average of the
+            // matching clinics already fetched — same fallback reasoning as
+            // the home anchor above.
+            var g = byZip[z];
+            var zLat = c ? c.lat : g.lat / g.n;
+            var zLng = c ? c.lng : g.lng / g.n;
+            return { zip: z, d: roughDist(lat, lng, zLat, zLng) };
+          })
+          .sort(function (a, b) { return a.d - b.d; })
+          .slice(0, PATIENT_NEIGHBOR_ZIPS);
 
-      var keep = {};
-      ranked.forEach(function (r) { keep[r.zip] = true; });
+        var keep = {};
+        ranked.forEach(function (r) { keep[r.zip] = true; });
 
-      var extra = (near || []).filter(function (c) {
-        return c.latitude && c.longitude &&
-               keep[String(c.zip).padStart(5, '0')] &&
-               taxMatches(c.primary_taxonomy, terms);
+        var extra = (near || []).filter(function (c) {
+          return c.latitude && c.longitude &&
+                 keep[String(c.zip).padStart(5, '0')] &&
+                 taxMatches(c.primary_taxonomy, terms);
+        });
+
+        // Tag the borrowed ones so the map can say where they came from.
+        extra.forEach(function (c) { c._neighbor = true; });
+        return home.concat(extra);
       });
-
-      // Tag the borrowed ones so the map can say where they came from.
-      extra.forEach(function (c) { c._neighbor = true; });
-      return home.concat(extra);
     });
   });
 }
