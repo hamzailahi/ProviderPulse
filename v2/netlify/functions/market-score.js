@@ -63,6 +63,51 @@ exports.handler = async (event) => {
     .then(r => (r.ok ? r.json() : []))
     .catch(() => []);
 
+  // ---------------------------------------------------------------------------
+  // PostgREST CAPS EVERY RESPONSE AT 1000 ROWS, WHATEVER `limit` SAYS.
+  //
+  // This function used to ask for limit=5000 on clinics, limit=1000 on the
+  // state's demographics and limit=200 on HPSA, and treat each reply as
+  // complete. It never was, and a truncated reply is byte-for-byte
+  // indistinguishable from a complete one -- no error, no warning, just a
+  // shorter array. Measured on live data:
+  //
+  //   clinics in ZIP 77036          1,626 rows -> 1,000 seen (supply 38% low,
+  //                                 so the ZIP scored as more underserved)
+  //   demographics_raw for TX       1,746 rows -> 1,000 seen
+  //   hpsa_designations for CA      4,031 rows ->   200 seen (5%)
+  //
+  // The medians were the worse half of it: none of those queries carried an
+  // ORDER BY, so the subset was arbitrary AND unstable between calls. The state
+  // insured rate and the HPSA score are 60% of the total weight, and both were
+  // being computed from a non-deterministic sample.
+  //
+  // pagedGet walks with keyset pagination on an ordered key rather than OFFSET:
+  // deep offsets make Postgres walk and discard every preceding row, which is
+  // what made the one-off benchmark scan time out with a 500.
+  //
+  // `cap` bounds the walk so a pathological ZIP cannot spend the whole 26s
+  // budget. Hitting it is reported as `truncated`, never swallowed -- the whole
+  // point of this change is that a partial answer says so.
+  // ---------------------------------------------------------------------------
+  const pagedGet = async (path, key, { cap = 6000, ms = 8000 } = {}) => {
+    const rows = [];
+    let cursor = null;
+    while (rows.length < cap) {
+      const seek = cursor === null ? '' : `&${key}=gt.${encodeURIComponent(cursor)}`;
+      const batch = await get(`${path}${seek}&order=${key}&limit=1000`, ms);
+      if (!batch.length) return { rows, truncated: false };
+      rows.push(...batch);
+      if (batch.length < 1000) return { rows, truncated: false };
+      const next = batch[batch.length - 1][key];
+      // Without a strictly increasing cursor the next request repeats this page
+      // forever. Stop rather than loop.
+      if (next == null || next === cursor) return { rows, truncated: true };
+      cursor = next;
+    }
+    return { rows, truncated: true };
+  };
+
   try {
     // 1. This ZIP's demographics
     const demRows = await get(`demographics_raw?zip=eq.${zip}&select=zip,state,%22Total%20Population%22,%22Insured%20Population%22&limit=1`);
@@ -94,10 +139,12 @@ exports.handler = async (event) => {
 
     // 2. Providers here, and the state's ZIP-level demographics for the benchmark
     const stripped = String(parseInt(zip, 10));
-    const [clinicRows, stateDem] = await Promise.all([
-      get(`clinics?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy&limit=5000`, 8000),
-      get(`demographics_raw?state=eq.${encodeURIComponent(state)}&select=zip,%22Total%20Population%22,%22Insured%20Population%22&limit=1000`, 8000)
+    const [clinicPage, stateDemPage] = await Promise.all([
+      pagedGet(`clinics?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy`, 'npi'),
+      pagedGet(`demographics_raw?state=eq.${encodeURIComponent(state)}&select=zip,%22Total%20Population%22,%22Insured%20Population%22`, 'zip')
     ]);
+    const clinicRows = clinicPage.rows;
+    const stateDem = stateDemPage.rows;
     // Count ALL listings. A clinic, hospital or surgical center is somewhere
     // care is delivered and doctors practise out of, so it is real capacity —
     // excluding it understates the market. The clinician/facility split is
@@ -126,8 +173,14 @@ exports.handler = async (event) => {
     // 4. Designated shortage: HPSA is county-level, so match on state and take
     //    the strongest primary-care designation available.
     const stateName = STATE_NAMES[String(state || '').toUpperCase()] || state;
-    const hpsaRows = await get(
-      `hpsa_designations?state=eq.${encodeURIComponent(stateName)}&select=hpsa_score,hpsa_type,discipline,county&limit=200`, 6000);
+    // Was limit=200 against a table holding 4,031 rows for California and 2,460
+    // for Texas, with no ORDER BY -- so the median driving 30% of the score came
+    // from an arbitrary 5% of the state. Paged on `id` because hpsa_score is not
+    // unique and a non-unique cursor skips rows.
+    const hpsaPage = await pagedGet(
+      `hpsa_designations?state=eq.${encodeURIComponent(stateName)}&select=id,hpsa_score,hpsa_type,discipline,county`,
+      'id', { cap: 8000 });
+    const hpsaRows = hpsaPage.rows;
     const primary = hpsaRows.filter(h => /primary/i.test(h.discipline || ''));
     const hpsaScore = median((primary.length ? primary : hpsaRows).map(h => Number(h.hpsa_score)).filter(n => isFinite(n)));
 
