@@ -244,6 +244,22 @@ select {
 .readout .src  { color: var(--faint); font-size: 11px; margin-top: 9px; }
 .readout .err  { color: var(--danger); }
 
+/* Per-specialty breakdown (market-score's `groups`). Rows, not the .figs grid
+   -- five labelled verdicts read better stacked than boxed, and a row can
+   carry a wide "no listings within Nmi" reason without wrapping awkwardly. */
+.specialty-note { font-size: 11px; color: var(--faint); margin: 13px 0 7px; line-height: 1.4; }
+.specialty-rows { display: flex; flex-direction: column; gap: 5px; }
+.spec-row {
+  display: flex; align-items: baseline; gap: 9px; padding: 6px 0;
+  border-bottom: 1px solid var(--hairline-2);
+}
+.spec-row:last-child { border-bottom: none; }
+.spec-row .spec-name { flex: 1 1 auto; font-size: 12.5px; color: var(--muted); }
+.spec-row .chip { flex: 0 0 auto; }
+.spec-row .spec-unserved {
+  flex: 0 0 auto; font-size: 11px; color: var(--faint); font-style: italic;
+}
+
 @media (max-width: 640px) {
   .pitch { max-width: 100%; }
   .stats { grid-template-columns: 1fr; }

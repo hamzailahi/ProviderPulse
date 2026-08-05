@@ -156,9 +156,6 @@ async function loadPayers(zip) {
   } catch (e) { /* the account panel still renders; the list is just shorter */ }
 }
 
-// Claim-a-listing: the map links here as register-provider.html#npi=1234567890.
-
-
 function setMsg(id, text, ok) { const m = $(id); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); }
 function busy(form, on) { form.querySelector('.submit').disabled = on; }
 
@@ -309,6 +306,47 @@ function verdictClass(label) {
   return 'well';
 }
 
+const SPECIALTY_LABEL = {
+  primary: 'Primary Care', specialty: 'Specialty Medicine', surgical: 'Surgical',
+  dental: 'Dental & Vision', behavioral: 'Behavioral Health'
+};
+// The five keys market-score always tries, in a fixed display order, so a
+// group missing from the response (an error mid-computation) still shows as
+// absent rather than silently shrinking the row count.
+const SPECIALTY_ORDER = ['primary', 'specialty', 'surgical', 'dental', 'behavioral'];
+
+// This ZIP form has no specialty selector -- a prospective provider hasn't
+// registered yet, so their discipline isn't known. Showing all five lets a
+// dentist and a psychiatrist both get a useful read from the same lookup.
+//
+// EVERY score here describes the CATCHMENT named in `catchment`, not the ZIP
+// alone -- market-score pools nearby ZIPs because most ZIPs have too few
+// listings in any one specialty to score in isolation (see market-score.js).
+// The radius is stated explicitly so this is never mistaken for a ZIP-only
+// figure.
+function specialtyHtml(groups, catchment, zip) {
+  if (!groups) return '';
+  if (groups.available === false) {
+    return '<div class="specialty-note">' + esc(groups.reason || 'Per-specialty breakdown unavailable for this ZIP.') + '</div>';
+  }
+  const radius = catchment ? catchment.radius_miles : null;
+  const rows = SPECIALTY_ORDER.filter(k => groups[k]).map(k => {
+    const g = groups[k];
+    const name = SPECIALTY_LABEL[k] || k;
+    if (!g.available) {
+      return '<div class="spec-row"><span class="spec-name">' + esc(name) + '</span>' +
+        '<span class="spec-unserved">' + esc(g.reason || 'no listings nearby') + '</span></div>';
+    }
+    return '<div class="spec-row"><span class="spec-name">' + esc(name) + '</span>' +
+      '<span class="chip ' + verdictClass(g.label) + '">' + esc(g.label) + ' · ' + g.score + '</span></div>';
+  }).join('');
+  if (!rows) return '';
+  return '<div class="specialty-note">Opportunity by specialty' +
+    (radius ? ', within ' + radius + ' miles of ' + esc(zip) : '') +
+    ' — modelled from CDC health-measure prevalence, not patient searches.</div>' +
+    '<div class="specialty-rows">' + rows + '</div>';
+}
+
 async function claimedInZip(zip) {
   try {
     const r = await fetch(FN + '/providers-public?all=1');
@@ -413,6 +451,7 @@ $('formZip').onsubmit = async e => {
     html += '</div>';
 
     if (scoreRes.finding) html += '<div class="note">' + esc(scoreRes.finding) + '</div>';
+    html += specialtyHtml(scoreRes.groups, scoreRes.catchment, zip);
     if (Array.isArray(scoreRes.sources)) {
       html += '<div class="src">Sources: ' + esc(scoreRes.sources.join(' · ')) + '</div>';
     }
