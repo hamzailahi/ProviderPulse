@@ -1,8 +1,8 @@
 # ProviderPulse
 
-[![LEIE import](https://github.com/hamzailahi/Map-of-Clinic-and-demographics-by-zipcode/actions/workflows/leie-import.yml/badge.svg)](.github/workflows/leie-import.yml)
-[![Medicare activity import](https://github.com/hamzailahi/Map-of-Clinic-and-demographics-by-zipcode/actions/workflows/medicare-activity-import.yml/badge.svg)](.github/workflows/medicare-activity-import.yml)
-[![CDC PLACES import](https://github.com/hamzailahi/Map-of-Clinic-and-demographics-by-zipcode/actions/workflows/cdc-places-import.yml/badge.svg)](.github/workflows/cdc-places-import.yml)
+[![LEIE import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/leie-import.yml/badge.svg)](.github/workflows/leie-import.yml)
+[![Medicare activity import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/medicare-activity-import.yml/badge.svg)](.github/workflows/medicare-activity-import.yml)
+[![CDC PLACES import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/cdc-places-import.yml/badge.svg)](.github/workflows/cdc-places-import.yml)
 [![License: All Rights Reserved](https://img.shields.io/badge/License-All%20Rights%20Reserved-red.svg)](LICENSE)
 
 A healthcare provider directory with two distinct user experiences on one
@@ -69,8 +69,8 @@ HTML/CSS/JS. To run it locally you need the [Netlify CLI](https://docs.netlify.c
 
 ```bash
 npm install -g netlify-cli
-git clone https://github.com/hamzailahi/Map-of-Clinic-and-demographics-by-zipcode.git
-cd Map-of-Clinic-and-demographics-by-zipcode/v2
+git clone https://github.com/hamzailahi/ProviderPulse.git
+cd ProviderPulse/v2
 # create .env with the variables below
 netlify dev
 ```
