@@ -20,8 +20,12 @@ re-running one is safe.
 | 003 | `003_insurance_payers.sql` | State-specific insurance lists on both signup forms | **Yes** — do this one next |
 | 004 | `004_provider_review_status.sql` | Name-based exclusion screening (flag for review) | **Yes** |
 | 002 | `002_patient_documents.sql` | Patient document upload + extraction | **NOT YET** — see below |
+| 013 | `013_npi_zip_enrichment.sql` | `provider_individuals` (NPI-1) + `zip_enrichment_queue` | **Applied** (2026-08-10, confirmed via anon-key curl) — required before 014 |
+| 014 | `014_clinic_secondary_locations.sql` | `clinic_secondary_locations` — pl_pfile secondary practice locations for both clinics and physicians | **Applied** (2026-08-10, confirmed via anon-key curl) — depends on 013 (physician secondary locations reference `provider_individuals`) |
+| 015 | `015_provider_individuals_affiliation.sql` | `provider_individuals.affiliated_clinic_npi` — coordinate-matched heuristic link to a parent clinic | Applied alongside 013/014 as part of the same bulk-load prep |
+| 016 | `016_clinics_npi_unique.sql` | `unique(npi)` on `clinics`, after deduping pre-existing duplicate/blank-NPI rows | **NOT YET applied** — blocks the NPPES bulk-load pipeline's upsert (`on_conflict=npi`) until run; see the file for what was found/removed |
 
-They are independent; the numbering is creation order, not a dependency chain.
+They are independent, EXCEPT 014 (depends on 013 — physician secondary locations reference `provider_individuals`) and 016 (should run before any further bulk-load upload, though it doesn't technically depend on 013/014/015) — everything else is creation order, not a dependency chain.
 
 ## Why 002 is held back
 

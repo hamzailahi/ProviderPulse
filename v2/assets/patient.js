@@ -298,9 +298,8 @@ function zipOr(zips) {
 // real, but it lives in market-score.js's scan of the whole `clinics` table,
 // not here).
 var CLINICS_PAGE_CAP = 6000;
-function clinicsQuery(filter) {
-  var base = SB_URL + '/rest/v1/clinics?' + filter +
-    '&select=npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude';
+function tableQuery(table, select, filter) {
+  var base = SB_URL + '/rest/v1/' + table + '?' + filter + '&select=' + select;
   function page(offset, acc) {
     return fetch(base + '&limit=1000&offset=' + offset, { headers: { apikey: SB_KEY, Accept: 'application/json' } })
       .then(function (r) { return r.ok ? r.json() : []; })
@@ -312,6 +311,33 @@ function clinicsQuery(filter) {
       .catch(function () { return acc; });
   }
   return page(0, []);
+}
+
+var PROVIDER_ROW_SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude';
+function clinicsQuery(filter) {
+  return tableQuery('clinics', PROVIDER_ROW_SELECT, filter);
+}
+
+// clinics (NPI-2 orgs) is what this used to query alone. provider_individuals
+// (NPI-1 physicians, migration 013) and clinic_secondary_locations (pl_pfile
+// secondary addresses, migration 014, parent_npi aliased to npi) share the same
+// row shape, so every caller of clinicsQuery gets them for free by switching to
+// this instead -- taxMatches/dedup/map-plotting downstream need no changes.
+// _src tags where each row came from so the popup can note when a physician
+// shares an address with a clinic (bulk NPPES has no confirmed affiliation
+// link, so this is a same-coordinate inference, not a stored fact) and can
+// label a clinic_secondary_locations row as a secondary address rather than
+// implying it is the practice's main site.
+function tagSrc(rows, src) { (rows || []).forEach(function (r) { r._src = src; }); return rows; }
+
+function providerRowsQuery(filter) {
+  return Promise.all([
+    clinicsQuery(filter),
+    tableQuery('provider_individuals', PROVIDER_ROW_SELECT, filter),
+    tableQuery('clinic_secondary_locations', 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude', filter)
+  ]).then(function (results) {
+    return tagSrc(results[0], 'clinic').concat(tagSrc(results[1], 'individual'), tagSrc(results[2], 'secondary'));
+  });
 }
 
 // Equirectangular approximation. Over the ~25 miles this ever spans the error
@@ -360,7 +386,7 @@ function nearbyClinics(zip, terms) {
   var homeZip = String(zip).padStart(5, '0');
 
   return Promise.all([
-    clinicsQuery('or=' + zipOr([zip])),
+    providerRowsQuery('or=' + zipOr([zip])),
     zctaCentroid([homeZip])
   ]).then(function (res) {
     var rows = res[0], homeCentroid = res[1][homeZip];
@@ -385,7 +411,7 @@ function nearbyClinics(zip, terms) {
     var box = 'latitude=gte.' + (lat - NEIGHBOR_BOX_DEG) + '&latitude=lte.' + (lat + NEIGHBOR_BOX_DEG) +
               '&longitude=gte.' + (lng - NEIGHBOR_BOX_DEG) + '&longitude=lte.' + (lng + NEIGHBOR_BOX_DEG);
 
-    return clinicsQuery(box).then(function (near) {
+    return providerRowsQuery(box).then(function (near) {
       // Which candidate ZIPs actually carry a matching specialty. This stays a
       // clinics-table question — PLACES has no taxonomy — so the box query and
       // the "hit" check are unchanged.
@@ -530,17 +556,33 @@ function initMap(canvas, note) {
       list.forEach(function (c) {
         if (c.zip) zipsInPlay[String(c.zip).padStart(5, '0')] = true;
       });
+      // No stored affiliation link exists yet (the bulk pipeline's coordinate-match
+      // stage hasn't been uploaded), so a physician's likely clinic is inferred here,
+      // live, from sharing the same rounded coordinates -- a hint, not a confirmed fact.
+      var clinicNameAt = {};
+      list.forEach(function (c) {
+        if (c._src === 'clinic' && c.latitude && c.longitude) {
+          clinicNameAt[(+c.latitude).toFixed(4) + ',' + (+c.longitude).toFixed(4)] = c.name;
+        }
+      });
       list.forEach(function (c) {
         if (recNpis[String(c.npi)]) return;          // already pinned as a recommendation
         if (c._neighbor) { borrowed++; otherZips[String(c.zip).padStart(5, '0')] = true; }
-        drawnAt[(+c.latitude).toFixed(4) + ',' + (+c.longitude).toFixed(4)] = true;
-        var reg = registeredNpis[String(c.npi)];
+        var coordKey = (+c.latitude).toFixed(4) + ',' + (+c.longitude).toFixed(4);
+        drawnAt[coordKey] = true;
+        // A secondary-location row is aliased to its parent's NPI (migration 014), so it
+        // must not borrow the parent's verified ring -- this address was never the one
+        // NPPES confirmed, only a different bulk-imported site for the same NPI.
+        var reg = c._src === 'secondary' ? null : registeredNpis[String(c.npi)];
+        var clinicHere = clinicNameAt[coordKey];
         pin(c.latitude, c.longitude, reg ? 'ver' : 'oth', reg ? 15 : 12)
           .addTo(map)
           .bindPopup(popupHtml({
             npi: c.npi, name: c.name, specialty: c.primary_taxonomy,
             address: c.address, city: c.city, state: c.state, zip: c.zip,
-            registered: !!reg
+            registered: !!reg,
+            co_located: (c._src === 'individual' && clinicHere && clinicHere !== c.name) ? clinicHere : null,
+            secondary: c._src === 'secondary'
           }, false));
         added++;
       });
@@ -611,10 +653,14 @@ function popupHtml(p, isRec) {
     // registry. Never let it borrow the verified badge.
     (p.self_reported
       ? '<span class="tag self">Address self-reported</span>' : '') +
+    (p.secondary
+      ? '<span class="tag self">Additional practice location</span>' : '') +
     '<strong>' + esc(p.name || 'Provider') + '</strong>' +
     (p.specialty ? '<span class="sp">' + esc(p.specialty) + '</span>' : '') +
     (line ? '<span class="ad">' + esc(line) + '</span>' : '') +
     (p.phone ? '<a class="tel" href="tel:' + esc(p.phone) + '">📞 ' + esc(p.phone) + '</a>' : '') +
+    // Same-address inference, not a confirmed affiliation -- see providerRowsQuery.
+    (p.co_located ? '<div class="ad" style="opacity:.75">May practice at ' + esc(p.co_located) + '</div>' : '') +
     '</div>';
 }
 

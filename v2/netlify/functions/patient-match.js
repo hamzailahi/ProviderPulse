@@ -7,6 +7,8 @@
 // Env vars: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY
 // (service role is used only to read published fields of registered providers)
 
+const { requestZipEnrichment } = require('./lib/zip-enrichment');
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -540,6 +542,10 @@ ${specialty
       source: specialty ? 'specialty_browser' : 'navigator',
       matched: providers.length
     });
+    // Queue this ZIP for the background NPI backfill (migration 013). Not
+    // awaited beyond its own internal timeouts -- same fire-and-forget rule
+    // as logDemand, a queueing failure must never delay a patient's results.
+    requestZipEnrichment(env, effectiveZip).catch(() => {});
 
     // zip + map_taxonomies let the frontend deep link the map to the whole search
     // area. map_taxonomies (not taxonomies) is what the map must filter on.

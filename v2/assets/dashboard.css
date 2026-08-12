@@ -556,17 +556,6 @@ input[type="file"]::-webkit-file-upload-button {
 }
 #legend-section.collapsed { display: none; }
 
-#legend-chip {
-  position: absolute; left: 16px; bottom: 66px; z-index: 501;
-  display: flex; align-items: center; gap: 9px; padding: 8px 13px;
-  border-radius: var(--r-pill); cursor: pointer; font: inherit; font-size: 11.5px;
-  color: var(--muted); background: color-mix(in srgb, var(--ground) 84%, transparent);
-  backdrop-filter: blur(14px); border: 1px solid var(--hairline-2);
-}
-#legend-chip:hover { color: var(--text); }
-#legend-chip-dots { display: inline-flex; gap: 4px; }
-#legend-chip-dots i { width: 8px; height: 8px; border-radius: 50%; display: block; }
-
 /* ---- compare tray ---- */
 #compare-tray {
   position: absolute; left: 16px; bottom: 16px; z-index: 501;
@@ -689,7 +678,7 @@ input[type="file"]::-webkit-file-upload-button {
 @media (max-width: 768px) {
   #surface-switch, #omnibar-slot { display: none; }
   #filter-rail { display: none !important; }
-  #legend-chip, #compare-tray, #legend-section { display: none !important; }
+  #compare-tray, #legend-section { display: none !important; }
   #sidebar {
     left: 0; right: 0; bottom: 0; top: auto; width: 100% !important;
     border-radius: var(--r-lg) var(--r-lg) 0 0;
@@ -716,7 +705,6 @@ input[type="file"]::-webkit-file-upload-button {
   :root:not([data-theme="dark"]) #filter-rail,
   :root:not([data-theme="dark"]) #sidebar,
   :root:not([data-theme="dark"]) #legend-section,
-  :root:not([data-theme="dark"]) #legend-chip,
   :root:not([data-theme="dark"]) #compare-tray,
   :root:not([data-theme="dark"]) #ai-command {
     background: rgba(255,255,255,.95);
@@ -746,7 +734,6 @@ input[type="file"]::-webkit-file-upload-button {
 :root[data-theme="light"] #filter-rail,
 :root[data-theme="light"] #sidebar,
 :root[data-theme="light"] #legend-section,
-:root[data-theme="light"] #legend-chip,
 :root[data-theme="light"] #compare-tray,
 :root[data-theme="light"] #ai-command {
   background: rgba(255,255,255,.95);

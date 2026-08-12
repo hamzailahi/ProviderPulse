@@ -34,7 +34,6 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="assets/taxonomy-groups.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
@@ -152,14 +151,6 @@
                            procedure volumes that surround them.</p>
                     </div>
                     <div id="map"></div>
-
-                    <!-- Collapsed legend. The full 6-group legend lives in
-                         #legend-section; this chip keeps it off the panel. -->
-                    <button id="legend-chip" type="button" onclick="toggleLegend()" hidden>
-                        <span id="legend-chip-dots"></span>
-                        <span id="legend-chip-label">6 specialty groups</span>
-                        <span class="chev">▾</span>
-                    </button>
 
                     <!-- Compare tray: holds ZIPs for side-by-side territory work -->
                     <div id="compare-tray" hidden>
@@ -597,52 +588,36 @@
             if (allAreCities) { await searchMultipleCities(commaParts); return; }
 
             try {
-                let baseQuery;
+                let filter;
                 if (searchTerm.match(/^\d{5}$/)) {
                     // ZIP code — try both with and without leading zero
                     const zipStripped = String(parseInt(searchTerm, 10));
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(zip.eq.' + searchTerm + ',zip.eq.' + zipStripped + ')';
+                    filter = 'or=(zip.eq.' + searchTerm + ',zip.eq.' + zipStripped + ')';
                 } else if (searchUpper.length === 2 && searchUpper.match(/^[A-Z]{2}$/)) {
                     // 2-letter state code
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?state=eq.' + searchUpper;
+                    filter = 'state=eq.' + searchUpper;
                 } else if (searchUpper.includes(',')) {
                     // "City, ST" format
                     const parts = searchUpper.split(',');
                     const cityUpper = parts[0].trim();
                     const cityMixed = cityUpper.charAt(0) + cityUpper.slice(1).toLowerCase();
                     const stateOnly = parts[1].trim();
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')&state=eq.' + stateOnly;
+                    filter = 'or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')&state=eq.' + stateOnly;
                 } else {
                     // City only
                     const cityUpper = searchUpper;
                     const cityMixed = cityUpper.charAt(0) + cityUpper.slice(1).toLowerCase();
-                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')';
+                    filter = 'or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')';
                 }
-                
-                // Fetch all clinics with pagination (Supabase limit is 1000 per request)
-                let clinicData = [];
-                let offset = 0;
-                const isRPC = baseQuery.includes('/rpc/');
-                
-                while (true) {
-                    const sep = baseQuery.includes('?') ? '&' : '?';
-                    const query = isRPC 
-                        ? baseQuery + '&limit=1000&offset=' + offset
-                        : baseQuery + '&limit=1000&offset=' + offset;
-                    const response = await fetch(query, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
-                    if (!response.ok) throw new Error('HTTP ' + response.status);
-                    
-                    const batch = await response.json();
-                    if (!batch || batch.length === 0) break;
-                    
-                    clinicData.push(...batch);
-                    statusEl.textContent = '🔄 Loaded ' + clinicData.length + ' clinics...';
-                    
-                    if (batch.length < 1000) break;
-                    offset += 1000;
-                }
-                
-                if (clinicData.length === 0) { statusEl.textContent = '\u274c No clinics found'; return; }
+
+                // Fetch clinics + physicians (provider_individuals) + secondary
+                // locations (clinic_secondary_locations), paginated per table.
+                const clinicData = await fetchProviderRows(
+                    () => filter,
+                    n => statusEl.textContent = '🔄 Loaded ' + n + ' providers...'
+                );
+
+                if (clinicData.length === 0) { statusEl.textContent = '❌ No clinics found'; return; }
 
                 // Fetch demographics for these ZIPs from demographics_raw table in batches
                 const zips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
@@ -676,6 +651,7 @@
                         'State': c.state || '',
                         'Latitude': c.latitude || '',
                         'Longitude': c.longitude || '',
+                        '_src': c._src,
                         // Demographics — spread all raw columns except keys that would overwrite clinic fields
                         ...Object.fromEntries(
                             Object.entries(dem).filter(([k]) =>
@@ -696,27 +672,71 @@
 
         // CSV upload replaced by Supabase search above
 
-        async function searchMultipleZips(zips) {
-            const statusEl = document.getElementById('dbStatus');
-            statusEl.textContent = `🔄 Loading ${zips.length} ZIPs...`;
-            try {
-                let clinicData = [];
-                // Try both padded and stripped formats
-                const zipVariants = [...new Set(zips.flatMap(z => [z, String(parseInt(z, 10))]))];
+        // Queues each searched ZIP for the background NPI backfill (migration
+        // 013) so clinics/provider_individuals fill in over time as ZIPs get
+        // analyzed. Fire-and-forget: the queue endpoint already no-ops on a
+        // ZIP that's already queued or was enriched recently, and a failure
+        // here must never affect the dashboard search itself.
+        function requestZipEnrichment(zips) {
+            zips.forEach(zip => {
+                fetch('/.netlify/functions/zip-enrich-request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ zip })
+                }).catch(() => {});
+            });
+        }
+
+        // Three tables draw pins on this map: clinics (NPI-2 orgs), provider_individuals
+        // (NPI-1 physicians, migration 013) and clinic_secondary_locations (pl_pfile
+        // secondary addresses, migration 014). All three share the row shape the rest of
+        // this file already expects -- secondary locations alias parent_npi -> npi so a
+        // location groups under the org/physician it belongs to. Rendering, popups and the
+        // legend need no changes: a physician or secondary address is just another row with
+        // an npi/name/address/primary_taxonomy/zip/state/latitude/longitude.
+        const PROVIDER_ROW_SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude';
+        const PROVIDER_SOURCES = [
+            { table: 'clinics', select: PROVIDER_ROW_SELECT, src: 'clinic' },
+            { table: 'provider_individuals', select: PROVIDER_ROW_SELECT, src: 'individual' },
+            { table: 'clinic_secondary_locations', select: 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude', src: 'secondary' }
+        ];
+
+        async function fetchProviderRows(filterFn, onProgress) {
+            let all = [];
+            for (const src of PROVIDER_SOURCES) {
                 let offset = 0;
                 while (true) {
-                    const res = await fetch(
-                        `${SUPABASE_URL}/rest/v1/clinics?zip=in.(${zipVariants.join(',')})&limit=1000&offset=${offset}`,
-                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
-                    );
+                    const url = `${SUPABASE_URL}/rest/v1/${src.table}?${filterFn()}&select=${src.select}&limit=1000&offset=${offset}`;
+                    const res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
                     if (!res.ok) break;
                     const batch = await res.json();
                     if (!batch || batch.length === 0) break;
-                    clinicData.push(...batch);
-                    statusEl.textContent = `🔄 Loaded ${clinicData.length} clinics...`;
+                    // _src tags where a row came from -- no stored affiliation link exists
+                    // yet (migration 015's coordinate-match stage hasn't been uploaded), so
+                    // renderMap infers a physician's likely clinic live, from sharing exact
+                    // coordinates with a clinic row, and labels secondary-location rows as
+                    // such rather than letting them read as a practice's main address.
+                    batch.forEach(r => { r._src = src.src; });
+                    all.push(...batch);
+                    if (onProgress) onProgress(all.length);
                     if (batch.length < 1000) break;
                     offset += 1000;
                 }
+            }
+            return all;
+        }
+
+        async function searchMultipleZips(zips) {
+            const statusEl = document.getElementById('dbStatus');
+            statusEl.textContent = `🔄 Loading ${zips.length} ZIPs...`;
+            requestZipEnrichment(zips);
+            try {
+                // Try both padded and stripped formats
+                const zipVariants = [...new Set(zips.flatMap(z => [z, String(parseInt(z, 10))]))];
+                const clinicData = await fetchProviderRows(
+                    () => `zip=in.(${zipVariants.join(',')})`,
+                    n => statusEl.textContent = `🔄 Loaded ${n} providers...`
+                );
 
                 if (!clinicData.length) { statusEl.textContent = '❌ No clinics found'; return; }
 
@@ -742,12 +762,12 @@
                     'Primary Practice Address': c.address || '',
                     'Primary Taxonomy': c.primary_taxonomy || '',
                     'ZIP Code': c.zip || '', 'State': c.state || '',
-                    'Latitude': c.latitude || '', 'Longitude': c.longitude || '',
+                    'Latitude': c.latitude || '', 'Longitude': c.longitude || '', '_src': c._src,
                     ...Object.fromEntries(Object.entries(demByZip[c.zip] || {}).filter(([k]) =>
                         !['zip','state','id','created_at','ZIP Code','State','Latitude','Longitude'].includes(k)))
                 }));
 
-                statusEl.textContent = `✅ Loaded ${clinicData.length} clinics across ${zips.length} ZIPs`;
+                statusEl.textContent = `✅ Loaded ${clinicData.length} providers across ${zips.length} ZIPs`;
                 document.getElementById('welcome-overlay').style.opacity = '0';
                 setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
                 processData(converted);
@@ -764,21 +784,12 @@
                 for (const cityState of cityStateList) {
                     const parts = cityState.split(',').map(s => s.trim());
                     const cityUpper = parts[0].toUpperCase();
-                    let url = `${SUPABASE_URL}/rest/v1/clinics?city=eq.${encodeURIComponent(cityUpper)}`;
-                    if (parts[1]) url += `&state=eq.${parts[1].trim().toUpperCase()}`;
-                    let offset = 0;
-                    while (true) {
-                        const res = await fetch(`${url}&limit=1000&offset=${offset}`, {
-                            headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' }
-                        });
-                        if (!res.ok) break;
-                        const batch = await res.json();
-                        if (!batch || batch.length === 0) break;
-                        clinicData.push(...batch);
-                        statusEl.textContent = `🔄 Loaded ${clinicData.length} clinics...`;
-                        if (batch.length < 1000) break;
-                        offset += 1000;
-                    }
+                    const stateUpper = parts[1] ? parts[1].trim().toUpperCase() : null;
+                    const rows = await fetchProviderRows(
+                        () => `city=eq.${encodeURIComponent(cityUpper)}` + (stateUpper ? `&state=eq.${stateUpper}` : ''),
+                        n => statusEl.textContent = `🔄 Loaded ${clinicData.length + n} providers...`
+                    );
+                    clinicData.push(...rows);
                 }
                 if (!clinicData.length) { statusEl.textContent = '❌ No clinics found'; return; }
 
@@ -800,11 +811,11 @@
                     'Primary Practice Address': c.address || '',
                     'Primary Taxonomy': c.primary_taxonomy || '',
                     'ZIP Code': c.zip || '', 'State': c.state || '',
-                    'Latitude': c.latitude || '', 'Longitude': c.longitude || '',
+                    'Latitude': c.latitude || '', 'Longitude': c.longitude || '', '_src': c._src,
                     ...Object.fromEntries(Object.entries(demByZip[c.zip] || {}).filter(([k]) =>
                         !['zip','state','id','created_at','ZIP Code','State','Latitude','Longitude'].includes(k)))
                 }));
-                statusEl.textContent = `✅ Loaded ${clinicData.length} clinics across ${cityStateList.length} cities`;
+                statusEl.textContent = `✅ Loaded ${clinicData.length} providers across ${cityStateList.length} cities`;
                 document.getElementById('welcome-overlay').style.opacity = '0';
                 setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
                 processData(converted);
@@ -865,19 +876,12 @@
             });
 
             const taxArray = Array.from(taxonomies).sort();
-            // Colour by specialty GROUP, not by individual taxonomy. Nineteen
-            // generated hues produced four near-identical greens and an
-            // unreadable legend; six fixed group colours are tellable apart.
-            taxArray.forEach((t, i) => {
-                taxonomyColors[t] = (window.TaxonomyGroups && TaxonomyGroups.colorFor(t)) || getColor(i, taxArray.length);
-            });
+            taxArray.forEach((t, i) => taxonomyColors[t] = getColor(i, taxArray.length));
             selectedTaxonomies = new Set(taxArray);
-            
+
             buildTaxDropdown(taxArray); updateLegend();
 
-            // Six colour groups replace the 19-swatch legend; the chip keeps it
-            // off the panel entirely. Clustering loads lazily on first search.
-            paintLegendChip();
+            // Clustering loads lazily on first search.
             ensureClusterLib().then(function (ok) {
                 if (!ok || window.clusterLayer) { renderMap(); return; }
                 window.clusterLayer = L.markerClusterGroup({
@@ -1315,17 +1319,29 @@
                     <b style="font-size:12px;">${items.length === 1 ? items[0].address : 'Multiple Practices at this Location'}</b>
                     <hr style="margin:5px 0;border-color:var(--border);"/>`;
 
+                // No stored affiliation link exists yet (migration 015's coordinate-match
+                // stage hasn't been uploaded to production), so a physician sharing this
+                // exact coordinate group with a clinic org is a live inference, not a fact.
+                const clinicHere = items.find(i => i.practice._src === 'clinic');
+
                 items.forEach(item => {
                     const npi = item.practice['NPI'] || '';
                     const recBadge = recSet.has(String(npi))
                         ? `<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:#f0883e;color:#0d1117;font-size:9px;font-weight:700;">★ RECOMMENDED FOR YOU</div><br/>`
                         : '';
+                    const secondaryBadge = item.practice._src === 'secondary'
+                        ? `<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:var(--bg-hover,#21293a);color:var(--text-secondary);font-size:9px;">ADDITIONAL PRACTICE LOCATION</div><br/>`
+                        : '';
+                    const affiliationNote = (item.practice._src === 'individual' && clinicHere && clinicHere.practice['Name'] !== item.practice['Name'])
+                        ? `<span style="color:var(--text-muted);font-size:10px;">May practice at ${clinicHere.practice['Name']}</span><br/>`
+                        : '';
                     popupHtml += `
                     <div style="margin-bottom:10px;" id="clinic-${npi}">
-                        ${recBadge}
+                        ${recBadge}${secondaryBadge}
                         <strong style="font-size:12px;">${item.practice['Name'] || '—'}</strong><br/>
                         <span style="color:var(--text-secondary);font-size:11px;">${item.practice['Primary Taxonomy'] || '—'}</span><br/>
                         ${items.length > 1 ? `<span style="color:var(--text-muted);font-size:10px;">${item.address}</span><br/>` : ''}
+                        ${affiliationNote}
                         <span style="color:var(--text-muted);font-size:10px;">NPI: ${npi}</span><br/>
                         <div id="nppes-${npi}" style="margin-top:4px;font-size:11px;color:var(--text-secondary);">
                             <em>Loading contact info...</em>
@@ -1345,7 +1361,11 @@
                     : `conic-gradient(${uniqueTaxs.map((t, idx) => `${colorMap[t] || '#3b82f6'} ${idx * (100/uniqueTaxs.length)}% ${(idx + 1) * (100/uniqueTaxs.length)}%`).join(', ')})`;
                 // Rings, in priority order: amber = recommended to this patient,
                 // teal = a claimed and NPI-verified listing. Both keep the taxonomy fill.
+                // A secondary-location row is aliased to its parent's NPI (migration 014),
+                // so it must not borrow the parent's verified ring -- that address was never
+                // the one NPPES confirmed, only a different bulk-imported site for the same NPI.
                 const isRegistered = items.some(i => {
+                    if (i.practice._src === 'secondary') return false;
                     const rp = registeredProviders[String(i.practice['NPI'] || '')];
                     return rp && rp.verified;
                 });
@@ -1687,26 +1707,12 @@
             });
 
             const neighborZipList = foundNeighbors.map(n => n.zip);
-            statusEl.textContent = `🔄 Loading clinics for ${neighborZipList.length} neighboring ZIPs...`;
+            statusEl.textContent = `🔄 Loading providers for ${neighborZipList.length} neighboring ZIPs...`;
 
             try {
-                // Fetch clinics for neighbor ZIPs with pagination
-                let clinicData = [];
-                let offset = 0;
                 // Try both padded and stripped ZIP formats
                 const zipVariants = [...new Set(neighborZipList.flatMap(z => [z, String(parseInt(z, 10))]))];
-                while (true) {
-                    const res = await fetch(
-                        `${SUPABASE_URL}/rest/v1/clinics?zip=in.(${zipVariants.join(',')})&limit=1000&offset=${offset}`,
-                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
-                    );
-                    if (!res.ok) break;
-                    const batch = await res.json();
-                    if (!batch || batch.length === 0) break;
-                    clinicData.push(...batch);
-                    if (batch.length < 1000) break;
-                    offset += 1000;
-                }
+                const clinicData = await fetchProviderRows(() => `zip=in.(${zipVariants.join(',')})`);
 
                 // Fetch demographics for neighbor ZIPs
                 const demRes = await fetch(
@@ -1736,7 +1742,8 @@
                             'Primary Practice Address': c.address,
                             'Primary Taxonomy': c.primary_taxonomy,
                             'ZIP Code': c.zip, 'State': c.state,
-                            'Latitude': c.latitude, 'Longitude': c.longitude
+                            'Latitude': c.latitude, 'Longitude': c.longitude,
+                            '_src': c._src
                         });
                     }
                     // Add taxonomy to color map if not already present
@@ -1747,12 +1754,7 @@
 
                 // Rebuild taxonomy colors to include any new taxonomies from neighbors
                 const taxArray = Array.from(taxonomies).sort();
-                // Colour by specialty GROUP, not by individual taxonomy. Nineteen
-            // generated hues produced four near-identical greens and an
-            // unreadable legend; six fixed group colours are tellable apart.
-            taxArray.forEach((t, i) => {
-                taxonomyColors[t] = (window.TaxonomyGroups && TaxonomyGroups.colorFor(t)) || getColor(i, taxArray.length);
-            });
+                taxArray.forEach((t, i) => taxonomyColors[t] = getColor(i, taxArray.length));
                 selectedTaxonomies = new Set(taxArray);
                 updateLegend();
 
@@ -3687,23 +3689,6 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
                 if (input && btn) { input.value = q; btn.click(); return; }
             }
             goToAddress(q);   // an address: just fly there
-        }
-
-        // 2. Legend chip — shows the six group colours, toggles the full legend.
-        function paintLegendChip() {
-            var dots = document.getElementById('legend-chip-dots');
-            var chip = document.getElementById('legend-chip');
-            if (!dots || !chip || !window.TaxonomyGroups) return;
-            dots.innerHTML = '';
-            TaxonomyGroups.list.forEach(function (g) {
-                var i = document.createElement('i');
-                i.style.background = g.color;
-                i.title = g.name;
-                dots.appendChild(i);
-            });
-            chip.hidden = false;
-            var sec = document.getElementById('legend-section');
-            if (sec) sec.classList.add('collapsed');   // start collapsed
         }
 
         // 3. Compare tray — holds ZIPs for territory comparison.

@@ -1,0 +1,62 @@
+name: Enrich NPI registry data by ZIP
+
+# Feeds `clinics` (NPI-2 orgs) and `provider_individuals` (NPI-1, migration
+# 013) from the queue that zip-enrich-request.js writes whenever a patient or
+# analyst searches a ZIP. Runs frequently and processes a small batch each
+# time -- unlike the LEIE/Medicare/CDC imports, this isn't a monthly bulk
+# refresh, it's draining a queue that grows a few ZIPs at a time.
+on:
+  schedule:
+    - cron: '15 * * * *'   # hourly, offset from the hour to avoid GitHub's :00 pileup
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Fetch and report without writing to Supabase or touching the queue'
+        type: boolean
+        default: false
+      limit:
+        description: 'Max ZIPs to process this run'
+        type: string
+        required: false
+      zip:
+        description: 'Process this one ZIP directly, bypassing the queue (for testing)'
+        type: string
+        required: false
+
+# Never expose the service role key to a fork's workflow run
+concurrency: npi-zip-enrich
+
+jobs:
+  enrich:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"
+            exit 1
+          fi
+
+      - name: Enrich pending ZIPs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+          IN_LIMIT: ${{ inputs.limit }}
+          IN_ZIP: ${{ inputs.zip }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          [ "${IN_DRY_RUN:-}" = "true" ] && ARGS+=(--dry-run) || true
+          [ -n "${IN_LIMIT:-}" ] && ARGS+=(--limit "$IN_LIMIT") || true
+          [ -n "${IN_ZIP:-}" ] && ARGS+=(--zip "$IN_ZIP") || true
+          echo "running: node scripts/enrich-npi-zips.mjs ${ARGS[*]-}"
+          node scripts/enrich-npi-zips.mjs ${ARGS[@]+"${ARGS[@]}"}
