@@ -240,6 +240,14 @@ input[type="file"]::-webkit-file-upload-button {
   box-shadow: 0 12px 36px rgba(0,0,0,.45) !important;
 }
 .leaflet-popup-tip { background: var(--ground-2) !important; border: 1px solid var(--hairline-2) !important; }
+/* Multi-provider popups (index.html renderMap) load each provider's NPPES/CMS
+   data async after the popup already opened, so Leaflet's own maxHeight option
+   -- which measures content height once, at open time -- often decides a short
+   "Loading..." list already fits and never enables its scroll class, then the
+   popup balloons past the screen as enrichment data lands with no way to scroll.
+   Enforcing max-height + overflow directly in CSS applies continuously as
+   content grows, regardless of when that growth happens. */
+.leaflet-popup-content { max-height: 360px !important; overflow-y: auto !important; overflow-x: hidden !important; }
 .leaflet-tooltip-top:before { border-top-color: var(--hairline-2) !important; }
 .leaflet-container { font-family: var(--sans); }
 .leaflet-bar a {

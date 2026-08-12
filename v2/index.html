@@ -92,6 +92,13 @@
             </div>
 
             <div class="filter-group">
+                <label class="group-label">Provider Source</label>
+                <label class="tax-option"><input type="checkbox" class="src-chk" value="clinic" checked /> Clinics &amp; Organizations</label>
+                <label class="tax-option"><input type="checkbox" class="src-chk" value="individual" checked /> Individual Physicians</label>
+                <label class="tax-option"><input type="checkbox" class="src-chk" value="secondary" checked /> Secondary Locations</label>
+            </div>
+
+            <div class="filter-group">
                 <label class="group-label">Catchment Radius</label>
                 <div class="filter-row">
                     <input type="number" id="radiusInput" placeholder="Miles" min="0.1" step="0.5" />
@@ -364,6 +371,10 @@
         let zipsWithClinics = new Set(); // Tracks which ZIPs have at least one clinic (for boundary styling only — NOT demographic data)
         let lockedZip = null, lockedLayer = null;
         let selectedTaxonomies = new Set();
+        // Which row sources renderMap draws. All on by default; the individual-physician
+        // source is by far the noisiest (often 5-10x the clinic count in a populated ZIP),
+        // so this is the main declutter lever short of turning off a whole layer.
+        let selectedSources = new Set(['clinic', 'individual', 'secondary']);
         let dashCharts = { rawAge: null, rawInc: null, age: null, inc: null, race: null };
         let activeStatesInCSV = new Set(); // Global so loadNeighboringZips can access it
         
@@ -888,7 +899,13 @@
                     iconCreateFunction: clusterIcon,
                     showCoverageOnHover: false,
                     maxClusterRadius: 55,
-                    disableClusteringAtZoom: 15
+                    // disableClusteringAtZoom used to turn clustering off at zoom 15+, which is exactly
+                    // street level -- so a handful of distinct-but-nearby addresses (e.g. buildings on
+                    // the same block) rendered as a shapeless pile of overlapping raw dots instead of a
+                    // numbered cluster bubble. Clustering now stays on at every zoom; spiderfy (built in,
+                    // on by default) fans a cluster's markers out into a clickable ring once it can't be
+                    // split by zooming in any further, which is what actually makes a dense pile browsable.
+                    spiderfyDistanceMultiplier: 1.5
                 }).addTo(map);
                 renderMap();
             });
@@ -1085,6 +1102,15 @@
         document.getElementById('tax-options-container').addEventListener('change', function(e) {
             if (!e.target.classList.contains('tax-chk')) return;
             updateSelectedTaxonomiesSet();
+        });
+
+        document.querySelectorAll('.src-chk').forEach(chk => {
+            chk.addEventListener('change', function () {
+                selectedSources = new Set(
+                    Array.from(document.querySelectorAll('.src-chk')).filter(c => c.checked).map(c => c.value)
+                );
+                renderMap();
+            });
         });
 
         function updateSelectedTaxonomiesSet() {
@@ -1293,7 +1319,10 @@
                     const nameMatch = (p['Name'] || '').toLowerCase().includes(searchTerm) || addr.toLowerCase().includes(searchTerm);
                     // If countyFilterBounds matched, show all providers inside it regardless of name match
                     const passSearch = countyFilterBounds ? true : nameMatch;
-                    return passSearch && (selectedTaxonomies.size === 0 || selectedTaxonomies.has(p['Primary Taxonomy']));
+                    // Rows with no _src tag predate the source split (e.g. recommended-pin
+                    // injections) and should never be hidden by a source toggle.
+                    const passSource = !p._src || selectedSources.has(p._src);
+                    return passSearch && passSource && (selectedTaxonomies.size === 0 || selectedTaxonomies.has(p['Primary Taxonomy']));
                 });
                 if (filtered.length === 0) continue;
                 
@@ -1380,7 +1409,11 @@
                     icon: L.divIcon({ className: 'multi-tax-icon', html: iconHtml, iconSize: [dotSize, dotSize], iconAnchor: [dotSize / 2, dotSize / 2] })
                 })
                 .bindTooltip(items.length === 1 ? items[0].practice['Name'] : `${items.length} Providers Here`, { direction: 'top', offset: [0, -8], opacity: 0.9 })
-                .bindPopup(popupHtml, { maxWidth: 280 });
+                // maxHeight makes Leaflet add its own .leaflet-popup-scrolled class (overflow-y:auto)
+                // once content exceeds it -- without it a same-coordinate group of 200 individuals
+                // (now routine with provider_individuals merged in) renders a popup taller than the
+                // viewport with no way to reach the rest.
+                .bindPopup(popupHtml, { maxWidth: 280, maxHeight: 360 });
                 if (!window.clusterLayer) marker.addTo(map);
 
                 // Fetch NPPES data when popup opens
