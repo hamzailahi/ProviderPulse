@@ -42,6 +42,13 @@ self-registration, screening, and market data. Live at
   agent that plans its own read-only queries against an explicit
   table/column allowlist, so the model can never see or guess at PHI
   tables.
+- **National NPPES coverage, growing state by state** — beyond the
+  original organization-level import, a separate bulk-load pipeline is
+  merging in individual physicians (NPI-1) and secondary practice
+  locations from the full NPPES dissemination file, state by state. 20
+  states + DC are loaded as of 2026-08-12, both rendered live on the map
+  with marker clustering and source filters (clinics / individual
+  physicians / secondary locations) to keep the added density readable.
 
 ## Architecture
 
@@ -99,6 +106,7 @@ via `workflow_dispatch`:
 | `leie-import.yml` | monthly, 8th | HHS OIG exclusion list (full refresh) |
 | `medicare-activity-import.yml` | monthly, 12th | CMS PUF + PECOS Order & Referring (upsert) |
 | `cdc-places-import.yml` | see workflow file | CDC PLACES |
+| `npi-zip-enrich.yml` | hourly | NPPES backfill for ZIPs actually searched (separate from the state-by-state national bulk-load pipeline, which is run by hand and isn't in this repo) |
 
 ## Tests
 
