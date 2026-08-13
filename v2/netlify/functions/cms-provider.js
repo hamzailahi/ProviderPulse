@@ -1,5 +1,63 @@
 const https = require('https');
 
+// Read-through cache for CMS lookups (migration 017, cms_provider_cache).
+// Without it, every map popup open fired a live request to data.cms.gov with
+// no persistence beyond the browser tab's in-memory cmsCache -- gone on
+// refresh, never shared across visitors, and repeated forever for NPIs CMS
+// doesn't cover at all (a doula, a facility). CMS's own file only refreshes
+// quarterly, so a row is treated as fresh for CACHE_TTL_DAYS before refetching.
+const CACHE_TTL_DAYS = 90;
+
+async function readCache(npi, env) {
+    if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return null;
+    try {
+        const res = await fetch(
+            `${env.SUPABASE_URL}/rest/v1/cms_provider_cache?npi=eq.${npi}&select=*&limit=1`,
+            {
+                headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` },
+                signal: AbortSignal.timeout(1200)
+            }
+        );
+        if (!res.ok) return null;          // table missing, etc. -- fall through to a live fetch
+        const rows = await res.json();
+        const row = rows && rows[0];
+        if (!row) return null;
+        const ageDays = (Date.now() - new Date(row.fetched_at).getTime()) / 86400000;
+        if (ageDays > CACHE_TTL_DAYS) return null;
+        return row;
+    } catch (e) {
+        return null;                        // cache is an optimization, never a hard dependency
+    }
+}
+
+async function writeCache(result, env) {
+    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return;
+    try {
+        await fetch(`${env.SUPABASE_URL}/rest/v1/cms_provider_cache`, {
+            method: 'POST',
+            headers: {
+                apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+                Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+                'Content-Type': 'application/json',
+                Prefer: 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify({ ...result, fetched_at: new Date().toISOString() }),
+            signal: AbortSignal.timeout(1200)
+        });
+    } catch (e) {
+        // A failed cache write must never fail the request -- the popup already
+        // has its answer, this was only trying to save the next visitor a round trip.
+    }
+}
+
+// A cache row's shape matches the API response exactly except for one thing:
+// PostgREST returns secondary_specialties as a real array already, so this is
+// only needed to strip the DB-only fetched_at field back off before sending.
+function rowToResult(row, npi) {
+    const { fetched_at, ...rest } = row;
+    return { ...rest, npi };
+}
+
 function fetchFromCMS(npi) {
     return new Promise((resolve, reject) => {
         const body = JSON.stringify({
@@ -34,7 +92,11 @@ function fetchFromCMS(npi) {
         });
 
         req.on('error', e => { console.log(`[CMS] Request error: ${e.message}`); reject(e); });
-        req.setTimeout(8000, () => { req.destroy(); reject(new Error('CMS API timeout')); });
+        // Budgeted against the 10s hard cap in netlify.toml (deliberately below the 26s
+        // ceiling): cache read (~1.2s) + this + the GET fallback (~2s) + cache write
+        // (~1.2s) must all fit inside it, since a miss now pays for both reads/writes
+        // around the CMS call as well as the call itself.
+        req.setTimeout(4500, () => { req.destroy(); reject(new Error('CMS API timeout')); });
         req.write(body);
         req.end();
     });
@@ -59,7 +121,7 @@ function fetchFromCMSGet(npi) {
             });
         });
         req.on('error', e => { console.log(`[CMS-GET] error: ${e.message}`); resolve(null); });
-        req.setTimeout(7000, () => { req.destroy(); resolve(null); });
+        req.setTimeout(2000, () => { req.destroy(); resolve(null); });
         req.end();
     });
 }
@@ -72,6 +134,17 @@ exports.handler = async function(event) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Valid 10-digit NPI required' }) };
     }
 
+    const env = process.env;
+
+    const cached = await readCache(npi, env);
+    if (cached) {
+        return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' },
+            body: JSON.stringify(rowToResult(cached, npi))
+        };
+    }
+
     try {
         let r = null;
         try {
@@ -82,10 +155,15 @@ exports.handler = async function(event) {
         if (!r) r = await fetchFromCMSGet(npi);
 
         if (!r) {
+            const result = { found: false, npi };
+            // Awaited, not fire-and-forget: Netlify (Lambda underneath) can freeze the
+            // execution environment right after the response is sent, which would
+            // silently drop an un-awaited write before it reaches Supabase.
+            await writeCache(result, env);   // caches the miss too, see migration 017
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ found: false, npi })
+                body: JSON.stringify(result)
             };
         }
 
@@ -117,6 +195,8 @@ exports.handler = async function(event) {
             medicare_participant: r['ind_assgn'] === 'Y' || r['ind_assgn'] === 'M',
             medicare_assignment: r['ind_assgn'] || null,  // Y=accepts full, M=may accept
         };
+
+        await writeCache(result, env);   // see the note above readCache's not-found branch
 
         return {
             statusCode: 200,
