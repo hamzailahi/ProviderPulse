@@ -32,7 +32,7 @@
 
   <div class="stats" role="list">
     <div class="stat" role="listitem">
-      <b>1,903,674</b><span>provider records already on the map</span>
+      <b id="providerCount">1,900,000+</b><span>provider records already on the map</span>
     </div>
     <div class="stat" role="listitem">
       <b>20,272</b><span>federally designated primary-care shortage areas</span>
@@ -588,6 +588,20 @@ async function loadAccount() {
     }, 700);
   };
 }
+
+// Trust-line provider count, live from the database (clinics + provider_individuals).
+// The markup ships with a rounded fallback so a slow/failed fetch never shows
+// a blank or broken-looking number -- this just upgrades it when it lands.
+(function loadProviderCount() {
+  fetch(`${FN}/provider-count`)
+    .then(r => r.json())
+    .then(d => {
+      if (d && d.available && Number.isFinite(d.count)) {
+        $('providerCount').textContent = d.count.toLocaleString('en-US');
+      }
+    })
+    .catch(() => {});
+})();
 </script>
 </body>
 </html>
