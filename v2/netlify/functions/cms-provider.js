@@ -89,24 +89,31 @@ exports.handler = async function(event) {
             };
         }
 
-        // Exact field names from CMS Data Dictionary
+        // The CMS Data Dictionary documents these as "Provider First Name", "Pri_spec",
+        // "Facility Name", etc., but the live datastore API actually returns lowercase
+        // snake_case keys (provider_first_name, pri_spec, facility_name, ...) -- confirmed
+        // 2026-08-13 via a direct query. Reading the dictionary's display names here meant
+        // every field silently came back undefined except the ones that happened to already
+        // be lowercase in both places (gndr, ind_assgn, num_org_mem, adr_ln_1) -- so a
+        // provider's enrichment box would show only the Medicare badge and nothing else,
+        // even though CMS actually had their facility, school, and specialty on file.
         const result = {
             found: true,
             npi,
-            first_name: r['Provider First Name'] || null,
-            last_name: r['Provider Last Name'] || null,
-            credential: r['Cred'] || null,
+            first_name: r['provider_first_name'] || null,
+            last_name: r['provider_last_name'] || null,
+            credential: r['cred'] || null,
             gender: r['gndr'] || null,
-            primary_specialty: r['Pri_spec'] || null,
-            secondary_specialties: [r['Sec_spec_1'], r['Sec_spec_2'], r['Sec_spec_3'], r['Sec_spec_4']].filter(Boolean),
-            medical_school: r['Med_sch'] || null,
-            graduation_year: r['Grd_yr'] || null,
-            telehealth: r['Telehlth'] === 'Y',
-            facility: r['Facility Name'] || null,
-            org_pac_id: r['Org_PAC_ID'] || null,
+            primary_specialty: r['pri_spec'] || null,
+            secondary_specialties: [r['sec_spec_1'], r['sec_spec_2'], r['sec_spec_3'], r['sec_spec_4']].filter(Boolean),
+            medical_school: r['med_sch'] || null,
+            graduation_year: r['grd_yr'] || null,
+            telehealth: r['telehlth'] === 'Y',
+            facility: r['facility_name'] || null,
+            org_pac_id: r['org_pac_id'] || null,
             group_size: r['num_org_mem'] || null,
-            address: [r['adr_ln_1'], r['City/Town'], r['State'], r['ZIP Code']].filter(Boolean).join(', ') || null,
-            phone: r['Telephone Number'] || null,
+            address: [r['adr_ln_1'], r['citytown'], r['state'], r['zip_code']].filter(Boolean).join(', ') || null,
+            phone: r['telephone_number'] || null,
             medicare_participant: r['ind_assgn'] === 'Y' || r['ind_assgn'] === 'M',
             medicare_assignment: r['ind_assgn'] || null,  // Y=accepts full, M=may accept
         };
