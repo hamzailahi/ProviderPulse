@@ -152,7 +152,12 @@ input[type="file"]::-webkit-file-upload-button {
 #tax-dropdown-btn:hover { color: var(--text); border-color: var(--hairline-2); }
 #tax-dropdown-list {
   display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 10000;
-  width: 292px; flex-direction: column; overflow: hidden;
+  /* #filter-rail is drag-resizable down to 160px (see makeResizable in index.html), but this
+     used to be a fixed 292px -- narrower than that, or than the map column when the sidebar is
+     dragged wide, and the dropdown would overflow the rail's edge onto whatever sits next to it.
+     Bounding it to the rail's own content width (100%) with a floor/ceiling keeps it inside the
+     rail it's anchored to instead of spilling onto the map or sidebar. */
+  width: 100%; min-width: 240px; max-width: 320px; flex-direction: column; overflow: hidden;
   background: var(--ground-2); border: 1px solid var(--hairline-2);
   border-radius: var(--r-md); box-shadow: 0 16px 48px rgba(0,0,0,.5);
 }
