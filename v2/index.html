@@ -201,14 +201,6 @@
                         <button class="tab-btn-v2" data-tab="ai" onclick="switchTab('ai')">Ask AI</button>
                     </div>
 
-                    <div class="legend-toggle" id="legendToggle" onclick="toggleLegend()">
-                        <h3>Taxonomy Legend</h3>
-                        <span class="legend-chev">▾</span>
-                    </div>
-                    <div id="legend-section">
-                        <div id="legend"><em style="color:var(--text-muted);font-size:12px;">Search a location to generate the legend.</em></div>
-                    </div>
-
                     <div id="dashboard-panel">
                 <div class="dashboard-header">
                     <div class="dashboard-header-text">
@@ -1125,10 +1117,13 @@
             document.getElementById('tax-dropdown-btn').textContent = selected === 0 ? 'None selected' : selected === total ? 'All Taxonomies' : `${selected} of ${total} selected`;
         }
 
+        // Despite the name, this is not just legend UI -- it also recomputes the
+        // marker color map renderMap() reads via window._displayColors, reassigning
+        // colors across only the active taxonomies when filtered so the remaining
+        // markers stay maximally distinct. The visible legend list itself was
+        // removed (it kept overlapping other sidebar panels when the filter rail
+        // was resized narrow), but this recomputation still has to run.
         function updateLegend() {
-            const legendDiv = document.getElementById('legend');
-            legendDiv.innerHTML = '';
-
             // When filtered, reassign colors across only active taxonomies for max distinction
             const allTax = Object.keys(taxonomyColors);
             const activeTax = allTax.filter(t => selectedTaxonomies.size === 0 || selectedTaxonomies.has(t));
@@ -1147,14 +1142,6 @@
 
             // Update marker colors to match display
             window._displayColors = displayColors;
-
-            allTax.forEach(t => {
-                const active = selectedTaxonomies.size === 0 || selectedTaxonomies.has(t);
-                legendDiv.innerHTML += `<div class="legend-item ${active ? '' : 'dimmed'}">
-                    <span class="legend-color" style="background-color:${displayColors[t]}"></span>
-                    <span>${t}</span>
-                </div>`;
-            });
         }
 
         // --- Radius Tools ---
@@ -2376,13 +2363,6 @@
 
             if (tab === 'ai') document.getElementById('ai-input')?.focus();
             if (tab === 'reports') updateReportScopeNote();
-        }
-
-        function toggleLegend() {
-            const section = document.getElementById('legend-section');
-            const toggle = document.getElementById('legendToggle');
-            section.classList.toggle('collapsed');
-            toggle.classList.toggle('collapsed');
         }
 
         // --- RESIZABLE PANELS ---
