@@ -69,7 +69,15 @@
   timeout = 26
 
 [functions."cms-provider"]
-  timeout = 10
+  # Was capped at 10s (below the 26s ceiling) since this is a lazy, detail-only
+  # popup enrichment call, not chained with anything else in a request budget.
+  # Raised 2026-08-14: a live database-wide check found CMS's real-world
+  # response time regularly exceeds 10s, which read identically to "not
+  # found" to the caller and (before a separate fix the same day) got
+  # wrongly cached as a confirmed miss. 20s gives the CMS fetch chain in
+  # cms-provider.js actual room to finish before the platform kills it,
+  # while staying under the 26s hard ceiling.
+  timeout = 20
 
 # patient-match chains NPPES (6s) + two geocoder attempts (5s each) + Anthropic
 # (15s abort). On Netlify's 10s default it could be killed mid-flight, returning a

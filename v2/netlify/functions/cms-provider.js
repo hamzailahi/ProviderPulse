@@ -113,11 +113,13 @@ function fetchFromCMS(npi) {
         });
 
         req.on('error', e => { console.log(`[CMS] Request error: ${e.message}`); reject(e); });
-        // Budgeted against the 10s hard cap in netlify.toml (deliberately below the 26s
-        // ceiling): cache read (~1s) + this + the GET fallback (~2.5s) + cache write
-        // (~1s) must all fit inside it, since a miss now pays for reads/writes around
-        // the CMS call as well as the call itself.
-        req.setTimeout(5000, () => { req.destroy(); reject(new Error('CMS API timeout')); });
+        // Budgeted against the function's 20s cap in netlify.toml: cache read (~1s) +
+        // this + the GET fallback (~6s) + cache write (~1s) must all fit inside it.
+        // A live database-wide check on 2026-08-14 found CMS regularly takes longer
+        // than the previous 10s cap allowed at all -- a slow-but-real answer and an
+        // outright failure looked identical to the caller. This is the primary path;
+        // most of the 20s budget belongs here, not the fallback.
+        req.setTimeout(10000, () => { req.destroy(); reject(new Error('CMS API timeout')); });
         req.write(body);
         req.end();
     });
@@ -142,7 +144,7 @@ function fetchFromCMSGet(npi) {
             });
         });
         req.on('error', e => { console.log(`[CMS-GET] error: ${e.message}`); reject(e); });
-        req.setTimeout(2500, () => { req.destroy(); reject(new Error('CMS-GET timeout')); });
+        req.setTimeout(6000, () => { req.destroy(); reject(new Error('CMS-GET timeout')); });
         req.end();
     });
 }
