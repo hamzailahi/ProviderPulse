@@ -705,8 +705,18 @@
         ];
 
         async function fetchProviderRows(filterFn, onProgress) {
-            let all = [];
-            for (const src of PROVIDER_SOURCES) {
+            // The three sources used to be fetched one after another -- clinics fully
+            // paginated, then provider_individuals fully paginated, then secondary
+            // locations -- which made every multi-ZIP search pay for all three trips
+            // back to back even though none of them depends on the others' results.
+            // Now that provider_individuals routinely outnumbers clinics 5-10x, that
+            // serial wait was the main cause of the map "hanging" on multi-ZIP loads.
+            // Each source still paginates sequentially within itself (that part is a
+            // real dependency, page 2 needs page 1's offset), but the three sources run
+            // concurrently.
+            let total = 0;
+            const perSource = await Promise.all(PROVIDER_SOURCES.map(async (src) => {
+                const rows = [];
                 let offset = 0;
                 while (true) {
                     const url = `${SUPABASE_URL}/rest/v1/${src.table}?${filterFn()}&select=${src.select}&limit=1000&offset=${offset}`;
@@ -720,13 +730,15 @@
                     // coordinates with a clinic row, and labels secondary-location rows as
                     // such rather than letting them read as a practice's main address.
                     batch.forEach(r => { r._src = src.src; });
-                    all.push(...batch);
-                    if (onProgress) onProgress(all.length);
+                    rows.push(...batch);
+                    total += batch.length;
+                    if (onProgress) onProgress(total);
                     if (batch.length < 1000) break;
                     offset += 1000;
                 }
-            }
-            return all;
+                return rows;
+            }));
+            return perSource.flat();
         }
 
         async function searchMultipleZips(zips) {
@@ -743,22 +755,25 @@
 
                 if (!clinicData.length) { statusEl.textContent = '❌ No clinics found'; return; }
 
-                // Fetch demographics in batches of 50
+                // Fetch demographics in batches of 50, all batches in flight together --
+                // same reasoning as fetchProviderRows: nothing here depends on another
+                // batch's result, so there is no reason to make one wait for the last.
                 const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
                 const demByZip = {};
-                for (let i = 0; i < allZips.length; i += 50) {
-                    const batch = allZips.slice(i, i + 50);
+                const demBatches = [];
+                for (let i = 0; i < allZips.length; i += 50) demBatches.push(allZips.slice(i, i + 50));
+                await Promise.all(demBatches.map(async (batch) => {
                     const res = await fetch(
                         `${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${batch.join(',')})&select=*`,
                         { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
                     );
-                    if (!res.ok) continue;
+                    if (!res.ok) return;
                     const data = await res.json();
                     data.forEach(d => {
                         if (!demByZip[d.zip]) demByZip[d.zip] = { 'ZIP Code': d.zip, 'State': d.state };
                         Object.keys(d).forEach(k => { if (k !== 'id' && k !== 'created_at') demByZip[d.zip][k] = d[k]; });
                     });
-                }
+                }));
 
                 const converted = clinicData.map(c => ({
                     'NPI': c.npi || '', 'Name': c.name || '',
@@ -783,32 +798,41 @@
             const statusEl = document.getElementById('dbStatus');
             statusEl.textContent = `🔄 Loading ${cityStateList.length} cities...`;
             try {
-                let clinicData = [];
-                for (const cityState of cityStateList) {
+                // Same fix as fetchProviderRows: one city's fetch doesn't depend on
+                // another's, so run them concurrently instead of waiting on each in turn.
+                // Each city reports its own running total via onProgress; summing the
+                // array on every update keeps the status line accurate across all of
+                // them in flight together, not just a page-fetch counter.
+                const progressPerCity = cityStateList.map(() => 0);
+                const perCity = await Promise.all(cityStateList.map((cityState, idx) => {
                     const parts = cityState.split(',').map(s => s.trim());
                     const cityUpper = parts[0].toUpperCase();
                     const stateUpper = parts[1] ? parts[1].trim().toUpperCase() : null;
-                    const rows = await fetchProviderRows(
+                    return fetchProviderRows(
                         () => `city=eq.${encodeURIComponent(cityUpper)}` + (stateUpper ? `&state=eq.${stateUpper}` : ''),
-                        n => statusEl.textContent = `🔄 Loaded ${clinicData.length + n} providers...`
+                        (n) => {
+                            progressPerCity[idx] = n;
+                            statusEl.textContent = `🔄 Loaded ${progressPerCity.reduce((a, b) => a + b, 0)} providers...`;
+                        }
                     );
-                    clinicData.push(...rows);
-                }
+                }));
+                const clinicData = perCity.flat();
                 if (!clinicData.length) { statusEl.textContent = '❌ No clinics found'; return; }
 
                 const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
                 const demByZip = {};
-                for (let i = 0; i < allZips.length; i += 50) {
-                    const batch = allZips.slice(i, i + 50);
+                const demBatches = [];
+                for (let i = 0; i < allZips.length; i += 50) demBatches.push(allZips.slice(i, i + 50));
+                await Promise.all(demBatches.map(async (batch) => {
                     const res = await fetch(`${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${batch.join(',')})&select=*`,
                         { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
-                    if (!res.ok) continue;
+                    if (!res.ok) return;
                     const data = await res.json();
                     data.forEach(d => {
                         if (!demByZip[d.zip]) demByZip[d.zip] = { 'ZIP Code': d.zip, 'State': d.state };
                         Object.keys(d).forEach(k => { if (k !== 'id' && k !== 'created_at') demByZip[d.zip][k] = d[k]; });
                     });
-                }
+                }));
                 const converted = clinicData.map(c => ({
                     'NPI': c.npi || '', 'Name': c.name || '',
                     'Primary Practice Address': c.address || '',
