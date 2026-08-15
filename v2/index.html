@@ -573,6 +573,38 @@
             if (!e.target.closest('#autocomplete-list') && e.target.id !== 'dbSearchInput') closeAutocomplete();
         });
 
+        // Users type a city as St/St./Saint/ST in whatever form they know it, but the
+        // underlying NPPES data stores the same real city under multiple LITERAL spellings
+        // at once -- confirmed live: clinics has rows for "PORT SAINT LUCIE", "PORT ST LUCIE"
+        // AND "PORT ST. LUCIE" simultaneously -- plus inconsistent casing across tables
+        // (clinics/provider_individuals are UPPERCASE, clinic_secondary_locations is Title
+        // Case). An exact-match search on whatever the user typed therefore silently missed
+        // most of the real rows. This expands one typed city into every spelling+casing
+        // variant worth trying, so the OR filter below catches all of them.
+        function cityNameVariants(raw) {
+            // Strip periods before matching "ST" as a whole word -- \b doesn't fire between
+            // the "." in "ST." and a following space (neither is a word character), so
+            // matching on the punctuated form directly missed "St." typed with a trailing
+            // period. Punctuation is re-added afterward as one of the generated variants.
+            const base = (raw || '').trim().toUpperCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
+            if (!base) return [];
+            const spellings = new Set([base]);
+            if (/\bST\b/.test(base)) spellings.add(base.replace(/\bST\b/g, 'SAINT'));
+            if (/\bSAINT\b/.test(base)) spellings.add(base.replace(/\bSAINT\b/g, 'ST'));
+            // Every spelling that contains a bare "ST" also deserves a punctuated "ST." sibling
+            Array.from(spellings).forEach(s => {
+                if (/\bST\b/.test(s)) spellings.add(s.replace(/\bST\b/g, 'ST.'));
+            });
+            const titleCase = s => s.replace(/\S+/g, w => w.charAt(0) + w.slice(1).toLowerCase());
+            const out = new Set();
+            spellings.forEach(s => { out.add(s); out.add(titleCase(s)); });
+            return Array.from(out);
+        }
+
+        function cityEqOr(raw) {
+            return cityNameVariants(raw).map(v => 'city.eq.' + encodeURIComponent(v)).join(',');
+        }
+
         document.getElementById('dbSearchBtn').addEventListener('click', async () => {
             const searchTerm = document.getElementById('dbSearchInput').value.trim();
             const searchUpper = searchTerm.toUpperCase();
@@ -601,16 +633,12 @@
                     filter = 'state=eq.' + searchUpper;
                 } else if (searchUpper.includes(',')) {
                     // "City, ST" format
-                    const parts = searchUpper.split(',');
-                    const cityUpper = parts[0].trim();
-                    const cityMixed = cityUpper.charAt(0) + cityUpper.slice(1).toLowerCase();
-                    const stateOnly = parts[1].trim();
-                    filter = 'or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')&state=eq.' + stateOnly;
+                    const parts = searchTerm.split(',');
+                    const stateOnly = parts[1].trim().toUpperCase();
+                    filter = 'or=(' + cityEqOr(parts[0]) + ')&state=eq.' + stateOnly;
                 } else {
                     // City only
-                    const cityUpper = searchUpper;
-                    const cityMixed = cityUpper.charAt(0) + cityUpper.slice(1).toLowerCase();
-                    filter = 'or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')';
+                    filter = 'or=(' + cityEqOr(searchTerm) + ')';
                 }
 
                 // Fetch clinics + physicians (provider_individuals) + secondary
@@ -806,10 +834,9 @@
                 const progressPerCity = cityStateList.map(() => 0);
                 const perCity = await Promise.all(cityStateList.map((cityState, idx) => {
                     const parts = cityState.split(',').map(s => s.trim());
-                    const cityUpper = parts[0].toUpperCase();
                     const stateUpper = parts[1] ? parts[1].trim().toUpperCase() : null;
                     return fetchProviderRows(
-                        () => `city=eq.${encodeURIComponent(cityUpper)}` + (stateUpper ? `&state=eq.${stateUpper}` : ''),
+                        () => `or=(${cityEqOr(parts[0])})` + (stateUpper ? `&state=eq.${stateUpper}` : ''),
                         (n) => {
                             progressPerCity[idx] = n;
                             statusEl.textContent = `🔄 Loaded ${progressPerCity.reduce((a, b) => a + b, 0)} providers...`;
@@ -921,7 +948,15 @@
                     // numbered cluster bubble. Clustering now stays on at every zoom; spiderfy (built in,
                     // on by default) fans a cluster's markers out into a clickable ring once it can't be
                     // split by zooming in any further, which is what actually makes a dense pile browsable.
-                    spiderfyDistanceMultiplier: 1.5
+                    spiderfyDistanceMultiplier: 1.5,
+                    // provider_individuals now outnumbers clinics 5-10x in most areas (more so
+                    // since the national rollout finished, 2026-08-15), so unchecking "Clinics"
+                    // and leaving only Individual Physicians / Secondary Locations can hand the
+                    // cluster engine several thousand markers in one call. Without chunkedLoading
+                    // that add runs synchronously on the main thread and can block the tab for
+                    // long enough to look like the map silently failed to render anything.
+                    // chunkedLoading spreads the add across animation frames instead.
+                    chunkedLoading: true
                 }).addTo(map);
                 renderMap();
             });
@@ -1347,35 +1382,48 @@
             // NPIs the care navigator recommended, when arrived via an area deep link
             const recSet = window._recommendedNPIs || new Set();
 
+            // Markers used to be added to the cluster layer one at a time inside the loop
+            // below via clusterLayer.addLayer(marker). Leaflet.markercluster's chunkedLoading
+            // option (enabled above) only batches the *bulk* addLayers() call -- repeated
+            // single addLayer() calls always run synchronously. With provider_individuals now
+            // routinely outnumbering clinics 5-10x per area, that per-marker loop could block
+            // the tab long enough that unchecking "Clinics" (leaving only the much larger
+            // Individual Physicians / Secondary Locations sets) looked like the map had
+            // rendered nothing. Markers are collected here and added in one addLayers() call
+            // after the loop instead.
+            const newMarkers = [];
+
             for (let key in coordGroups) {
                 const group = coordGroups[key], items = group.items;
                 const isRecommended = items.some(i => recSet.has(String(i.practice['NPI'] || '')));
-
-                // Build popup with NPPES enrichment placeholder
-                const firstNPI = items[0]?.practice['NPI'] || '';
-                const popupId = `popup-${firstNPI}-${Date.now()}`;
-
-                let popupHtml = `<div class="popup-content" style="min-width:220px;">
-                    <b style="font-size:12px;">${items.length === 1 ? items[0].address : 'Multiple Practices at this Location'}</b>
-                    <hr style="margin:5px 0;border-color:var(--border);"/>`;
 
                 // No stored affiliation link exists yet (migration 015's coordinate-match
                 // stage hasn't been uploaded to production), so a physician sharing this
                 // exact coordinate group with a clinic org is a live inference, not a fact.
                 const clinicHere = items.find(i => i.practice._src === 'clinic');
 
-                items.forEach(item => {
-                    const npi = item.practice['NPI'] || '';
-                    const recBadge = recSet.has(String(npi))
-                        ? `<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:#f0883e;color:#0d1117;font-size:9px;font-weight:700;">★ RECOMMENDED FOR YOU</div><br/>`
-                        : '';
-                    const secondaryBadge = item.practice._src === 'secondary'
-                        ? `<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:var(--bg-hover,#21293a);color:var(--text-secondary);font-size:9px;">ADDITIONAL PRACTICE LOCATION</div><br/>`
-                        : '';
-                    const affiliationNote = (item.practice._src === 'individual' && clinicHere && clinicHere.practice['Name'] !== item.practice['Name'])
-                        ? `<span style="color:var(--text-muted);font-size:10px;">May practice at ${clinicHere.practice['Name']}</span><br/>`
-                        : '';
-                    popupHtml += `
+                // Popup content used to be built eagerly for every marker, even though most
+                // popups are never opened -- with thousands of individual-physician markers
+                // in a single render that string-building work ran synchronously right
+                // alongside the addLayer cost above. Leaflet supports passing a function to
+                // bindPopup() so the HTML is only built the first time a given popup opens.
+                function buildPopupHtml() {
+                    let popupHtml = `<div class="popup-content" style="min-width:220px;">
+                    <b style="font-size:12px;">${items.length === 1 ? items[0].address : 'Multiple Practices at this Location'}</b>
+                    <hr style="margin:5px 0;border-color:var(--border);"/>`;
+
+                    items.forEach(item => {
+                        const npi = item.practice['NPI'] || '';
+                        const recBadge = recSet.has(String(npi))
+                            ? `<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:#f0883e;color:#0d1117;font-size:9px;font-weight:700;">★ RECOMMENDED FOR YOU</div><br/>`
+                            : '';
+                        const secondaryBadge = item.practice._src === 'secondary'
+                            ? `<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:var(--bg-hover,#21293a);color:var(--text-secondary);font-size:9px;">ADDITIONAL PRACTICE LOCATION</div><br/>`
+                            : '';
+                        const affiliationNote = (item.practice._src === 'individual' && clinicHere && clinicHere.practice['Name'] !== item.practice['Name'])
+                            ? `<span style="color:var(--text-muted);font-size:10px;">May practice at ${clinicHere.practice['Name']}</span><br/>`
+                            : '';
+                        popupHtml += `
                     <div style="margin-bottom:10px;" id="clinic-${npi}">
                         ${recBadge}${secondaryBadge}
                         <strong style="font-size:12px;">${item.practice['Name'] || '—'}</strong><br/>
@@ -1391,8 +1439,10 @@
                             <a href="register-provider.html#npi=${npi}" target="_blank" style="color:var(--accent);">Is this your practice? Claim this listing →</a>
                         </div>` : '')}
                     </div>`;
-                });
-                popupHtml += `</div>`;
+                    });
+                    popupHtml += `</div>`;
+                    return popupHtml;
+                }
 
                 let uniqueTaxs = [...new Set(items.map(i => i.practice['Primary Taxonomy']))];
                 const colorMap = window._displayColors || taxonomyColors;
@@ -1424,8 +1474,7 @@
                 // once content exceeds it -- without it a same-coordinate group of 200 individuals
                 // (now routine with provider_individuals merged in) renders a popup taller than the
                 // viewport with no way to reach the rest.
-                .bindPopup(popupHtml, { maxWidth: 280, maxHeight: 360 });
-                if (!window.clusterLayer) marker.addTo(map);
+                .bindPopup(buildPopupHtml, { maxWidth: 280, maxHeight: 360 });
 
                 // Fetch NPPES data when popup opens
                 marker.on('popupopen', () => {
@@ -1437,9 +1486,12 @@
                     });
                 });
 
-                if (window.clusterLayer) clusterLayer.addLayer(marker); else marker.addTo(map);
+                newMarkers.push(marker);
                 markers.push(marker);
             }
+
+            if (window.clusterLayer) clusterLayer.addLayers(newMarkers);
+            else newMarkers.forEach(m => m.addTo(map));
 
             // Re-added on every render because renderMap clears the marker list, and
             // the navigator's picks must survive the user changing the taxonomy filter.
