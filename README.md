@@ -42,13 +42,32 @@ self-registration, screening, and market data. Live at
   agent that plans its own read-only queries against an explicit
   table/column allowlist, so the model can never see or guess at PHI
   tables.
-- **National NPPES coverage, growing state by state** — beyond the
-  original organization-level import, a separate bulk-load pipeline is
-  merging in individual physicians (NPI-1) and secondary practice
-  locations from the full NPPES dissemination file, state by state. 20
-  states + DC are loaded as of 2026-08-12, both rendered live on the map
-  with marker clustering and source filters (clinics / individual
-  physicians / secondary locations) to keep the added density readable.
+- **Cached CMS enrichment on map popups** — clicking a provider pin looks
+  up their Medicare participation/credentials from CMS's live datastore
+  API and caches the result in Supabase for 90 days (a `found:false`
+  answer is refetched sooner, in case CMS's own coverage is still
+  catching up on a given NPI), so the same popup doesn't re-hit an
+  external API on every open.
+- **National NPPES coverage** — beyond the original organization-level
+  import, a separate bulk-load pipeline merged in individual physicians
+  (NPI-1) and secondary practice locations from the full NPPES
+  dissemination file. **All 50 states + DC are loaded as of 2026-08-15**,
+  bringing the map to roughly **9 million** providers (~1.9M
+  organizations + ~7.15M individual physicians), both rendered live with
+  marker clustering and source filters (clinics / individual physicians /
+  secondary locations) to keep the added density readable. The "X
+  providers mapped" figures on the login and provider-signup pages read
+  this count live from Supabase rather than a hardcoded number.
+- **Map search handles real-world spelling variance** — the same city is
+  often stored under several literal spellings at once (e.g. `PORT SAINT
+  LUCIE` / `PORT ST LUCIE` / `PORT ST. LUCIE` as separate, all-populated
+  rows), so city search expands whatever the user types across every
+  common abbreviation pair (St/Saint, Ft/Fort, Mt/Mount, N/North, S/South,
+  E/East, W/West, Ste/Sainte) and casing convention before querying,
+  including cities that combine two of them (`E St Louis`). The dashboard
+  also batches map markers into a single bulk add instead of one Leaflet
+  call per marker, since unfiltered individual-physician volume can now
+  reach into the thousands for a single search.
 
 ## Architecture
 
