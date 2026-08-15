@@ -6,10 +6,20 @@
 // NOT clinic_secondary_locations, which are additional addresses for NPIs
 // already counted in one of those two tables, not distinct providers.
 //
-// Uses PostgREST's exact count (Prefer: count=exact, HEAD so no rows are
-// transferred) against the Content-Range response header. Both tables are
-// public-read (see CLAUDE.md), so the anon key is enough -- no service role
-// needed for a plain count of already-public data.
+// Uses PostgREST's PLANNED count (Prefer: count=planned, HEAD so no rows are
+// transferred) against the Content-Range response header -- Postgres's query
+// planner estimate from table statistics, not a real COUNT(*). This was
+// count=exact until 2026-08-15: an exact count forces a full scan, and once
+// the national bulk-load pipeline finished loading every state,
+// provider_individuals crossed ~7M rows and that scan started timing out
+// (500s) rather than just being slow, so the trust-line stat silently fell
+// back to its static placeholder on every page view. A trust-line stat
+// doesn't need to be exact to the row -- the planner estimate is off by at
+// most a few percent on a table this size and never times out regardless of
+// how large the tables grow.
+//
+// Both tables are public-read (see CLAUDE.md), so the anon key is enough --
+// no service role needed for a plain count of already-public data.
 //
 // Env: SUPABASE_URL, SUPABASE_ANON_KEY
 
@@ -20,13 +30,13 @@ const CORS = {
   'Content-Type': 'application/json'
 };
 
-async function exactCount(baseUrl, anonKey, table) {
+async function plannedCount(baseUrl, anonKey, table) {
   const res = await fetch(`${baseUrl}/rest/v1/${table}?select=npi&limit=1`, {
     method: 'HEAD',
     headers: {
       apikey: anonKey,
       Authorization: `Bearer ${anonKey}`,
-      Prefer: 'count=exact'
+      Prefer: 'count=planned'
     },
     signal: AbortSignal.timeout(6000)
   });
@@ -50,8 +60,8 @@ exports.handler = async (event) => {
 
   try {
     const [clinics, individuals] = await Promise.all([
-      exactCount(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, 'clinics'),
-      exactCount(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, 'provider_individuals')
+      plannedCount(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, 'clinics'),
+      plannedCount(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, 'provider_individuals')
     ]);
 
     if (clinics === null && individuals === null) {
