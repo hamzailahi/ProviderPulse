@@ -573,28 +573,53 @@
             if (!e.target.closest('#autocomplete-list') && e.target.id !== 'dbSearchInput') closeAutocomplete();
         });
 
-        // Users type a city as St/St./Saint/ST in whatever form they know it, but the
-        // underlying NPPES data stores the same real city under multiple LITERAL spellings
-        // at once -- confirmed live: clinics has rows for "PORT SAINT LUCIE", "PORT ST LUCIE"
-        // AND "PORT ST. LUCIE" simultaneously -- plus inconsistent casing across tables
-        // (clinics/provider_individuals are UPPERCASE, clinic_secondary_locations is Title
-        // Case). An exact-match search on whatever the user typed therefore silently missed
-        // most of the real rows. This expands one typed city into every spelling+casing
-        // variant worth trying, so the OR filter below catches all of them.
+        // Users type a city in whatever abbreviated or spelled-out form they know it, but
+        // the underlying NPPES data stores the same real city under multiple LITERAL
+        // spellings at once. Confirmed live across every one of these pairs, not just
+        // St/Saint: "PORT SAINT LUCIE"/"PORT ST LUCIE"/"PORT ST. LUCIE" (302/675/23 rows),
+        // "SAINT LOUIS"/"ST LOUIS"/"ST. LOUIS" (893/75/32), "FORT WORTH"/"FT WORTH"/"FT.
+        // WORTH" (881/110/9), "MOUNT VERNON"/"MT VERNON"/"MT. VERNON" (927/49/24), "NORTH
+        // CHARLESTON"/"N CHARLESTON"/"N. CHARLESTON" (674/121/9), "WEST PALM BEACH"/"W PALM
+        // BEACH" (998/2), "STE GENEVIEVE"/"SAINTE GENEVIEVE"/"STE. GENEVIEVE", and even
+        // combinations of two at once -- "EAST SAINT LOUIS"/"E ST LOUIS"/"EAST ST
+        // LOUIS"/"E SAINT LOUIS" are all separately populated. Plus inconsistent casing
+        // across tables (clinics/provider_individuals are UPPERCASE, clinic_secondary_
+        // locations is Title Case). An exact-match search on whatever the user typed
+        // therefore silently missed most of the real rows for any of these. This expands
+        // one typed city into every abbreviation + casing combination worth trying, so the
+        // OR filter below catches all of them -- per word, not just once, so a city using
+        // two abbreviated words (e.g. "E St Louis") still resolves to all of its variants.
+        const CITY_ABBREV = { ST: 'SAINT', STE: 'SAINTE', FT: 'FORT', MT: 'MOUNT', N: 'NORTH', S: 'SOUTH', E: 'EAST', W: 'WEST' };
+        const CITY_ABBREV_REV = Object.fromEntries(Object.entries(CITY_ABBREV).map(([short, full]) => [full, short]));
+
         function cityNameVariants(raw) {
-            // Strip periods before matching "ST" as a whole word -- \b doesn't fire between
-            // the "." in "ST." and a following space (neither is a word character), so
-            // matching on the punctuated form directly missed "St." typed with a trailing
-            // period. Punctuation is re-added afterward as one of the generated variants.
+            // Strip periods before word-matching abbreviations -- \b doesn't fire between
+            // the "." in "St." and a following space (neither is a word character), so
+            // matching on the punctuated form directly missed anything typed with a
+            // trailing period. Punctuation is re-added afterward as its own variant.
             const base = (raw || '').trim().toUpperCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
             if (!base) return [];
-            const spellings = new Set([base]);
-            if (/\bST\b/.test(base)) spellings.add(base.replace(/\bST\b/g, 'SAINT'));
-            if (/\bSAINT\b/.test(base)) spellings.add(base.replace(/\bSAINT\b/g, 'ST'));
-            // Every spelling that contains a bare "ST" also deserves a punctuated "ST." sibling
-            Array.from(spellings).forEach(s => {
-                if (/\bST\b/.test(s)) spellings.add(s.replace(/\bST\b/g, 'ST.'));
+
+            // Cartesian product across words: each word that has a known abbreviated/full
+            // counterpart contributes both forms, everything else stays fixed.
+            let combos = [[]];
+            base.split(' ').forEach(word => {
+                const alt = CITY_ABBREV[word] || CITY_ABBREV_REV[word];
+                const options = alt ? [word, alt] : [word];
+                const next = [];
+                combos.forEach(c => options.forEach(o => next.push(c.concat(o))));
+                combos = next;
             });
+            const spellings = new Set(combos.map(c => c.join(' ')));
+
+            // Every spelling word matching a short abbreviation also deserves a punctuated
+            // sibling ("ST" -> "ST.", "MT" -> "MT.", ...).
+            Array.from(spellings).forEach(s => {
+                const words = s.split(' ');
+                if (!words.some(w => CITY_ABBREV[w])) return;
+                spellings.add(words.map(w => (CITY_ABBREV[w] ? w + '.' : w)).join(' '));
+            });
+
             const titleCase = s => s.replace(/\S+/g, w => w.charAt(0) + w.slice(1).toLowerCase());
             const out = new Set();
             spellings.forEach(s => { out.add(s); out.add(titleCase(s)); });
