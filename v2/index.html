@@ -3954,10 +3954,44 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
                     lab.className = 'vlabel ' + cls; lab.textContent = d.label;
                     var find = document.createElement('div');
                     find.className = 'vfind'; find.textContent = d.finding || '';
+                    body.appendChild(lab); body.appendChild(find);
+
+                    // Breakdown behind the total: as of 2026-08-19 `providers`
+                    // is organizations + individual physicians merged, so this
+                    // makes that checkable instead of one opaque number. See
+                    // market-score.js's file header for why the merge happened.
+                    // DOM methods, not innerHTML -- same rule buildVgroups
+                    // follows just above: every string here comes from the API.
+                    var m = d.metrics || {};
+                    if (m.organizations != null && m.individual_physicians != null) {
+                        var supply = document.createElement('div');
+                        supply.className = 'vsupply';
+                        var b1 = document.createElement('b'); b1.textContent = m.organizations.toLocaleString();
+                        var b2 = document.createElement('b'); b2.textContent = m.individual_physicians.toLocaleString();
+                        supply.appendChild(b1);
+                        supply.appendChild(document.createTextNode(' organizations · '));
+                        supply.appendChild(b2);
+                        supply.appendChild(document.createTextNode(' individual physicians'));
+                        body.appendChild(supply);
+                    }
+
+                    // State-level Medicare Advantage vs. Original Medicare split.
+                    // Absent (not zero, not guessed) until the monthly CMS
+                    // import has run at least once -- see market-score.js.
+                    if (d.medicare && d.medicare.available) {
+                        var medicare = document.createElement('div');
+                        medicare.className = 'vmedicare';
+                        var b3 = document.createElement('b'); b3.textContent = d.medicare.medicare_advantage_pct + '%';
+                        medicare.appendChild(b3);
+                        medicare.appendChild(document.createTextNode(
+                            ' of Medicare beneficiaries statewide are on Medicare Advantage (' + d.medicare.as_of + ')'));
+                        body.appendChild(medicare);
+                    }
+
                     var src = document.createElement('div');
                     src.className = 'vsrc';
                     src.textContent = 'Sources: ' + (d.sources || []).join(' · ');
-                    body.appendChild(lab); body.appendChild(find); body.appendChild(src);
+                    body.appendChild(src);
 
                     card.appendChild(ring); card.appendChild(body);
                     var vgroups = buildVgroups(d.groups, d.catchment, zip);

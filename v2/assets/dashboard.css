@@ -605,6 +605,12 @@ input[type="file"]::-webkit-file-upload-button {
 #verdict-card .vlabel.served   { background: var(--surface-2); color: var(--muted); }
 #verdict-card .vfind { font-size: 12.5px; line-height: 1.45; color: var(--text); }
 #verdict-card .vfind b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+/* Org/individual breakdown behind the total, and the state Medicare payer
+   mix -- both added 2026-08-19 so the headline number is checkable rather
+   than a single opaque total. Same size/color as .vsrc since both are
+   supporting detail, not the finding itself. */
+#verdict-card .vsupply, #verdict-card .vmedicare { font-size: 11px; color: var(--muted); line-height: 1.4; }
+#verdict-card .vsupply b, #verdict-card .vmedicare b { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text); }
 #verdict-card .vsrc { font-size: 9.5px; color: var(--faint); }
 
 /* ---- per-specialty breakdown, below the main verdict ----

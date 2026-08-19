@@ -109,3 +109,18 @@
 # budget, and the two together would exceed the 26s kill.
 [functions."audit-narrate"]
   timeout = 26
+
+# Auth check + appointment lookup + profile read + document-facts read, then
+# one Anthropic call (12s abort) plus the upsert. Comfortably past the 10s
+# default once the model call is in the chain.
+[functions."appointment-briefing"]
+  timeout = 20
+
+# Was running on the 10s default despite already chaining a paged clinics
+# query, a state demographics query, an 8000-row-capped HPSA query, and (for
+# the catchment branch) a second paged CDC PLACES query. Added 2026-08-19: a
+# parallel provider_individuals query at both the ZIP and catchment level, plus
+# a medicare_county_enrollment query -- real added latency on a function that
+# had no headroom configured at all.
+[functions."market-score"]
+  timeout = 20

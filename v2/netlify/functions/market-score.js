@@ -13,6 +13,25 @@
 // Each sub-score is 0-100 and the weights are declared in WEIGHTS below so the
 // formula can be audited rather than reverse-engineered.
 //
+// ── Supply counts BOTH organisations and individual physicians ──────────────
+// Until 2026-08-19 the supply figure came from `clinics` alone -- NPI-2
+// organisations only. Individual physicians (NPI-1, `provider_individuals`)
+// routinely outnumber them (confirmed live: 544 vs. 217 for ZIP 38017), so
+// every score computed before this date understated real capacity by roughly
+// that ratio. Both tables are now queried and merged at every level (ZIP,
+// catchment); `metrics.organizations`/`individual_physicians` keep the split
+// visible instead of collapsing it into one opaque total. This does NOT
+// include clinic_secondary_locations -- those rows are additional sites for
+// an NPI already counted once via its primary listing, and adding them would
+// double the same providers rather than finding new ones.
+//
+// `medicare` is a new, separate field: the state-level Original Medicare vs.
+// Medicare Advantage split from medicare_county_enrollment (migration 019,
+// scripts/import-medicare-enrollment.mjs). STATE-level because there is no
+// ZIP-to-county crosswalk in this schema -- same limitation the HPSA shortage
+// score already has. `available: false` until that importer has run at least
+// once; this is expected, not an error.
+//
 // Env: SUPABASE_URL, SUPABASE_ANON_KEY
 
 const CORS = {
@@ -200,19 +219,34 @@ exports.handler = async (event) => {
     }
 
     // 2. Providers here, and the state's ZIP-level demographics for the benchmark
+    //
+    // `clinics` is organisations only (NPI-2). Until 2026-08-19 this was the
+    // ONLY supply source, which undercounted real capacity by 2-10x wherever
+    // individual physicians (NPI-1, `provider_individuals`) outnumber the
+    // organisations they might practise at -- confirmed live for ZIP 38017:
+    // 217 clinics vs. 544 individuals. NPI-1 and NPI-2 are disjoint number
+    // spaces (see "NPI-1 vs NPI-2" in CLAUDE.md), so concatenating the two
+    // row sets is safe -- no NPI can appear in both.
     const stripped = String(parseInt(zip, 10));
-    const [clinicPage, stateDemPage] = await Promise.all([
+    const [clinicPage, individualPage, stateDemPage] = await Promise.all([
       pagedGet(`clinics?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy`, 'npi'),
+      pagedGet(`provider_individuals?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy`, 'npi'),
       pagedGet(`demographics_raw?state=eq.${encodeURIComponent(state)}&select=zip,%22Total%20Population%22,%22Insured%20Population%22`, 'zip')
     ]);
     const clinicRows = clinicPage.rows;
+    const individualRows = individualPage.rows;
     const stateDem = stateDemPage.rows;
-    // Count ALL listings. A clinic, hospital or surgical center is somewhere
-    // care is delivered and doctors practise out of, so it is real capacity —
-    // excluding it understates the market. The clinician/facility split is
-    // still reported below for anyone who wants to break the number down.
-    const listings = clinicRows.length;
-    const clinicians = clinicRows.filter(r => TaxonomyGroups.isClinician(r.primary_taxonomy)).length;
+    // Count ALL listings, both sources. A clinic, hospital or surgical center
+    // is somewhere care is delivered and doctors practise out of, so it is
+    // real capacity — excluding it understates the market, and so does
+    // excluding the individual physicians who outnumber those organisations
+    // in most ZIPs. The org/individual split is reported below so the total
+    // is checkable rather than a single opaque number.
+    const allRows = clinicRows.concat(individualRows);
+    const listings = allRows.length;
+    const organizations = clinicRows.length;
+    const individuals = individualRows.length;
+    const clinicians = allRows.filter(r => TaxonomyGroups.isClinician(r.primary_taxonomy)).length;
     const providers = listings;
     const per1k = pop ? (listings / pop) * 1000 : null;
 
@@ -239,9 +273,38 @@ exports.handler = async (event) => {
     // for Texas, with no ORDER BY -- so the median driving 30% of the score came
     // from an arbitrary 5% of the state. Paged on `id` because hpsa_score is not
     // unique and a non-unique cursor skips rows.
-    const hpsaPage = await pagedGet(
-      `hpsa_designations?state=eq.${encodeURIComponent(stateName)}&select=id,hpsa_score,hpsa_type,discipline,county`,
-      'id', { cap: 8000 });
+    const [hpsaPage, medicarePage] = await Promise.all([
+      pagedGet(
+        `hpsa_designations?state=eq.${encodeURIComponent(stateName)}&select=id,hpsa_score,hpsa_type,discipline,county`,
+        'id', { cap: 8000 }),
+      pagedGet(
+        `medicare_county_enrollment?state=eq.${encodeURIComponent(state)}&select=fips,total_benes,original_medicare_benes,ma_and_other_benes,data_month,data_year`,
+        'fips', { cap: 500, ms: 5000 })
+    ]);
+
+    // State-level Original Medicare vs. Medicare Advantage split. Summed
+    // counts, not an average of per-county percentages, so a large county
+    // isn't weighted the same as a tiny one. null fields (CMS privacy
+    // suppression, see import-medicare-enrollment.mjs) are skipped rather
+    // than treated as zero.
+    let medicareMix = { available: false, reason: 'No Medicare enrollment data imported yet for this state' };
+    if (medicarePage.rows.length) {
+      let total = 0, original = 0, ma = 0;
+      for (const r of medicarePage.rows) {
+        if (typeof r.total_benes === 'number') total += r.total_benes;
+        if (typeof r.original_medicare_benes === 'number') original += r.original_medicare_benes;
+        if (typeof r.ma_and_other_benes === 'number') ma += r.ma_and_other_benes;
+      }
+      const first = medicarePage.rows[0];
+      medicareMix = total > 0 ? {
+        available: true,
+        total_beneficiaries: total,
+        original_medicare_pct: Math.round((original / total) * 1000) / 10,
+        medicare_advantage_pct: Math.round((ma / total) * 1000) / 10,
+        counties: medicarePage.rows.length,
+        as_of: `${first.data_month} ${first.data_year}`
+      } : { available: false, reason: 'Medicare enrollment data for this state has no usable counts' };
+    }
     const hpsaRows = hpsaPage.rows;
     const primary = hpsaRows.filter(h => /primary/i.test(h.discipline || ''));
     const hpsaScore = median((primary.length ? primary : hpsaRows).map(h => Number(h.hpsa_score)).filter(n => isFinite(n)));
@@ -329,17 +392,22 @@ exports.handler = async (event) => {
         // query above already asks for both forms. Same problem across a list.
         const zipVariants = [...new Set(memberZips.flatMap(z => [z, String(parseInt(z, 10))]))];
 
-        const [clinicPage, placesPage] = await Promise.all([
+        const [clinicPage, individualPage, placesPage] = await Promise.all([
           pagedGet(`clinics?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy`,
+            'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
+          pagedGet(`provider_individuals?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy`,
             'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
           pagedGet(`cdc_places?zip=in.(${memberZips.join(',')})` +
             `&measureid=in.(${HealthDemand.measureIds().join(',')})` +
             `&select=zip,measureid,value,pop_18plus,data_year`, 'zip', { cap: 4000, ms: 7000 })
         ]);
 
-        // Supply: count listings per group across the catchment.
+        // Supply: count listings per group across the catchment, organisations
+        // and individual physicians both — same reasoning as the ZIP-level
+        // count above, and the same taxonomy classifier so this stays the one
+        // place that decides what counts as a clinician (see taxonomy-groups.js).
         const counts = {};
-        for (const r of clinicPage.rows) {
+        for (const r of clinicPage.rows.concat(individualPage.rows)) {
           const g = TaxonomyGroups.keyFor(r.primary_taxonomy);
           counts[g] = (counts[g] || 0) + 1;
         }
@@ -437,7 +505,8 @@ exports.handler = async (event) => {
           max_neighbors: CATCHMENT_MAX_NEIGHBORS,
           furthest_miles: members.length > 1 ? Number(members[members.length - 1].miles.toFixed(1)) : 0,
           clinic_rows: clinicPage.rows.length,
-          truncated: clinicPage.truncated || placesPage.truncated || boxPage.truncated,
+          individual_rows: individualPage.rows.length,
+          truncated: clinicPage.truncated || individualPage.truncated || placesPage.truncated || boxPage.truncated,
           basis: 'ZCTA centroid distance; approximates adjacency, not drive time',
           weights: PER_GROUP_WEIGHTS
         };
@@ -469,10 +538,24 @@ exports.handler = async (event) => {
           clinicians: clinicians,
           total_listings: listings,
           facilities: listings - clinicians,
+          // Added 2026-08-19: the total above used to mean "clinics only".
+          // These two are what it's actually made of now, so the total is
+          // checkable instead of a single opaque number.
+          organizations: organizations,
+          individual_physicians: individuals,
           providers_per_1k: per1k,
           benchmark_per_1k: benchDensity,
           hpsa_score: hpsaScore
         },
+        // State-level Medicare Advantage vs. Original Medicare split, from
+        // medicare_county_enrollment (migration 019). STATE-level, not
+        // ZIP-level, for the same reason hpsa_score above is a state median:
+        // there is no ZIP-to-county crosswalk in this schema, and HPSA data
+        // is itself only published at county granularity. Refuses (rather
+        // than guessing) when the table is empty or unreachable, which is
+        // expected until scripts/import-medicare-enrollment.mjs has run at
+        // least once.
+        medicare: medicareMix,
         // Per-specialty verdict. NOTE: these describe the CATCHMENT named in
         // `catchment`, not this ZIP. Do not render a group score under a
         // ZIP-only heading.
@@ -480,8 +563,9 @@ exports.handler = async (event) => {
         catchment,
         // Named so the UI can cite them, and so a missing one is visible
         sources: [
-          'NPPES via clinics', 'US Census / demographics_raw', 'HRSA HPSA',
-          'CDC PLACES (modelled small-area prevalence, not survey responses)'
+          'NPPES via clinics and provider_individuals', 'US Census / demographics_raw', 'HRSA HPSA',
+          'CDC PLACES (modelled small-area prevalence, not survey responses)',
+          'CMS Medicare Monthly Enrollment (state-level)'
         ],
         omitted: ['patient demand trend — not tracked; no search history exists']
       })

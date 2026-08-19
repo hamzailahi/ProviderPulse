@@ -437,6 +437,13 @@ $('formZip').onsubmit = async e => {
         '<span>providers per 1,000 residents' +
         (m.benchmark_per_1k ? ' · national ' + m.benchmark_per_1k : '') + '</span></div>';
     }
+    // Breakdown behind the total above: as of 2026-08-19 "providers" is
+    // organizations + individual physicians merged (see market-score.js), so
+    // this makes the number checkable rather than opaque.
+    if (m.organizations != null && m.individual_physicians != null) {
+      html += '<div class="fig"><b>' + fmt(m.organizations) + '</b>' +
+        '<span>organizations · ' + fmt(m.individual_physicians) + ' individual physicians</span></div>';
+    }
     if (m.population != null) {
       html += '<div class="fig"><b>' + fmt(m.population) + '</b><span>residents in this ZIP</span></div>';
     }
@@ -451,6 +458,13 @@ $('formZip').onsubmit = async e => {
     html += '</div>';
 
     if (scoreRes.finding) html += '<div class="note">' + esc(scoreRes.finding) + '</div>';
+    // State-level Medicare Advantage vs. Original Medicare split. Absent
+    // (not zero, not guessed) until the monthly CMS import has run at least
+    // once -- see market-score.js.
+    if (scoreRes.medicare && scoreRes.medicare.available) {
+      html += '<div class="note"><b>' + scoreRes.medicare.medicare_advantage_pct + '%</b> of Medicare beneficiaries ' +
+        'statewide are on Medicare Advantage (' + esc(scoreRes.medicare.as_of) + ')</div>';
+    }
     html += specialtyHtml(scoreRes.groups, scoreRes.catchment, zip);
     if (Array.isArray(scoreRes.sources)) {
       html += '<div class="src">Sources: ' + esc(scoreRes.sources.join(' · ')) + '</div>';

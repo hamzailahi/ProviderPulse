@@ -1,0 +1,68 @@
+name: Import Medicare county enrollment (CMS Monthly Enrollment)
+
+# Feeds medicare_county_enrollment: current-month Original Medicare vs.
+# Medicare Advantage beneficiary counts per county. CMS publishes this by the
+# 15th of each month, so this runs on the 18th to give that a few days'
+# buffer, while staying clear of the LEIE import (8th) and the Medicare
+# activity import (12th).
+on:
+  schedule:
+    - cron: '0 7 18 * *'
+  workflow_dispatch:
+    inputs:
+      discover:
+        description: 'DISCOVER ONLY: print the CMS catalog entry that matches, then stop. Downloads nothing.'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Parse and report totals without writing to Supabase'
+        type: boolean
+        default: false
+      csv_url:
+        description: 'Direct CSV URL (blank = resolve from the CMS catalog)'
+        type: string
+        required: false
+
+# Never expose the service role key to a fork's workflow run
+concurrency: medicare-enrollment-import
+
+jobs:
+  import:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    # The source file is CMS's full 2013-to-present history (500k+ rows), not
+    # a monthly slice, even though only the newest month is kept.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"
+            exit 1
+          fi
+
+      # The dataset URL is resolved from the CMS catalog at run time, not
+      # pinned -- CMS publishes a new distribution every month. Run with
+      # `discover` first to verify the catalog match before trusting a
+      # scheduled run.
+      - name: Import Medicare county enrollment into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          IN_DISCOVER: ${{ inputs.discover }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+          IN_CSV_URL: ${{ inputs.csv_url }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          [ "${IN_DISCOVER:-}" = "true" ] && ARGS+=(--discover) || true
+          [ "${IN_DRY_RUN:-}" = "true" ] && ARGS+=(--dry-run) || true
+          [ -n "${IN_CSV_URL:-}" ] && ARGS+=(--csv-url "$IN_CSV_URL") || true
+          echo "running: node scripts/import-medicare-enrollment.mjs ${ARGS[*]-}"
+          node --max-old-space-size=4096 scripts/import-medicare-enrollment.mjs ${ARGS[@]+"${ARGS[@]}"}
