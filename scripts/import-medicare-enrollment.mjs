@@ -83,7 +83,7 @@ const discover = flag('--discover');
 const csvUrlArg = opt('--csv-url');
 const fileArg = opt('--file');
 
-const rowsFrom = () => (fileArg ? fileCsvRows(fileArg) : fetchCsvRows(csvUrlArg, 'enrollment'));
+const rowsFrom = (file, url) => (file ? fileCsvRows(file) : fetchCsvRows(url, 'enrollment'));
 
 // ---------------------------------------------------------------------------
 // CMS catalog resolution -- same shape as import-medicare-activity.mjs
@@ -192,7 +192,7 @@ async function main() {
   const byFips = new Map();
   let maxPeriod = 0; // year*12 + monthIndex, for whichever row is newest
 
-  for await (const row of rowsFrom()) {
+  for await (const row of rowsFrom(fileArg, csvUrl)) {
     if (!header) {
       header = row;
       at = columnIndex(header, REQUIRED_COLS, 'enrollment');
