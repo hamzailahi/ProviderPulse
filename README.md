@@ -3,6 +3,7 @@
 [![LEIE import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/leie-import.yml/badge.svg)](.github/workflows/leie-import.yml)
 [![Medicare activity import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/medicare-activity-import.yml/badge.svg)](.github/workflows/medicare-activity-import.yml)
 [![Medicare county enrollment import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/medicare-enrollment-import.yml/badge.svg)](.github/workflows/medicare-enrollment-import.yml)
+[![ZIP-county crosswalk import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/zip-county-crosswalk-import.yml/badge.svg)](.github/workflows/zip-county-crosswalk-import.yml)
 [![CDC PLACES import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/cdc-places-import.yml/badge.svg)](.github/workflows/cdc-places-import.yml)
 [![License: All Rights Reserved](https://img.shields.io/badge/License-All%20Rights%20Reserved-red.svg)](LICENSE)
 
@@ -323,10 +324,11 @@ hand, in the Supabase SQL editor.
 | `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, `report-generate` in audit mode) |
 | `PATIENT_SIGNUP_ENABLED` | patient registration kill switch — defaults closed, since patient PHI storage isn't live until a Supabase BAA is in place |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
+| `HUD_API_TOKEN` | `zip-county-crosswalk-import.yml` only — a free HUD USER account token, not a Netlify function secret |
 
 ## Scheduled jobs
 
-Four GitHub Actions keep the backing data current. Each can also be
+Five GitHub Actions keep the backing data current. Each can also be
 triggered manually through `workflow_dispatch`.
 
 | Workflow | Cadence | Source |
@@ -334,6 +336,7 @@ triggered manually through `workflow_dispatch`.
 | `leie-import.yml` | monthly, the 8th | HHS OIG exclusion list — full refresh, not an upsert, so a reinstated provider actually disappears from the table |
 | `medicare-activity-import.yml` | monthly, the 12th | CMS Physician & Other Practitioners PUF + PECOS Order & Referring |
 | `medicare-enrollment-import.yml` | monthly, the 18th | CMS Medicare Monthly Enrollment — current month only; the source file is CMS's full history back to 2013, so this keeps just the newest month and overwrites the table rather than accumulating one |
+| `zip-county-crosswalk-import.yml` | quarterly, the 25th of Jan/Apr/Jul/Oct | HUD USPS ZIP Code Crosswalk API — which county(ies) each ZIP falls in, weighted by residential-address ratio; 51 state-level API calls, not one per ZIP |
 | `cdc-places-import.yml` | see workflow file | CDC PLACES health measures |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched (the full state-by-state national load is a separate, hand-run process not included in this repo) |
 
@@ -373,12 +376,22 @@ pipeline stage that was supposed to produce that link produced no rows in
 production, so the map falls back to a same-coordinate guess at render
 time instead of a confirmed fact.
 
-The new Medicare Advantage payer-mix figure is state-level, not ZIP-level
-— there's no ZIP-to-county crosswalk in this schema, which is the same
-reason the HRSA shortage score falls back to a state median rather than
-matching the exact county a ZIP sits in. Both are honest about the
-precision they actually have rather than presenting a state figure as if
-it were specific to the ZIP being viewed.
+The Medicare Advantage payer-mix figure is ZIP-level as of 2026-08-19, via
+`zip_county_crosswalk` — HUD's USPS ZIP Code Crosswalk API, weighted by
+residential-address ratio rather than land area (the free Census ZCTA
+relationship file was tried first and rejected: it weights a split ZIP by
+land overlap, which is badly wrong whenever population concentrates away
+from the larger-area county — confirmed live, ZIP 38017 is 91% Shelby
+County / 9% Fayette County by address count but a misleading 43%/57% by
+land area). The HRSA shortage score still falls back to a state median,
+because `hpsa_designations` stores county names with the suffix already
+stripped ("Natrona", not "Natrona County"/"Parish"/"Borough") and mapping
+that safely needs the same verify-before-guessing discipline the taxonomy
+vocabularies required — not yet done. When the crosswalk has no rows for a
+ZIP (a territory outside the 50 states + DC it covers, or not yet
+imported), the Medicare figure falls back to the old state-wide number
+rather than guessing — both levels are labeled, never presented as more
+precise than they are.
 
 The appointment-request/briefing flow and the market-opportunity fix
 described above don't have dedicated automated test coverage yet, unlike
