@@ -2,6 +2,7 @@
 
 [![LEIE import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/leie-import.yml/badge.svg)](.github/workflows/leie-import.yml)
 [![Medicare activity import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/medicare-activity-import.yml/badge.svg)](.github/workflows/medicare-activity-import.yml)
+[![Medicare county enrollment import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/medicare-enrollment-import.yml/badge.svg)](.github/workflows/medicare-enrollment-import.yml)
 [![CDC PLACES import](https://github.com/hamzailahi/ProviderPulse/actions/workflows/cdc-places-import.yml/badge.svg)](.github/workflows/cdc-places-import.yml)
 [![License: All Rights Reserved](https://img.shields.io/badge/License-All%20Rights%20Reserved-red.svg)](LICENSE)
 
@@ -69,6 +70,20 @@ ZIP are missing hours or insurance information. No demand numbers are
 shown on that pitch, deliberately — the search-volume log the product
 collects is too new to support a claim like "searches up 34%," so the
 page sticks to figures that are independently checkable today.
+
+**Appointment requests and pre-visit briefings.** A patient can request an
+appointment with a claimed listing directly; the provider confirms or
+declines, and each side can only move the status in the direction that's
+theirs to move (a patient cancels, a provider confirms/declines/completes —
+enforced in code, not left to row-level security to guess at). Once
+requested, the provider gets a short pre-visit briefing assembled from what
+the patient's profile already says and, if they've uploaded and approved
+anything, the specific facts pulled from those documents — never anything
+the patient hasn't explicitly signed off on. The briefing is organized, not
+diagnosed: same rule as document extraction below, enforced the same way,
+with the same non-diagnostic disclaimer checked twice — once in the prompt,
+once again on the way out, so a model that drops it doesn't get the last
+word.
 
 **OIG exclusion screening.** NPPES will tell you an NPI exists; it won't
 tell you whether that provider has been excluded from Medicare and
@@ -158,6 +173,21 @@ list that had already been corrupted before it ever saw it. The fix was
 upstream of the prompt: gate the injection on specialty match, and treat
 an unknown specialty as a non-match rather than a permissive default.
 
+The analyst dashboard's market-opportunity score had a similar shape of
+bug, found the same way: checking live counts rather than trusting the
+code's own assumption. It computed provider density from one table only,
+organization-level NPPES records, while individual physicians live in a
+separate table populated by a later pipeline and, in most ZIPs, outnumber
+the organizations they might practice at. One ZIP used to verify this: 217
+organizations counted, 544 individual physicians silently excluded, so the
+score was computing "how underserved is this market" from roughly a
+quarter of the real supply. Fixing it moved that ZIP's verdict from
+underserved to well served — the more consequential kind of bug, a
+confidently wrong business answer rather than a crash. The fix merges both
+tables at every level the score computes and shows the org/individual
+split explicitly in the UI now, so the total is something a reader can
+check rather than a number to trust blindly.
+
 ## How the AI pieces are scoped
 
 Every AI feature in this product is built around one rule: constrain what
@@ -186,7 +216,22 @@ audit engine's narration step sees the decomposed scoring signals and
 nothing else, so it's structurally impossible for it to state a fact the
 scorer didn't actually record; if the model's output fails to parse
 correctly, the system falls back to a deterministic, template-built
-rationale rather than failing the audit or guessing.
+rationale rather than failing the audit or guessing. The pre-visit
+briefing feature follows the identical pattern one layer further into
+PHI: the model only ever sees facts the patient has already approved, not
+the source documents themselves, and the same deterministic-fallback
+discipline applies if it produces something unusable.
+
+Every JSON-producing call in the product — document extraction, audit
+narration, the market-memo planner — is now constrained with the API's
+own schema enforcement rather than a prompt instruction asking nicely for
+"JSON only, no prose." That earlier approach mostly worked and
+occasionally didn't, in a way that was hard to distinguish from a real
+parsing bug until it happened in production; schema enforcement moves
+that failure mode from "sometimes" to "structurally can't," though a
+guarded parse is still kept everywhere, because a refusal or a
+token-limit cutoff can produce a response that never reaches the schema
+check at all.
 
 ## Access control
 
@@ -288,6 +333,7 @@ triggered manually through `workflow_dispatch`.
 |---|---|---|
 | `leie-import.yml` | monthly, the 8th | HHS OIG exclusion list — full refresh, not an upsert, so a reinstated provider actually disappears from the table |
 | `medicare-activity-import.yml` | monthly, the 12th | CMS Physician & Other Practitioners PUF + PECOS Order & Referring |
+| `medicare-enrollment-import.yml` | monthly, the 18th | CMS Medicare Monthly Enrollment — current month only; the source file is CMS's full history back to 2013, so this keeps just the newest month and overwrites the table rather than accumulating one |
 | `cdc-places-import.yml` | see workflow file | CDC PLACES health measures |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched (the full state-by-state national load is a separate, hand-run process not included in this repo) |
 
@@ -326,6 +372,20 @@ shared coordinates rather than read from a stored, precomputed link — the
 pipeline stage that was supposed to produce that link produced no rows in
 production, so the map falls back to a same-coordinate guess at render
 time instead of a confirmed fact.
+
+The new Medicare Advantage payer-mix figure is state-level, not ZIP-level
+— there's no ZIP-to-county crosswalk in this schema, which is the same
+reason the HRSA shortage score falls back to a state median rather than
+matching the exact county a ZIP sits in. Both are honest about the
+precision they actually have rather than presenting a state figure as if
+it were specific to the ZIP being viewed.
+
+The appointment-request/briefing flow and the market-opportunity fix
+described above don't have dedicated automated test coverage yet, unlike
+the three areas listed under Tests — verified by hand against live data
+before shipping (see the bug writeup in Data), but not yet pinned down
+the way the scoring engine, the query planner, and claimed-listing
+gating are.
 
 ## License
 
