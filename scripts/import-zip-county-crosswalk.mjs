@@ -68,8 +68,11 @@ async function fetchState(token, state, attempt = 1) {
   }
   if (!res.ok) throw new Error(`${state}: HUD API HTTP ${res.status} ${await res.text().then(t => t.slice(0, 200))}`);
   const json = await res.json();
-  const results = (json.data && json.data.results) || [];
-  return results;
+  const data = json.data || {};
+  // year/quarter are siblings of results[] in the response, not fields on
+  // each result row -- reading r.year/r.quarter per-row (the first version
+  // of this script did) silently wrote null into every row.
+  return { year: data.year ?? null, quarter: data.quarter ?? null, results: data.results || [] };
 }
 
 async function main() {
@@ -83,16 +86,15 @@ async function main() {
   console.log(`crosswalk: fetching ${states.length} state(s) from HUD, concurrency ${CONCURRENCY}`);
 
   const rows = [];
-  let dataYear = null, dataQuarter = null;
   let done = 0;
 
   for (let i = 0; i < states.length; i += CONCURRENCY) {
     const chunk = states.slice(i, i + CONCURRENCY);
     const perState = await Promise.all(chunk.map(async st => {
-      const results = await fetchState(HUD_API_TOKEN, st);
-      return { st, results };
+      const { year, quarter, results } = await fetchState(HUD_API_TOKEN, st);
+      return { st, year, quarter, results };
     }));
-    for (const { st, results } of perState) {
+    for (const { st, year, quarter, results } of perState) {
       for (const r of results) {
         if (!r.zip || !r.geoid) continue;
         rows.push({
@@ -100,8 +102,8 @@ async function main() {
           fips: String(r.geoid).trim(),
           state: st,
           res_ratio: Number(r.res_ratio),
-          data_year: r.year != null ? String(r.year) : null,
-          data_quarter: r.quarter != null ? String(r.quarter) : null
+          data_year: year != null ? String(year) : null,
+          data_quarter: quarter != null ? String(quarter) : null
         });
       }
       done++;
