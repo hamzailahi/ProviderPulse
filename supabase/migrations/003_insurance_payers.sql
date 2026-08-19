@@ -38,6 +38,13 @@ alter table public.insurance_payers enable row level security;
 drop policy if exists "payers are public" on public.insurance_payers;
 create policy "payers are public" on public.insurance_payers for select using (active);
 
+-- 'Medicare' and 'Medicare Advantage' below stay as the generic "I don't
+-- know my specific carrier" fallback. Named MA carrier brands per state
+-- (Aetna Medicare, Humana, BlueCare Plus Tennessee, ...) are populated
+-- separately and automatically by scripts/import-medicare-advantage-payers.mjs,
+-- sourced from CMS's own contract enrollment + directory data rather than
+-- hand-typed here -- do not hand-add individual MA carrier rows to this file,
+-- that importer will just re-add them on its next monthly run anyway.
 -- ---------------------------------------------------------------- national ---
 insert into public.insurance_payers (name, state, category, sort_order) values
   ('Medicare',                     null, 'medicare',   10),

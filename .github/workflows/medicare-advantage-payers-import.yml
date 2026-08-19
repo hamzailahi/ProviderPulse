@@ -1,0 +1,63 @@
+name: Import Medicare Advantage payers (CMS carrier directory)
+
+# Feeds insurance_payers: which Medicare Advantage carriers actually enrol
+# beneficiaries in each state, by consumer-facing brand name (joined from
+# CMS's state/county/contract enrollment file and its MA Contract Directory
+# -- see scripts/import-medicare-advantage-payers.mjs for why the join, not
+# either file alone). CMS republishes both monthly, so this runs monthly too
+# -- clear of LEIE (8th), Medicare activity (12th), Medicare enrollment
+# (18th) and the ZIP-county crosswalk (quarterly, 25th of Jan/Apr/Jul/Oct).
+on:
+  schedule:
+    - cron: '0 7 22 * *'
+  workflow_dispatch:
+    inputs:
+      discover:
+        description: 'DISCOVER ONLY: print the resolved enrollment + directory file URLs, then stop. Downloads nothing.'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Parse and report totals without writing to Supabase'
+        type: boolean
+        default: false
+
+# Never expose the service role key to a fork's workflow run
+concurrency: medicare-advantage-payers-import
+
+jobs:
+  import:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"
+            exit 1
+          fi
+
+      # Both CMS files are resolved from live index pages at run time, not
+      # pinned -- neither is in the DCAT catalog the other CMS importers use,
+      # and the enrollment file's URL embeds the current month/year. Run with
+      # `discover` first to verify the resolved links before trusting a
+      # scheduled run.
+      - name: Import Medicare Advantage payers into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          IN_DISCOVER: ${{ inputs.discover }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          [ "${IN_DISCOVER:-}" = "true" ] && ARGS+=(--discover) || true
+          [ "${IN_DRY_RUN:-}" = "true" ] && ARGS+=(--dry-run) || true
+          echo "running: node scripts/import-medicare-advantage-payers.mjs ${ARGS[*]-}"
+          node scripts/import-medicare-advantage-payers.mjs ${ARGS[@]+"${ARGS[@]}"}
