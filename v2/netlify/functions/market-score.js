@@ -25,12 +25,18 @@
 // an NPI already counted once via its primary listing, and adding them would
 // double the same providers rather than finding new ones.
 //
-// `medicare` is a new, separate field: the state-level Original Medicare vs.
-// Medicare Advantage split from medicare_county_enrollment (migration 019,
-// scripts/import-medicare-enrollment.mjs). STATE-level because there is no
-// ZIP-to-county crosswalk in this schema -- same limitation the HPSA shortage
-// score already has. `available: false` until that importer has run at least
-// once; this is expected, not an error.
+// `medicare` is a separate field: the Original Medicare vs. Medicare
+// Advantage split from medicare_county_enrollment (migration 019,
+// scripts/import-medicare-enrollment.mjs). ZIP-level as of 2026-08-19, via
+// zip_county_crosswalk (migration 020, scripts/import-zip-county-crosswalk.mjs)
+// -- HUD's residential-address-weighted ZIP-to-county crosswalk, used to
+// allocate each matched county's beneficiary counts proportionally to this
+// ZIP (`medicare.level: 'zip'`). Falls back to the old state-wide aggregate
+// (`level: 'state'`) when the crosswalk has no rows for this ZIP -- not yet
+// imported, or a territory outside the 50 states + DC it covers -- same
+// limitation the HPSA shortage score still has (hpsa_designations has no
+// verified name-mapping to the crosswalk yet, see migration 020's header).
+// `available: false` until at least one of the two importers has run.
 //
 // Env: SUPABASE_URL, SUPABASE_ANON_KEY
 
@@ -273,22 +279,63 @@ exports.handler = async (event) => {
     // for Texas, with no ORDER BY -- so the median driving 30% of the score came
     // from an arbitrary 5% of the state. Paged on `id` because hpsa_score is not
     // unique and a non-unique cursor skips rows.
-    const [hpsaPage, medicarePage] = await Promise.all([
+    const [hpsaPage, medicarePage, crosswalkPage] = await Promise.all([
       pagedGet(
         `hpsa_designations?state=eq.${encodeURIComponent(stateName)}&select=id,hpsa_score,hpsa_type,discipline,county`,
         'id', { cap: 8000 }),
       pagedGet(
         `medicare_county_enrollment?state=eq.${encodeURIComponent(state)}&select=fips,total_benes,original_medicare_benes,ma_and_other_benes,data_month,data_year`,
-        'fips', { cap: 500, ms: 5000 })
+        'fips', { cap: 500, ms: 5000 }),
+      // zip_county_crosswalk (migration 020): which county(ies) this ZIP
+      // falls in, weighted by HUD's residential-address ratio. A handful of
+      // rows per ZIP at most, so a small cap is plenty.
+      pagedGet(`zip_county_crosswalk?or=(zip.eq.${zip},zip.eq.${stripped})&select=fips,res_ratio`, 'id', { cap: 50 })
     ]);
 
-    // State-level Original Medicare vs. Medicare Advantage split. Summed
-    // counts, not an average of per-county percentages, so a large county
-    // isn't weighted the same as a tiny one. null fields (CMS privacy
-    // suppression, see import-medicare-enrollment.mjs) are skipped rather
-    // than treated as zero.
+    // ZIP-level Medicare mix via the crosswalk, when available. A ZIP can
+    // span multiple counties -- confirmed live, 38017 is 91% Shelby / 9%
+    // Fayette by HUD's residential-address ratio -- so summing
+    // county_total * res_ratio across every matched county estimates this
+    // ZIP's own beneficiary count and mix, not just its state's. Falls back
+    // to the state-level aggregate below when the crosswalk has no rows for
+    // this ZIP (not yet imported, or a territory outside the 50 states + DC
+    // it covers) or when none of the matched counties have usable data.
     let medicareMix = { available: false, reason: 'No Medicare enrollment data imported yet for this state' };
-    if (medicarePage.rows.length) {
+    if (crosswalkPage.rows.length) {
+      const fipsList = [...new Set(crosswalkPage.rows.map(r => r.fips))];
+      const zipCountyPage = await pagedGet(
+        `medicare_county_enrollment?fips=in.(${fipsList.join(',')})&select=fips,total_benes,original_medicare_benes,ma_and_other_benes,data_month,data_year`,
+        'fips', { cap: 50 });
+      const byFips = {};
+      zipCountyPage.rows.forEach(r => { byFips[r.fips] = r; });
+      let total = 0, original = 0, ma = 0, matchedCounties = 0, first = null;
+      for (const cw of crosswalkPage.rows) {
+        const r = byFips[cw.fips];
+        if (!r || typeof r.total_benes !== 'number') continue;
+        total += r.total_benes * cw.res_ratio;
+        if (typeof r.original_medicare_benes === 'number') original += r.original_medicare_benes * cw.res_ratio;
+        if (typeof r.ma_and_other_benes === 'number') ma += r.ma_and_other_benes * cw.res_ratio;
+        matchedCounties++;
+        if (!first) first = r;
+      }
+      if (total > 0) {
+        medicareMix = {
+          available: true,
+          level: 'zip',
+          total_beneficiaries: Math.round(total),
+          original_medicare_pct: Math.round((original / total) * 1000) / 10,
+          medicare_advantage_pct: Math.round((ma / total) * 1000) / 10,
+          counties: matchedCounties,
+          as_of: `${first.data_month} ${first.data_year}`
+        };
+      }
+    }
+
+    // State-level fallback. Summed counts, not an average of per-county
+    // percentages, so a large county isn't weighted the same as a tiny one.
+    // null fields (CMS privacy suppression, see import-medicare-enrollment.mjs)
+    // are skipped rather than treated as zero.
+    if (!medicareMix.available && medicarePage.rows.length) {
       let total = 0, original = 0, ma = 0;
       for (const r of medicarePage.rows) {
         if (typeof r.total_benes === 'number') total += r.total_benes;
@@ -298,6 +345,7 @@ exports.handler = async (event) => {
       const first = medicarePage.rows[0];
       medicareMix = total > 0 ? {
         available: true,
+        level: 'state',
         total_beneficiaries: total,
         original_medicare_pct: Math.round((original / total) * 1000) / 10,
         medicare_advantage_pct: Math.round((ma / total) * 1000) / 10,
@@ -547,14 +595,14 @@ exports.handler = async (event) => {
           benchmark_per_1k: benchDensity,
           hpsa_score: hpsaScore
         },
-        // State-level Medicare Advantage vs. Original Medicare split, from
-        // medicare_county_enrollment (migration 019). STATE-level, not
-        // ZIP-level, for the same reason hpsa_score above is a state median:
-        // there is no ZIP-to-county crosswalk in this schema, and HPSA data
-        // is itself only published at county granularity. Refuses (rather
-        // than guessing) when the table is empty or unreachable, which is
-        // expected until scripts/import-medicare-enrollment.mjs has run at
-        // least once.
+        // Medicare Advantage vs. Original Medicare split, allocated to this
+        // ZIP via zip_county_crosswalk when available (medicare.level ===
+        // 'zip'), else the old state-wide aggregate (medicare.level ===
+        // 'state') -- see the header comment. hpsa_score above is still a
+        // state median; the crosswalk does not have a verified join to
+        // hpsa_designations yet. Refuses (rather than guessing) when neither
+        // table has usable rows for this ZIP/state, which is expected until
+        // the importers have run.
         medicare: medicareMix,
         // Per-specialty verdict. NOTE: these describe the CATCHMENT named in
         // `catchment`, not this ZIP. Do not render a group score under a
@@ -565,7 +613,9 @@ exports.handler = async (event) => {
         sources: [
           'NPPES via clinics and provider_individuals', 'US Census / demographics_raw', 'HRSA HPSA',
           'CDC PLACES (modelled small-area prevalence, not survey responses)',
-          'CMS Medicare Monthly Enrollment (state-level)'
+          medicareMix.level === 'zip'
+            ? 'CMS Medicare Monthly Enrollment via HUD ZIP-county crosswalk'
+            : 'CMS Medicare Monthly Enrollment (state-level)'
         ],
         omitted: ['patient demand trend — not tracked; no search history exists']
       })

@@ -458,12 +458,14 @@ $('formZip').onsubmit = async e => {
     html += '</div>';
 
     if (scoreRes.finding) html += '<div class="note">' + esc(scoreRes.finding) + '</div>';
-    // State-level Medicare Advantage vs. Original Medicare split. Absent
-    // (not zero, not guessed) until the monthly CMS import has run at least
-    // once -- see market-score.js.
+    // Medicare Advantage vs. Original Medicare split, ZIP-level via the HUD
+    // county crosswalk when available (scoreRes.medicare.level === 'zip'),
+    // else the state-wide aggregate -- see market-score.js. Absent (not
+    // zero, not guessed) until an import has run.
     if (scoreRes.medicare && scoreRes.medicare.available) {
+      var medScope = scoreRes.medicare.level === 'zip' ? 'in this ZIP' : 'statewide';
       html += '<div class="note"><b>' + scoreRes.medicare.medicare_advantage_pct + '%</b> of Medicare beneficiaries ' +
-        'statewide are on Medicare Advantage (' + esc(scoreRes.medicare.as_of) + ')</div>';
+        medScope + ' are on Medicare Advantage (' + esc(scoreRes.medicare.as_of) + ')</div>';
     }
     html += specialtyHtml(scoreRes.groups, scoreRes.catchment, zip);
     if (Array.isArray(scoreRes.sources)) {

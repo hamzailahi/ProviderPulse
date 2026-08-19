@@ -3975,16 +3975,18 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
                         body.appendChild(supply);
                     }
 
-                    // State-level Medicare Advantage vs. Original Medicare split.
-                    // Absent (not zero, not guessed) until the monthly CMS
-                    // import has run at least once -- see market-score.js.
+                    // Medicare Advantage vs. Original Medicare split, ZIP-level via
+                    // the HUD county crosswalk when available (d.medicare.level ===
+                    // 'zip'), else the state-wide aggregate -- see market-score.js.
+                    // Absent (not zero, not guessed) until an import has run.
                     if (d.medicare && d.medicare.available) {
                         var medicare = document.createElement('div');
                         medicare.className = 'vmedicare';
                         var b3 = document.createElement('b'); b3.textContent = d.medicare.medicare_advantage_pct + '%';
                         medicare.appendChild(b3);
+                        var scopeWord = d.medicare.level === 'zip' ? 'in this ZIP' : 'statewide';
                         medicare.appendChild(document.createTextNode(
-                            ' of Medicare beneficiaries statewide are on Medicare Advantage (' + d.medicare.as_of + ')'));
+                            ' of Medicare beneficiaries ' + scopeWord + ' are on Medicare Advantage (' + d.medicare.as_of + ')'));
                         body.appendChild(medicare);
                     }
 

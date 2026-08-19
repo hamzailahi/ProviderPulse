@@ -1,0 +1,59 @@
+name: Import ZIP-to-county crosswalk (HUD USPS Crosswalk)
+
+# Feeds zip_county_crosswalk: which county (or counties) each ZIP falls in,
+# weighted by HUD's residential-address ratio. HUD republishes this quarterly,
+# so this runs quarterly too -- clear of the monthly LEIE (8th), Medicare
+# activity (12th) and Medicare enrollment (18th) imports.
+on:
+  schedule:
+    - cron: '0 7 25 1,4,7,10 *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Parse and report totals without writing to Supabase'
+        type: boolean
+        default: false
+      state:
+        description: 'Import a single 2-letter state only, for testing (blank = all 50 states + DC)'
+        type: string
+        required: false
+
+# Never expose the service role key or the HUD token to a fork's workflow run
+concurrency: zip-county-crosswalk-import
+
+jobs:
+  import:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    # 51 state-level API calls at concurrency 5, each a modest JSON payload --
+    # far lighter than the CSV-file imports, but the HUD API's own latency is
+    # unpredictable, so this still gets real headroom.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ] || [ -z "${{ secrets.HUD_API_TOKEN }}" ]; then
+            echo "::error::SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and HUD_API_TOKEN repository secrets are required"
+            exit 1
+          fi
+
+      - name: Import ZIP-to-county crosswalk into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HUD_API_TOKEN: ${{ secrets.HUD_API_TOKEN }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+          IN_STATE: ${{ inputs.state }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          [ "${IN_DRY_RUN:-}" = "true" ] && ARGS+=(--dry-run) || true
+          [ -n "${IN_STATE:-}" ] && ARGS+=(--state "$IN_STATE") || true
+          echo "running: node scripts/import-zip-county-crosswalk.mjs ${ARGS[*]-}"
+          node scripts/import-zip-county-crosswalk.mjs ${ARGS[@]+"${ARGS[@]}"}
