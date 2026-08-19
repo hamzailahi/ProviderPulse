@@ -35,13 +35,34 @@ const BUCKET = 'patient-docs';
 const MAX_EXTRACT_BYTES = 10 * 1024 * 1024;
 
 const FACT_TYPES = ['condition', 'referral', 'medication', 'allergy', 'provider', 'date'];
+const DOC_KINDS = ['lab result', 'discharge summary', 'referral', 'visit summary', 'imaging report', 'prescription', 'other', 'unreadable'];
+
+// Schema-constrained output (Structured Outputs) replaces the old "return JSON
+// only, strip the code fence" prompting -- the API guarantees this shape, so
+// the model can no longer wrap the answer in prose or a fence.
+const EXTRACT_SCHEMA = {
+  type: 'object',
+  properties: {
+    document_kind: { type: 'string', enum: DOC_KINDS },
+    facts: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          fact_type: { type: 'string', enum: FACT_TYPES },
+          value: { type: 'string' },
+          source_text: { type: 'string' }
+        },
+        required: ['fact_type', 'value', 'source_text'],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ['document_kind', 'facts'],
+  additionalProperties: false
+};
 
 const SYSTEM = `You extract structured information from a patient's own medical document so they can add it to their provider-search profile. You are part of a healthcare provider directory, not a clinical tool.
-
-Return ONLY a JSON object of this exact shape, with no prose before or after:
-
-{"document_kind": "<lab result|discharge summary|referral|visit summary|imaging report|prescription|other|unreadable>",
- "facts": [{"fact_type":"condition|referral|medication|allergy|provider|date","value":"<short label>","source_text":"<verbatim quote from the document>"}]}
 
 Rules, in order of importance:
 
@@ -52,8 +73,8 @@ Rules, in order of importance:
 5. "medication" and "allergy" are copied as listed. Do not add dosing guidance.
 6. "provider" is a clinician or practice named in the document. "date" is the document or visit date, as ISO YYYY-MM-DD if it is unambiguous.
 7. Keep each value under 80 characters and each source_text under 200 characters.
-8. If the document is unreadable, not a medical document, or contains none of the above, return {"document_kind":"<kind>","facts":[]}. An empty list is a correct answer.
-9. Never address the patient. Never add commentary, reassurance, or warnings. Output the JSON object and nothing else.`;
+8. If the document is unreadable, not a medical document, or contains none of the above, return an empty facts list. An empty list is a correct answer.
+9. Never address the patient. Never add commentary, reassurance, or warnings.`;
 
 async function audit(env, row) {
   try {
@@ -161,11 +182,11 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         model: 'claude-sonnet-5',
         max_tokens: 1500,
-        temperature: 0,
         system: SYSTEM,
+        output_config: { format: { type: 'json_schema', schema: EXTRACT_SCHEMA } },
         messages: [{
           role: 'user',
-          content: [block, { type: 'text', text: 'Extract from this document. JSON only.' }]
+          content: [block, { type: 'text', text: 'Extract from this document.' }]
         }]
       }),
       signal: controller.signal
@@ -176,10 +197,12 @@ exports.handler = async (event) => {
       return await fail('The reader is unavailable right now. Your file was saved — try again in a moment.', 502);
     }
     const aiData = await aiRes.json();
+    // A refusal or a max_tokens cutoff can still leave content that doesn't
+    // match EXTRACT_SCHEMA -- the schema constrains a *completed* response,
+    // not these two stop reasons -- so this stays a guarded parse rather than
+    // an unconditional one.
     const text = (aiData.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
-    // Tolerate a fenced block even though the prompt forbids one
-    const jsonText = (text.match(/\{[\s\S]*\}/) || [text])[0];
-    parsed = JSON.parse(jsonText);
+    parsed = JSON.parse(text);
   } catch (e) {
     return await fail('Could not read that document. It may be blurry, password-protected, or not a medical record.', 502);
   }

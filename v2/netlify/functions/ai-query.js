@@ -53,8 +53,46 @@ Rules:
   Rehabilitation, Facility / Clinic, Radiology & Imaging, Surgery, Oncology,
   Dermatology, Neurology, Obstetrics & Gynecology.
 - Prefer count_by for "how many per X" questions.
-- There is no table of patients, provider accounts, emails, or contact details. If the question asks for any of those, or for anything not answerable from the tables above, return {"refuse":"<one short sentence saying what is unavailable>"}.
-- Return ONLY the JSON object. No prose, no code fence.`;
+- There is no table of patients, provider accounts, emails, or contact details. If the question asks for any of those, or for anything not answerable from the tables above, set "refuse" to one short sentence saying what is unavailable and omit the plan fields.`;
+
+// Schema-constrained output (Structured Outputs). All fields are optional so
+// the same schema covers both a real plan and a {refuse: "..."} response --
+// validatePlan() in lib/query-plan.js remains the actual security boundary
+// (the allowlist a plan must pass to run); this schema only guarantees the
+// model's JSON is shaped correctly before that check ever sees it.
+const PLAN_SCHEMA = {
+  type: 'object',
+  properties: {
+    table: { type: 'string', enum: Object.keys(TABLES) },
+    select: { type: 'array', items: { type: 'string' } },
+    filters: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          column: { type: 'string' },
+          op: { type: 'string', enum: OPS },
+          value: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'number' },
+              { type: 'array', items: { type: 'string' } }
+            ]
+          }
+        },
+        required: ['column', 'op', 'value'],
+        additionalProperties: false
+      }
+    },
+    aggregate: { type: 'string', enum: ['none', 'count', 'count_by'] },
+    group_by: { type: 'string' },
+    taxonomy: { type: 'string' },
+    limit: { type: 'integer' },
+    refuse: { type: 'string' }
+  },
+  required: [],
+  additionalProperties: false
+};
 
 const MEMO_SYSTEM = `You write a short market memo for a healthcare strategy analyst, grounded ONLY in the query results supplied.
 
@@ -97,6 +135,7 @@ async function marketMemo(parsed, apiKey) {
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 700,
     system: PLANNER_SYSTEM,
+    output_config: { format: { type: 'json_schema', schema: PLAN_SCHEMA } },
     messages: [{ role: 'user', content: question }]
   }, apiKey);
 
@@ -104,6 +143,9 @@ async function marketMemo(parsed, apiKey) {
     return { statusCode: 502, headers: JSONH, body: JSON.stringify({ error: 'The planner is unavailable right now.' }) };
   }
   const planText = (planRes.body.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
+  // Guarded, not unconditional: a refusal or a max_tokens cutoff can still
+  // leave content that doesn't match PLAN_SCHEMA, since the schema
+  // constrains a *completed* response, not those two stop reasons.
   let rawPlan;
   try { rawPlan = JSON.parse(stripFence(planText)); }
   catch { return { statusCode: 200, headers: JSONH, body: JSON.stringify({ refused: true, reason: 'Could not turn that into a query I can run. Try naming a state, ZIP or specialty.' }) }; }
@@ -447,6 +489,12 @@ exports.handler = async function(event, context) {
         }
 
         const { system, messages, clientData } = parsed;
+        // The client-supplied system prompt doesn't know about parallel tool
+        // calling. These read-only lookups over already-loaded map data never
+        // depend on each other, so encourage batching independent calls into
+        // one turn instead of one round trip per tool.
+        const systemWithParallelHint = (system || '') +
+          '\n\nIf a question needs more than one of these tools and the calls do not depend on each other\'s results, request them together in the same turn rather than one at a time.';
 
         // Log payload size for debugging
         console.log('Payload size:', Buffer.byteLength(event.body), 'bytes');
@@ -459,9 +507,9 @@ exports.handler = async function(event, context) {
         while (iterations < 5) {
             iterations++;
             const result = await callAnthropic({
-                model: 'claude-sonnet-4-5',
+                model: 'claude-sonnet-5',
                 max_tokens: 2000,
-                system,
+                system: systemWithParallelHint,
                 tools: TOOLS,
                 messages: currentMessages
             }, apiKey);

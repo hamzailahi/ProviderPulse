@@ -487,11 +487,13 @@ exports.handler = async (event) => {
 
   const system = `You are the ProviderPulse care navigator, a warm and concise assistant inside a healthcare provider directory.
 
-PATIENT (greet them by first name):
+<patient note="greet them by first name">
 ${JSON.stringify(patientContext)}
+</patient>
 
-PROVIDERS FOUND NEAR THEM in the national registry, already filtered to their area (${effectiveZip ? 'ZIP ' + effectiveZip : 'no ZIP on file'}) and relevant specialties (${terms.join(', ')}). This is the COMPLETE list, use ALL of them and never invent others:
+<providers note="Found near the patient in the national registry, already filtered to their area (${effectiveZip ? 'ZIP ' + effectiveZip : 'no ZIP on file'}) and relevant specialties (${terms.join(', ')}). This is the COMPLETE list -- use ALL of them and never invent others.">
 ${JSON.stringify(providers)}
+</providers>
 
 Rules:
 ${specialty

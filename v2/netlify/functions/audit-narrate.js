@@ -44,9 +44,31 @@ RULES, all mandatory:
 4. NEVER assert certainty. Do not write that a provider IS inactive, IS excluded, or IS accurate. Write what the signals indicate.
 5. NEVER describe the result as compliance, certification, validation, or a guarantee. Every rationale must make clear this is a ${DISCLAIMER}.
 6. Do not invent facts. If it is not in the signals, it is not available to you.
+7. Return one entry per provider you were given, in the same order, with the npi copied verbatim from the input.`;
 
-Return ONLY a JSON object mapping each NPI string to its rationale string. No markdown, no code fence, no commentary.
-Example shape: {"1234567890":"...","1987654321":"..."}`;
+// Schema-constrained output (Structured Outputs). An object keyed by NPI
+// can't be expressed in JSON Schema (dynamic property names), so the shape
+// is an array of {npi, rationale} pairs instead -- the handler below turns
+// that into the NPI-keyed map the rest of the file works with.
+const NARRATE_SCHEMA = {
+  type: 'object',
+  properties: {
+    narratives: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          npi: { type: 'string' },
+          rationale: { type: 'string' }
+        },
+        required: ['npi', 'rationale'],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ['narratives'],
+  additionalProperties: false
+};
 
 const svc = env => ({
   apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -79,17 +101,23 @@ function fallbackNarrative(f) {
   return parts.join(' ');
 }
 
-/** Strip a code fence the prompt already forbids, then parse. */
+/**
+ * Parse the schema-constrained {narratives:[{npi,rationale},...]} response
+ * into the NPI-keyed map the rest of the file expects. A refusal or a
+ * max_tokens cutoff can still leave content that doesn't match
+ * NARRATE_SCHEMA -- the schema constrains a *completed* response, not those
+ * two stop reasons -- so this stays a guarded parse, with the deterministic
+ * fallbackNarrative() as the backstop.
+ */
 function parseModelJson(text) {
-  let t = String(text || '').trim();
-  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence) t = fence[1].trim();
-  // Tolerate a leading sentence before the object.
-  const brace = t.indexOf('{');
-  if (brace > 0) t = t.slice(brace);
   try {
-    const o = JSON.parse(t);
-    return (o && typeof o === 'object' && !Array.isArray(o)) ? o : null;
+    const o = JSON.parse(String(text || '').trim());
+    if (!o || !Array.isArray(o.narratives)) return null;
+    const byNpi = {};
+    for (const n of o.narratives) {
+      if (n && typeof n.npi === 'string' && typeof n.rationale === 'string') byNpi[n.npi] = n.rationale;
+    }
+    return byNpi;
   } catch { return null; }
 }
 
@@ -166,6 +194,7 @@ exports.handler = async (event) => {
           // ~4 sentences x 25 providers, plus JSON structure.
           max_tokens: 4000,
           system: SYSTEM,
+          output_config: { format: { type: 'json_schema', schema: NARRATE_SCHEMA } },
           messages: [{ role: 'user', content: JSON.stringify(findings.map(forPrompt)) }]
         }),
         signal: controller.signal

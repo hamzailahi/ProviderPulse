@@ -199,7 +199,7 @@ CMS UTILIZATION: ${Object.keys(cms || {}).length > 0 ? JSON.stringify(cms).subst
 
     try {
         const result = await callAnthropic({
-            model: 'claude-sonnet-4-5',
+            model: 'claude-sonnet-5',
             max_tokens: 900,
             system: systemPrompt,
             messages: [{ role: 'user', content: question }]
