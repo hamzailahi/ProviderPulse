@@ -17,7 +17,7 @@ const USER_AGENT = 'ProviderPulse/1.0 (healthcare provider directory)';
 
 async function geocodeGoogle(query) {
   const key = process.env.GOOGLE_GEOCODING_KEY;
-  if (!key) return null;
+  if (!key) { console.log('[geocode] GOOGLE_GEOCODING_KEY not set, skipping to Nominatim'); return null; }
   try {
     const r = await fetch(
       `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&components=country:US&key=${key}`,
@@ -27,7 +27,14 @@ async function geocodeGoogle(query) {
     const loc = d && d.status === 'OK' && d.results && d.results[0] &&
       d.results[0].geometry && d.results[0].geometry.location;
     if (loc) return { lat: loc.lat, lng: loc.lng };
-  } catch { /* fall through to Nominatim */ }
+    // TEMP diagnostic — remove once Google's status is confirmed healthy in
+    // production. d.status is Google's own error code (REQUEST_DENIED,
+    // ZERO_RESULTS, OVER_QUERY_LIMIT, INVALID_REQUEST, ...); error_message
+    // often names the exact misconfiguration (e.g. API not enabled for key).
+    console.log('[geocode] google non-OK status:', d && d.status, d && d.error_message);
+  } catch (e) {
+    console.log('[geocode] google threw:', e && e.message);
+  }
   return null;
 }
 
@@ -49,8 +56,10 @@ async function geocodeNominatim(query) {
 async function geocode(query) {
   if (!query || !query.trim()) return null;
   const hit = await geocodeGoogle(query);
-  if (hit) return hit;
-  return geocodeNominatim(query);
+  if (hit) { console.log('[geocode] google hit:', query); return hit; }
+  const fallback = await geocodeNominatim(query);
+  console.log(fallback ? '[geocode] nominatim hit:' : '[geocode] no hit at all:', query);
+  return fallback;
 }
 
 module.exports = { geocode };
