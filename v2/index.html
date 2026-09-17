@@ -40,6 +40,19 @@
     
     <link rel="stylesheet" href="assets/tokens.css">
     <link rel="stylesheet" href="assets/dashboard.css">
+    <style>
+        /* "View in 3D" modal — additive, sits outside #app-body-v2/#map (Leaflet) entirely. */
+        #modal3d { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--ground) 80%, transparent); backdrop-filter: blur(4px); }
+        #modal3d[hidden] { display: none; }
+        #modal3d-panel { width: min(1100px, 92vw); height: min(760px, 88vh); background: var(--ground-2); border: 1px solid var(--hairline-2); border-radius: var(--r-md); display: flex; flex-direction: column; overflow: hidden; }
+        #modal3d-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--hairline-2); }
+        #modal3d-title { font-weight: 700; font-size: 13px; }
+        #modal3d-count { flex: 1; font-size: 11px; color: var(--faint); }
+        #modal3d-close { background: none; border: none; color: var(--faint); font-size: 16px; cursor: pointer; }
+        #modal3d-body { flex: 1; position: relative; }
+        #map3d { width: 100%; height: 100%; }
+        #modal3d-status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--muted); font-size: 13px; background: var(--ground-2); }
+    </style>
 </head>
 <body>
     <h2>Provider Market Strategy Dashboard</h2>
@@ -110,6 +123,11 @@
             <div class="filter-group">
                 <label class="group-label">Boundaries</label>
                 <button class="filter-rail-btn active" id="toggleCountiesBtn">Counties ON</button>
+            </div>
+
+            <div class="filter-group">
+                <label class="group-label">3D View</label>
+                <button class="filter-rail-btn" id="view3dBtn" onclick="open3DView()">🧱 View in 3D</button>
             </div>
 
             <div class="filter-group">
@@ -326,6 +344,20 @@
         </div> <!-- /map-column -->
     </div> <!-- /app-body-v2 -->
 
+    <div id="modal3d" hidden>
+        <div id="modal3d-panel">
+            <div id="modal3d-header">
+                <span id="modal3d-title">3D View</span>
+                <span id="modal3d-count"></span>
+                <button id="modal3d-close" onclick="close3DView()">✕</button>
+            </div>
+            <div id="modal3d-body">
+                <div id="map3d"></div>
+                <div id="modal3d-status" hidden></div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Chart.js Dark Mode Defaults
         // Chart.js paints to <canvas>, where var() does not resolve — passing it a
@@ -427,6 +459,16 @@
         // ── Supabase Search ──────────────────────────────────────────
         const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
         const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
+
+        // ── "View in 3D" (Google Maps) ───────────────────────────────
+        // Additive-only bolt-on: an optional tilted vector view of whatever
+        // renderMap() currently has filtered in. Key is referrer-restricted to
+        // this domain + scoped to Maps JavaScript API only in Google Cloud
+        // Console, same publishable-key posture as SUPABASE_KEY/MAPTILER_KEY
+        // above — never loaded until the analyst clicks "View in 3D".
+        const GOOGLE_MAPS_KEY = 'AIzaSyDbF727h463FfTk2mtvAjS4DieqewIQIck';
+        const GOOGLE_MAP_ID = 'eb3466ccc61b36cfabc31925';
+        const MAX_3D_MARKERS = 500;
 
         // ── Autocomplete ─────────────────────────────────────────────
         let autocompleteTimer = null;
@@ -4032,6 +4074,118 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
                 document.head.appendChild(js);
             });
             return clusterLib;
+        }
+
+        // 6. "View in 3D" — an optional, additive tilted vector view of whatever
+        //    renderMap() currently has filtered into `currentlyVisiblePractices`.
+        //    Loaded lazily (only on the analyst's first click) so the dashboard
+        //    never pays for a Google Maps load unless this is actually used.
+        //    Deliberately does not replicate the 2D map's ring semantics
+        //    (recommended/verified/self-reported) — this view answers "where is
+        //    this market clustered geographically," not "which listing should I
+        //    click first," so a single color-by-taxonomy dot is the right depth.
+        var googleMapsLib = null;
+        function ensureGoogleMapsLib() {
+            if (window.google && window.google.maps && window.google.maps.marker) return Promise.resolve(true);
+            if (googleMapsLib) return googleMapsLib;
+            googleMapsLib = new Promise(function (resolve) {
+                window.__gmaps3dCallback = function () {
+                    Promise.all([
+                        google.maps.importLibrary('maps'),
+                        google.maps.importLibrary('marker')
+                    ]).then(function () { resolve(true); }).catch(function () { resolve(false); });
+                };
+                var js = document.createElement('script');
+                js.src = 'https://maps.googleapis.com/maps/api/js?key=' + GOOGLE_MAPS_KEY + '&v=weekly&loading=async&callback=__gmaps3dCallback';
+                js.async = true;
+                js.onerror = function () { resolve(false); };
+                document.head.appendChild(js);
+            });
+            return googleMapsLib;
+        }
+
+        var map3d = null, map3dMarkers = [];
+
+        function open3DView() {
+            document.getElementById('modal3d').hidden = false;
+            var statusEl = document.getElementById('modal3d-status');
+            statusEl.hidden = true;
+            ensureGoogleMapsLib().then(function (ok) {
+                if (!ok) {
+                    statusEl.hidden = false;
+                    statusEl.textContent = 'Could not load Google Maps. Check your connection or try again later.';
+                    return;
+                }
+                if (!map3d) {
+                    map3d = new google.maps.Map(document.getElementById('map3d'), {
+                        mapId: GOOGLE_MAP_ID, tilt: 45, heading: 0, center: { lat: 39.5, lng: -98.35 }, zoom: 4
+                    });
+                }
+                render3DMarkers();
+            });
+        }
+
+        function close3DView() {
+            document.getElementById('modal3d').hidden = true;
+            // Instance kept alive intentionally — recreating google.maps.Map on
+            // every open is wasteful; render3DMarkers() clears/rebuilds markers
+            // instead, mirroring how renderMap() already handles the 2D map.
+        }
+
+        function render3DMarkers() {
+            map3dMarkers.forEach(function (m) { m.map = null; });
+            map3dMarkers = [];
+
+            var pts = [];
+            for (var i = 0; i < currentlyVisiblePractices.length; i++) {
+                var p = currentlyVisiblePractices[i];
+                var lat = parseFloat(p['Latitude']);
+                var lng = parseFloat(p['Longitude']);
+                if (!isFinite(lat) || !isFinite(lng)) continue;
+                pts.push({ p: p, lat: lat, lng: lng });
+            }
+
+            var capped = pts.length > MAX_3D_MARKERS;
+            var shown = capped ? pts.slice(0, MAX_3D_MARKERS) : pts;
+
+            var bounds = new google.maps.LatLngBounds();
+            var colorMap = window._displayColors || taxonomyColors;
+            var infoWindow = new google.maps.InfoWindow();
+
+            shown.forEach(function (pt) {
+                var color = colorMap[pt.p['Primary Taxonomy']] || '#3b82f6';
+                var pinEl = document.createElement('div');
+                pinEl.style.cssText = 'width:14px;height:14px;border-radius:50%;background:' + color +
+                    ';border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.5);';
+                var marker = new google.maps.marker.AdvancedMarkerElement({
+                    map: map3d, position: { lat: pt.lat, lng: pt.lng }, content: pinEl
+                });
+                marker.addListener('gmp-click', function () {
+                    infoWindow.setContent(
+                        '<div style="font-size:12px;"><strong>' + (pt.p['Name'] || '—') + '</strong><br/>' +
+                        (pt.p['Primary Taxonomy'] || '') + '<br/>' +
+                        (pt.p['Primary Practice Address'] || '') + '</div>'
+                    );
+                    infoWindow.open({ map: map3d, anchor: marker });
+                });
+                map3dMarkers.push(marker);
+                bounds.extend({ lat: pt.lat, lng: pt.lng });
+            });
+
+            if (shown.length > 0) map3d.fitBounds(bounds);
+
+            var countEl = document.getElementById('modal3d-count');
+            countEl.textContent = capped
+                ? 'Showing the first ' + MAX_3D_MARKERS + ' of ' + pts.length + ' — narrow your filters for a complete view'
+                : pts.length + ' provider' + (pts.length === 1 ? '' : 's');
+
+            var statusEl = document.getElementById('modal3d-status');
+            if (shown.length === 0) {
+                statusEl.hidden = false;
+                statusEl.textContent = 'No providers to show for the current filters.';
+            } else {
+                statusEl.hidden = true;
+            }
         }
 
         function clusterIcon(cluster) {
