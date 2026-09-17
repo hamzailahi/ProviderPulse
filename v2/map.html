@@ -3,43 +3,379 @@
 <head>
     <meta charset="utf-8" />
     <title>Healthcare Provider Map - Demographics & Insurance Analysis</title>
-
-    <!-- ====================================================================
-         SIGN-IN GATE. First script in the document on purpose: it runs before
-         the CDN libraries below and before any Supabase query, so an unsigned
-         visitor never loads the data or sees the page paint.
-
-         READ THIS BEFORE RELYING ON IT. This is a deterrent, not access
-         control. The site is static and SUPABASE_KEY is in this file in plain
-         text, so anyone who views source can query the same tables directly
-         with curl. It stops a shared URL from working; it does not make the
-         data private. Real protection means either moving these reads behind
-         an authenticated Netlify Function, or tightening RLS so the anon role
-         cannot select from clinics/demographics_raw at all.
-         ==================================================================== -->
-    <script>
-    (function requireSession() {
-        var s = null;
-        try {
-            var raw = sessionStorage.getItem('pp.session.v1') || localStorage.getItem('pp.session.v1')
-                   || sessionStorage.getItem('pp.patient.v1') || localStorage.getItem('pp.patient.v1');
-            s = raw ? JSON.parse(raw) : null;
-        } catch (e) { s = null; }
-        if (s && s.access_token && !(s.expiresAt && s.expiresAt < Date.now())) return;
-        // Carry where they were headed so the deep link survives the detour.
-        var back = location.pathname + location.search + location.hash;
-        location.replace('/signin?next=' + encodeURIComponent(back));
-    })();
-    </script>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
     
-    <link rel="stylesheet" href="assets/tokens.css">
-    <link rel="stylesheet" href="assets/dashboard.css">
+    <style>
+        :root {
+            --bg-base:       #0d1117;
+            --bg-surface:    #161b22;
+            --bg-elevated:   #1c2330;
+            --bg-hover:      #21293a;
+            --border:        #2a3444;
+            --border-light:  #1e2836;
+            --accent:        #3b82f6;
+            --accent-dim:    rgba(59,130,246,0.15);
+            --accent-glow:   rgba(59,130,246,0.35);
+            --text-primary:  #e6edf3;
+            --text-secondary:#8b949e;
+            --text-muted:    #484f58;
+            --green:         #3fb950;
+            --orange:        #f0883e;
+            --red:           #f85149;
+            --cyan:          #58a6ff;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg-base); color: var(--text-primary); display: flex; flex-direction: column; height: 100vh; padding: 12px; gap: 10px; }
+        h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); padding: 0 2px; }
+
+        /* Controls */
+        #controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--bg-surface); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); }
+        #controls strong { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px; }
+        
+        input[type="file"], input[type="text"], input[type="number"] { font-size: 11px; color: var(--text-primary); background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 5px; padding: 5px 10px; outline: none; font-family: 'DM Sans', sans-serif;}
+        input[type="file"]::-webkit-file-upload-button { background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; margin-right: 6px; }
+        input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent); }
+
+        .control-btn { padding: 5px 12px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; border-radius: 5px; font-family: 'DM Sans', sans-serif; background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border); transition: 0.15s; }
+        .control-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .control-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .topbar-divider { width: 1px; height: 30px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
+
+        #search-wrapper { display: flex; gap: 4px; align-items: center; }
+        #searchInput { width: 160px; } #radiusInput { width: 70px; }
+
+        /* Dropdown */
+        #tax-dropdown-wrapper { position: relative; }
+        #tax-dropdown-btn { padding: 5px 10px; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 5px; min-width: 150px; text-align: left; }
+        #tax-dropdown-list { display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 10000; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px; width: 280px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); flex-direction: column; }
+        #tax-dropdown-list.open { display: flex; }
+        #tax-search-container { padding: 8px; border-bottom: 1px solid var(--border); background: var(--bg-surface); border-radius: 6px 6px 0 0; }
+        #taxSearchInput { width: 100%; padding: 6px; font-size: 11px; background: var(--bg-base); }
+        .tax-option { display: flex; align-items: center; padding: 6px 10px; font-size: 11px; cursor: pointer; gap: 8px; color: var(--text-secondary); transition: 0.1s; }
+        .tax-option:hover { background: var(--bg-hover); color: var(--text-primary); }
+        #tax-select-all { border-bottom: 1px solid var(--border); font-weight: 600; color: var(--text-muted); font-size: 10px; text-transform: uppercase; background: var(--bg-surface); padding: 8px 10px;}
+        #tax-options-container { max-height: 220px; overflow-y: auto; }
+
+        /* Main Area */
+        #main-area { display: flex; flex: 1; min-height: 0; gap: 0; position: relative; }
+        #map-container { flex: 1; position: relative; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
+        #map { width: 100%; height: 100%; background: #0d1117; }
+        .multi-tax-icon { background: transparent; border: none; }
+
+        /* Resize handles */
+        .resize-handle { width: 10px; flex-shrink: 0; cursor: col-resize; display: flex; align-items: center; justify-content: center; position: relative; }
+        .resize-handle::after { content: ''; width: 3px; height: 36px; background: var(--border); border-radius: 2px; transition: background 0.15s; }
+        .resize-handle:hover::after, .resize-handle.dragging::after { background: var(--accent); }
+        .resize-handle.dragging { background: var(--accent-dim); }
+        .width-badge { position: absolute; top: -22px; right: 0; font-size: 9px; color: var(--text-muted); font-family: 'DM Mono', monospace; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+        .width-badge.show { opacity: 1; }
+
+        /* Filter Rail */
+        #filter-rail { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; overflow-y: auto; position: relative; }
+        #filter-rail h3 { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+        .filter-group { border-bottom: 1px solid var(--border-light); padding-bottom: 12px; margin-bottom: 4px; }
+        .filter-group:last-child { border-bottom: none; }
+        .filter-group label.group-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 6px; }
+        .filter-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+        .filter-row input[type="number"] { flex: 1; min-width: 0; }
+        .filter-rail-btn { padding: 5px 10px; font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-elevated); color: var(--text-secondary); font-family: 'DM Sans', sans-serif; transition: 0.15s; width: 100%; text-align: left; }
+        .filter-rail-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .filter-rail-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .filter-row .filter-rail-btn { width: auto; flex-shrink: 0; text-align: center; }
+
+        #welcome-overlay { position: absolute; inset: 0; background: rgba(13,17,23,0.85); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(4px); transition: opacity 0.5s; }
+        #welcome-overlay h1 { color: var(--text-primary); font-size: 24px; margin-bottom: 10px; }
+
+        .leaflet-popup-content-wrapper, .leaflet-tooltip { background: var(--bg-elevated) !important; color: var(--text-primary) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
+        .leaflet-popup-tip, .leaflet-tooltip-top:before { border-top-color: var(--border) !important; }
+
+        /* Sidebar & Dashboards */
+        #sidebar { width: 440px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; position: relative; }
+
+        #sidebar-select-row { padding: 12px 14px 0 14px; flex: 0 0 auto; }
+        #dashboard-select { width: 100%; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--text-primary); background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; outline: none; font-family: 'DM Sans', sans-serif; cursor: pointer; }
+        #dashboard-select:focus { border-color: var(--accent); }
+
+        .legend-toggle { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 10px 14px 0 14px; flex: 0 0 auto; }
+        .legend-toggle h3 { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin: 0; }
+        .legend-toggle .legend-chev { font-size: 10px; color: var(--text-muted); transition: transform 0.15s; }
+        .legend-toggle.collapsed .legend-chev { transform: rotate(-90deg); }
+
+        #legend-section { flex: 0 0 auto; max-height: 180px; overflow-y: auto; padding: 8px 14px 14px 14px; border-bottom: 1px solid var(--border); background: var(--bg-surface); transition: max-height 0.15s, padding 0.15s; }
+        #legend-section.collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; border-bottom: none; }
+        #legend-section::-webkit-scrollbar { width: 4px; }
+        #legend-section::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 11px; color: var(--text-secondary); transition: opacity 0.2s; }
+        .legend-item.dimmed { opacity: 0.2; }
+        .legend-color { width: 10px; height: 10px; margin-right: 10px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px var(--accent-glow); }
+
+        #dashboard-panel { flex: 1; overflow-y: auto; padding: 14px; background: var(--bg-base); }
+        #dashboard-panel::-webkit-scrollbar { width: 6px; }
+        #dashboard-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        .dashboard-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        .dashboard-header-text { display: flex; flex-direction: column; }
+        #dashboard-title { font-family: 'DM Mono', monospace; color: var(--cyan); font-size: 16px; margin: 0 0 4px 0; font-weight: 600; text-transform: uppercase; }
+        #dashboard-context { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
+
+        .zip-close-btn { padding: 4px 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .zip-close-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--accent); }
+
+        /* KPI Grid updated to 2x2 */
+        .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+        .kpi-box { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .kpi-val { font-size: 18px; font-weight: 600; color: var(--text-primary); font-family: 'DM Mono', monospace; }
+        .kpi-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-top: 4px; }
+
+        .chart-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+        .chart-card h4 { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; letter-spacing: 0.05em; }
+        .chart-wrapper { width: 100%; height: 180px; position: relative; }
+
+        /* AI Panel */
+        #ai-panel { flex: 1; display: none; flex-direction: column; background: var(--bg-base); overflow: hidden; }
+        #ai-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+        #ai-messages::-webkit-scrollbar { width: 4px; }
+        #ai-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .ai-msg-user { align-self: flex-end; background: var(--accent); color: #fff; border-radius: 12px 12px 2px 12px; padding: 8px 12px; font-size: 12px; max-width: 85%; line-height: 1.4; }
+        .ai-msg-ai { align-self: flex-start; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 12px 12px 12px 2px; padding: 10px 12px; font-size: 12px; max-width: 100%; line-height: 1.5; color: var(--text-primary); }
+        .ai-msg-ai table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
+        .ai-msg-ai th { background: var(--bg-surface); color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+        .ai-msg-ai td { padding: 6px 8px; border-bottom: 1px solid var(--border-light); color: var(--text-secondary); vertical-align: top; }
+        .ai-msg-ai tr:last-child td { border-bottom: none; }
+        .ai-msg-ai tr:hover td { background: var(--bg-hover); }
+        #ai-input-area { padding: 10px; border-top: 1px solid var(--border); display: flex; gap: 6px; background: var(--bg-surface); }
+        #ai-input { flex: 1; font-size: 12px; padding: 8px 10px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-family: 'DM Sans', sans-serif; resize: none; height: 36px; line-height: 1.4; outline: none; }
+        #ai-input:focus { border-color: var(--accent); }
+        #ai-send { padding: 8px 14px; background: var(--accent); color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+        #ai-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ===================== DESIGN B RESKIN ===================== */
+        body { padding: 0; gap: 0; }
+        h2 { display: none; } /* replaced by topbar brand */
+
+        #topbar-v2 {
+            height: 56px; flex: 0 0 auto; display: flex; align-items: center; gap: 14px;
+            padding: 0 18px; border-bottom: 1px solid var(--border); background: var(--bg-surface);
+        }
+        #topbar-v2 .brand { display: flex; align-items: center; gap: 9px; }
+        #topbar-v2 .brand .logo-mark {
+            width: 26px; height: 26px; border-radius: 7px;
+            background: linear-gradient(135deg, var(--accent), #2f6be0);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 700; font-size: 13px;
+        }
+        #topbar-v2 .brand .logo-text { color: var(--text-primary); font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+        #topbar-v2 .divider { width: 1px; height: 22px; background: var(--border); }
+        #topbar-v2 .subtitle { color: var(--text-secondary); font-size: 12.5px; }
+        #topbar-v2 .right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+        #app-body-v2 { flex: 1; display: flex; min-height: 0; }
+
+        /* Icon rail */
+        #icon-rail {
+            width: 60px; flex: 0 0 auto; background: var(--bg-surface);
+            border-right: 1px solid var(--border); display: flex; flex-direction: column;
+            align-items: center; padding: 14px 0; gap: 6px;
+        }
+        #icon-rail .rail-logo {
+            width: 34px; height: 34px; border-radius: 9px;
+            background: linear-gradient(135deg, var(--accent), #2f6be0);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 700; font-size: 15px; margin-bottom: 12px;
+        }
+        .rail-btn {
+            width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center;
+            justify-content: center; font-size: 16px; cursor: pointer; color: var(--text-secondary);
+            border: 1px solid transparent; background: none; transition: 0.15s;
+        }
+        .rail-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .rail-btn.active { background: var(--accent-dim); color: var(--cyan); border-color: rgba(59,130,246,0.4); }
+
+        /* Filter rail becomes a slide panel triggered by icon rail */
+        #filter-rail {
+            width: 280px; flex: 0 0 auto; margin: 0; border-radius: 0;
+            border-right: 1px solid var(--border); border-top: none; border-bottom: none; border-left: none;
+            display: none; flex-direction: column; gap: 14px; padding: 16px;
+        }
+        #filter-rail.open { display: flex; }
+        #filter-rail h3 { font-size: 13px; }
+
+        /* Docked omnibar row (search) sits at top of map column */
+        #map-column { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        #omnibar-row {
+            height: 60px; flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+            padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--bg-surface);
+        }
+        #omnibar-row #controls { border: none; background: none; padding: 0; flex: 1; display: flex; gap: 12px; align-items: center; flex-wrap: nowrap; overflow-x: auto; }
+        #omnibar-row #controls > div { flex-shrink: 0; }
+        #omnibar-row #controls strong { display: none; }
+        #searchInput { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; }
+
+        #main-area { flex: 1; display: flex; min-height: 0; border: none; }
+        #map-container { flex: 1; }
+
+        /* Right dashboard as fixed panel (not resizable in v2) */
+        .resize-handle { display: none !important; }
+        #sidebar {
+            width: 400px !important; border-radius: 0; border-top: none; border-bottom: none; border-right: none;
+        }
+
+        /* Segmented tab bar replaces the <select> */
+        #tab-bar-v2 {
+            display: flex; gap: 4px; padding: 10px 12px 0 12px; background: var(--bg-elevated);
+            border-radius: 9px; margin: 12px 12px 0 12px;
+        }
+        #tab-bar-v2 { padding: 3px; margin: 12px; }
+        .tab-btn-v2 {
+            flex: 1; background: transparent; border: none; cursor: pointer;
+            font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600;
+            padding: 9px 4px; border-radius: 7px; color: var(--text-secondary); transition: 0.15s;
+        }
+        .tab-btn-v2.active { background: var(--accent); color: #fff; }
+        .tab-btn-v2:hover:not(.active) { color: var(--text-primary); }
+
+        #dashboard-select { display: none; } /* superseded by tab-bar-v2 but kept for JS compat */
+
+        /* Reports panel */
+        #reports-panel { display: none; flex: 1; overflow-y: auto; padding: 16px; background: var(--bg-base); }
+        .report-card {
+            background: linear-gradient(135deg, rgba(59,130,246,0.1), var(--bg-surface));
+            border: 1px solid rgba(59,130,246,0.25); border-radius: 12px; padding: 14px; margin-bottom: 14px;
+        }
+        .report-card h4 { font-size: 13px; color: var(--text-primary); margin-bottom: 4px; }
+        .report-card p { font-size: 11.5px; color: var(--text-secondary); line-height: 1.5; }
+        #reportQuestion {
+            width: 100%; background: var(--bg-elevated); border: 1px solid var(--border);
+            border-radius: 8px; padding: 10px 12px; color: var(--text-primary); font-size: 12.5px;
+            font-family: 'DM Sans', sans-serif; resize: vertical; margin-bottom: 12px;
+        }
+        #reportScopeNote {
+            font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;
+            background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+        }
+        #generateReportBtn {
+            width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 10px;
+            padding: 12px; font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+            cursor: pointer; margin-bottom: 14px;
+        }
+        #generateReportBtn:hover { background: #2563eb; }
+        #generateReportBtn:disabled { background: var(--bg-hover); color: var(--text-muted); cursor: not-allowed; }
+        #reportOutput {
+            background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px;
+            padding: 16px; font-size: 12.5px; line-height: 1.7; color: var(--text-primary);
+            white-space: pre-wrap; display: none;
+        }
+        #reportWordCount { font-size: 10.5px; color: var(--text-muted); margin-top: 10px; text-align: right; }
+
+        /* ===================== MOBILE STYLES ===================== */
+        @media (max-width: 768px) {
+            body { padding: 0; gap: 0; height: 100dvh; overflow: hidden; }
+
+            #controls {
+                border-radius: 0;
+                border-left: none; border-right: none; border-top: none;
+                padding: 8px 10px;
+                gap: 8px;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                position: relative;
+                z-index: 1000;
+            }
+            #controls > div { flex-shrink: 0; }
+            #controls strong { display: none; }
+            #address-search-wrapper { display: none !important; }
+            #addressStatus { display: none !important; }
+            #filter-rail { display: none !important; }
+            .resize-handle { display: none !important; }
+            .width-badge { display: none !important; }
+
+            #main-area { flex: 1; position: relative; min-height: 0; overflow: hidden; }
+
+            #map-container { position: absolute; inset: 0; width: 100% !important; }
+            #map { width: 100%; height: 100%; }
+
+            /* Bottom sheet sidebar */
+            #sidebar {
+                position: absolute;
+                bottom: 0; left: 0; right: 0;
+                width: 100% !important;
+                height: auto;
+                max-height: 78dvh;
+                border-radius: 16px 16px 0 0;
+                border: none;
+                border-top: 1px solid var(--border);
+                z-index: 500;
+                transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+                transform: translateY(calc(100% - 56px));
+                box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
+                overflow: hidden;
+            }
+            #sidebar.sheet-open { transform: translateY(0); }
+
+            /* Drag pill */
+            #sheet-drag-pill {
+                display: block;
+                width: 36px; height: 4px;
+                background: var(--border);
+                border-radius: 2px;
+                margin: 10px auto 4px auto;
+                flex-shrink: 0;
+            }
+
+            #sidebar-select-row { padding: 6px 12px 4px 12px; }
+            #legend-section { display: none; }
+
+            #dashboard-panel,
+            #health-panel,
+            #procedures-panel,
+            #ai-panel {
+                max-height: calc(78dvh - 100px);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Floating toggle button */
+            #sheet-toggle-btn {
+                display: flex !important;
+                position: absolute;
+                bottom: 64px; right: 16px;
+                z-index: 600;
+                background: var(--accent);
+                color: #fff;
+                border: none;
+                border-radius: 50%;
+                width: 50px; height: 50px;
+                align-items: center;
+                justify-content: center;
+                font-size: 22px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+
+            .leaflet-control-zoom { margin-bottom: 80px !important; }
+            .leaflet-control-attribution { display: none !important; }
+        }
+        @media (min-width: 769px) { #sheet-toggle-btn { display: none !important; } #sheet-drag-pill { display: none; } }
+    </style>
+<script>
+  // Session guard — must run before anything else
+  (function() {
+    const session = JSON.parse(localStorage.getItem('map_session') || 'null');
+    if (!session || new Date(session.expires_at) <= new Date()) {
+      localStorage.removeItem('map_session');
+      window.location.href = '/login.html';
+    }
+  })();
+</script>
 </head>
 <body>
     <h2>Provider Market Strategy Dashboard</h2>
@@ -50,19 +386,9 @@
             <div class="logo-text">ProviderPulse</div>
         </div>
         <div class="divider"></div>
-        <!-- Surface switcher: the "one product" nav. Makes the two-sided nature
-             visible instead of each surface pretending to be the whole thing. -->
-        <nav id="surface-switch" aria-label="Switch product area">
-            <a href="/">Find care</a>
-            <a href="/register-provider.html">For providers</a>
-            <span class="active" aria-current="page">Market Strategy</span>
-        </nav>
-        <div id="omnibar-slot"></div>
+        <div class="subtitle">Market Strategy</div>
         <div class="right">
             <span id="sessionInfo" style="font-size:10px;color:var(--text-muted);"></span>
-            <!-- Patients arrive here from the care navigator's map link; give them
-                 a way back rather than stranding them in the analyst tool. -->
-            <a href="/" style="font-size:10px;color:var(--accent,var(--accent));text-decoration:none;margin-left:12px;">← Find care</a>
         </div>
     </div>
 
@@ -70,8 +396,10 @@
         <div id="icon-rail">
             <div class="rail-logo">P</div>
             <button class="rail-btn active" id="railFiltersBtn" title="Filters" onclick="toggleFilterRail()">◈</button>
+            <button class="rail-btn" title="Layers">⧉</button>
             <button class="rail-btn" id="railReportsBtn" title="Reports" onclick="switchTab('reports')">📄</button>
             <button class="rail-btn" id="railAIBtn" title="Ask AI" onclick="switchTab('ai')">✨</button>
+            <button class="rail-btn" id="railExportBtn" title="Export CSV" onclick="document.getElementById('exportCsvBtn')?.click()">⭳</button>
         </div>
 
         <div id="filter-rail" class="open">
@@ -89,13 +417,6 @@
                         <div id="tax-options-container"></div>
                     </div>
                 </div>
-            </div>
-
-            <div class="filter-group">
-                <label class="group-label">Provider Source</label>
-                <label class="tax-option"><input type="checkbox" class="src-chk" value="clinic" checked /> Clinics &amp; Organizations</label>
-                <label class="tax-option"><input type="checkbox" class="src-chk" value="individual" checked /> Individual Physicians</label>
-                <label class="tax-option"><input type="checkbox" class="src-chk" value="secondary" checked /> Secondary Locations</label>
             </div>
 
             <div class="filter-group">
@@ -133,16 +454,19 @@
 
         <div id="map-column">
             <div id="omnibar-row">
-                <div id="controls" style="flex:1;">
-                    <div style="flex:1;max-width:700px;">
-                        <div style="display:flex;gap:8px;align-items:center;">
-                            <input type="text" id="addressInput" placeholder="Search a ZIP, city or state to load the market — or an address to jump there" style="flex:1;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:9px 14px;color:var(--text-primary);font-size:13px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')omniSearch(this.value)" />
-                            <button class="control-btn" id="addressGoBtn" style="padding:9px 16px;font-size:13px;background:var(--accent);color:#fff;border-color:var(--accent);">📍 Go</button>
+                <div id="controls">
+                    <div>
+                        <strong>Search Map</strong>
+                        <div id="search-wrapper">
+                            <input type="text" id="searchInput" placeholder="Address, Name, or County..." />
+                        </div>
+                        <div id="address-search-wrapper" style="margin-top:6px;display:flex;gap:6px;align-items:center;">
+                            <input type="text" id="addressInput" placeholder="Go to address..." style="flex:1;background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text-primary);font-size:11px;outline:none;" />
+                            <button class="control-btn" id="addressGoBtn" style="white-space:nowrap;padding:5px 10px;font-size:11px;">📍 Go</button>
                         </div>
                         <div id="addressStatus" style="font-size:10px;color:var(--text-muted);margin-top:3px;display:none;"></div>
                     </div>
-                    <!-- hidden search input kept for JS compatibility -->
-                    <input type="text" id="searchInput" style="display:none;" />
+                    <button class="control-btn" id="exportCsvBtn">Export CSV View</button>
                     <span id="zip-loading">⏳ Loading ZIP Boundaries…</span>
                     <span id="county-loading" style="display:none;color:var(--orange);font-size:11px;font-family:'DM Mono',monospace;background:rgba(240,136,62,0.08);border:1px solid rgba(240,136,62,0.2);padding:4px 10px;border-radius:4px;">⏳ Loading County Boundaries…</span>
                 </div>
@@ -152,26 +476,10 @@
                 <div id="map-container">
                     <button id="sheet-toggle-btn" onclick="toggleBottomSheet()" title="Toggle data panel">📊</button>
                     <div id="welcome-overlay">
-                        <h1>See any market in the country</h1>
-                        <p>Search a ZIP, city, or state to map every provider in the area
-                           alongside the demographics, health outcomes and Medicare
-                           procedure volumes that surround them.</p>
+                        <h1>Ready for Analysis</h1>
+                        <p style="color:var(--text-secondary);font-size:14px;">Search a ZIP, city, or state above to get started.</p>
                     </div>
                     <div id="map"></div>
-
-                    <!-- Compare tray: holds ZIPs for side-by-side territory work -->
-                    <div id="compare-tray" hidden>
-                        <span class="ct-label">COMPARE</span>
-                        <span id="compare-chips"></span>
-                        <button type="button" id="compare-add" onclick="armCompareAdd()">+ add</button>
-                    </div>
-
-                    <!-- AI as the primary entry point, not a buried tab -->
-                    <button id="ai-command" type="button" onclick="switchTab('ai')">
-                        <span class="ai-mark">✦</span>
-                        <span class="ai-ph">Ask this market anything — “where should a cardiology clinic open?”</span>
-                        <kbd>⌘K</kbd>
-                    </button>
                 </div>
 
                 <div class="resize-handle" id="handle-right"></div>
@@ -189,16 +497,20 @@
                         </select>
                     </div>
 
-                    <!-- Verdict first: the answer before the raw numbers.
-                         Filled from /market-score; hidden until a ZIP is chosen. -->
-                    <div id="verdict-card" hidden></div>
-
                     <div id="tab-bar-v2">
                         <button class="tab-btn-v2 active" data-tab="demographics" onclick="switchTab('demographics')">Demographics</button>
                         <button class="tab-btn-v2" data-tab="health" onclick="switchTab('health')">Health</button>
                         <button class="tab-btn-v2" data-tab="procedures" onclick="switchTab('procedures')">Procedures</button>
                         <button class="tab-btn-v2" data-tab="reports" onclick="switchTab('reports')">Reports</button>
                         <button class="tab-btn-v2" data-tab="ai" onclick="switchTab('ai')">Ask AI</button>
+                    </div>
+
+                    <div class="legend-toggle" id="legendToggle" onclick="toggleLegend()">
+                        <h3>Taxonomy Legend</h3>
+                        <span class="legend-chev">▾</span>
+                    </div>
+                    <div id="legend-section">
+                        <div id="legend"><em style="color:var(--text-muted);font-size:12px;">Search a location to generate the legend.</em></div>
                     </div>
 
                     <div id="dashboard-panel">
@@ -303,16 +615,16 @@
                 <div id="ai-input-area">
                     <textarea id="ai-input" placeholder="Ask about the loaded clinics..." rows="1"></textarea>
                     <button id="ai-send" onclick="sendAIQuery()">Send</button>
-                    <!-- Market memo queries the DATABASE directly through a
-                         validated query plan, rather than reasoning over the
-                         clinics currently loaded in the browser. It therefore
-                         answers questions the loaded set cannot. -->
-                    <button id="ai-memo" onclick="sendMarketMemo()" title="Query the database directly and write a market memo">Memo</button>
                 </div>
             </div>
 
             <div id="reports-panel">
-                <div id="reportScopeNote">📍 Scope: <span id="reportZipList">no ZIPs loaded yet — search a location first</span></div>
+                <div class="report-card">
+                    <h4>Market Intelligence Report</h4>
+                    <p>Generates a concise, sourced summary — max 500 words — scoped only to the ZIP codes currently loaded on the map. No file is created; the report renders here as text.</p>
+                </div>
+
+                <div id="reportScopeNote">Scope: <span id="reportZipList">no ZIPs loaded yet — search a location first</span></div>
 
                 <textarea id="reportQuestion" rows="3" placeholder="What should this report answer? e.g. 'Is this a good market to open a neurology practice?'"></textarea>
 
@@ -328,39 +640,20 @@
 
     <script>
         // Chart.js Dark Mode Defaults
-        // Chart.js paints to <canvas>, where var() does not resolve — passing it a
-        // CSS variable silently yields an invisible chart. Read the COMPUTED token
-        // values instead, so charts inherit the design system and follow light mode.
-        const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-        const CHART = {
-            a1:    cssVar('--a1')      || '#2dd4bf',
-            a2:    cssVar('--a2')      || '#6366f1',
-            good:  cssVar('--good')    || '#4ade80',
-            bad:   cssVar('--danger')  || '#f87171',
-            muted: cssVar('--muted')   || '#93a3b8',
-            line:  cssVar('--hairline-2') || 'rgba(255,255,255,.16)',
-            surf:  cssVar('--ground-2')   || '#0b0f16'
-        };
-        Chart.defaults.color = CHART.muted;
-        Chart.defaults.font.family = cssVar('--sans') || 'system-ui, sans-serif';
-        Chart.defaults.plugins.tooltip.backgroundColor = CHART.surf;
-        Chart.defaults.plugins.tooltip.borderColor = CHART.line;
+        Chart.defaults.color = '#8b949e';
+        Chart.defaults.font.family = "'DM Sans', sans-serif";
+        Chart.defaults.plugins.tooltip.backgroundColor = '#1c2330';
+        Chart.defaults.plugins.tooltip.borderColor = '#2a3444';
         Chart.defaults.plugins.tooltip.borderWidth = 1;
 
         let map = L.map('map').setView([39.5, -98.35], 4);
-        // Dark tiles under a light UI look broken, so pick the tile set from the
-        // active theme — the explicit toggle wins over the OS preference.
-        var _t = document.documentElement.getAttribute('data-theme');
-        var _light = _t === 'light' || (!_t && window.matchMedia &&
-                     window.matchMedia('(prefers-color-scheme: light)').matches);
         // CARTO's free basemaps.cartocdn.com tiles now require an API key
         // (every tile comes back watermarked "API KEY REQUIRED") — switched
         // to Esri's no-key Canvas basemap, base + label reference stacked to match.
-        var _style = _light ? 'Light_Gray' : 'Dark_Gray';
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_' + _style + '_Base/MapServer/tile/{z}/{y}/{x}', {
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19, attribution: '&copy; Esri'
         }).addTo(map);
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_' + _style + '_Reference/MapServer/tile/{z}/{y}/{x}', {
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19
         }).addTo(map);
 
@@ -370,10 +663,6 @@
         let zipsWithClinics = new Set(); // Tracks which ZIPs have at least one clinic (for boundary styling only — NOT demographic data)
         let lockedZip = null, lockedLayer = null;
         let selectedTaxonomies = new Set();
-        // Which row sources renderMap draws. All on by default; the individual-physician
-        // source is by far the noisiest (often 5-10x the clinic count in a populated ZIP),
-        // so this is the main declutter lever short of turning off a whole layer.
-        let selectedSources = new Set(['clinic', 'individual', 'secondary']);
         let dashCharts = { rawAge: null, rawInc: null, age: null, inc: null, race: null };
         let activeStatesInCSV = new Set(); // Global so loadNeighboringZips can access it
         
@@ -405,9 +694,7 @@
         // ── Session display & logout ──────────────────────────────
         function logoutMap() {
             localStorage.removeItem('map_session');
-            // There is no /login.html on the v2 site — this used to 404. The root
-            // is the patient app, which is the right place to land.
-            window.location.href = '/';
+            window.location.href = '/login.html';
         }
 
         (function() {
@@ -580,63 +867,6 @@
             if (!e.target.closest('#autocomplete-list') && e.target.id !== 'dbSearchInput') closeAutocomplete();
         });
 
-        // Users type a city in whatever abbreviated or spelled-out form they know it, but
-        // the underlying NPPES data stores the same real city under multiple LITERAL
-        // spellings at once. Confirmed live across every one of these pairs, not just
-        // St/Saint: "PORT SAINT LUCIE"/"PORT ST LUCIE"/"PORT ST. LUCIE" (302/675/23 rows),
-        // "SAINT LOUIS"/"ST LOUIS"/"ST. LOUIS" (893/75/32), "FORT WORTH"/"FT WORTH"/"FT.
-        // WORTH" (881/110/9), "MOUNT VERNON"/"MT VERNON"/"MT. VERNON" (927/49/24), "NORTH
-        // CHARLESTON"/"N CHARLESTON"/"N. CHARLESTON" (674/121/9), "WEST PALM BEACH"/"W PALM
-        // BEACH" (998/2), "STE GENEVIEVE"/"SAINTE GENEVIEVE"/"STE. GENEVIEVE", and even
-        // combinations of two at once -- "EAST SAINT LOUIS"/"E ST LOUIS"/"EAST ST
-        // LOUIS"/"E SAINT LOUIS" are all separately populated. Plus inconsistent casing
-        // across tables (clinics/provider_individuals are UPPERCASE, clinic_secondary_
-        // locations is Title Case). An exact-match search on whatever the user typed
-        // therefore silently missed most of the real rows for any of these. This expands
-        // one typed city into every abbreviation + casing combination worth trying, so the
-        // OR filter below catches all of them -- per word, not just once, so a city using
-        // two abbreviated words (e.g. "E St Louis") still resolves to all of its variants.
-        const CITY_ABBREV = { ST: 'SAINT', STE: 'SAINTE', FT: 'FORT', MT: 'MOUNT', N: 'NORTH', S: 'SOUTH', E: 'EAST', W: 'WEST' };
-        const CITY_ABBREV_REV = Object.fromEntries(Object.entries(CITY_ABBREV).map(([short, full]) => [full, short]));
-
-        function cityNameVariants(raw) {
-            // Strip periods before word-matching abbreviations -- \b doesn't fire between
-            // the "." in "St." and a following space (neither is a word character), so
-            // matching on the punctuated form directly missed anything typed with a
-            // trailing period. Punctuation is re-added afterward as its own variant.
-            const base = (raw || '').trim().toUpperCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
-            if (!base) return [];
-
-            // Cartesian product across words: each word that has a known abbreviated/full
-            // counterpart contributes both forms, everything else stays fixed.
-            let combos = [[]];
-            base.split(' ').forEach(word => {
-                const alt = CITY_ABBREV[word] || CITY_ABBREV_REV[word];
-                const options = alt ? [word, alt] : [word];
-                const next = [];
-                combos.forEach(c => options.forEach(o => next.push(c.concat(o))));
-                combos = next;
-            });
-            const spellings = new Set(combos.map(c => c.join(' ')));
-
-            // Every spelling word matching a short abbreviation also deserves a punctuated
-            // sibling ("ST" -> "ST.", "MT" -> "MT.", ...).
-            Array.from(spellings).forEach(s => {
-                const words = s.split(' ');
-                if (!words.some(w => CITY_ABBREV[w])) return;
-                spellings.add(words.map(w => (CITY_ABBREV[w] ? w + '.' : w)).join(' '));
-            });
-
-            const titleCase = s => s.replace(/\S+/g, w => w.charAt(0) + w.slice(1).toLowerCase());
-            const out = new Set();
-            spellings.forEach(s => { out.add(s); out.add(titleCase(s)); });
-            return Array.from(out);
-        }
-
-        function cityEqOr(raw) {
-            return cityNameVariants(raw).map(v => 'city.eq.' + encodeURIComponent(v)).join(',');
-        }
-
         document.getElementById('dbSearchBtn').addEventListener('click', async () => {
             const searchTerm = document.getElementById('dbSearchInput').value.trim();
             const searchUpper = searchTerm.toUpperCase();
@@ -655,32 +885,52 @@
             if (allAreCities) { await searchMultipleCities(commaParts); return; }
 
             try {
-                let filter;
+                let baseQuery;
                 if (searchTerm.match(/^\d{5}$/)) {
                     // ZIP code — try both with and without leading zero
                     const zipStripped = String(parseInt(searchTerm, 10));
-                    filter = 'or=(zip.eq.' + searchTerm + ',zip.eq.' + zipStripped + ')';
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(zip.eq.' + searchTerm + ',zip.eq.' + zipStripped + ')';
                 } else if (searchUpper.length === 2 && searchUpper.match(/^[A-Z]{2}$/)) {
                     // 2-letter state code
-                    filter = 'state=eq.' + searchUpper;
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?state=eq.' + searchUpper;
                 } else if (searchUpper.includes(',')) {
                     // "City, ST" format
-                    const parts = searchTerm.split(',');
-                    const stateOnly = parts[1].trim().toUpperCase();
-                    filter = 'or=(' + cityEqOr(parts[0]) + ')&state=eq.' + stateOnly;
+                    const parts = searchUpper.split(',');
+                    const cityUpper = parts[0].trim();
+                    const cityMixed = cityUpper.charAt(0) + cityUpper.slice(1).toLowerCase();
+                    const stateOnly = parts[1].trim();
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')&state=eq.' + stateOnly;
                 } else {
                     // City only
-                    filter = 'or=(' + cityEqOr(searchTerm) + ')';
+                    const cityUpper = searchUpper;
+                    const cityMixed = cityUpper.charAt(0) + cityUpper.slice(1).toLowerCase();
+                    baseQuery = SUPABASE_URL + '/rest/v1/clinics?or=(city.eq.' + encodeURIComponent(cityUpper) + ',city.eq.' + encodeURIComponent(cityMixed) + ')';
                 }
-
-                // Fetch clinics + physicians (provider_individuals) + secondary
-                // locations (clinic_secondary_locations), paginated per table.
-                const clinicData = await fetchProviderRows(
-                    () => filter,
-                    n => statusEl.textContent = '🔄 Loaded ' + n + ' providers...'
-                );
-
-                if (clinicData.length === 0) { statusEl.textContent = '❌ No clinics found'; return; }
+                
+                // Fetch all clinics with pagination (Supabase limit is 1000 per request)
+                let clinicData = [];
+                let offset = 0;
+                const isRPC = baseQuery.includes('/rpc/');
+                
+                while (true) {
+                    const sep = baseQuery.includes('?') ? '&' : '?';
+                    const query = isRPC 
+                        ? baseQuery + '&limit=1000&offset=' + offset
+                        : baseQuery + '&limit=1000&offset=' + offset;
+                    const response = await fetch(query, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    
+                    const batch = await response.json();
+                    if (!batch || batch.length === 0) break;
+                    
+                    clinicData.push(...batch);
+                    statusEl.textContent = '🔄 Loaded ' + clinicData.length + ' clinics...';
+                    
+                    if (batch.length < 1000) break;
+                    offset += 1000;
+                }
+                
+                if (clinicData.length === 0) { statusEl.textContent = '\u274c No clinics found'; return; }
 
                 // Fetch demographics for these ZIPs from demographics_raw table in batches
                 const zips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
@@ -714,7 +964,6 @@
                         'State': c.state || '',
                         'Latitude': c.latitude || '',
                         'Longitude': c.longitude || '',
-                        '_src': c._src,
                         // Demographics — spread all raw columns except keys that would overwrite clinic fields
                         ...Object.fromEntries(
                             Object.entries(dem).filter(([k]) =>
@@ -735,117 +984,58 @@
 
         // CSV upload replaced by Supabase search above
 
-        // Queues each searched ZIP for the background NPI backfill (migration
-        // 013) so clinics/provider_individuals fill in over time as ZIPs get
-        // analyzed. Fire-and-forget: the queue endpoint already no-ops on a
-        // ZIP that's already queued or was enriched recently, and a failure
-        // here must never affect the dashboard search itself.
-        function requestZipEnrichment(zips) {
-            zips.forEach(zip => {
-                fetch('/.netlify/functions/zip-enrich-request', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ zip })
-                }).catch(() => {});
-            });
-        }
-
-        // Three tables draw pins on this map: clinics (NPI-2 orgs), provider_individuals
-        // (NPI-1 physicians, migration 013) and clinic_secondary_locations (pl_pfile
-        // secondary addresses, migration 014). All three share the row shape the rest of
-        // this file already expects -- secondary locations alias parent_npi -> npi so a
-        // location groups under the org/physician it belongs to. Rendering, popups and the
-        // legend need no changes: a physician or secondary address is just another row with
-        // an npi/name/address/primary_taxonomy/zip/state/latitude/longitude.
-        const PROVIDER_ROW_SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude';
-        const PROVIDER_SOURCES = [
-            { table: 'clinics', select: PROVIDER_ROW_SELECT, src: 'clinic' },
-            { table: 'provider_individuals', select: PROVIDER_ROW_SELECT, src: 'individual' },
-            { table: 'clinic_secondary_locations', select: 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude', src: 'secondary' }
-        ];
-
-        async function fetchProviderRows(filterFn, onProgress) {
-            // The three sources used to be fetched one after another -- clinics fully
-            // paginated, then provider_individuals fully paginated, then secondary
-            // locations -- which made every multi-ZIP search pay for all three trips
-            // back to back even though none of them depends on the others' results.
-            // Now that provider_individuals routinely outnumbers clinics 5-10x, that
-            // serial wait was the main cause of the map "hanging" on multi-ZIP loads.
-            // Each source still paginates sequentially within itself (that part is a
-            // real dependency, page 2 needs page 1's offset), but the three sources run
-            // concurrently.
-            let total = 0;
-            const perSource = await Promise.all(PROVIDER_SOURCES.map(async (src) => {
-                const rows = [];
-                let offset = 0;
-                while (true) {
-                    const url = `${SUPABASE_URL}/rest/v1/${src.table}?${filterFn()}&select=${src.select}&limit=1000&offset=${offset}`;
-                    const res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
-                    if (!res.ok) break;
-                    const batch = await res.json();
-                    if (!batch || batch.length === 0) break;
-                    // _src tags where a row came from -- no stored affiliation link exists
-                    // yet (migration 015's coordinate-match stage hasn't been uploaded), so
-                    // renderMap infers a physician's likely clinic live, from sharing exact
-                    // coordinates with a clinic row, and labels secondary-location rows as
-                    // such rather than letting them read as a practice's main address.
-                    batch.forEach(r => { r._src = src.src; });
-                    rows.push(...batch);
-                    total += batch.length;
-                    if (onProgress) onProgress(total);
-                    if (batch.length < 1000) break;
-                    offset += 1000;
-                }
-                return rows;
-            }));
-            return perSource.flat();
-        }
-
         async function searchMultipleZips(zips) {
             const statusEl = document.getElementById('dbStatus');
             statusEl.textContent = `🔄 Loading ${zips.length} ZIPs...`;
-            requestZipEnrichment(zips);
             try {
+                let clinicData = [];
                 // Try both padded and stripped formats
                 const zipVariants = [...new Set(zips.flatMap(z => [z, String(parseInt(z, 10))]))];
-                const clinicData = await fetchProviderRows(
-                    () => `zip=in.(${zipVariants.join(',')})`,
-                    n => statusEl.textContent = `🔄 Loaded ${n} providers...`
-                );
+                let offset = 0;
+                while (true) {
+                    const res = await fetch(
+                        `${SUPABASE_URL}/rest/v1/clinics?zip=in.(${zipVariants.join(',')})&limit=1000&offset=${offset}`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                    );
+                    if (!res.ok) break;
+                    const batch = await res.json();
+                    if (!batch || batch.length === 0) break;
+                    clinicData.push(...batch);
+                    statusEl.textContent = `🔄 Loaded ${clinicData.length} clinics...`;
+                    if (batch.length < 1000) break;
+                    offset += 1000;
+                }
 
                 if (!clinicData.length) { statusEl.textContent = '❌ No clinics found'; return; }
 
-                // Fetch demographics in batches of 50, all batches in flight together --
-                // same reasoning as fetchProviderRows: nothing here depends on another
-                // batch's result, so there is no reason to make one wait for the last.
+                // Fetch demographics in batches of 50
                 const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
                 const demByZip = {};
-                const demBatches = [];
-                for (let i = 0; i < allZips.length; i += 50) demBatches.push(allZips.slice(i, i + 50));
-                await Promise.all(demBatches.map(async (batch) => {
+                for (let i = 0; i < allZips.length; i += 50) {
+                    const batch = allZips.slice(i, i + 50);
                     const res = await fetch(
                         `${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${batch.join(',')})&select=*`,
                         { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
                     );
-                    if (!res.ok) return;
+                    if (!res.ok) continue;
                     const data = await res.json();
                     data.forEach(d => {
                         if (!demByZip[d.zip]) demByZip[d.zip] = { 'ZIP Code': d.zip, 'State': d.state };
                         Object.keys(d).forEach(k => { if (k !== 'id' && k !== 'created_at') demByZip[d.zip][k] = d[k]; });
                     });
-                }));
+                }
 
                 const converted = clinicData.map(c => ({
                     'NPI': c.npi || '', 'Name': c.name || '',
                     'Primary Practice Address': c.address || '',
                     'Primary Taxonomy': c.primary_taxonomy || '',
                     'ZIP Code': c.zip || '', 'State': c.state || '',
-                    'Latitude': c.latitude || '', 'Longitude': c.longitude || '', '_src': c._src,
+                    'Latitude': c.latitude || '', 'Longitude': c.longitude || '',
                     ...Object.fromEntries(Object.entries(demByZip[c.zip] || {}).filter(([k]) =>
                         !['zip','state','id','created_at','ZIP Code','State','Latitude','Longitude'].includes(k)))
                 }));
 
-                statusEl.textContent = `✅ Loaded ${clinicData.length} providers across ${zips.length} ZIPs`;
+                statusEl.textContent = `✅ Loaded ${clinicData.length} clinics across ${zips.length} ZIPs`;
                 document.getElementById('welcome-overlay').style.opacity = '0';
                 setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
                 processData(converted);
@@ -858,50 +1048,51 @@
             const statusEl = document.getElementById('dbStatus');
             statusEl.textContent = `🔄 Loading ${cityStateList.length} cities...`;
             try {
-                // Same fix as fetchProviderRows: one city's fetch doesn't depend on
-                // another's, so run them concurrently instead of waiting on each in turn.
-                // Each city reports its own running total via onProgress; summing the
-                // array on every update keeps the status line accurate across all of
-                // them in flight together, not just a page-fetch counter.
-                const progressPerCity = cityStateList.map(() => 0);
-                const perCity = await Promise.all(cityStateList.map((cityState, idx) => {
+                let clinicData = [];
+                for (const cityState of cityStateList) {
                     const parts = cityState.split(',').map(s => s.trim());
-                    const stateUpper = parts[1] ? parts[1].trim().toUpperCase() : null;
-                    return fetchProviderRows(
-                        () => `or=(${cityEqOr(parts[0])})` + (stateUpper ? `&state=eq.${stateUpper}` : ''),
-                        (n) => {
-                            progressPerCity[idx] = n;
-                            statusEl.textContent = `🔄 Loaded ${progressPerCity.reduce((a, b) => a + b, 0)} providers...`;
-                        }
-                    );
-                }));
-                const clinicData = perCity.flat();
+                    const cityUpper = parts[0].toUpperCase();
+                    let url = `${SUPABASE_URL}/rest/v1/clinics?city=eq.${encodeURIComponent(cityUpper)}`;
+                    if (parts[1]) url += `&state=eq.${parts[1].trim().toUpperCase()}`;
+                    let offset = 0;
+                    while (true) {
+                        const res = await fetch(`${url}&limit=1000&offset=${offset}`, {
+                            headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' }
+                        });
+                        if (!res.ok) break;
+                        const batch = await res.json();
+                        if (!batch || batch.length === 0) break;
+                        clinicData.push(...batch);
+                        statusEl.textContent = `🔄 Loaded ${clinicData.length} clinics...`;
+                        if (batch.length < 1000) break;
+                        offset += 1000;
+                    }
+                }
                 if (!clinicData.length) { statusEl.textContent = '❌ No clinics found'; return; }
 
                 const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
                 const demByZip = {};
-                const demBatches = [];
-                for (let i = 0; i < allZips.length; i += 50) demBatches.push(allZips.slice(i, i + 50));
-                await Promise.all(demBatches.map(async (batch) => {
+                for (let i = 0; i < allZips.length; i += 50) {
+                    const batch = allZips.slice(i, i + 50);
                     const res = await fetch(`${SUPABASE_URL}/rest/v1/demographics_raw?zip=in.(${batch.join(',')})&select=*`,
                         { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
-                    if (!res.ok) return;
+                    if (!res.ok) continue;
                     const data = await res.json();
                     data.forEach(d => {
                         if (!demByZip[d.zip]) demByZip[d.zip] = { 'ZIP Code': d.zip, 'State': d.state };
                         Object.keys(d).forEach(k => { if (k !== 'id' && k !== 'created_at') demByZip[d.zip][k] = d[k]; });
                     });
-                }));
+                }
                 const converted = clinicData.map(c => ({
                     'NPI': c.npi || '', 'Name': c.name || '',
                     'Primary Practice Address': c.address || '',
                     'Primary Taxonomy': c.primary_taxonomy || '',
                     'ZIP Code': c.zip || '', 'State': c.state || '',
-                    'Latitude': c.latitude || '', 'Longitude': c.longitude || '', '_src': c._src,
+                    'Latitude': c.latitude || '', 'Longitude': c.longitude || '',
                     ...Object.fromEntries(Object.entries(demByZip[c.zip] || {}).filter(([k]) =>
                         !['zip','state','id','created_at','ZIP Code','State','Latitude','Longitude'].includes(k)))
                 }));
-                statusEl.textContent = `✅ Loaded ${clinicData.length} providers across ${cityStateList.length} cities`;
+                statusEl.textContent = `✅ Loaded ${clinicData.length} clinics across ${cityStateList.length} cities`;
                 document.getElementById('welcome-overlay').style.opacity = '0';
                 setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
                 processData(converted);
@@ -964,34 +1155,8 @@
             const taxArray = Array.from(taxonomies).sort();
             taxArray.forEach((t, i) => taxonomyColors[t] = getColor(i, taxArray.length));
             selectedTaxonomies = new Set(taxArray);
-
+            
             buildTaxDropdown(taxArray); updateLegend();
-
-            // Clustering loads lazily on first search.
-            ensureClusterLib().then(function (ok) {
-                if (!ok || window.clusterLayer) { renderMap(); return; }
-                window.clusterLayer = L.markerClusterGroup({
-                    iconCreateFunction: clusterIcon,
-                    showCoverageOnHover: false,
-                    maxClusterRadius: 55,
-                    // disableClusteringAtZoom used to turn clustering off at zoom 15+, which is exactly
-                    // street level -- so a handful of distinct-but-nearby addresses (e.g. buildings on
-                    // the same block) rendered as a shapeless pile of overlapping raw dots instead of a
-                    // numbered cluster bubble. Clustering now stays on at every zoom; spiderfy (built in,
-                    // on by default) fans a cluster's markers out into a clickable ring once it can't be
-                    // split by zooming in any further, which is what actually makes a dense pile browsable.
-                    spiderfyDistanceMultiplier: 1.5,
-                    // provider_individuals now outnumbers clinics 5-10x in most areas (more so
-                    // since the national rollout finished, 2026-08-15), so unchecking "Clinics"
-                    // and leaving only Individual Physicians / Secondary Locations can hand the
-                    // cluster engine several thousand markers in one call. Without chunkedLoading
-                    // that add runs synchronously on the main thread and can block the tab for
-                    // long enough to look like the map silently failed to render anything.
-                    // chunkedLoading spreads the add across animation frames instead.
-                    chunkedLoading: true
-                }).addTo(map);
-                renderMap();
-            });
             
             // --- DATA-DRIVEN BOUNDARY LOADING ---
             // Clears any old states/polygons to ensure clean slate if hot-swapping files
@@ -1047,9 +1212,6 @@
                 fetchPLACESData(allLoadedZips);
                 fetchProceduresData(allLoadedZips);
             }
-
-            // Claimed-listing details; re-renders itself if any are found
-            loadRegisteredProviders();
         }
 
         // Dedicated state loader bypassing map movement logic
@@ -1187,15 +1349,6 @@
             updateSelectedTaxonomiesSet();
         });
 
-        document.querySelectorAll('.src-chk').forEach(chk => {
-            chk.addEventListener('change', function () {
-                selectedSources = new Set(
-                    Array.from(document.querySelectorAll('.src-chk')).filter(c => c.checked).map(c => c.value)
-                );
-                renderMap();
-            });
-        });
-
         function updateSelectedTaxonomiesSet() {
             selectedTaxonomies.clear(); let allChecked = true;
             document.querySelectorAll('.tax-chk').forEach(chk => { if (chk.checked) selectedTaxonomies.add(chk.value); else allChecked = false; });
@@ -1208,13 +1361,10 @@
             document.getElementById('tax-dropdown-btn').textContent = selected === 0 ? 'None selected' : selected === total ? 'All Taxonomies' : `${selected} of ${total} selected`;
         }
 
-        // Despite the name, this is not just legend UI -- it also recomputes the
-        // marker color map renderMap() reads via window._displayColors, reassigning
-        // colors across only the active taxonomies when filtered so the remaining
-        // markers stay maximally distinct. The visible legend list itself was
-        // removed (it kept overlapping other sidebar panels when the filter rail
-        // was resized narrow), but this recomputation still has to run.
         function updateLegend() {
+            const legendDiv = document.getElementById('legend');
+            legendDiv.innerHTML = '';
+
             // When filtered, reassign colors across only active taxonomies for max distinction
             const allTax = Object.keys(taxonomyColors);
             const activeTax = allTax.filter(t => selectedTaxonomies.size === 0 || selectedTaxonomies.has(t));
@@ -1233,6 +1383,14 @@
 
             // Update marker colors to match display
             window._displayColors = displayColors;
+
+            allTax.forEach(t => {
+                const active = selectedTaxonomies.size === 0 || selectedTaxonomies.has(t);
+                legendDiv.innerHTML += `<div class="legend-item ${active ? '' : 'dimmed'}">
+                    <span class="legend-color" style="background-color:${displayColors[t]}"></span>
+                    <span>${t}</span>
+                </div>`;
+            });
         }
 
         // --- Radius Tools ---
@@ -1311,63 +1469,17 @@
             });
         });
 
-        // --- REGISTERED PROVIDERS (claimed listings) ---
-        // Clinics come from bulk NPPES data, which cannot say whether a practice is
-        // taking new patients or which payers it accepts. Providers who registered and
-        // verified their NPI supply that themselves; join it in by NPI at render time
-        // so the clinics table stays untouched.
-        let registeredProviders = {};
-
-        async function loadRegisteredProviders() {
-            try {
-                const res = await fetch('/.netlify/functions/providers-public?all=1');
-                if (!res.ok) return;
-                const data = await res.json();
-                registeredProviders = data.providers || {};
-                const n = Object.keys(registeredProviders).length;
-                if (n) { console.log(`[providers] ${n} registered listing(s) loaded`); renderMap(); }
-            } catch (e) {
-                console.warn('[providers] enrichment unavailable', e);
-            }
-        }
-
-        // Extra popup detail for a claimed listing. Returns '' for unregistered NPIs,
-        // so unclaimed clinics render exactly as before.
-        function registeredPopupHtml(npi) {
-            const p = registeredProviders[npi];
-            if (!p) return '';
-            const chip = (text, bg, fg) =>
-                `<span style="display:inline-block;margin:2px 3px 0 0;padding:1px 6px;border-radius:8px;background:${bg};color:${fg};font-size:9px;font-weight:700;">${text}</span>`;
-            let html = '<div style="margin-top:5px;padding-top:5px;border-top:1px solid var(--border);">';
-            html += chip('✓ VERIFIED PROVIDER', '#2dd4bf', '#04211d');
-            if (p.accepting_new_patients === true) html += chip('ACCEPTING PATIENTS', '#4ade80', '#04211d');
-            if (p.accepting_new_patients === false) html += chip('NOT ACCEPTING', '#484f58', '#e5eaf0');
-            if (p.telehealth) html += chip('TELEHEALTH', '#3b82f6', '#fff');
-            if (p.payers && p.payers.length) {
-                html += `<div style="margin-top:5px;font-size:10px;color:var(--text-secondary);">Accepts: <span style="color:var(--text-primary);">${
-                    p.payers.slice(0, 8).map(x => String(x).replace(/</g, '&lt;')).join(', ')
-                }${p.payers.length > 8 ? ` +${p.payers.length - 8} more` : ''}</span></div>`;
-            }
-            if (p.office_hours) {
-                var DAY = [['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat'],['sun','Sun']];
-                var open = DAY.filter(function (d) { return p.office_hours[d[0]]; })
-                    .map(function (d) { return d[1] + ' ' + p.office_hours[d[0]].open + '–' + p.office_hours[d[0]].close; });
-                if (open.length) html += '<div style="margin-top:5px;font-size:10px;color:var(--text-secondary);">Hours: <span style="color:var(--text-primary)">' +
-                    open.slice(0, 3).join(' · ').replace(/</g, '&lt;') + (open.length > 3 ? ' …' : '') + '</span></div>';
-            }
-            if (p.hours_note) html += `<div style="margin-top:3px;font-size:10px;color:var(--text-muted);">${String(p.hours_note).slice(0,90).replace(/</g,'&lt;')}</div>`;
-            if (p.bio) html += `<div style="margin-top:4px;font-size:10px;color:var(--text-secondary);">${String(p.bio).slice(0, 220).replace(/</g, '&lt;')}</div>`;
-            html += '</div>';
-            return html;
-        }
+        document.getElementById('exportCsvBtn').addEventListener('click', () => {
+            if (currentlyVisiblePractices.length === 0) return alert("No data visible on map.");
+            const csv = Papa.unparse(currentlyVisiblePractices);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "provider_export.csv");
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        });
 
         // --- MAP RENDER & MULTI-TAXONOMY PINS ---
         function renderMap() {
-            // Markers live in a cluster layer when markercluster is available.
-            // 1,500 individually-placed pins stacked into an unreadable column;
-            // clustering is the single biggest legibility win on this screen.
-            if (window.clusterLayer) { clusterLayer.clearLayers(); }
-            markers.forEach(m => { try { map.removeLayer(m); } catch (e) {} }); markers = []; currentlyVisiblePractices = [];
+            markers.forEach(m => map.removeLayer(m)); markers = []; currentlyVisiblePractices = [];
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
             // Check if search term matches a county name, get its bounds for spatial filter
@@ -1397,10 +1509,7 @@
                     const nameMatch = (p['Name'] || '').toLowerCase().includes(searchTerm) || addr.toLowerCase().includes(searchTerm);
                     // If countyFilterBounds matched, show all providers inside it regardless of name match
                     const passSearch = countyFilterBounds ? true : nameMatch;
-                    // Rows with no _src tag predate the source split (e.g. recommended-pin
-                    // injections) and should never be hidden by a source toggle.
-                    const passSource = !p._src || selectedSources.has(p._src);
-                    return passSearch && passSource && (selectedTaxonomies.size === 0 || selectedTaxonomies.has(p['Primary Taxonomy']));
+                    return passSearch && (selectedTaxonomies.size === 0 || selectedTaxonomies.has(p['Primary Taxonomy']));
                 });
                 if (filtered.length === 0) continue;
                 
@@ -1411,102 +1520,45 @@
                 filtered.forEach(p => coordGroups[coordKey].items.push({ practice: p, address: addr }));
             }
 
-            // NPIs the care navigator recommended, when arrived via an area deep link
-            const recSet = window._recommendedNPIs || new Set();
-
-            // Markers used to be added to the cluster layer one at a time inside the loop
-            // below via clusterLayer.addLayer(marker). Leaflet.markercluster's chunkedLoading
-            // option (enabled above) only batches the *bulk* addLayers() call -- repeated
-            // single addLayer() calls always run synchronously. With provider_individuals now
-            // routinely outnumbering clinics 5-10x per area, that per-marker loop could block
-            // the tab long enough that unchecking "Clinics" (leaving only the much larger
-            // Individual Physicians / Secondary Locations sets) looked like the map had
-            // rendered nothing. Markers are collected here and added in one addLayers() call
-            // after the loop instead.
-            const newMarkers = [];
-
             for (let key in coordGroups) {
                 const group = coordGroups[key], items = group.items;
-                const isRecommended = items.some(i => recSet.has(String(i.practice['NPI'] || '')));
 
-                // No stored affiliation link exists yet (migration 015's coordinate-match
-                // stage hasn't been uploaded to production), so a physician sharing this
-                // exact coordinate group with a clinic org is a live inference, not a fact.
-                const clinicHere = items.find(i => i.practice._src === 'clinic');
+                // Build popup with NPPES enrichment placeholder
+                const firstNPI = items[0]?.practice['NPI'] || '';
+                const popupId = `popup-${firstNPI}-${Date.now()}`;
 
-                // Popup content used to be built eagerly for every marker, even though most
-                // popups are never opened -- with thousands of individual-physician markers
-                // in a single render that string-building work ran synchronously right
-                // alongside the addLayer cost above. Leaflet supports passing a function to
-                // bindPopup() so the HTML is only built the first time a given popup opens.
-                function buildPopupHtml() {
-                    let popupHtml = `<div class="popup-content" style="min-width:220px;">
+                let popupHtml = `<div class="popup-content" style="min-width:220px;">
                     <b style="font-size:12px;">${items.length === 1 ? items[0].address : 'Multiple Practices at this Location'}</b>
-                    <hr style="margin:5px 0;border-color:var(--border);"/>`;
+                    <hr style="margin:5px 0;border-color:#2a3444;"/>`;
 
-                    items.forEach(item => {
-                        const npi = item.practice['NPI'] || '';
-                        const recBadge = recSet.has(String(npi))
-                            ? `<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:#f0883e;color:#0d1117;font-size:9px;font-weight:700;">★ RECOMMENDED FOR YOU</div><br/>`
-                            : '';
-                        const secondaryBadge = item.practice._src === 'secondary'
-                            ? `<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:var(--bg-hover,#21293a);color:var(--text-secondary);font-size:9px;">ADDITIONAL PRACTICE LOCATION</div><br/>`
-                            : '';
-                        const affiliationNote = (item.practice._src === 'individual' && clinicHere && clinicHere.practice['Name'] !== item.practice['Name'])
-                            ? `<span style="color:var(--text-muted);font-size:10px;">May practice at ${clinicHere.practice['Name']}</span><br/>`
-                            : '';
-                        popupHtml += `
+                items.forEach(item => {
+                    const npi = item.practice['NPI'] || '';
+                    popupHtml += `
                     <div style="margin-bottom:10px;" id="clinic-${npi}">
-                        ${recBadge}${secondaryBadge}
                         <strong style="font-size:12px;">${item.practice['Name'] || '—'}</strong><br/>
-                        <span style="color:var(--text-secondary);font-size:11px;">${item.practice['Primary Taxonomy'] || '—'}</span><br/>
-                        ${items.length > 1 ? `<span style="color:var(--text-muted);font-size:10px;">${item.address}</span><br/>` : ''}
-                        ${affiliationNote}
-                        <span style="color:var(--text-muted);font-size:10px;">NPI: ${npi}</span><br/>
-                        <div id="nppes-${npi}" style="margin-top:4px;font-size:11px;color:var(--text-secondary);">
+                        <span style="color:#8b949e;font-size:11px;">${item.practice['Primary Taxonomy'] || '—'}</span><br/>
+                        ${items.length > 1 ? `<span style="color:#6e7681;font-size:10px;">${item.address}</span><br/>` : ''}
+                        <span style="color:#484f58;font-size:10px;">NPI: ${npi}</span><br/>
+                        <div id="nppes-${npi}" style="margin-top:4px;font-size:11px;color:#8b949e;">
                             <em>Loading contact info...</em>
                         </div>
-                        <div id="cms-${npi}" style="margin-top:3px;font-size:11px;"></div>
-                        ${registeredPopupHtml(npi) || (npi ? `<div style="margin-top:5px;font-size:10px;">
-                            <a href="register-provider.html#npi=${npi}" target="_blank" style="color:var(--accent);">Is this your practice? Claim this listing →</a>
-                        </div>` : '')}
                     </div>`;
-                    });
-                    popupHtml += `</div>`;
-                    return popupHtml;
-                }
+                });
+                popupHtml += `</div>`;
 
                 let uniqueTaxs = [...new Set(items.map(i => i.practice['Primary Taxonomy']))];
                 const colorMap = window._displayColors || taxonomyColors;
                 let gradientStr = uniqueTaxs.length === 1
                     ? (colorMap[uniqueTaxs[0]] || '#3b82f6')
                     : `conic-gradient(${uniqueTaxs.map((t, idx) => `${colorMap[t] || '#3b82f6'} ${idx * (100/uniqueTaxs.length)}% ${(idx + 1) * (100/uniqueTaxs.length)}%`).join(', ')})`;
-                // Rings, in priority order: amber = recommended to this patient,
-                // teal = a claimed and NPI-verified listing. Both keep the taxonomy fill.
-                // A secondary-location row is aliased to its parent's NPI (migration 014),
-                // so it must not borrow the parent's verified ring -- that address was never
-                // the one NPPES confirmed, only a different bulk-imported site for the same NPI.
-                const isRegistered = items.some(i => {
-                    if (i.practice._src === 'secondary') return false;
-                    const rp = registeredProviders[String(i.practice['NPI'] || '')];
-                    return rp && rp.verified;
-                });
-                const dotSize = isRecommended ? 20 : (isRegistered ? 17 : 14);
-                const iconHtml = isRecommended
-                    ? `<div style="width:20px; height:20px; border-radius:50%; background:${gradientStr}; border: 2.5px solid var(--orange); box-shadow: 0 0 8px 2px rgba(240,136,62,0.75);"></div>`
-                    : isRegistered
-                    ? `<div style="width:17px; height:17px; border-radius:50%; background:${gradientStr}; border: 2px solid var(--accent); box-shadow: 0 0 6px 1px rgba(45,212,191,0.6);"></div>`
-                    : `<div style="width:14px; height:14px; border-radius:50%; background:${gradientStr}; border: 1.5px solid var(--bg-base); box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`;
+                const iconHtml = `<div style="width:14px; height:14px; border-radius:50%; background:${gradientStr}; border: 1.5px solid #0d1117; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`;
 
                 const marker = L.marker([group.lat, group.lng], {
-                    icon: L.divIcon({ className: 'multi-tax-icon', html: iconHtml, iconSize: [dotSize, dotSize], iconAnchor: [dotSize / 2, dotSize / 2] })
+                    icon: L.divIcon({ className: 'multi-tax-icon', html: iconHtml, iconSize: [14, 14], iconAnchor: [7, 7] })
                 })
                 .bindTooltip(items.length === 1 ? items[0].practice['Name'] : `${items.length} Providers Here`, { direction: 'top', offset: [0, -8], opacity: 0.9 })
-                // maxHeight makes Leaflet add its own .leaflet-popup-scrolled class (overflow-y:auto)
-                // once content exceeds it -- without it a same-coordinate group of 200 individuals
-                // (now routine with provider_individuals merged in) renders a popup taller than the
-                // viewport with no way to reach the rest.
-                .bindPopup(buildPopupHtml, { maxWidth: 280, maxHeight: 360 });
+                .bindPopup(popupHtml, { maxWidth: 280 })
+                .addTo(map);
 
                 // Fetch NPPES data when popup opens
                 marker.on('popupopen', () => {
@@ -1514,21 +1566,11 @@
                         const npi = item.practice['NPI'];
                         if (!npi) return;
                         enrichWithNPPES(npi);
-                        enrichWithCMS(npi);
                     });
                 });
 
-                newMarkers.push(marker);
                 markers.push(marker);
             }
-
-            if (window.clusterLayer) clusterLayer.addLayers(newMarkers);
-            else newMarkers.forEach(m => m.addTo(map));
-
-            // Re-added on every render because renderMap clears the marker list, and
-            // the navigator's picks must survive the user changing the taxonomy filter.
-            drawRecommendedPins();
-            drawLocationPins();
 
             if (zipGeoJSONLayer) markers.forEach(m => { if (m && typeof m.bringToFront === 'function') m.bringToFront(); });
             if (countyGeoJSONLayer && showCounties && map.hasLayer(countyGeoJSONLayer)) countyGeoJSONLayer.bringToFront();
@@ -1835,12 +1877,26 @@
             });
 
             const neighborZipList = foundNeighbors.map(n => n.zip);
-            statusEl.textContent = `🔄 Loading providers for ${neighborZipList.length} neighboring ZIPs...`;
+            statusEl.textContent = `🔄 Loading clinics for ${neighborZipList.length} neighboring ZIPs...`;
 
             try {
+                // Fetch clinics for neighbor ZIPs with pagination
+                let clinicData = [];
+                let offset = 0;
                 // Try both padded and stripped ZIP formats
                 const zipVariants = [...new Set(neighborZipList.flatMap(z => [z, String(parseInt(z, 10))]))];
-                const clinicData = await fetchProviderRows(() => `zip=in.(${zipVariants.join(',')})`);
+                while (true) {
+                    const res = await fetch(
+                        `${SUPABASE_URL}/rest/v1/clinics?zip=in.(${zipVariants.join(',')})&limit=1000&offset=${offset}`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                    );
+                    if (!res.ok) break;
+                    const batch = await res.json();
+                    if (!batch || batch.length === 0) break;
+                    clinicData.push(...batch);
+                    if (batch.length < 1000) break;
+                    offset += 1000;
+                }
 
                 // Fetch demographics for neighbor ZIPs
                 const demRes = await fetch(
@@ -1870,8 +1926,7 @@
                             'Primary Practice Address': c.address,
                             'Primary Taxonomy': c.primary_taxonomy,
                             'ZIP Code': c.zip, 'State': c.state,
-                            'Latitude': c.latitude, 'Longitude': c.longitude,
-                            '_src': c._src
+                            'Latitude': c.latitude, 'Longitude': c.longitude
                         });
                     }
                     // Add taxonomy to color map if not already present
@@ -1908,11 +1963,6 @@
                 document.getElementById('closePanelBtn').style.display = 'none';
                 renderDashboard(agg);
                 renderMap();
-
-                // Auto-load procedures and PLACES for all loaded ZIPs
-                const allNeighborZips = [seedPadded, ...neighborZipList];
-                fetchProceduresData(allNeighborZips);
-                fetchPLACESData(allNeighborZips);
 
                 statusEl.textContent = `✅ Loaded ${clinicData.length} clinics from ${neighborZipList.length} neighboring ZIPs`;
                 document.getElementById('clearZipsBtn').style.display = 'inline-block';
@@ -2362,11 +2412,6 @@
             document.getElementById('kpi-hh').textContent = totalHH >= 10000 ? (totalHH/1000).toFixed(1)+'k' : totalHH.toLocaleString();
 
             dashCharts = drawDashboardCharts(r, 'rawAgeChart', 'rawIncomeChart', 'ageChart', 'incomeChart', 'raceChart', dashCharts);
-
-            // Lead with the verdict for whichever ZIP this panel is showing
-            var vz = (lockedZip || (r['ZIP Code'] || r['zip'] || '')).toString().padStart(5, '0');
-            renderVerdict(vz);
-            if (compareArmed) addCompareZip(vz);
         }
 
         function drawDashboardCharts(r, rawAgeCanvasId, rawIncCanvasId, ageCanvasId, incCanvasId, raceCanvasId, existingInsts) {
@@ -2402,12 +2447,12 @@
             const rawAgeData = ageBuckets.map(b => b.keys_t.reduce((s,k)=>s+getV(k),0));
             const rawAgeInst = new Chart(document.getElementById(rawAgeCanvasId), {
                 type: 'bar',
-                data: { labels: ageBuckets.map(b=>b.l), datasets: [{ label: 'Total Population', data: rawAgeData, backgroundColor: CHART.a1, borderRadius: 3 }] },
+                data: { labels: ageBuckets.map(b=>b.l), datasets: [{ label: 'Total Population', data: rawAgeData, backgroundColor: '#3b82f6', borderRadius: 3 }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: {font: {size: 9}} }, y: { grid: { color: '#1e2836' }, ticks: {font: {size: 9}} } } }
             });
 
             // STACKED AGE CHART
-            const ageInst = new Chart(document.getElementById(ageCanvasId), { type: 'bar', data: { labels: ageBuckets.map(b=>b.l), datasets: [ { label: 'Insured', data: ageBuckets.map(b=>b.d.i_pct), backgroundColor: CHART.a1 }, { label: 'Uninsured', data: ageBuckets.map(b=>b.d.u_pct), backgroundColor: CHART.bad } ] }, options: defaultOpts });
+            const ageInst = new Chart(document.getElementById(ageCanvasId), { type: 'bar', data: { labels: ageBuckets.map(b=>b.l), datasets: [ { label: 'Insured', data: ageBuckets.map(b=>b.d.i_pct), backgroundColor: '#3b82f6' }, { label: 'Uninsured', data: ageBuckets.map(b=>b.d.u_pct), backgroundColor: '#f85149' } ] }, options: defaultOpts });
 
             // STACKED INCOME CHART
             const incBuckets = [
@@ -2422,11 +2467,11 @@
             const rawIncData = incBuckets.map(b => b.keys_t.reduce((s,k)=>s+getV(k),0));
             const rawIncInst = new Chart(document.getElementById(rawIncCanvasId), {
                 type: 'bar',
-                data: { labels: incBuckets.map(b=>b.l), datasets: [{ label: 'Total Households', data: rawIncData, backgroundColor: CHART.good, borderRadius: 3 }] },
+                data: { labels: incBuckets.map(b=>b.l), datasets: [{ label: 'Total Households', data: rawIncData, backgroundColor: '#3fb950', borderRadius: 3 }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: {font: {size: 9}} }, y: { grid: { color: '#1e2836' }, ticks: {font: {size: 9}} } } }
             });
 
-            const incInst = new Chart(document.getElementById(incCanvasId), { type: 'bar', data: { labels: incBuckets.map(b=>b.l), datasets: [ { label: 'Insured', data: incBuckets.map(b=>b.d.i_pct), backgroundColor: CHART.good }, { label: 'Uninsured', data: incBuckets.map(b=>b.d.u_pct), backgroundColor: CHART.bad } ] }, options: defaultOpts });
+            const incInst = new Chart(document.getElementById(incCanvasId), { type: 'bar', data: { labels: incBuckets.map(b=>b.l), datasets: [ { label: 'Insured', data: incBuckets.map(b=>b.d.i_pct), backgroundColor: '#3fb950' }, { label: 'Uninsured', data: incBuckets.map(b=>b.d.u_pct), backgroundColor: '#f85149' } ] }, options: defaultOpts });
 
             // RACE CHART
             const races = [
@@ -2437,7 +2482,7 @@
                 { l: 'Native', t: getV('Total: American Indian and Alaska Native alone'), i: getV('Insured: American Indian and Alaska Native alone') }
             ].sort((a,b) => b.t - a.t);
             const raceInst = new Chart(document.getElementById(raceCanvasId), {
-                type: 'bar', data: { labels: races.map(r=>r.l), datasets: [ { label: 'Total Pop', data: races.map(r=>r.t), backgroundColor: CHART.line, grouped: false, barPercentage: 0.85 }, { label: 'Insured Pop', data: races.map(r=>r.i), backgroundColor: CHART.a2, grouped: false, barPercentage: 0.5 } ] },
+                type: 'bar', data: { labels: races.map(r=>r.l), datasets: [ { label: 'Total Pop', data: races.map(r=>r.t), backgroundColor: '#2a3444', grouped: false, barPercentage: 0.85 }, { label: 'Insured Pop', data: races.map(r=>r.i), backgroundColor: '#58a6ff', grouped: false, barPercentage: 0.5 } ] },
                 options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: {size: 9} } } }, scales: { x: { grid: { color: '#1e2836' }, ticks: {font: {size: 9}} }, y: { grid: { display: false }, ticks: {font: {size: 9}} } } }
             });
 
@@ -2456,11 +2501,7 @@
             Object.values(panels).forEach(p => { if (p) p.style.display = 'none'; });
 
             const panel = panels[tab];
-            if (panel) {
-                if (tab === 'ai') panel.style.display = 'flex';
-                else if (tab === 'reports') panel.style.display = 'flex';
-                else panel.style.display = 'block';
-            }
+            if (panel) panel.style.display = (tab === 'ai' || tab === 'reports') ? 'flex' : 'block';
 
             const select = document.getElementById('dashboard-select');
             if (select && select.value !== tab) select.value = tab;
@@ -2471,6 +2512,13 @@
 
             if (tab === 'ai') document.getElementById('ai-input')?.focus();
             if (tab === 'reports') updateReportScopeNote();
+        }
+
+        function toggleLegend() {
+            const section = document.getElementById('legend-section');
+            const toggle = document.getElementById('legendToggle');
+            section.classList.toggle('collapsed');
+            toggle.classList.toggle('collapsed');
         }
 
         // --- RESIZABLE PANELS ---
@@ -2526,39 +2574,6 @@
 
         // --- NPPES ENRICHMENT ---
         const nppesCache = {}; // cache by NPI to avoid repeat calls
-        const cmsCache = {}; // cache CMS provider data by NPI
-
-        async function enrichWithCMS(npi) {
-            const el = document.getElementById(`cms-${npi}`);
-            if (!el) return;
-
-            if (cmsCache[npi]) {
-                renderCMSData(el, cmsCache[npi]);
-                return;
-            }
-
-            try {
-                const res = await fetch(`/.netlify/functions/cms-provider?npi=${npi}`);
-                const data = await res.json();
-                if (!data.found) { cmsCache[npi] = null; return; }
-                cmsCache[npi] = data;
-                renderCMSData(el, data);
-            } catch(e) {
-                // silent fail — CMS data is supplementary
-            }
-        }
-
-        function renderCMSData(el, data) {
-            if (!el || !data) return;
-            const badges = [];
-            if (data.medicare_participant) badges.push('<span style="background:#1a3a1a;color:#3fb950;padding:1px 5px;border-radius:3px;font-size:10px;">✓ Medicare</span>');
-            if (data.telehealth) badges.push('<span style="background:#1a2a3a;color:var(--accent);padding:1px 5px;border-radius:3px;font-size:10px;">📹 Telehealth</span>');
-            let html = badges.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:3px;">${badges.join('')}</div>` : '';
-            if (data.facility) html += `<span style="color:var(--text-secondary);font-size:10px;">🏥 ${data.facility}</span><br/>`;
-            if (data.medical_school) html += `<span style="color:var(--text-secondary);font-size:10px;">🎓 ${data.medical_school}${data.graduation_year ? ' (' + data.graduation_year + ')' : ''}</span><br/>`;
-            if (data.secondary_specialties?.length) html += `<span style="color:var(--text-muted);font-size:10px;">Also: ${data.secondary_specialties.slice(0,2).join(', ')}</span><br/>`;
-            if (html) el.innerHTML = html;
-        }
 
         async function enrichWithNPPES(npi) {
             const el = document.getElementById(`nppes-${npi}`);
@@ -2576,7 +2591,7 @@
                 const result = data?.results?.[0];
 
                 if (!result) {
-                    el.innerHTML = '<em style="color:var(--text-muted);">No NPPES record found</em>';
+                    el.innerHTML = '<em style="color:#484f58;">No NPPES record found</em>';
                     return;
                 }
 
@@ -2606,18 +2621,18 @@
                 renderNPPESData(el, info);
 
             } catch(e) {
-                if (el) el.innerHTML = `<em style="color:var(--text-muted);">Contact info unavailable</em>`;
+                if (el) el.innerHTML = `<em style="color:#484f58;">Contact info unavailable</em>`;
             }
         }
 
         function renderNPPESData(el, info) {
             if (!el) return;
             let html = '';
-            if (info.phone) html += `📞 <a href="tel:${info.phone}" style="color:var(--accent);text-decoration:none;">${info.phone}</a><br/>`;
+            if (info.phone) html += `📞 <a href="tel:${info.phone}" style="color:#58a6ff;text-decoration:none;">${info.phone}</a><br/>`;
             if (info.fax) html += `🖷 ${info.fax}<br/>`;
             if (info.authorized_official) html += `👤 ${info.authorized_official}${info.authorized_title ? ` · ${info.authorized_title}` : ''}<br/>`;
-            if (info.type) html += `<span style="color:var(--text-muted);font-size:10px;">${info.type}${info.status ? ' · ' + info.status : ''}</span>`;
-            if (!html) html = '<em style="color:var(--text-muted);font-size:10px;">No additional contact info</em>';
+            if (info.type) html += `<span style="color:#484f58;font-size:10px;">${info.type}${info.status ? ' · ' + info.status : ''}</span>`;
+            if (!html) html = '<em style="color:#484f58;font-size:10px;">No additional contact info</em>';
             el.innerHTML = html;
         }
 
@@ -2697,368 +2712,6 @@
             if (isMobile()) toggleBottomSheet(true);
         }
 
-        // Deep link from care navigator: #goto=<address>, #pin=<lat>,<lng>,<name>,
-        // or #zip=<zip>&tax=<taxonomy,list>&rec=<npi,list> for a whole search area
-        // Runs on whichever of DOMContentLoaded / load happens first, and guards
-        // against running twice. Binding only to `load` meant a slow or blocked
-        // CDN script (Leaflet, Chart.js, TopoJSON are all third-party) could delay
-        // this for seconds or, if the page was restored from bfcache, skip it —
-        // leaving the visitor staring at an empty search box with no idea a deep
-        // link was ever involved.
-        let deepLinkRan = false;
-        const runDeepLink = () => {
-            if (deepLinkRan) return;
-            deepLinkRan = true;
-
-            const h = location.hash || '';
-            const isPin = h.indexOf('#pin=') === 0;
-            const isGoto = h.indexOf('#goto=') === 0;
-            const isArea = h.indexOf('#zip=') === 0;
-            if (!isPin && !isGoto && !isArea) return;
-            console.log('[deeplink] hash detected:', h);
-
-            const whenReady = (fn, tries) => {
-                tries = tries || 0;
-                if (typeof L !== 'undefined' && typeof map !== 'undefined' && map && map.setView) {
-                    try { fn(); } catch (err) { console.error('[deeplink] failed:', err); }
-                    return;
-                }
-                if (tries > 60) { console.warn('[deeplink] map never became ready'); return; }
-                setTimeout(() => whenReady(fn, tries + 1), 150);
-            };
-
-            if (isArea) {
-                const params = new URLSearchParams(h.slice(1));
-                const zip = (params.get('zip') || '').trim();
-                const wantTax = (params.get('tax') || '').split(',').map(s => s.trim()).filter(Boolean);
-                const recNPIs = (params.get('rec') || '').split(',').map(s => s.trim()).filter(Boolean);
-                if (!/^\d{5}$/.test(zip)) { console.warn('[deeplink] bad zip:', h); return; }
-                // renderMap reads this to badge/enlarge the navigator's picks
-                window._recommendedNPIs = new Set(recNPIs);
-                // lat,lng,npi,name pairs for the recommended providers themselves
-                window._recommendedPins = (params.get('pins') || '').split('|').filter(Boolean).map(s => {
-                    const [lat, lng, npi, ...rest] = s.split(',');
-                    return { lat: parseFloat(lat), lng: parseFloat(lng), npi: (npi || '').trim(), name: rest.join(',').trim() };
-                }).filter(p => !isNaN(p.lat) && !isNaN(p.lng));
-                whenReady(() => runAreaDeepLink(zip, wantTax));
-                return;
-            }
-
-            if (isPin) {
-                const parts = h.slice(5).split(',');
-                const lat = parseFloat(parts[0]);
-                const lng = parseFloat(parts[1]);
-                const name = decodeURIComponent(parts.slice(2).join(',') || 'Provider');
-                if (isNaN(lat) || isNaN(lng)) { console.warn('[deeplink] bad coords:', h); return; }
-                whenReady(() => {
-                    map.setView([lat, lng], 16);
-                    const mk = L.marker([lat, lng]).addTo(map);
-                    mk.bindPopup('<b>' + name.replace(/</g, '&lt;') + '</b>').openPopup();
-                    console.log('[deeplink] pin placed at', lat, lng, name);
-                });
-            } else {
-                const addr = decodeURIComponent(h.slice(6));
-                whenReady(() => goToAddress(addr));
-            }
-        };
-
-        if (document.readyState === 'complete' || document.readyState === 'interactive') runDeepLink();
-        else document.addEventListener('DOMContentLoaded', runDeepLink);
-        window.addEventListener('load', runDeepLink);
-        // Arriving at an already-open tab via a new deep link should re-run it
-        window.addEventListener('hashchange', () => { deepLinkRan = false; runDeepLink(); });
-
-        // Care-navigator area deep link: run the normal ZIP search, then narrow the
-        // taxonomy filter to the specialties the navigator searched with, so the map
-        // shows every matching clinic in the area rather than only the recommended few.
-        async function runAreaDeepLink(zip, wantTax) {
-            const statusEl = document.getElementById('dbStatus');
-            document.getElementById('dbSearchInput').value = zip;
-            // Say what is happening straight away. Without this the visitor sees an
-            // apparently idle page for several seconds and assumes the link did nothing.
-            if (statusEl) statusEl.textContent = '🔗 Opening your results for ' + zip + '…';
-            document.getElementById('dbSearchBtn').click();
-
-            // The search is an async Supabase fetch (clinics, then demographics per ZIP),
-            // so wait for processData to land instead of assuming a fixed delay.
-            const loaded = await new Promise(resolve => {
-                let tries = 0;
-                const poll = () => {
-                    if (Object.keys(groupedData).length > 0 && taxonomies.size > 0) return resolve(true);
-                    if (++tries > 140) return resolve(false);
-                    setTimeout(poll, 150);
-                };
-                poll();
-            });
-            if (!loaded) {
-                console.warn('[deeplink] clinics never loaded for ZIP', zip);
-                // Never fail silently: the ZIP is already in the box, so tell them to retry
-                if (statusEl) statusEl.textContent = '⚠️ Could not load ' + zip + ' — press Search to try again';
-                return;
-            }
-
-            applyNavigatorTaxonomyFilter(wantTax);
-        }
-
-        // The navigator searches NPPES by taxonomy description ("Internal Medicine"),
-        // while clinics.primary_taxonomy stores a role-suffixed form of the same value
-        // ("Internal Medicine Physician"), so match the term as a prefix of the stored
-        // value. The leading space anchors it to a word boundary, without which
-        // "Urology Physician" would match "NeUROLOGY PHYSICIAN"; the absent trailing
-        // space still lets "Dentist" match "General Practice Dentistry".
-        function applyNavigatorTaxonomyFilter(wantTax) {
-            const norm = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
-            const wanted = wantTax.map(norm).filter(Boolean);
-
-            // No terms asked for means "show me this whole market" — a link like
-            // #zip=38017 with no tax=. Without this guard the no-match branch
-            // below fires and hides every clinic, landing the visitor on an
-            // empty map.
-            if (!wanted.length) {
-                renderMap();
-                const el = document.getElementById('dbStatus');
-                if (el) el.textContent = '✅ ' + Object.keys(groupedData).length + ' locations loaded';
-                return;
-            }
-            const matched = new Set();
-            for (const t of taxonomies) {
-                const nt = ' ' + norm(t);
-                if (wanted.some(w => nt.includes(' ' + w))) matched.add(t);
-            }
-
-            const statusEl = document.getElementById('dbStatus');
-            const pins = window._recommendedPins || [];
-            if (matched.size === 0) {
-                // Showing every clinic here would make all of them read as the requested
-                // specialty. Hide them instead; the recommended pins below still render.
-                // (An empty selectedTaxonomies means "no filter" to renderMap, so use a
-                // sentinel value that no real taxonomy can equal.)
-                console.warn('[deeplink] no stored taxonomy matched', wantTax);
-                selectedTaxonomies = new Set([' no-match']);
-                document.querySelectorAll('.tax-chk').forEach(chk => { chk.checked = false; });
-                const chkAll = document.getElementById('chk-all');
-                if (chkAll) chkAll.checked = false;
-                updateDropdownLabel(); updateLegend();
-                if (statusEl) {
-                    statusEl.textContent = pins.length
-                        ? `Showing the ${pins.length} recommended provider${pins.length === 1 ? '' : 's'} — no other ${wantTax[0] || 'matching'} clinics in this ZIP`
-                        : `⚠️ No ${wantTax[0] || 'matching'} providers found in this ZIP`;
-                }
-            } else {
-                selectedTaxonomies = matched;
-                const boxes = document.querySelectorAll('.tax-chk');
-                boxes.forEach(chk => { chk.checked = matched.has(chk.value); });
-                document.getElementById('chk-all').checked = matched.size === boxes.length;
-                updateDropdownLabel(); updateLegend();
-                if (statusEl) statusEl.textContent = `✅ Showing ${matched.size} matching provider type${matched.size === 1 ? '' : 's'} in this area`;
-            }
-
-            renderMap();
-
-            // Frame whatever ended up visible after filtering
-            const pts = markers.map(m => m.getLatLng()).map(p => [p.lat, p.lng]);
-            pins.forEach(p => pts.push([p.lat, p.lng]));
-            if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 13 });
-        }
-
-        // The navigator's picks come from the national registry, so some have no row
-        // in the clinics table and would otherwise never appear. Pin them directly,
-        // skipping any that renderMap already drew so they are not doubled up.
-        function drawRecommendedPins() {
-            const pins = window._recommendedPins || [];
-            if (!pins.length) return;
-            const onMap = new Set();
-            for (const addr in groupedData) {
-                for (const pr of groupedData[addr].practices) onMap.add(String(pr['NPI'] || ''));
-            }
-            pins.forEach(p => {
-                if (p.npi && onMap.has(p.npi)) return;
-                const icon = L.divIcon({
-                    className: 'multi-tax-icon',
-                    html: `<div style="width:20px;height:20px;border-radius:50%;background:var(--orange);border:2.5px solid var(--bg-base);box-shadow:0 0 8px 2px rgba(240,136,62,0.75);"></div>`,
-                    iconSize: [20, 20], iconAnchor: [10, 10]
-                });
-                const label = (p.name || 'Recommended provider').replace(/</g, '&lt;');
-                const marker = L.marker([p.lat, p.lng], { icon })
-                    .bindTooltip(label, { direction: 'top', offset: [0, -10], opacity: 0.9 })
-                    .bindPopup(`<div class="popup-content" style="min-width:180px;">
-                        <div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:#f0883e;color:#0d1117;font-size:9px;font-weight:700;">★ RECOMMENDED FOR YOU</div><br/>
-                        <strong style="font-size:12px;">${label}</strong><br/>
-                        <span style="color:var(--text-muted);font-size:10px;">NPI: ${p.npi || '—'}</span>
-                    </div>`, { maxWidth: 260 })
-                    .addTo(map);
-                if (window.clusterLayer) clusterLayer.addLayer(marker); else marker.addTo(map);
-                markers.push(marker);
-            });
-        }
-
-        // Practice locations published by a claimed listing (migration 006).
-        // The clinics table only knows the address tied to the NPI, so a
-        // provider's other sites exist nowhere else on this map -- which is why
-        // a second office could be entered carefully and still never appear.
-        //
-        // Ring convention extends the existing one: solid teal stays "NPPES
-        // verified", hollow teal is self-reported. They must not look alike or
-        // the verified ring stops carrying information.
-        // ---------------------------------------------------------------
-        // MARKET MEMO
-        //
-        // Unlike sendAIQuery, this does NOT ship the loaded clinics to the
-        // model. It sends the question only; the function turns it into a
-        // validated query plan, runs that server-side against an allowlisted
-        // set of tables, and writes a memo over the summarised results. So it
-        // can answer questions about ZIPs that are not currently on screen --
-        // and it will refuse anything touching patient or account data.
-        // ---------------------------------------------------------------
-        async function sendMarketMemo() {
-            const input = document.getElementById('ai-input');
-            const q = (input.value || '').trim();
-            if (!q) { input.focus(); return; }
-
-            appendAIMessage('user', q);
-            input.value = '';
-            const btn = document.getElementById('ai-memo');
-            const send = document.getElementById('ai-send');
-            btn.disabled = true; send.disabled = true;
-            const label = btn.textContent; btn.textContent = 'Working…';
-
-            try {
-                const r = await fetch('/.netlify/functions/ai-query', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mode: 'market_memo', question: q })
-                });
-                const d = await r.json();
-
-                if (d.refused) {
-                    // Show the validator's own words. A refusal that explains
-                    // itself teaches the next question; a generic one does not.
-                    appendAIMessage('ai', 'I can\'t answer that from the market tables.\n\n' + (d.reason || ''));
-                    return;
-                }
-                if (d.error) { appendAIMessage('ai', d.error); return; }
-
-                const res = d.results || {};
-                const bits = [];
-                bits.push(d.memo || '(no memo)');
-                bits.push('');
-                bits.push('— based on ' + (res.matched != null ? res.matched.toLocaleString() : '?') +
-                          ' matching rows from ' + (res.table || '?') +
-                          (d.plan && d.plan.taxonomy ? ' filtered to ' + d.plan.taxonomy : ''));
-                appendMemoResult(bits.join('\n'), d);
-            } catch (e) {
-                appendAIMessage('ai', 'The memo service is unavailable right now.');
-            } finally {
-                btn.disabled = false; send.disabled = false; btn.textContent = label;
-            }
-        }
-
-        // Memo results get two affordances the chat messages do not: a copy
-        // button, and the query plan that produced them. Showing the plan is
-        // deliberate -- an analyst should see exactly what was run before
-        // quoting the number to anyone.
-        function appendMemoResult(text, detail) {
-            const box = document.getElementById('ai-messages');
-            if (!box) return;
-            const wrap = document.createElement('div');
-            wrap.className = 'ai-msg-ai';
-
-            const body = document.createElement('div');
-            body.textContent = text;              // textContent, never innerHTML
-            wrap.appendChild(body);
-
-            const tools = document.createElement('div');
-            tools.className = 'ai-memo-tools';
-
-            const copy = document.createElement('button');
-            copy.type = 'button';
-            copy.textContent = 'Copy';
-            copy.onclick = function () {
-                navigator.clipboard.writeText(text).then(function () {
-                    copy.textContent = 'Copied';
-                    setTimeout(function () { copy.textContent = 'Copy'; }, 1500);
-                }).catch(function () { copy.textContent = 'Copy failed'; });
-            };
-            tools.appendChild(copy);
-            wrap.appendChild(tools);
-
-            if (detail && detail.plan) {
-                const show = document.createElement('button');
-                show.type = 'button';
-                show.textContent = 'Show query';
-                const pre = document.createElement('pre');
-                pre.className = 'ai-plan';
-                pre.style.display = 'none';
-                pre.textContent = JSON.stringify(detail.plan, null, 2);
-                show.onclick = function () {
-                    const on = pre.style.display === 'none';
-                    pre.style.display = on ? 'block' : 'none';
-                    show.textContent = on ? 'Hide query' : 'Show query';
-                };
-                tools.appendChild(show);
-                wrap.appendChild(pre);
-            }
-
-            box.appendChild(wrap);
-            box.scrollTop = box.scrollHeight;
-        }
-
-        function drawLocationPins() {
-            if (!Object.keys(registeredProviders || {}).length) return;
-
-            // Which claimed providers are actually on this map, and where a pin
-            // already sits. Same groupedData walk drawRecommendedPins uses.
-            const npisOnMap = new Set();
-            const pinnedAt = new Set();
-            for (const addr in groupedData) {
-                const g = groupedData[addr];
-                if (g.lat && g.lng) pinnedAt.add((+g.lat).toFixed(4) + ',' + (+g.lng).toFixed(4));
-                for (const pr of g.practices) npisOnMap.add(String(pr['NPI'] || ''));
-            }
-            if (!npisOnMap.size) return;
-
-            Object.keys(registeredProviders).forEach(npi => {
-                // registeredProviders is every claimed listing in the country.
-                // Only draw extra sites for a provider already on screen.
-                if (!npisOnMap.has(String(npi))) return;
-                const rp = registeredProviders[npi] || {};
-                (rp.locations || []).forEach(loc => {
-                    // No coordinates means geocoding never ran or failed. There
-                    // is nowhere to put the pin, so skip rather than guess.
-                    if (!loc.latitude || !loc.longitude) return;
-                    const key = (+loc.latitude).toFixed(4) + ',' + (+loc.longitude).toFixed(4);
-                    if (pinnedAt.has(key)) return;   // the clinics row already covers it
-                    pinnedAt.add(key);
-
-                    const verified = !!loc.verified;
-                    const size = verified ? 17 : 15;
-                    const html = verified
-                        ? '<div style="width:17px;height:17px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-base);box-shadow:0 0 6px 1px rgba(45,212,191,0.6);"></div>'
-                        : '<div style="width:15px;height:15px;border-radius:50%;background:transparent;border:2px solid var(--accent);box-shadow:0 0 5px rgba(45,212,191,0.35);"></div>';
-
-                    const esc = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-                    const name = esc(rp.name || 'Claimed listing');
-                    const label = loc.label ? name + ' \u2014 ' + esc(loc.label) : name;
-                    const addr = [loc.address_line, loc.city, loc.state, loc.zip].filter(Boolean).map(esc).join(', ');
-                    const badge = verified
-                        ? '<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:var(--accent);color:#0d1117;font-size:9px;font-weight:700;">&#10003; NPPES VERIFIED</div>'
-                        : '<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:var(--text-muted);color:#0d1117;font-size:9px;font-weight:700;">SELF-REPORTED ADDRESS</div>';
-
-                    const marker = L.marker([loc.latitude, loc.longitude], {
-                        icon: L.divIcon({ className: 'multi-tax-icon', html: html, iconSize: [size, size], iconAnchor: [size / 2, size / 2] })
-                    })
-                    .bindTooltip(label, { direction: 'top', offset: [0, -9], opacity: 0.9 })
-                    .bindPopup('<div class="popup-content" style="min-width:180px;">' + badge +
-                        '<br/><strong style="font-size:12px;">' + label + '</strong><br/>' +
-                        (addr ? '<span style="color:var(--text-muted);font-size:10px;">' + addr + '</span><br/>' : '') +
-                        '<span style="color:var(--text-muted);font-size:10px;">NPI: ' + esc(npi) + '</span></div>', { maxWidth: 260 });
-
-                    if (window.clusterLayer) clusterLayer.addLayer(marker); else marker.addTo(map);
-                    markers.push(marker);
-                });
-            });
-        }
-
         window.addEventListener('load', () => {
             initSheetDrag();
         });
@@ -3082,14 +2735,7 @@
             btn.disabled = true;
 
             try {
-                // Bias to the US. Photon is worldwide and unbiased, so a bare
-                // "38017" matched Kocasinan, Kayseri, TURKEY — a 5-digit string
-                // is a valid postcode in dozens of countries. Bias to the
-                // continental US centroid and append the country for ZIPs.
-                const isZip = /^\d{5}$/.test(query.trim());
-                const q = isZip ? query.trim() + ', USA' : query;
-                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}`
-                          + `&limit=5&lang=en&lat=39.5&lon=-98.35`;
+                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1&lang=en`;
                 const res = await fetch(url);
                 const data = await res.json();
                 const features = data?.features;
@@ -3101,12 +2747,8 @@
                     return;
                 }
 
-                // Prefer a US hit even if the geocoder ranked something else first
-                const usFirst = features.find(f =>
-                    ['United States', 'United States of America', 'USA'].includes(
-                        (f.properties && f.properties.country) || '')) || features[0];
-                const [lng, lat] = usFirst.geometry.coordinates;
-                const props = usFirst.properties;
+                const [lng, lat] = features[0].geometry.coordinates;
+                const props = features[0].properties;
                 const label = [props.name, props.street, props.city, props.state, props.country]
                     .filter(Boolean).join(', ');
 
@@ -3140,7 +2782,6 @@
         }
 
         document.getElementById('addressGoBtn').addEventListener('click', () => {
-            if (typeof omniSearch === 'function') { omniSearch(document.getElementById('addressInput').value); return; }
             goToAddress(document.getElementById('addressInput').value);
         });
 
@@ -3442,14 +3083,22 @@
                 // Pull demographics directly scoped to loaded zips
                 const demScoped = zips.map(z => zipDemographics[z] || zipDemographics[String(parseInt(z))]).filter(Boolean);
 
+                const procScoped = {};
+                if (proceduresRawData) {
+                    Object.entries(proceduresRawData).forEach(([specialty, procs]) => {
+                        procScoped[specialty] = procs;
+                    });
+                }
+
                 const res = await fetch('/.netlify/functions/report-generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         question,
                         zips,
-                        clinics: allClinics,
+                        clinics: allClinics.slice(0, 300),
                         demographics: demScoped.slice(0, 30),
+                        procedures: procScoped,
                         places: window.placesDataCache || {},
                         cms: window.cmsDataCache || {}
                     })
@@ -3723,327 +3372,6 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
                 sendAIQuery();
             }
         });
-    
-        /* ====================================================================
-           ROLE-AWARE ENTRY
-           The dashboard is the analyst/provider surface. It previously had no
-           auth check at all, so a signed-in patient landing here got a market
-           tool instead of their own app.
-
-           The deep-link exception matters: the care navigator sends patients
-           here with #zip=/#pin=/#goto= to see their results on the map. Those
-           must keep working for everyone, so the redirect only fires when a
-           patient arrives with no deep link — i.e. they navigated here by hand.
-           ==================================================================== */
-        (function roleAwareEntry() {
-            var hash = location.hash || '';
-            var deepLink = /^#(zip|pin|goto)=/.test(hash);
-
-            var s = null;
-            try {
-                s = JSON.parse(sessionStorage.getItem('pp.session.v1')
-                    || localStorage.getItem('pp.session.v1')
-                    || sessionStorage.getItem('pp.patient.v1')
-                    || localStorage.getItem('pp.patient.v1') || 'null');
-            } catch (e) { return; }
-            if (!s || !s.role || (s.expiresAt && s.expiresAt < Date.now())) return;
-
-            // Only the PATIENT redirect must stand down for a deep link — that is
-            // how the care navigator hands a patient to the full map, and bouncing
-            // them home would break it. The provider branch below only appends a
-            // link, so it is safe during a deep link and must still run: saving a
-            // provider profile lands on /dashboard#zip=<zip>, so gating on the hash
-            // meant the one path providers actually take never got the link.
-            if (s.role === 'patient') {
-                if (deepLink) return;
-                location.replace('/');
-                return;
-            }
-
-            if (s.role === 'provider') {
-                // Signed-in provider: say so, and give them a way back to their listing.
-                var right = document.querySelector('#topbar-v2 .right');
-                if (!right) return;
-                var a = document.createElement('a');
-                a.href = 'register-provider.html';
-                a.textContent = 'Your listing';
-                a.style.cssText = 'font-size:11px;color:var(--a1);text-decoration:none;margin-left:12px';
-                right.appendChild(a);
-            }
-        })();
-
-        /* ====================================================================
-           REDESIGN WIRING
-           Kept in one block at the end so it can be read (or reverted) as a
-           unit. It only adds behaviour — no existing function is replaced.
-           ==================================================================== */
-
-        // 1. Relocate the omnibar into the topbar. Doing this in JS rather than
-        //    moving the markup keeps every existing #controls / #dbSearchInput
-        //    reference valid, and leaves the row intact if this block ever fails.
-        (function mountOmnibar() {
-            var slot = document.getElementById('omnibar-slot');
-            var row  = document.getElementById('omnibar-row');
-            if (slot && row) slot.appendChild(row);
-        })();
-
-        // 1b. UNIFIED OMNIBAR.
-        //     There were two search boxes doing different jobs: this one only
-        //     geocoded and panned, while the box that actually loads clinics was
-        //     buried in the filter rail. Typing a ZIP up here moved the map and
-        //     left the welcome screen up, which reads as "search is broken".
-        //     One input now routes by what was typed.
-        function omniSearch(raw) {
-            var q = String(raw || '').trim();
-            if (!q) return;
-            var street     = /^\d+\s+\S/.test(q);                       // "304 Majestic Trail"
-            var zip        = /^\d{5}$/.test(q);
-            var state      = /^[A-Za-z]{2}$/.test(q);
-            var cityState  = /^[A-Za-z .'-]+,\s*[A-Za-z]{2}$/.test(q);
-            var city       = /^[A-Za-z .'-]{3,}$/.test(q);
-            var multiZip   = /^\s*\d{5}(\s*,\s*\d{5})+\s*$/.test(q);
-
-            if (!street && (zip || state || cityState || city || multiZip)) {
-                // Load the market: this is what dismisses the welcome overlay
-                var input = document.getElementById('dbSearchInput');
-                var btn   = document.getElementById('dbSearchBtn');
-                if (input && btn) { input.value = q; btn.click(); return; }
-            }
-            goToAddress(q);   // an address: just fly there
-        }
-
-        // 3. Compare tray — holds ZIPs for territory comparison.
-        var compareZips = [];
-        var compareArmed = false;
-        function armCompareAdd() {
-            compareArmed = !compareArmed;
-            var b = document.getElementById('compare-add');
-            if (b) b.classList.toggle('armed', compareArmed);
-            if (compareArmed) {
-                var st = document.getElementById('dbStatus');
-                if (st) st.textContent = 'Click a ZIP on the map to add it to the comparison';
-            }
-        }
-        function addCompareZip(zip) {
-            if (!/^\d{5}$/.test(String(zip || ''))) return;
-            if (compareZips.indexOf(zip) === -1) compareZips.push(zip);
-            if (compareZips.length > 4) compareZips.shift();
-            compareArmed = false;
-            var b = document.getElementById('compare-add');
-            if (b) b.classList.remove('armed');
-            paintCompare();
-        }
-        function paintCompare() {
-            var tray = document.getElementById('compare-tray');
-            var wrap = document.getElementById('compare-chips');
-            if (!tray || !wrap) return;
-            wrap.innerHTML = '';
-            compareZips.forEach(function (z, i) {
-                var b = document.createElement('button');
-                b.type = 'button';
-                b.className = 'cc' + (i === compareZips.length - 1 ? ' on' : '');
-                b.textContent = z;
-                b.title = 'Remove ' + z;
-                b.onclick = function () {
-                    compareZips = compareZips.filter(function (x) { return x !== z; });
-                    paintCompare();
-                };
-                wrap.appendChild(b);
-            });
-            tray.hidden = false;
-        }
-
-        // 4. Verdict card — the answer before the numbers. Reads /market-score,
-        //    which computes from real data and refuses to score a ZIP with no
-        //    population rather than inventing a confident-looking number.
-        // Per-specialty breakdown labels/order, matching register-provider.html.
-        // ANALYST-FACING ONLY -- market-score's `groups` is provider/market-
-        // opportunity data. patient.js never calls market-score at all; do not
-        // add that call, and do not move this rendering into any patient-facing
-        // file. This dashboard is already behind requireSession() at the top of
-        // this document.
-        var VGROUP_LABEL = {
-            primary: 'Primary Care', specialty: 'Specialty Medicine', surgical: 'Surgical',
-            dental: 'Dental & Vision', behavioral: 'Behavioral Health'
-        };
-        var VGROUP_ORDER = ['primary', 'specialty', 'surgical', 'dental', 'behavioral'];
-
-        function vgroupClass(score) {
-            return score >= 70 ? 'under' : score >= 50 ? 'balanced' : 'served';
-        }
-
-        // Builds the per-specialty block as DOM nodes, not innerHTML -- every
-        // string here (label, reason) ultimately comes from the API response,
-        // and this file's own rule elsewhere is values are placed with
-        // textContent/DOM methods, never interpolated into innerHTML.
-        function buildVgroups(groups, catchment, zip) {
-            var wrap = document.createElement('div');
-            wrap.className = 'vgroups';
-            if (!groups) return null;
-
-            var note = document.createElement('div');
-            note.className = 'vgroups-note';
-            if (groups.available === false) {
-                note.textContent = groups.reason || 'Per-specialty breakdown unavailable for this ZIP.';
-                wrap.appendChild(note);
-                return wrap;
-            }
-            var radius = catchment ? catchment.radius_miles : null;
-            note.textContent = 'Opportunity by specialty' +
-                (radius ? ', within ' + radius + ' miles of ' + zip : '') +
-                ' — modelled from CDC health-measure prevalence, not patient searches.';
-            wrap.appendChild(note);
-
-            var rows = document.createElement('div');
-            rows.className = 'vgroup-rows';
-            var any = false;
-            VGROUP_ORDER.forEach(function (key) {
-                var g = groups[key];
-                if (!g) return;
-                any = true;
-                var row = document.createElement('div');
-                row.className = 'vgroup-row';
-                var name = document.createElement('span');
-                name.className = 'vgname'; name.textContent = VGROUP_LABEL[key] || key;
-                row.appendChild(name);
-                if (!g.available) {
-                    var unserved = document.createElement('span');
-                    unserved.className = 'vgunserved';
-                    unserved.textContent = g.reason || 'no listings nearby';
-                    row.appendChild(unserved);
-                } else {
-                    var chip = document.createElement('span');
-                    chip.className = 'vgchip ' + vgroupClass(g.score);
-                    chip.textContent = g.label + ' · ' + g.score;
-                    row.appendChild(chip);
-                }
-                rows.appendChild(row);
-            });
-            if (!any) return null;
-            wrap.appendChild(rows);
-            return wrap;
-        }
-
-        var verdictReq = 0;
-        function renderVerdict(zip) {
-            var card = document.getElementById('verdict-card');
-            if (!card) return;
-            if (!/^\d{5}$/.test(String(zip || ''))) { card.hidden = true; return; }
-
-            var mine = ++verdictReq;
-            fetch('/.netlify/functions/market-score?zip=' + encodeURIComponent(zip))
-                .then(function (r) { return r.json(); })
-                .then(function (d) {
-                    if (mine !== verdictReq) return;             // a newer ZIP won
-                    if (!d || !d.available) { card.hidden = true; return; }
-
-                    var cls = d.score >= 70 ? 'under' : d.score >= 50 ? 'balanced' : 'served';
-                    var circ = 2 * Math.PI * 31;
-                    var dash = Math.max(0, Math.min(1, d.score / 100)) * circ;
-
-                    card.innerHTML = '';
-                    var ring = document.createElement('div');
-                    ring.className = 'ring';
-                    ring.innerHTML =
-                        '<svg width="74" height="74" viewBox="0 0 74 74">' +
-                        '<circle cx="37" cy="37" r="31" fill="none" stroke="var(--hairline-2)" stroke-width="6"></circle>' +
-                        '<circle cx="37" cy="37" r="31" fill="none" stroke="var(--a1)" stroke-width="6" stroke-linecap="round"' +
-                        ' stroke-dasharray="' + dash.toFixed(1) + ' ' + circ.toFixed(1) + '" transform="rotate(-90 37 37)"></circle></svg>';
-                    var inner = document.createElement('span');
-                    var sc = document.createElement('span'); sc.className = 'vscore'; sc.textContent = d.score;
-                    var cap = document.createElement('span'); cap.className = 'vcap'; cap.textContent = 'OPPORTUNITY';
-                    inner.appendChild(sc); inner.appendChild(cap);
-                    ring.appendChild(inner);
-
-                    var body = document.createElement('div');
-                    body.className = 'vbody';
-                    var lab = document.createElement('span');
-                    lab.className = 'vlabel ' + cls; lab.textContent = d.label;
-                    var find = document.createElement('div');
-                    find.className = 'vfind'; find.textContent = d.finding || '';
-                    body.appendChild(lab); body.appendChild(find);
-
-                    // Breakdown behind the total: as of 2026-08-19 `providers`
-                    // is organizations + individual physicians merged, so this
-                    // makes that checkable instead of one opaque number. See
-                    // market-score.js's file header for why the merge happened.
-                    // DOM methods, not innerHTML -- same rule buildVgroups
-                    // follows just above: every string here comes from the API.
-                    var m = d.metrics || {};
-                    if (m.organizations != null && m.individual_physicians != null) {
-                        var supply = document.createElement('div');
-                        supply.className = 'vsupply';
-                        var b1 = document.createElement('b'); b1.textContent = m.organizations.toLocaleString();
-                        var b2 = document.createElement('b'); b2.textContent = m.individual_physicians.toLocaleString();
-                        supply.appendChild(b1);
-                        supply.appendChild(document.createTextNode(' organizations · '));
-                        supply.appendChild(b2);
-                        supply.appendChild(document.createTextNode(' individual physicians'));
-                        body.appendChild(supply);
-                    }
-
-                    // Medicare Advantage vs. Original Medicare split, ZIP-level via
-                    // the HUD county crosswalk when available (d.medicare.level ===
-                    // 'zip'), else the state-wide aggregate -- see market-score.js.
-                    // Absent (not zero, not guessed) until an import has run.
-                    if (d.medicare && d.medicare.available) {
-                        var medicare = document.createElement('div');
-                        medicare.className = 'vmedicare';
-                        var b3 = document.createElement('b'); b3.textContent = d.medicare.medicare_advantage_pct + '%';
-                        medicare.appendChild(b3);
-                        var scopeWord = d.medicare.level === 'zip' ? 'in this ZIP' : 'statewide';
-                        medicare.appendChild(document.createTextNode(
-                            ' of Medicare beneficiaries ' + scopeWord + ' are on Medicare Advantage (' + d.medicare.as_of + ')'));
-                        body.appendChild(medicare);
-                    }
-
-                    var src = document.createElement('div');
-                    src.className = 'vsrc';
-                    src.textContent = 'Sources: ' + (d.sources || []).join(' · ');
-                    body.appendChild(src);
-
-                    card.appendChild(ring); card.appendChild(body);
-                    var vgroups = buildVgroups(d.groups, d.catchment, zip);
-                    if (vgroups) card.appendChild(vgroups);
-                    card.hidden = false;
-                })
-                .catch(function () { card.hidden = true; });
-        }
-
-        // 5. Cluster the markers. 1,500 individually-placed pins stacked into an
-        //    unreadable pile; this groups them by proximity and only resolves to
-        //    individual dots once zoomed in. markercluster is loaded lazily so
-        //    the page does not pay for it before a search happens.
-        var clusterLib = null;
-        function ensureClusterLib() {
-            if (window.L && L.markerClusterGroup) return Promise.resolve(true);
-            if (clusterLib) return clusterLib;
-            clusterLib = new Promise(function (resolve) {
-                var css = document.createElement('link');
-                css.rel = 'stylesheet';
-                css.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
-                document.head.appendChild(css);
-                var js = document.createElement('script');
-                js.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
-                js.onload = function () { resolve(!!(window.L && L.markerClusterGroup)); };
-                js.onerror = function () { resolve(false); };   // fall back to plain markers
-                document.head.appendChild(js);
-            });
-            return clusterLib;
-        }
-
-        function clusterIcon(cluster) {
-            var n = cluster.getChildCount();
-            var size = n > 500 ? 74 : n > 100 ? 60 : n > 20 ? 48 : 38;
-            var label = size >= 60 ? '<small>PROVIDERS</small>' : '';
-            return L.divIcon({
-                className: '',
-                iconSize: [size, size],
-                html: '<div class="pp-cluster" style="width:' + size + 'px;height:' + size + 'px;font-size:' +
-                      Math.round(size * 0.26) + 'px">' + n + label + '</div>'
-            });
-        }
-
     </script>
 </body>
 </html>
