@@ -21,6 +21,7 @@
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AUDIT_ADMIN_KEY
 
 const { scoreProvider } = require('./lib/accuracy-signals.js');
+const { geocode } = require('./lib/geocode.js');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +34,6 @@ const MAX_NPIS = 25;
 const NPPES_CONCURRENCY = 6;
 const NPPES_TIMEOUT = 6000;
 const SUPABASE_TIMEOUT = 6000;
-const GEOCODE_TIMEOUT = 5000;
 
 // Stop starting new work at this point and persist what we have. Well inside
 // the 26s kill, leaving room for the writes that follow.
@@ -103,28 +103,6 @@ async function nppesLookup(npi) {
       city: loc.city || '', state: loc.state || '', zip: (loc.postal_code || '').slice(0, 5)
     };
   } catch { return null; }   // unreachable NPPES is unknown, never "clean"
-}
-
-async function geocode(query) {
-  if (!query || !query.trim()) return null;
-  try {
-    const r = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=1&q=${encodeURIComponent(query)}`,
-      { headers: { 'User-Agent': 'ProviderPulse/1.0 (directory accuracy audit)' }, signal: AbortSignal.timeout(GEOCODE_TIMEOUT) }
-    );
-    const d = await r.json();
-    if (Array.isArray(d) && d[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
-  } catch { /* fall through */ }
-  try {
-    const r = await fetch(
-      `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1&lang=en`,
-      { signal: AbortSignal.timeout(GEOCODE_TIMEOUT) }
-    );
-    const d = await r.json();
-    const c = d && d.features && d.features[0] && d.features[0].geometry && d.features[0].geometry.coordinates;
-    if (c) return { lat: c[1], lng: c[0] };
-  } catch { /* give up */ }
-  return null;
 }
 
 /* --------------------------------------------------------------- supabase */

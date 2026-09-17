@@ -8,6 +8,7 @@
 // (service role is used only to read published fields of registered providers)
 
 const { requestZipEnrichment } = require('./lib/zip-enrichment');
+const { geocode: geocodeAddress } = require('./lib/geocode');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -286,27 +287,11 @@ async function claimedInZip(env, zip) {
   } catch { return []; }
 }
 
-// Server-side geocoding, Nominatim first (accurate for US), Photon fallback
+// Builds the query string, then hands off to the shared geocoder
+// (lib/geocode.js) — see that file for the Google/Nominatim chain.
 async function geocode(provider) {
   const query = `${provider.address}, ${provider.city}, ${provider.state} ${provider.zip}`;
-  try {
-    const r = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=1&q=${encodeURIComponent(query)}`,
-      { headers: { 'User-Agent': 'ProviderPulse/1.0 (healthcare provider directory)' }, signal: AbortSignal.timeout(5000) }
-    );
-    const data = await r.json();
-    if (Array.isArray(data) && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  } catch { /* try photon */ }
-  try {
-    const r = await fetch(
-      `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1&lang=en`,
-      { signal: AbortSignal.timeout(5000) }
-    );
-    const data = await r.json();
-    const c = data && data.features && data.features[0] && data.features[0].geometry && data.features[0].geometry.coordinates;
-    if (c) return { lat: c[1], lng: c[0] };
-  } catch { /* give up */ }
-  return null;
+  return geocodeAddress(query);
 }
 
 /**

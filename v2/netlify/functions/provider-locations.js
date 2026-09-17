@@ -32,36 +32,20 @@ const FIELDS = [
 
 const MAX_LOCATIONS = 25;
 
+const { geocode: geocodeAddress } = require('./lib/geocode');
+
 function pick(obj, keys) {
   const out = {};
   for (const k of keys) if (k in obj) out[k] = obj[k];
   return out;
 }
 
-// Same two-provider chain patient-match.js uses: Nominatim first, Photon as the
-// fallback. Kept to a 5s budget each so a slow geocoder cannot push this
-// function toward the 26s kill.
+// Builds the query string this address's parts represent, then hands off to
+// the shared geocoder (lib/geocode.js) — see that file for the Google/
+// Nominatim chain and why Photon isn't a third tier here.
 async function geocode(parts) {
   const query = [parts.address_line, parts.city, parts.state, parts.zip].filter(Boolean).join(', ');
-  if (!query.trim()) return null;
-  try {
-    const r = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=1&q=${encodeURIComponent(query)}`,
-      { headers: { 'User-Agent': 'ProviderPulse/1.0 (healthcare provider directory)' }, signal: AbortSignal.timeout(5000) }
-    );
-    const data = await r.json();
-    if (Array.isArray(data) && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  } catch { /* try photon */ }
-  try {
-    const r = await fetch(
-      `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1&lang=en`,
-      { signal: AbortSignal.timeout(5000) }
-    );
-    const data = await r.json();
-    const c = data && data.features && data.features[0] && data.features[0].geometry && data.features[0].geometry.coordinates;
-    if (c) return { lat: c[1], lng: c[0] };
-  } catch { /* give up */ }
-  return null;
+  return query.trim() ? geocodeAddress(query) : null;
 }
 
 // Attach coordinates when we can. A failed geocode is recorded as
