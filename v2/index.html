@@ -353,15 +353,17 @@
         var _t = document.documentElement.getAttribute('data-theme');
         var _light = _t === 'light' || (!_t && window.matchMedia &&
                      window.matchMedia('(prefers-color-scheme: light)').matches);
-        // CARTO's free basemaps.cartocdn.com tiles now require an API key
-        // (every tile comes back watermarked "API KEY REQUIRED") — switched
-        // to Esri's no-key Canvas basemap, base + label reference stacked to match.
-        var _style = _light ? 'Light_Gray' : 'Dark_Gray';
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_' + _style + '_Base/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19, attribution: '&copy; Esri'
-        }).addTo(map);
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_' + _style + '_Reference/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19
+        // CARTO's free basemaps.cartocdn.com tiles started requiring an API
+        // key (every tile watermarked "API KEY REQUIRED"), and Esri's no-key
+        // Canvas basemap that replaced it throttles real browser traffic the
+        // same way ("Map data not yet available" tiles). MapTiler's free tier
+        // (10k tile loads/mo, no card) is the stable option — MAPTILER_KEY is
+        // a client-side map key, restricted by domain in the MapTiler
+        // dashboard, same publishable-key posture as SUPABASE_KEY below.
+        var MAPTILER_KEY = '5LQ8tmZJYC4eWN4l4hdi';
+        var _style = _light ? 'dataviz' : 'dataviz-dark';
+        L.tileLayer('https://api.maptiler.com/maps/' + _style + '/256/{z}/{x}/{y}.png?key=' + MAPTILER_KEY, {
+            maxZoom: 19, attribution: '&copy; MapTiler &copy; OpenStreetMap contributors'
         }).addTo(map);
 
         let groupedData = {}, markers = [], currentlyVisiblePractices = [];

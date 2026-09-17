@@ -514,14 +514,14 @@ function initMap(canvas, note) {
 
     var map = L.map(canvas, { zoomControl: true, attributionControl: true }).setView(center, recs.length ? 12 : 4);
     mapState.map = map;
-    // CARTO's free basemaps.cartocdn.com tiles now require an API key (every
-    // tile comes back watermarked "API KEY REQUIRED") — switched to Esri's
-    // no-key Canvas basemap, base + label reference stacked to match.
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-      attribution: '&copy; Esri', maxZoom: 19
-    }).addTo(map);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 19
+    // CARTO's free basemaps.cartocdn.com tiles started requiring an API key
+    // (every tile watermarked "API KEY REQUIRED"), and Esri's no-key Canvas
+    // basemap that replaced it throttles real browser traffic the same way
+    // ("Map data not yet available" tiles). MapTiler's free tier (10k tile
+    // loads/mo, no card) is the stable option — MAPTILER_KEY is a client-side
+    // map key, restricted by domain in the MapTiler dashboard.
+    L.tileLayer('https://api.maptiler.com/maps/dataviz-dark/256/{z}/{x}/{y}.png?key=5LQ8tmZJYC4eWN4l4hdi', {
+      attribution: '&copy; MapTiler &copy; OpenStreetMap contributors', maxZoom: 19
     }).addTo(map);
 
     var bounds = [];
