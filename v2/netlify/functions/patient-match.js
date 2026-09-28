@@ -183,14 +183,16 @@ async function registeredByNpi(env, npis) {
     Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
   };
   try {
-    // Listings flagged by OIG exclusion screening must not be recommended to a
-    // patient. Falls back if the review column has not been added yet.
+    // Only screened-clear listings may be recommended: 'pending' awaits review
+    // and 'blocked' is a confirmed OIG exclusion (not.eq.pending let 'blocked'
+    // through). Falls back ONLY on a 400, i.e. the review column has not been
+    // added yet -- a timeout or 5xx must not unmask flagged listings.
     const sel = 'select=id,npi,accepting_new_patients,telehealth';
     let res = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=in.(${list.join(',')})&review_status=not.eq.pending&${sel}`,
+      `${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=in.(${list.join(',')})&review_status=eq.clear&${sel}`,
       { headers: svc, signal: AbortSignal.timeout(5000) }
     );
-    if (!res.ok) {
+    if (res.status === 400) {
       res = await fetch(
         `${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=in.(${list.join(',')})&${sel}`,
         { headers: svc, signal: AbortSignal.timeout(5000) }
@@ -264,7 +266,7 @@ async function claimedInZip(env, zip) {
   if (!/^\d{5}$/.test(String(zip || '')) || !env.SUPABASE_SERVICE_ROLE_KEY) return [];
   try {
     const res = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/provider_profiles?zip=eq.${zip}&review_status=not.eq.pending` +
+      `${env.SUPABASE_URL}/rest/v1/provider_profiles?zip=eq.${zip}&review_status=eq.clear` +
       `&select=npi,org_name,first_name,last_name,address_line,city,state,zip,phone,taxonomy_desc&limit=20`,
       {
         headers: {
@@ -464,7 +466,9 @@ exports.handler = async (event) => {
       }
     : {
         first_name: p.first_name || 'there',
-        zip: p.zip || 'unknown',
+        // effectiveZip, not p.zip: a ZIP typed in chat is what was searched,
+        // and telling the model 'unknown' made it ask for a ZIP it already had.
+        zip: effectiveZip || 'unknown',
         insurance: p.insurance_payer || 'not specified',
         conditions: p.conditions || [],
         concern_description: p.concern_description || ''
@@ -545,3 +549,6 @@ ${specialty
     return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'The assistant is unavailable right now, please try again in a moment.' }) };
   }
 };
+
+// Exported for scripts/test-claimed-relevance.mjs only.
+exports.practisesAny = practisesAny;

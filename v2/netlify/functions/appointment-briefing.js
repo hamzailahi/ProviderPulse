@@ -153,6 +153,14 @@ exports.handler = async (event) => {
   const appt = Array.isArray(apptRows) && apptRows[0];
   if (!appt) return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'No such appointment' }) };
 
+  // A briefing hands the provider the patient's DOB, conditions and approved
+  // document facts. Only once the provider has actually confirmed the visit:
+  // before this check, any provider a patient merely REQUESTED (or who had
+  // declined, or been cancelled on) could pull that PHI.
+  if (appt.status !== 'confirmed' && appt.status !== 'completed') {
+    return { statusCode: 409, headers: CORS, body: JSON.stringify({ error: 'A briefing is available once the appointment is confirmed' }) };
+  }
+
   const svcHeaders = svc(env);
 
   const profRes = await fetch(

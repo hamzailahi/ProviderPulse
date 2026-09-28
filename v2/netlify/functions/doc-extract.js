@@ -193,7 +193,6 @@ exports.handler = async (event) => {
     });
     clearTimeout(timer);
     if (!aiRes.ok) {
-      const detail = await aiRes.text().catch(() => '');
       return await fail('The reader is unavailable right now. Your file was saved — try again in a moment.', 502);
     }
     const aiData = await aiRes.json();

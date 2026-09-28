@@ -90,6 +90,14 @@ exports.handler = async (event) => {
   const missingTable = (res, text) =>
     res.status === 404 || /relation .*provider_locations.* does not exist/i.test(text || '');
 
+  // Migration 006 allows one primary per provider (a partial unique index), so
+  // promoting a location has to demote the current primary first, or the write
+  // fails on the index and the provider sees a raw Postgres error.
+  const demoteOtherPrimaries = (exceptId) => fetch(
+    `${BASE}?provider_id=eq.${user.id}&is_primary=is.true` + (exceptId ? `&id=neq.${encodeURIComponent(exceptId)}` : ''),
+    { method: 'PATCH', headers: H, body: JSON.stringify({ is_primary: false }) }
+  );
+
   try {
     if (event.httpMethod === 'GET') {
       const r = await fetch(`${BASE}?provider_id=eq.${user.id}&select=*&order=is_primary.desc,created_at.asc`, { headers: H });
@@ -123,6 +131,7 @@ exports.handler = async (event) => {
       row.verified = false;
       // The first location a provider adds becomes primary; after that they choose.
       if (!Array.isArray(existing) || existing.length === 0) row.is_primary = true;
+      else if (row.is_primary === true) await demoteOtherPrimaries(null);
       await withCoords(row);
 
       const r = await fetch(BASE, { method: 'POST', headers: { ...H, Prefer: 'return=representation' }, body: JSON.stringify(row) });
@@ -157,6 +166,7 @@ exports.handler = async (event) => {
         row.geocoded = geo.geocoded;
       }
       row.updated_at = new Date().toISOString();
+      if (row.is_primary === true) await demoteOtherPrimaries(id);
 
       // provider_id in the filter as well as RLS: defence in depth, and it
       // makes the intent obvious to anyone reading the query.

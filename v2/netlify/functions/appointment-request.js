@@ -24,6 +24,10 @@ const CORS = {
   'Content-Type': 'application/json'
 };
 
+// Ids are spliced into PostgREST filters, one of them under the service role,
+// so anything that is not a plain UUID is rejected before it reaches a URL.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const PATIENT_TRANSITIONS = { requested: ['cancelled'], confirmed: ['cancelled'] };
 const PROVIDER_TRANSITIONS = { requested: ['confirmed', 'declined'], confirmed: ['completed', 'declined'] };
 
@@ -83,7 +87,7 @@ exports.handler = async (event) => {
     catch { return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
     const providerId = String(body.provider_id || '').trim();
-    if (!providerId) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'provider_id required' }) };
+    if (!UUID_RE.test(providerId)) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'provider_id required' }) };
 
     // A patient's JWT cannot read provider_profiles (self-only RLS), so this
     // existence check has to run under the service role. It only confirms
@@ -127,7 +131,7 @@ exports.handler = async (event) => {
 
     const id = String(body.id || '').trim();
     const nextStatus = String(body.status || '').trim();
-    if (!id || !nextStatus) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'id and status required' }) };
+    if (!UUID_RE.test(id) || !nextStatus) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'id and status required' }) };
 
     const getRes = await fetch(`${env.SUPABASE_URL}/rest/v1/appointment_requests?id=eq.${id}&select=*`, { headers: userHeaders });
     const rows = getRes.ok ? await getRes.json().catch(() => []) : [];

@@ -122,8 +122,8 @@ exports.handler = async (event) => {
 
   const patch = action === 'clear'
     ? { review_status: 'clear', review_reason: null }
-    // 'blocked' is not 'pending', so providers-public and patient-match keep
-    // hiding it — but it is distinguishable from never-reviewed in the data.
+    // providers-public and patient-match publish only review_status='clear',
+    // so 'blocked' stays hidden, and it is distinguishable from never-reviewed.
     : { review_status: 'blocked', review_reason: String(body.note || 'Confirmed OIG exclusion').slice(0, 300) };
 
   const res = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=eq.${npi}`, {

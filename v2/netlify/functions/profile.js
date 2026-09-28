@@ -90,10 +90,16 @@ exports.handler = async (event) => {
       const existsRes = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?id=eq.${user.id}&select=id`, { headers: userHeaders });
       const existsRows = await existsRes.json().catch(() => []);
       if (!Array.isArray(existsRows) || existsRows.length === 0) {
+        // Never seed a provider row here. user_metadata (role AND npi) is
+        // writable by the account holder via /auth/v1/user with the public
+        // publishable key, so seeding from it let anyone claim any NPI without
+        // the NPPES name match in auth-register-provider.js. A provider row
+        // only ever comes from that verified registration path.
+        if (role === 'provider') {
+          return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'No provider listing on this account. Register your NPI first.' }) };
+        }
         // Insert via service role: RLS intentionally grants no self-insert policy
-        const seed = role === 'provider'
-          ? { id: user.id, npi: (user.user_metadata || {}).npi || null }
-          : { id: user.id };
+        const seed = { id: user.id };
         const seedRes = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}`, {
           method: 'POST',
           headers: {

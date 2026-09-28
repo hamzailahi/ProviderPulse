@@ -47,7 +47,7 @@ async function pagedAll(url, key, headers) {
     const seek = cursor === '' ? '' : `&${key}=gt.${encodeURIComponent(cursor)}`;
     const res = await fetch(`${url}${seek}&order=${key}&limit=1000`,
       { headers, signal: AbortSignal.timeout(6000) });
-    if (!res.ok) return { rows, ok: rows.length > 0, truncated: false };
+    if (!res.ok) return { rows, ok: rows.length > 0, truncated: false, status: res.status };
     const batch = await res.json();
     if (!Array.isArray(batch) || !batch.length) return { rows, ok: true, truncated: false };
     rows.push(...batch);
@@ -89,10 +89,14 @@ exports.handler = async (event) => {
   const filter = wantAll ? 'npi=not.is.null' : `npi=in.(${npis.join(',')})`;
   const inList = `(${npis.join(',')})`;
 
-  // Listings flagged by exclusion screening stay unpublished until reviewed. If the
-  // review column does not exist yet the query 400s, so fall back to the unfiltered
-  // form — before that migration there is nothing flagged to hide.
-  const REVIEW_FILTER = 'review_status=not.eq.pending';
+  // Only listings that passed exclusion screening are published: 'pending' is
+  // awaiting review and 'blocked' is a confirmed OIG exclusion. This used to be
+  // not.eq.pending, which let 'blocked' through -- the one state that must
+  // never reach a patient. If the review column does not exist yet (migration
+  // 004 not run) the query 400s, and only THAT falls back to the unfiltered
+  // form: before the migration there is nothing flagged to hide. A timeout or
+  // 5xx must not, or a flaky request would publish flagged listings.
+  const REVIEW_FILTER = 'review_status=eq.clear';
 
   let truncated = false;
 
@@ -102,13 +106,13 @@ exports.handler = async (event) => {
       let page = await pagedAll(
         `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&${REVIEW_FILTER}&select=${PUBLIC_COLUMNS}`,
         'npi', svc);
-      if (!page.ok) {
+      if (!page.ok && page.status === 400) {
         page = await pagedAll(
           `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&select=${PUBLIC_COLUMNS}`, 'npi', svc);
       }
       // Neither worked: retry without the availability columns, in case
       // migration 005 has not been applied yet.
-      if (!page.ok) {
+      if (!page.ok && page.status === 400) {
         page = await pagedAll(
           `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&select=${BASE_COLUMNS}`, 'npi', svc);
       }
@@ -120,7 +124,7 @@ exports.handler = async (event) => {
         `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&${REVIEW_FILTER}&select=${PUBLIC_COLUMNS}`,
         { headers: svc, signal: AbortSignal.timeout(6000) }
       );
-      if (!profRes.ok) {
+      if (profRes.status === 400) {
         profRes = await fetch(
           `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&select=${PUBLIC_COLUMNS}`,
           { headers: svc, signal: AbortSignal.timeout(6000) }
@@ -128,7 +132,7 @@ exports.handler = async (event) => {
       }
       // Neither worked: retry without the availability columns, in case migration
       // 005 has not been applied yet.
-      if (!profRes.ok) {
+      if (profRes.status === 400) {
         profRes = await fetch(
           `${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&select=${BASE_COLUMNS}`,
           { headers: svc, signal: AbortSignal.timeout(6000) }
@@ -167,16 +171,30 @@ exports.handler = async (event) => {
     // providers alone can produce 1000 insurance rows), and the URL-length
     // limit of putting thousands of UUIDs in one query string. Chunking the
     // `in.()` list AND paging each chunk's response handles both.
+    //
+    // Paged by OFFSET within a chunk, not by pagedAll's keyset: provider_id is
+    // not unique in these tables (one provider has many payers), so a
+    // `provider_id=gt.<last>` cursor skipped every remaining row of whichever
+    // provider straddled a 1000-row page boundary. A chunk is at most
+    // 100 providers x 50 payers, so the offsets stay small. `order` adds a
+    // tiebreaker after provider_id so OFFSET pages are stable.
     const ID_BATCH = 100;
-    async function fetchByProviderIds(table, selectCols) {
+    async function fetchByProviderIds(table, selectCols, order) {
       const out = [];
       for (let i = 0; i < ids.length; i += ID_BATCH) {
         const chunk = ids.slice(i, i + ID_BATCH);
         const inClause = `(${chunk.map(x => `"${x}"`).join(',')})`;
-        const page = await pagedAll(
-          `${env.SUPABASE_URL}/rest/v1/${table}?provider_id=in.${inClause}&select=${selectCols}`,
-          'provider_id', svc);
-        out.push(...page.rows);
+        for (let offset = 0; offset < ALL_PAGE_CAP; offset += 1000) {
+          const res = await fetch(
+            `${env.SUPABASE_URL}/rest/v1/${table}?provider_id=in.${inClause}&select=${selectCols}` +
+            `&order=${order}&limit=1000&offset=${offset}`,
+            { headers: svc, signal: AbortSignal.timeout(6000) });
+          if (!res.ok) break;
+          const batch = await res.json();
+          if (!Array.isArray(batch) || !batch.length) break;
+          out.push(...batch);
+          if (batch.length < 1000) break;
+        }
       }
       return out;
     }
@@ -184,7 +202,7 @@ exports.handler = async (event) => {
     const payersByNpi = {};
     const ids = Object.keys(npiById);
     if (ids.length) {
-      const insRows = await fetchByProviderIds('provider_insurance', 'provider_id,payer_name');
+      const insRows = await fetchByProviderIds('provider_insurance', 'provider_id,payer_name', 'provider_id,payer_name');
       for (const row of insRows) {
         const npi = npiById[row.provider_id];
         if (!npi || !row.payer_name) continue;
@@ -200,7 +218,7 @@ exports.handler = async (event) => {
     const locsByNpi = {};
     if (ids.length) {
       try {
-        const locRows = await fetchByProviderIds('provider_locations', LOCATION_COLUMNS);
+        const locRows = await fetchByProviderIds('provider_locations', LOCATION_COLUMNS, 'provider_id,address_line,label');
         for (const row of locRows) {
           const npi = npiById[row.provider_id];
           if (!npi) continue;

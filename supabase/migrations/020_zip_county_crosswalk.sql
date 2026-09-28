@@ -44,5 +44,6 @@ alter table public.zip_county_crosswalk enable row level security;
 -- Public reference data (HUD/Census geography, not PHI), same posture as
 -- insurance_payers, hpsa_designations and medicare_county_enrollment:
 -- readable by anyone, written only by the import script's service role.
+drop policy if exists "zip county crosswalk is public" on public.zip_county_crosswalk;
 create policy "zip county crosswalk is public" on public.zip_county_crosswalk
   for select using (true);

@@ -6,8 +6,11 @@ exports.handler = async function(event, context) {
     }
 
     const npi = event.queryStringParameters?.npi;
-    if (!npi) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'NPI required' }) };
+    // Strict 10 digits: this value is spliced into the NPPES query string, so
+    // anything else (e.g. "1&limit=200&state=TX") turned the endpoint into an
+    // open NPPES search proxy.
+    if (!npi || !/^\d{10}$/.test(npi)) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Valid 10-digit NPI required' }) };
     }
 
     const url = `https://npiregistry.cms.hhs.gov/api/?version=2.1&number=${npi}&limit=1`;

@@ -4,19 +4,11 @@
 //
 // node scripts/test-claimed-relevance.mjs
 
-const taxNorm = s => String(s || '')
-  .toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
-
-function practisesAny(specialty, terms) {
-  const s = taxNorm(specialty);
-  if (!s) return false;
-  for (const t of (terms || [])) {
-    const term = taxNorm(t);
-    if (!term) continue;
-    if ((' ' + s).includes(' ' + term) || (' ' + term).includes(' ' + s)) return true;
-  }
-  return false;
-}
+// Tests the real function, not a copy: a pasted duplicate here would keep
+// passing even after patient-match.js drifted away from it.
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { practisesAny } = require('../v2/netlify/functions/patient-match.js');
 
 let pass = 0, fail = 0;
 const check = (l, c, d) => { if (c) { pass++; console.log(`  PASS  ${l}`); } else { fail++; console.log(`  FAIL  ${l}${d ? '\n        ' + d : ''}`); } };

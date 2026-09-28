@@ -31,5 +31,6 @@ alter table public.medicare_county_enrollment enable row level security;
 -- Public aggregate data (CMS county-level counts, not PHI), same posture as
 -- insurance_payers and hpsa_designations: readable by anyone, written only by
 -- the import script's service role.
+drop policy if exists "medicare enrollment is public" on public.medicare_county_enrollment;
 create policy "medicare enrollment is public" on public.medicare_county_enrollment
   for select using (true);

@@ -81,8 +81,12 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body || '{}'); }
   catch { return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const accepted = [...new Set((Array.isArray(body.accept) ? body.accept : []).map(String))].slice(0, 40);
-  const rejected = [...new Set((Array.isArray(body.reject) ? body.reject : []).map(String))].slice(0, 40);
+  // Fact ids are quoted into an in.(...) filter run under the service role, so
+  // only plain UUIDs are allowed through.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const ids = v => [...new Set((Array.isArray(v) ? v : []).map(String).filter(x => UUID_RE.test(x)))].slice(0, 40);
+  const accepted = ids(body.accept);
+  const rejected = ids(body.reject);
   if (!accepted.length && !rejected.length) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Nothing to apply' }) };
   }
