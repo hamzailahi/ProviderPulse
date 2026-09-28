@@ -25,12 +25,15 @@ on conflict (id) do update
 
 -- Objects are stored at  <auth.uid()>/<document_id>.<ext>  so the first path
 -- segment is the owner. Every policy below keys off that.
+drop policy if exists "own docs: read" on storage.objects;
 create policy "own docs: read" on storage.objects for select
   using (bucket_id = 'patient-docs' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "own docs: insert" on storage.objects;
 create policy "own docs: insert" on storage.objects for insert
   with check (bucket_id = 'patient-docs' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "own docs: delete" on storage.objects;
 create policy "own docs: delete" on storage.objects for delete
   using (bucket_id = 'patient-docs' and (storage.foldername(name))[1] = auth.uid()::text);
 
@@ -76,14 +79,19 @@ alter table public.patient_document_facts enable row level security;
 
 -- Self-only, matching the patient_profiles model. No insert policy: rows are
 -- created by functions under the service role, exactly as profile rows are.
+drop policy if exists "own documents: select" on public.patient_documents;
 create policy "own documents: select" on public.patient_documents
   for select using (auth.uid() = patient_id);
+drop policy if exists "own documents: delete" on public.patient_documents;
 create policy "own documents: delete" on public.patient_documents
   for delete using (auth.uid() = patient_id);
 
+drop policy if exists "own facts: select" on public.patient_document_facts;
 create policy "own facts: select" on public.patient_document_facts
   for select using (auth.uid() = patient_id);
+drop policy if exists "own facts: update" on public.patient_document_facts;
 create policy "own facts: update" on public.patient_document_facts
   for update using (auth.uid() = patient_id) with check (auth.uid() = patient_id);
+drop policy if exists "own facts: delete" on public.patient_document_facts;
 create policy "own facts: delete" on public.patient_document_facts
   for delete using (auth.uid() = patient_id);

@@ -68,7 +68,7 @@ exports.handler = async (event) => {
   const filename = String(body.filename || 'document').trim().slice(0, 200);
 
   if (!ALLOWED[mime]) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Upload a PDF or a photo (JPEG, PNG, HEIC or WebP).' }) };
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Upload a PDF or a photo (JPEG, PNG, WebP or GIF).' }) };
   }
   if (!Number.isFinite(size) || size <= 0 || size > MAX_BYTES) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Files must be under 15 MB.' }) };

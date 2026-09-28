@@ -428,6 +428,41 @@
         const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
         const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
 
+        // ── Session for the AI endpoints ─────────────────────────────
+        // ai-query and report-generate require a signed-in caller (they spend
+        // the Anthropic key), so send the stored access token. Refreshed first
+        // when it is about to expire, since an analyst can sit on this page for
+        // longer than a token lives. Supabase rotates the refresh token, so the
+        // new pair is written back to the same store it came from.
+        async function authHeaders() {
+            const KEY = 'pp.session.v1';
+            let store = null, s = null;
+            try {
+                store = sessionStorage.getItem(KEY) ? sessionStorage
+                      : localStorage.getItem(KEY) ? localStorage : null;
+                s = JSON.parse((store && store.getItem(KEY))
+                    || sessionStorage.getItem('pp.patient.v1')
+                    || localStorage.getItem('pp.patient.v1') || 'null');
+            } catch (e) { s = null; }
+            if (!s || !s.access_token) return {};
+            if (s.refresh_token && s.expiresAt && s.expiresAt - 60000 < Date.now()) {
+                try {
+                    const r = await fetch('/.netlify/functions/auth-refresh', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ refresh_token: s.refresh_token })
+                    });
+                    if (r.ok) {
+                        const d = await r.json();
+                        s = { access_token: d.access_token, refresh_token: d.refresh_token,
+                              role: d.role || s.role, expiresAt: Date.now() + (d.expires_in || 3600) * 1000 };
+                        (store || sessionStorage).setItem(KEY, JSON.stringify(s));
+                    }
+                } catch (e) { /* fall through with the old token; the server answers 401 */ }
+            }
+            return { Authorization: 'Bearer ' + s.access_token };
+        }
+
         // ── Autocomplete ─────────────────────────────────────────────
         let autocompleteTimer = null;
         const acList = document.getElementById('autocomplete-list');
@@ -1443,7 +1478,7 @@
                 // bindPopup() so the HTML is only built the first time a given popup opens.
                 function buildPopupHtml() {
                     let popupHtml = `<div class="popup-content" style="min-width:220px;">
-                    <b style="font-size:12px;">${items.length === 1 ? items[0].address : 'Multiple Practices at this Location'}</b>
+                    <b style="font-size:12px;">${items.length === 1 ? escHtml(items[0].address) : 'Multiple Practices at this Location'}</b>
                     <hr style="margin:5px 0;border-color:var(--border);"/>`;
 
                     items.forEach(item => {
@@ -1455,14 +1490,14 @@
                             ? `<div style="display:inline-block;margin-bottom:3px;padding:1px 6px;border-radius:8px;background:var(--bg-hover,#21293a);color:var(--text-secondary);font-size:9px;">ADDITIONAL PRACTICE LOCATION</div><br/>`
                             : '';
                         const affiliationNote = (item.practice._src === 'individual' && clinicHere && clinicHere.practice['Name'] !== item.practice['Name'])
-                            ? `<span style="color:var(--text-muted);font-size:10px;">May practice at ${clinicHere.practice['Name']}</span><br/>`
+                            ? `<span style="color:var(--text-muted);font-size:10px;">May practice at ${escHtml(clinicHere.practice['Name'])}</span><br/>`
                             : '';
                         popupHtml += `
                     <div style="margin-bottom:10px;" id="clinic-${npi}">
                         ${recBadge}${secondaryBadge}
-                        <strong style="font-size:12px;">${item.practice['Name'] || '—'}</strong><br/>
-                        <span style="color:var(--text-secondary);font-size:11px;">${item.practice['Primary Taxonomy'] || '—'}</span><br/>
-                        ${items.length > 1 ? `<span style="color:var(--text-muted);font-size:10px;">${item.address}</span><br/>` : ''}
+                        <strong style="font-size:12px;">${escHtml(item.practice['Name'] || '—')}</strong><br/>
+                        <span style="color:var(--text-secondary);font-size:11px;">${escHtml(item.practice['Primary Taxonomy'] || '—')}</span><br/>
+                        ${items.length > 1 ? `<span style="color:var(--text-muted);font-size:10px;">${escHtml(item.address)}</span><br/>` : ''}
                         ${affiliationNote}
                         <span style="color:var(--text-muted);font-size:10px;">NPI: ${npi}</span><br/>
                         <div id="nppes-${npi}" style="margin-top:4px;font-size:11px;color:var(--text-secondary);">
@@ -2526,6 +2561,12 @@
         })();
 
 
+        // Text -> HTML-safe string, for values interpolated into innerHTML/popups.
+        function escHtml(v) {
+            return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
         // --- NPPES ENRICHMENT ---
         const nppesCache = {}; // cache by NPI to avoid repeat calls
         const cmsCache = {}; // cache CMS provider data by NPI
@@ -2836,7 +2877,7 @@
                 // (An empty selectedTaxonomies means "no filter" to renderMap, so use a
                 // sentinel value that no real taxonomy can equal.)
                 console.warn('[deeplink] no stored taxonomy matched', wantTax);
-                selectedTaxonomies = new Set([' no-match']);
+                selectedTaxonomies = new Set(['\u0000no-match']);
                 document.querySelectorAll('.tax-chk').forEach(chk => { chk.checked = false; });
                 const chkAll = document.getElementById('chk-all');
                 if (chkAll) chkAll.checked = false;
@@ -2927,7 +2968,7 @@
             try {
                 const r = await fetch('/.netlify/functions/ai-query', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
                     body: JSON.stringify({ mode: 'market_memo', question: q })
                 });
                 const d = await r.json();
@@ -3125,7 +3166,7 @@
 
                 addressPin = L.marker([lat, lng], { icon: pinIcon })
                     .addTo(map)
-                    .bindPopup(`<div style="font-size:11px;max-width:200px;"><strong>📍 Address</strong><br>${label}</div>`)
+                    .bindPopup(`<div style="font-size:11px;max-width:200px;"><strong>📍 Address</strong><br>${escHtml(label)}</div>`)
                     .openPopup();
 
                 map.flyTo([lat, lng], 16, { animate: true, duration: 1.2 });
@@ -3446,7 +3487,7 @@
 
                 const res = await fetch('/.netlify/functions/report-generate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
                     body: JSON.stringify({
                         question,
                         zips,
@@ -3640,7 +3681,7 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
 
                 const response = await fetch('/.netlify/functions/ai-query', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
                     body: JSON.stringify({
                         system: systemPrompt,
                         messages: [{ role: 'user', content: query }],
@@ -3649,7 +3690,7 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
                 });
 
                 const data = await response.json();
-                const text = data.content?.find(b => b.type === 'text')?.text || 'No response received.';
+                const text = data.content?.find(b => b.type === 'text')?.text || data.error || 'No response received.';
 
                 const loadingEl = document.getElementById(loadingId);
                 if (loadingEl) loadingEl.remove();
@@ -3684,8 +3725,12 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
         }
 
         function markdownToHTML(text) {
+            // Escape first. This renders model output, and the model is fed clinic
+            // names and other third-party text that could carry markup, so raw
+            // HTML in a reply must display as text, never execute.
+            let html = escHtml(text);
+
             // Convert markdown tables
-            let html = text;
 
             // Tables
             const tableRegex = /(\|.+\|\n)+/g;

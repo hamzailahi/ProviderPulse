@@ -1,0 +1,44 @@
+name: Tests
+
+# The only workflow that runs on pull requests. Every other file in this
+# directory is a scheduled data import, so before this the unit tests in
+# scripts/test-*.mjs only ever ran when someone remembered to run them locally.
+# No secrets and no network: everything here is pure and dependency-free.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      # Catches a syntax error in any function before Netlify deploys it.
+      - name: Syntax-check functions, assets and scripts
+        run: |
+          set -euo pipefail
+          for f in v2/netlify/functions/*.js v2/netlify/functions/lib/*.js v2/assets/*.js scripts/*.mjs scripts/lib/*.mjs; do
+            node --check "$f"
+          done
+
+      # Requiring each handler catches a broken require() path or a throw at
+      # module load, which --check alone does not.
+      - name: Load every function
+        run: node -e "for (const f of require('fs').readdirSync('v2/netlify/functions').filter(f => f.endsWith('.js'))) require('./v2/netlify/functions/' + f)"
+
+      - name: Scoring engine
+        run: node scripts/test-accuracy-signals.mjs
+
+      - name: Market-memo query allowlist
+        run: node scripts/test-query-plan.mjs
+
+      - name: Claimed-listing specialty gating
+        run: node scripts/test-claimed-relevance.mjs

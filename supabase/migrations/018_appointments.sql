@@ -56,10 +56,13 @@ alter table public.appointment_briefings enable row level security;
 -- fields each side may change (patient: cancel only; provider: confirm/
 -- decline/complete only) -- the same coarse-RLS-plus-field-whitelist split
 -- profile.js already uses for PROVIDER_FIELDS/PATIENT_FIELDS.
+drop policy if exists "appointment parties: select" on public.appointment_requests;
 create policy "appointment parties: select" on public.appointment_requests
   for select using (auth.uid() = patient_id or auth.uid() = provider_id);
+drop policy if exists "appointment parties: insert" on public.appointment_requests;
 create policy "appointment parties: insert" on public.appointment_requests
   for insert with check (auth.uid() = patient_id);
+drop policy if exists "appointment parties: update" on public.appointment_requests;
 create policy "appointment parties: update" on public.appointment_requests
   for update using (auth.uid() = patient_id or auth.uid() = provider_id)
   with check (auth.uid() = patient_id or auth.uid() = provider_id);
@@ -71,6 +74,7 @@ create policy "appointment parties: update" on public.appointment_requests
 -- rows are written only by a function under the service role, after that
 -- function has independently confirmed the caller is one of the two parties
 -- on the appointment. Read access mirrors that same two-party check.
+drop policy if exists "appointment parties: select briefing" on public.appointment_briefings;
 create policy "appointment parties: select briefing" on public.appointment_briefings
   for select using (
     exists (

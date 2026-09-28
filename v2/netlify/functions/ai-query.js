@@ -1,5 +1,6 @@
 const https = require('https');
 const { validatePlan, buildPath, summarise, TABLES, OPS } = require('./lib/query-plan.js');
+const { getUser } = require('./lib/auth.js');
 
 // ---------------------------------------------------------------------------
 // MARKET MEMO: a two-step agent.
@@ -478,6 +479,13 @@ exports.handler = async function(event, context) {
         const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) return { statusCode: 500, body: JSON.stringify({ error: 'API key not configured' }) };
 
+        // Signed-in callers only. The tool-loop mode below forwards a
+        // client-supplied system prompt to the model, so without this the
+        // endpoint was an open proxy to ANTHROPIC_API_KEY.
+        if (!(await getUser(process.env, event))) {
+            return { statusCode: 401, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Please sign in again to use the assistant.' }) };
+        }
+
         let parsed;
         try { parsed = JSON.parse(event.body); }
         catch(e) { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON in request body' }) }; }
@@ -489,6 +497,9 @@ exports.handler = async function(event, context) {
         }
 
         const { system, messages, clientData } = parsed;
+        if (!Array.isArray(messages) || !messages.length) {
+            return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'messages is required' }) };
+        }
         // The client-supplied system prompt doesn't know about parallel tool
         // calling. These read-only lookups over already-loaded map data never
         // depend on each other, so encourage batching independent calls into
