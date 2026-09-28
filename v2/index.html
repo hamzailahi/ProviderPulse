@@ -25,7 +25,15 @@
                    || sessionStorage.getItem('pp.patient.v1') || localStorage.getItem('pp.patient.v1');
             s = raw ? JSON.parse(raw) : null;
         } catch (e) { s = null; }
-        if (s && s.access_token && !(s.expiresAt && s.expiresAt < Date.now())) return;
+        var live = s && s.access_token &&
+            (!(s.expiresAt && s.expiresAt < Date.now()) || s.refresh_token);   // authHeaders() renews it
+        // The market dashboard is the PROVIDER surface. Patients have their own
+        // map in the patient app (limited to their search and nearby ZIPs), so a
+        // signed-in patient is sent home rather than shown every provider and
+        // the market panels. The server enforces the same rule on the AI
+        // endpoints (lib/auth.js isProvider); this redirect is the UX half.
+        if (live && s.role === 'patient') { location.replace('/'); return; }
+        if (live) return;
         // Carry where they were headed so the deep link survives the detour.
         var back = location.pathname + location.search + location.hash;
         location.replace('/signin?next=' + encodeURIComponent(back));
@@ -3773,39 +3781,18 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
     
         /* ====================================================================
            ROLE-AWARE ENTRY
-           The dashboard is the analyst/provider surface. It previously had no
-           auth check at all, so a signed-in patient landing here got a market
-           tool instead of their own app.
-
-           The deep-link exception matters: the care navigator sends patients
-           here with #zip=/#pin=/#goto= to see their results on the map. Those
-           must keep working for everyone, so the redirect only fires when a
-           patient arrives with no deep link — i.e. they navigated here by hand.
+           Patients never get this far: the sign-in gate in <head> sends them
+           home, because this is the provider's market tool and the patient app
+           has its own, narrower map. What is left here is the provider nicety
+           of a link back to their own listing.
            ==================================================================== */
         (function roleAwareEntry() {
-            var hash = location.hash || '';
-            var deepLink = /^#(zip|pin|goto)=/.test(hash);
-
             var s = null;
             try {
                 s = JSON.parse(sessionStorage.getItem('pp.session.v1')
-                    || localStorage.getItem('pp.session.v1')
-                    || sessionStorage.getItem('pp.patient.v1')
-                    || localStorage.getItem('pp.patient.v1') || 'null');
+                    || localStorage.getItem('pp.session.v1') || 'null');
             } catch (e) { return; }
-            if (!s || !s.role || (s.expiresAt && s.expiresAt < Date.now())) return;
-
-            // Only the PATIENT redirect must stand down for a deep link — that is
-            // how the care navigator hands a patient to the full map, and bouncing
-            // them home would break it. The provider branch below only appends a
-            // link, so it is safe during a deep link and must still run: saving a
-            // provider profile lands on /dashboard#zip=<zip>, so gating on the hash
-            // meant the one path providers actually take never got the link.
-            if (s.role === 'patient') {
-                if (deepLink) return;
-                location.replace('/');
-                return;
-            }
+            if (!s || !s.role) return;
 
             if (s.role === 'provider') {
                 // Signed-in provider: say so, and give them a way back to their listing.

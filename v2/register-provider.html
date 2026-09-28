@@ -106,6 +106,26 @@
       </button>
       <div class="msg" id="locMsg" role="status" aria-live="polite"></div>
     </fieldset>
+
+    <!-- Appointment inbox. Patients request a time from the patient app;
+         the practice confirms, declines or marks it done here. -->
+    <fieldset class="fs" id="apptWrap" style="margin-top:26px">
+      <h2 class="fs-title">Appointment requests</h2>
+      <p class="hint" style="margin:-4px 0 12px">
+        Patients who found you on ProviderPulse. Confirming unlocks a short pre-visit
+        briefing built from what the patient told us and approved.
+      </p>
+      <div id="apptList"><p class="hint">Loading…</p></div>
+      <div class="msg" id="apptMsg" role="status" aria-live="polite"></div>
+    </fieldset>
+
+    <!-- Your area: the provider's view of their market. The map buttons open
+         the full dashboard, which is the provider-only map. -->
+    <fieldset class="fs" id="areaWrap" style="margin-top:26px">
+      <h2 class="fs-title">Your area</h2>
+      <div id="areaDemand"></div>
+      <div id="areaLinks" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"></div>
+    </fieldset>
     <button class="submit" id="acctSave">Save changes</button>
     <button class="submit" id="acctSignOut" type="button"
             style="background:none;border:1px solid var(--hairline-2);color:var(--muted);margin-top:10px">
@@ -497,6 +517,119 @@ $('acctSignOut').onclick = async () => {
   location.reload();
 };
 
+
+// ---------------------------------------------------------------------------
+// Appointment inbox. Every value placed with textContent: patient names and
+// reasons are free text from another user.
+// ---------------------------------------------------------------------------
+const APPT_LABEL = { requested: 'New request', confirmed: 'Confirmed', declined: 'Declined',
+                     cancelled: 'Cancelled by patient', completed: 'Completed' };
+const APPT_ACTIONS = { requested: [['confirmed', 'Confirm'], ['declined', 'Decline']],
+                       confirmed: [['completed', 'Mark completed'], ['declined', 'Decline']] };
+
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  Object.entries(attrs || {}).forEach(([k, v]) => {
+    if (k === 'style') n.style.cssText = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v);
+  });
+  kids.flat().forEach(k => { if (k != null && k !== false) n.append(k instanceof Node ? k : String(k)); });
+  return n;
+}
+const whenText = iso => {
+  if (!iso) return 'No time requested';
+  const d = new Date(iso);
+  return isNaN(d) ? String(iso) : d.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+};
+const ghost = 'background:none;border:1px solid var(--hairline-2);color:var(--text);width:auto;padding:8px 14px;margin:0';
+
+async function loadInbox() {
+  const box = $('apptList');
+  let items = [];
+  try {
+    const r = await fetch(FN + '/appointment-request', { headers: { Authorization: 'Bearer ' + session.access_token } });
+    if (!r.ok) throw new Error();
+    items = (await r.json()).appointments || [];
+  } catch (e) {
+    box.replaceChildren(el('p', { class: 'hint' }, 'Could not load requests just now.'));
+    return;
+  }
+  if (!items.length) {
+    box.replaceChildren(el('p', { class: 'hint' }, 'No requests yet. Patients can request a time from your listing once it is verified.'));
+    return;
+  }
+  // Open items first, newest first within each group.
+  const open = a => (a.status === 'requested' ? 0 : a.status === 'confirmed' ? 1 : 2);
+  items.sort((a, b) => open(a) - open(b));
+  box.replaceChildren(...items.map(a => {
+    const brief = el('div', { style: 'margin-top:8px;font-size:13px;color:var(--muted);white-space:pre-wrap' });
+    const acts = (APPT_ACTIONS[a.status] || []).map(([to, label]) =>
+      el('button', { type: 'button', class: 'submit', style: ghost, onclick: () => moveAppt(a.id, to) }, label));
+    if (a.status === 'confirmed' || a.status === 'completed') {
+      acts.push(el('button', { type: 'button', class: 'submit', style: ghost, onclick: () => showBriefing(a.id, brief) }, 'Pre-visit briefing'));
+    }
+    return el('div', { class: 'loc', style: 'margin-bottom:10px' },
+      el('div', { style: 'display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap' },
+        el('b', {}, a.patient_name || 'Patient'),
+        el('span', { class: 'hint', style: 'margin:0' }, APPT_LABEL[a.status] || a.status)),
+      el('div', { class: 'hint', style: 'margin:4px 0 0' }, whenText(a.requested_time)),
+      a.reason ? el('div', { style: 'margin-top:6px;font-size:13.5px' }, 'Reason: ', a.reason) : null,
+      acts.length ? el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' }, acts) : null,
+      brief);
+  }));
+}
+
+async function moveAppt(id, status) {
+  const r = await fetch(FN + '/appointment-request', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+    body: JSON.stringify({ id, status })
+  });
+  let d = {}; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) { setMsg('apptMsg', d.error || 'Could not update the request', false); return; }
+  setMsg('apptMsg', 'Updated.', true);
+  loadInbox();
+}
+
+async function showBriefing(id, out) {
+  out.textContent = 'Preparing the briefing…';
+  const r = await fetch(FN + '/appointment-briefing', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+    body: JSON.stringify({ appointment_id: id })
+  });
+  let d = {}; try { d = await r.json(); } catch (e) {}
+  const b = d.briefing && d.briefing.summary;
+  out.textContent = r.ok && b ? b.narrative : (d.error || 'The briefing is unavailable right now.');
+}
+
+// ---------------------------------------------------------------------------
+// Your area: local patient demand (demand-stats, small groups suppressed
+// server-side) and two ways into the provider map.
+// ---------------------------------------------------------------------------
+async function loadArea(p) {
+  const zip = String(p.zip || '').trim();
+  const links = $('areaLinks');
+  if (!/^\d{5}$/.test(zip)) {
+    $('areaDemand').replaceChildren(el('p', { class: 'hint' }, 'Add your practice ZIP above to see your area.'));
+    return;
+  }
+  // The dashboard's tax= list is comma-separated and matched at a word
+  // boundary, so pass only the head of an NPPES description like
+  // "Nurse Practitioner, Family" rather than a term the comma would split.
+  const spec = String(p.taxonomy_desc || '').split(',')[0].trim();
+  const btn = (href, label) => el('a', { class: 'submit', href, style: ghost + ';text-decoration:none;display:inline-block' }, label);
+  links.replaceChildren(
+    spec ? btn('/dashboard#zip=' + zip + '&tax=' + encodeURIComponent(spec), 'Map: ' + spec + ' near ' + zip) : null,
+    btn('/dashboard#zip=' + zip, 'Map: all providers near ' + zip));
+
+  const demand = await demandInZip(zip);
+  // demandHtml escapes every API value before it reaches innerHTML.
+  $('areaDemand').innerHTML = demand ? demandHtml(demand)
+    : '<p class="hint">Not enough patient searches in ' + zip + ' yet to show without identifying anyone.</p>';
+}
+
 async function loadAccount() {
   if (!session) return;
   const r = await fetch(FN + '/profile', { headers: { Authorization: 'Bearer ' + session.access_token } });
@@ -520,6 +653,8 @@ async function loadAccount() {
   $('pitchBody').classList.add('hidden');
   $('account').classList.remove('hidden');
   loadLocs();
+  loadInbox();
+  loadArea(p);
   const mine = new Set((insurance || []).map(i => i.payer_name));
   // The plan list is state-specific and loads asynchronously, so fetch this
   // provider's own state before rendering the checkboxes — otherwise PAYERS is

@@ -205,27 +205,6 @@ function api(path, opts) {
   });
 }
 
-/* ---------- map deep link -------------------------------------------------
-   Frozen here on purpose. index.html's handler is strict:
-   - `tax` MUST come from map_taxonomies (clinics.primary_taxonomy vocabulary).
-     Using `taxonomies` matches nothing and the map falls back to every clinic.
-   - `pins` entries are lat,lng,npi,name joined by "|", and the handler splits
-     each on "," taking the rest as the name — so a "|" in a name breaks it.
-   - a non-5-digit zip makes the handler bail silently.
-   -------------------------------------------------------------------------- */
-function mapDeepLink(zip, mapTerms, providers) {
-  if (!/^\d{5}$/.test(String(zip || ''))) return null;
-  var terms = (mapTerms || []).filter(Boolean).join(',');
-  var url = 'index.html#zip=' + encodeURIComponent(zip) + '&tax=' + encodeURIComponent(terms);
-  var list = providers || [];
-  var rec = list.map(function (p) { return p.npi; }).filter(Boolean).join(',');
-  if (rec) url += '&rec=' + encodeURIComponent(rec);
-  var pins = list.filter(function (p) { return p.lat && p.lng; }).map(function (p) {
-    return [p.lat, p.lng, p.npi || '', String(p.name || '').replace(/[|,]/g, ' ')].join(',');
-  }).join('|');
-  if (pins) url += '&pins=' + encodeURIComponent(pins);
-  return url;
-}
 /* ---------- in-app map ----------------------------------------------------
    The map is a sheet inside the app, not a jump to the analyst dashboard.
    Leaflet is loaded on first open so the conversation home pays nothing for it.
@@ -271,10 +250,11 @@ function taxMatches(stored, terms) {
 // The analyst dashboard's "+ Add Neighbors" loads every adjacent ZIP, which is
 // the right tool for sizing a market. It is the wrong one for a patient: it
 // buries the ZIP they asked about under hundreds of pins from places they were
-// never going to drive to. This is capped at the TWO NEAREST ZIPs instead —
-// enough to rescue a sparse rural ZIP, small enough that the map still answers
-// "who is near me". The dashboard's neighbor logic is separate and untouched.
-var PATIENT_NEIGHBOR_ZIPS = 2;
+// never going to drive to. This is capped at the THREE NEAREST ZIPs that carry
+// the searched specialty instead -- enough to rescue a sparse rural ZIP, small
+// enough that the map still answers "who is near me". The dashboard (a
+// provider tool) has its own neighbor logic, separate and untouched.
+var PATIENT_NEIGHBOR_ZIPS = 3;
 var NEIGHBOR_BOX_DEG = 0.35;   // ~24 miles; the search box, not the result set
 
 // ZIPs are stored both zero-padded and not, so always ask for both forms.
@@ -379,7 +359,7 @@ function zctaCentroid(zips) {
 }
 
 // Other clinics matching the searched specialties, in the searched ZIP plus the
-// two nearest ZIPs. Queried straight from PostgREST — no function needed, so
+// PATIENT_NEIGHBOR_ZIPS nearest ZIPs that have one. Queried straight from PostgREST — no function needed, so
 // this still works when the navigator itself is down.
 function nearbyClinics(zip, terms) {
   if (!/^\d{5}$/.test(String(zip || '')) || !terms.length) return Promise.resolve([]);
@@ -428,7 +408,7 @@ function nearbyClinics(zip, terms) {
 
       var candidates = Object.keys(byZip).filter(function (z) { return byZip[z].hit; });
       // A ZIP with no matching specialty adds pins the patient did not ask
-      // for, so it does not count as one of the two — filtered above, before
+      // for, so it does not count as one of the neighbours — filtered above, before
       // spending a request on centroids for ZIPs about to be discarded anyway.
       return zctaCentroid(candidates).then(function (centroids) {
         var ranked = candidates
@@ -490,11 +470,9 @@ function mapSheet() {
     note
   ];
 
-  // Secondary escape hatch to the full analysis dashboard. Keeps the deep-link
-  // contract exercised; everything a patient needs is in this sheet.
-  var deep = mapDeepLink(s.zip, s.mapTerms || [], state.results);
-  if (deep) body.push(h('div', { class: 'actions' },
-    h('a', { class: 'act', href: deep, target: '_blank', rel: 'noopener' }, 'Open the full analysis map ↗')));
+  // No link out to the market dashboard: that is a provider tool. The patient
+  // map is this sheet, limited to the searched specialty in their ZIP and the
+  // nearest neighbouring ZIPs that have it (see nearbyClinics).
 
   // Render the sheet first so Leaflet has a sized container to attach to
   var frag = sheet(s.zip ? 'Providers near ' + s.zip : 'Providers near you', body);
@@ -726,6 +704,10 @@ function providerCard(p, i) {
   // the app. Restore it once the Directions API is integrated in-app.
   if (p.lat && p.lng) acts.push(h('button', { class: 'act', type: 'button',
     onclick: function () { showOnMap(p.npi); } }, 'Show on map'));
+  // Request-to-book only for claimed listings: an unclaimed NPPES record has
+  // nobody on our side to confirm it, so those keep Call as the way in.
+  if (p.registered) acts.push(h('button', { class: 'act primary', type: 'button',
+    onclick: function () { location.hash = '#/book/' + p.npi; } }, '📅 Request appointment'));
   acts.push(h('button', { class: 'act', type: 'button', onclick: function () { location.hash = '#/p/' + p.npi; } }, 'Details'));
 
   return h('article', { class: 'card', style: '--i:' + i },
@@ -1060,6 +1042,106 @@ function deleteDocument(id) {
   }).catch(function (err) { toast(err.message, true); });
 }
 
+/* ---------- appointments -------------------------------------------------
+   Request-to-book, not instant booking: the patient proposes a time, the
+   practice confirms or declines from its inbox (register-provider.html). The
+   server resolves the NPI to the practice's account, so the patient app never
+   needs, or sees, a provider's account id.
+   -------------------------------------------------------------------------- */
+var APPT_STATUS = {
+  requested: 'Waiting for the practice', confirmed: 'Confirmed',
+  declined: 'Declined by the practice', cancelled: 'Cancelled', completed: 'Completed'
+};
+
+function fmtWhen(iso) {
+  if (!iso) return 'Any time that suits the practice';
+  var d = new Date(iso);
+  return isNaN(d.getTime()) ? String(iso) : d.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function bookSheet(npi) {
+  var p = null;
+  for (var i = 0; i < state.results.length; i++) if (String(state.results[i].npi) === String(npi)) p = state.results[i];
+  if (!p || !p.registered) {
+    return sheet('Request an appointment', [h('p', { style: 'color:var(--muted)' },
+      'That provider is no longer in your results, or does not take requests here yet. Search again, or call them.')]);
+  }
+
+  // datetime-local wants local "YYYY-MM-DDTHH:MM"; default to tomorrow 9:00.
+  var t = new Date(); t.setDate(t.getDate() + 1); t.setHours(9, 0, 0, 0);
+  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  var local = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  var fWhen = h('input', { type: 'datetime-local', value: local(t), min: local(new Date()), 'aria-label': 'Preferred date and time' });
+  var fWhy = h('textarea', { maxlength: '300', placeholder: 'e.g. New patient, follow-up on blood pressure', 'aria-label': 'Reason for visit' });
+  var msg = h('div', { class: 'msg' });
+
+  function submit(btn) {
+    btn.disabled = true;
+    var when = fWhen.value ? new Date(fWhen.value) : null;
+    api('/appointment-request', { method: 'POST', body: {
+      npi: p.npi,
+      requested_time: when && !isNaN(when.getTime()) ? when.toISOString() : null,
+      reason: fWhy.value.trim()
+    } }).then(function () {
+      toast('Request sent. ' + (p.name || 'The practice') + ' will confirm or suggest another time.');
+      location.hash = '#/appointments';
+    }).catch(function (err) {
+      msg.className = 'msg err'; msg.textContent = err.message; btn.disabled = false;
+    });
+  }
+  var go = h('button', { class: 'btn-full', type: 'button', onclick: function () { submit(go); } }, 'Send request');
+
+  return sheet('Request an appointment', [
+    h('p', { style: 'margin-bottom:14px' }, h('b', {}, p.name || 'Provider'),
+      p.specialty ? h('span', { style: 'color:var(--muted)' }, ' · ' + p.specialty) : null),
+    h('div', { class: 'field' }, h('label', {}, 'Preferred date and time'), fWhen),
+    h('div', { class: 'field' }, h('label', {}, 'Reason for visit (optional)'), fWhy),
+    go, msg,
+    h('div', { class: 'phi' },
+      'The practice sees your name, this time and your reason. Once they confirm, they can also see the health details on your profile to prepare for the visit.')
+  ]);
+}
+
+function appointmentsSheet() {
+  var list = h('div', { style: 'display:flex;flex-direction:column;gap:10px' },
+    h('p', { style: 'color:var(--muted)' }, 'Loading…'));
+
+  function paint(items) {
+    clear(list);
+    if (!items.length) {
+      list.appendChild(h('p', { style: 'color:var(--muted)' },
+        'No requests yet. Look for "Request appointment" on a verified listing.'));
+      return;
+    }
+    items.forEach(function (a) {
+      var canCancel = a.status === 'requested' || a.status === 'confirmed';
+      list.appendChild(h('div', { class: 'card' },
+        h('div', { class: 'card-top' }, h('div', {},
+          h('h3', {}, a.provider_name || 'Provider'),
+          h('div', { class: 'spec' }, APPT_STATUS[a.status] || a.status))),
+        h('div', { class: 'addr' }, fmtWhen(a.requested_time),
+          a.provider_city ? ' · ' + a.provider_city : ''),
+        a.reason ? h('div', { class: 'payers' }, 'Reason: ', h('b', {}, a.reason)) : null,
+        h('div', { class: 'actions' },
+          a.provider_phone ? h('a', { class: 'act', href: 'tel:' + a.provider_phone }, '📞 Call') : null,
+          canCancel ? h('button', { class: 'act danger', type: 'button', onclick: function () { cancel(a.id); } }, 'Cancel request') : null)));
+    });
+  }
+
+  function load() {
+    api('/appointment-request').then(function (d) { paint(d.appointments || []); })
+      .catch(function (err) { clear(list); list.appendChild(h('p', { class: 'msg err' }, err.message)); });
+  }
+  function cancel(id) {
+    if (!window.confirm('Cancel this appointment request?')) return;
+    api('/appointment-request', { method: 'PATCH', body: { id: id, status: 'cancelled' } })
+      .then(function () { toast('Cancelled.'); load(); })
+      .catch(function (err) { toast(err.message, true); });
+  }
+  load();
+  return sheet('Your appointment requests', [list]);
+}
+
 /* ---------- sheets -------------------------------------------------------- */
 function sheet(title, body) {
   var frag = document.createDocumentFragment();
@@ -1124,6 +1206,8 @@ function detailSheet(npi) {
       (p.registered && p.payers && p.payers.length) ? h('dd', {}, p.payers.join(', ')) : null),
     h('div', { class: 'sec-label' }, 'From Medicare records'), cms,
     h('div', { class: 'actions' },
+      p.registered ? h('button', { class: 'act primary', type: 'button',
+        onclick: function () { location.hash = '#/book/' + p.npi; } }, '📅 Request appointment') : null,
       p.phone ? h('a', { class: 'act primary', href: 'tel:' + p.phone }, '📞 Call') : null,
       (p.lat && p.lng) ? h('button', { class: 'act', type: 'button', onclick: function () { showOnMap(p.npi); } }, 'Show on map') : null)
   ]);
@@ -1237,6 +1321,8 @@ function accountSheet() {
     h('div', { class: 'checks' }, boxes),
     h('div', { class: 'field', style: 'margin-top:14px' }, h('label', {}, 'Anything else to note'), fDesc),
     saveBtn, msg,
+    h('div', { class: 'sec-label' }, 'Appointments'),
+    h('button', { class: 'act', type: 'button', onclick: function () { location.hash = '#/appointments'; } }, '📅 Your appointment requests'),
     h('div', { class: 'sec-label' }, 'Documents'),
     h('button', { class: 'act', type: 'button', onclick: function () { location.hash = '#/documents'; } }, '📄 Manage your documents'),
     h('div', { class: 'sec-label' }, 'Session'),
@@ -1362,6 +1448,8 @@ function render() {
   else if (r.name === 'documents') { document.body.appendChild(documentsSheet()); loadDocuments(); }
   else if (r.name === 'specialties') document.body.appendChild(specialtiesSheet());
   else if (r.name === 'map') { loadRegistered(); document.body.appendChild(mapSheet()); }
+  else if (r.name === 'book' && r.arg) document.body.appendChild(bookSheet(r.arg));
+  else if (r.name === 'appointments') document.body.appendChild(appointmentsSheet());
 
   var t = document.getElementById('transcript');
   if (t && (state.pending || state.messages.length)) t.scrollIntoView({ block: 'end', behavior: 'smooth' });

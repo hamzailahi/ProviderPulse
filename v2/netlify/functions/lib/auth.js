@@ -1,13 +1,12 @@
 // lib/auth.js
 // Resolves the Supabase user behind a request's bearer token.
 //
-// Used by the dashboard's AI endpoints (ai-query, report-generate), which were
-// unauthenticated: ai-query forwards a client-supplied system prompt and
-// messages to the model, so anyone could use it as a free proxy to the
-// ANTHROPIC_API_KEY. Any signed-in account is enough here -- the dashboard's
-// own gate accepts both roles -- the point is that an anonymous caller is not.
+// Used by the dashboard's AI endpoints (ai-query, report-generate). ai-query
+// forwards a client-supplied system prompt to the model, so an unchecked caller
+// could use it as a free proxy to ANTHROPIC_API_KEY. The market dashboard is a
+// provider tool, so both endpoints require getUser() AND isProvider().
 //
-// Deliberately does NOT read a role: user_metadata is writable by the account
+// Neither function reads user_metadata.role: it is writable by the account
 // holder, so a role taken from it is not a trust boundary.
 
 'use strict';
@@ -30,4 +29,26 @@ async function getUser(env, event) {
   }
 }
 
-module.exports = { getUser };
+// True when this user owns a provider listing. Checked against
+// provider_profiles under the service role, never against user_metadata.role:
+// a provider row only comes from the NPPES-verified registration path, so it is
+// the one role signal an account holder cannot forge.
+async function isProvider(env, user) {
+  if (!user || !user.id || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return false;
+  try {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/provider_profiles?id=eq.${encodeURIComponent(user.id)}&select=id&limit=1`,
+      {
+        headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
+        signal: AbortSignal.timeout(5000)
+      }
+    );
+    if (!res.ok) return false;
+    const rows = await res.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { getUser, isProvider };

@@ -1,6 +1,6 @@
 const https = require('https');
 const { renderAuditReport } = require('./lib/audit-report.js');
-const { getUser } = require('./lib/auth.js');
+const { getUser, isProvider } = require('./lib/auth.js');
 
 /**
  * Render a stored Directory Accuracy audit as a self-contained HTML report.
@@ -117,8 +117,13 @@ exports.handler = async function(event) {
 
     // Signed-in callers only: this path spends ANTHROPIC_API_KEY on whatever
     // question it is sent. The directory_audit branch above has its own key.
-    if (!(await getUser(process.env, event))) {
+    // Providers only, same rule as ai-query: the market tools are a provider feature.
+    const caller = await getUser(process.env, event);
+    if (!caller) {
         return { statusCode: 401, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Please sign in again to generate a report.' }) };
+    }
+    if (!(await isProvider(process.env, caller))) {
+        return { statusCode: 403, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Market reports are available to registered providers.' }) };
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;

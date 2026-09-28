@@ -1,6 +1,6 @@
 const https = require('https');
 const { validatePlan, buildPath, summarise, TABLES, OPS } = require('./lib/query-plan.js');
-const { getUser } = require('./lib/auth.js');
+const { getUser, isProvider } = require('./lib/auth.js');
 
 // ---------------------------------------------------------------------------
 // MARKET MEMO: a two-step agent.
@@ -482,8 +482,14 @@ exports.handler = async function(event, context) {
         // Signed-in callers only. The tool-loop mode below forwards a
         // client-supplied system prompt to the model, so without this the
         // endpoint was an open proxy to ANTHROPIC_API_KEY.
-        if (!(await getUser(process.env, event))) {
+        // The market dashboard is a provider tool: a provider_profiles row is
+        // required, not just any account.
+        const caller = await getUser(process.env, event);
+        if (!caller) {
             return { statusCode: 401, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Please sign in again to use the assistant.' }) };
+        }
+        if (!(await isProvider(process.env, caller))) {
+            return { statusCode: 403, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'The market assistant is available to registered providers.' }) };
         }
 
         let parsed;
