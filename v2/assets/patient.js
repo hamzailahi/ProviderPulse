@@ -52,16 +52,20 @@ function clear(node) { while (node.firstChild) node.removeChild(node.firstChild)
 var state = {
   session: null,      // {access_token, role, expiresAt}
   profile: null,
-  messages: [],       // exactly what we POST as `messages`
-  results: [],
-  lastSearch: null,   // {zip, mapTerms, specialty, label}
-  pending: false,
-  replay: null,       // action to re-run after a mid-session re-auth
+  search: null,       // the find view's query, results and filters (newSearch)
+  askDraft: '',       // text handed to the "Not sure who to see?" helper
   documents: [],
   reviewing: null,    // {document_id, document_kind, facts[]}
   persist: false,     // "stay signed in" -> localStorage instead of sessionStorage
   ctrl: null          // in-flight AbortController
 };
+
+// A result by NPI, from the current search. Detail and booking sheets read it.
+function findResult(npi) {
+  var all = (state.search && state.search.all) || [];
+  for (var i = 0; i < all.length; i++) if (String(all[i].npi) === String(npi)) return all[i];
+  return null;
+}
 
 /* ---------- session ------------------------------------------------------- */
 // The refresh token IS persisted, which is a deliberate trade-off. It is a
@@ -110,9 +114,10 @@ function signOut() {
   var had = state.session;
   if (had) api('/auth-logout', { method: 'POST' }).catch(function () {});
   clearSession();
-  state.session = null; state.profile = null; state.messages = [];
-  state.results = []; state.documents = []; state.reviewing = null;
+  state.session = null; state.profile = null; state.search = null;
+  state.documents = []; state.reviewing = null;
   payerCache = {};
+  unmountFind();
   location.hash = '';
   render();
 }
@@ -245,18 +250,6 @@ function taxMatches(stored, terms) {
   return false;
 }
 
-// How far the patient map will look beyond the searched ZIP.
-//
-// The analyst dashboard's "+ Add Neighbors" loads every adjacent ZIP, which is
-// the right tool for sizing a market. It is the wrong one for a patient: it
-// buries the ZIP they asked about under hundreds of pins from places they were
-// never going to drive to. This is capped at the THREE NEAREST ZIPs that carry
-// the searched specialty instead -- enough to rescue a sparse rural ZIP, small
-// enough that the map still answers "who is near me". The dashboard (a
-// provider tool) has its own neighbor logic, separate and untouched.
-var PATIENT_NEIGHBOR_ZIPS = 3;
-var NEIGHBOR_BOX_DEG = 0.35;   // ~24 miles; the search box, not the result set
-
 // ZIPs are stored both zero-padded and not, so always ask for both forms.
 function zipOr(zips) {
   var forms = {};
@@ -316,17 +309,12 @@ function providerRowsQuery(filter) {
     tableQuery('provider_individuals', PROVIDER_ROW_SELECT, filter),
     tableQuery('clinic_secondary_locations', 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude', filter)
   ]).then(function (results) {
-    return tagSrc(results[0], 'clinic').concat(tagSrc(results[1], 'individual'), tagSrc(results[2], 'secondary'));
+    var all = tagSrc(results[0], 'clinic').concat(tagSrc(results[1], 'individual'), tagSrc(results[2], 'secondary'));
+    // Any table that hit the page cap means the answer is a sample, and the
+    // results list says so instead of presenting it as complete.
+    all.truncated = results.some(function (r) { return (r || []).length >= CLINICS_PAGE_CAP; });
+    return all;
   });
-}
-
-// Equirectangular approximation. Over the ~25 miles this ever spans the error
-// against haversine is metres, and we only need to RANK ZIPs, not report a
-// distance to anyone.
-function roughDist(aLat, aLng, bLat, bLng) {
-  var x = (bLng - aLng) * Math.cos((aLat + bLat) * Math.PI / 360);
-  var y = (bLat - aLat);
-  return Math.sqrt(x * x + y * y);
 }
 
 // CDC PLACES carries a real ZCTA centroid for every ZIP it covers (32,520 of
@@ -358,308 +346,22 @@ function zctaCentroid(zips) {
     .catch(function () { return {}; });
 }
 
-// Other clinics matching the searched specialties, in the searched ZIP plus the
-// PATIENT_NEIGHBOR_ZIPS nearest ZIPs that have one. Queried straight from PostgREST — no function needed, so
-// this still works when the navigator itself is down.
-function nearbyClinics(zip, terms) {
-  if (!/^\d{5}$/.test(String(zip || '')) || !terms.length) return Promise.resolve([]);
-  var homeZip = String(zip).padStart(5, '0');
-
-  return Promise.all([
-    providerRowsQuery('or=' + zipOr([zip])),
-    zctaCentroid([homeZip])
-  ]).then(function (res) {
-    var rows = res[0], homeCentroid = res[1][homeZip];
-    var home = (rows || []).filter(function (c) {
-      return c.latitude && c.longitude && taxMatches(c.primary_taxonomy, terms);
-    });
-
-    // Anchor on the ZIP's real centroid. Fall back to averaging its own
-    // clinics only when PLACES has no row for it at all — chiefly Puerto Rico,
-    // which PLACES does not publish (see health-demand.js) — because an
-    // approximate anchor still beats none.
-    var lat, lng;
-    if (homeCentroid) { lat = homeCentroid.lat; lng = homeCentroid.lng; }
-    else {
-      var anchored = (rows || []).filter(function (c) { return c.latitude && c.longitude; });
-      if (!anchored.length) return home;
-      lat = 0; lng = 0;
-      anchored.forEach(function (c) { lat += +c.latitude; lng += +c.longitude; });
-      lat /= anchored.length; lng /= anchored.length;
-    }
-
-    var box = 'latitude=gte.' + (lat - NEIGHBOR_BOX_DEG) + '&latitude=lte.' + (lat + NEIGHBOR_BOX_DEG) +
-              '&longitude=gte.' + (lng - NEIGHBOR_BOX_DEG) + '&longitude=lte.' + (lng + NEIGHBOR_BOX_DEG);
-
-    return providerRowsQuery(box).then(function (near) {
-      // Which candidate ZIPs actually carry a matching specialty. This stays a
-      // clinics-table question — PLACES has no taxonomy — so the box query and
-      // the "hit" check are unchanged.
-      var byZip = {};
-      (near || []).forEach(function (c) {
-        if (!c.latitude || !c.longitude || !c.zip) return;
-        var z = String(c.zip).padStart(5, '0');
-        if (z === homeZip) return;                            // the home ZIP, already have it
-        if (!byZip[z]) byZip[z] = { lat: 0, lng: 0, n: 0, hit: false };
-        var g = byZip[z];
-        g.lat += +c.latitude; g.lng += +c.longitude; g.n++;
-        if (taxMatches(c.primary_taxonomy, terms)) g.hit = true;
-      });
-
-      var candidates = Object.keys(byZip).filter(function (z) { return byZip[z].hit; });
-      // A ZIP with no matching specialty adds pins the patient did not ask
-      // for, so it does not count as one of the neighbours — filtered above, before
-      // spending a request on centroids for ZIPs about to be discarded anyway.
-      return zctaCentroid(candidates).then(function (centroids) {
-        var ranked = candidates
-          .map(function (z) {
-            var c = centroids[z];
-            // Real centroid when PLACES has one; otherwise the average of the
-            // matching clinics already fetched — same fallback reasoning as
-            // the home anchor above.
-            var g = byZip[z];
-            var zLat = c ? c.lat : g.lat / g.n;
-            var zLng = c ? c.lng : g.lng / g.n;
-            return { zip: z, d: roughDist(lat, lng, zLat, zLng) };
-          })
-          .sort(function (a, b) { return a.d - b.d; })
-          .slice(0, PATIENT_NEIGHBOR_ZIPS);
-
-        var keep = {};
-        ranked.forEach(function (r) { keep[r.zip] = true; });
-
-        var extra = (near || []).filter(function (c) {
-          return c.latitude && c.longitude &&
-                 keep[String(c.zip).padStart(5, '0')] &&
-                 taxMatches(c.primary_taxonomy, terms);
-        });
-
-        // Tag the borrowed ones so the map can say where they came from.
-        extra.forEach(function (c) { c._neighbor = true; });
-        return home.concat(extra);
-      });
-    });
-  });
-}
-
-var mapState = { map: null, focusNpi: null };
-
-function showOnMap(npi) {
-  mapState.focusNpi = npi || null;
-  // If the persistent pane is already showing, just fly to the pin rather than
-  // stacking a sheet on top of a map the patient can already see.
-  if (mapState.map && document.querySelector('.split-map #mapCanvas')) {
-    var p = state.results.filter(function (x) { return String(x.npi) === String(npi); })[0];
-    if (p && p.lat && p.lng) { mapState.map.setView([p.lat, p.lng], 15); return; }
-  }
-  location.hash = '#/map';
-}
-
-function mapSheet() {
-  var s = state.lastSearch || {};
-  var canvas = h('div', { id: 'mapCanvas' });
-  var note = h('div', { class: 'maphint' }, 'Loading map…');
-
-  var body = [
-    canvas,
-    h('div', { class: 'legend-row' },
-      h('span', {}, h('i', { class: 'pin rec' }), 'Recommended for you'),
-      h('span', {}, h('i', { class: 'pin ver' }), 'Verified listing'),
-      h('span', {}, h('i', { class: 'pin self' }), 'Self-reported location'),
-      h('span', {}, h('i', { class: 'pin oth' }), 'Other clinics nearby')),
-    note
-  ];
-
-  // No link out to the market dashboard: that is a provider tool. The patient
-  // map is this sheet, limited to the searched specialty in their ZIP and the
-  // nearest neighbouring ZIPs that have it (see nearbyClinics).
-
-  // Render the sheet first so Leaflet has a sized container to attach to
-  var frag = sheet(s.zip ? 'Providers near ' + s.zip : 'Providers near you', body);
-  setTimeout(function () { initMap(canvas, note); }, 0);
-  return frag;
-}
-
-function initMap(canvas, note) {
-  loadLeaflet().then(function (ok) {
-    if (!ok) {
-      note.textContent = 'The map could not load. Your results are listed above.';
-      return;
-    }
-    var s = state.lastSearch || {};
-    var recs = state.results.filter(function (p) { return p.lat && p.lng; });
-    var center = recs.length ? [recs[0].lat, recs[0].lng] : [39.5, -98.35];
-
-    var map = L.map(canvas, { zoomControl: true, attributionControl: true }).setView(center, recs.length ? 12 : 4);
-    mapState.map = map;
-    // CARTO's free basemaps.cartocdn.com tiles started requiring an API key
-    // (every tile watermarked "API KEY REQUIRED"), and Esri's no-key Canvas
-    // basemap that replaced it throttles real browser traffic the same way
-    // ("Map data not yet available" tiles). MapTiler's free tier (10k tile
-    // loads/mo, no card) is the stable option — MAPTILER_KEY is a client-side
-    // map key, restricted by domain in the MapTiler dashboard.
-    L.tileLayer('https://api.maptiler.com/maps/dataviz-dark/256/{z}/{x}/{y}.png?key=5LQ8tmZJYC4eWN4l4hdi', {
-      attribution: '&copy; MapTiler &copy; OpenStreetMap contributors', maxZoom: 19
-    }).addTo(map);
-
-    var bounds = [];
-    function pin(lat, lng, kind, size) {
-      return L.marker([lat, lng], {
-        icon: L.divIcon({
-          className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2],
-          html: '<div class="mk ' + kind + '" style="width:' + size + 'px;height:' + size + 'px"></div>'
-        })
-      });
-    }
-
-    recs.forEach(function (p) {
-      var m = pin(p.lat, p.lng, 'rec', 22).addTo(map);
-      m.bindPopup(popupHtml(p, true));
-      bounds.push([p.lat, p.lng]);
-      if (mapState.focusNpi && String(p.npi) === String(mapState.focusNpi)) {
-        setTimeout(function () { map.setView([p.lat, p.lng], 15); m.openPopup(); }, 250);
-      }
-    });
-
-    if (bounds.length > 1 && !mapState.focusNpi) map.fitBounds(bounds, { padding: [45, 45], maxZoom: 14 });
-
-    note.textContent = recs.length
-      ? 'Showing your ' + recs.length + ' recommended provider' + (recs.length === 1 ? '' : 's') + '. Looking for more nearby…'
-      : 'No mapped coordinates for these results.';
-
-    // Layer in the rest of the area's matching clinics
-    nearbyClinics(s.zip, s.mapTerms || []).then(function (list) {
-      var recNpis = {};
-      recs.forEach(function (p) { recNpis[String(p.npi)] = true; });
-      var added = 0, borrowed = 0, otherZips = {};
-      // Remember where a pin already exists so a provider's own location does
-      // not double up on the clinics row it corresponds to.
-      var drawnAt = {};
-      var zipsInPlay = {};
-      if (s.zip) zipsInPlay[String(s.zip).padStart(5, '0')] = true;
-      list.forEach(function (c) {
-        if (c.zip) zipsInPlay[String(c.zip).padStart(5, '0')] = true;
-      });
-      // No stored affiliation link exists yet (the bulk pipeline's coordinate-match
-      // stage hasn't been uploaded), so a physician's likely clinic is inferred here,
-      // live, from sharing the same rounded coordinates -- a hint, not a confirmed fact.
-      var clinicNameAt = {};
-      list.forEach(function (c) {
-        if (c._src === 'clinic' && c.latitude && c.longitude) {
-          clinicNameAt[(+c.latitude).toFixed(4) + ',' + (+c.longitude).toFixed(4)] = c.name;
-        }
-      });
-      list.forEach(function (c) {
-        if (recNpis[String(c.npi)]) return;          // already pinned as a recommendation
-        if (c._neighbor) { borrowed++; otherZips[String(c.zip).padStart(5, '0')] = true; }
-        var coordKey = (+c.latitude).toFixed(4) + ',' + (+c.longitude).toFixed(4);
-        drawnAt[coordKey] = true;
-        // A secondary-location row is aliased to its parent's NPI (migration 014), so it
-        // must not borrow the parent's verified ring -- this address was never the one
-        // NPPES confirmed, only a different bulk-imported site for the same NPI.
-        var reg = c._src === 'secondary' ? null : registeredNpis[String(c.npi)];
-        var clinicHere = clinicNameAt[coordKey];
-        pin(c.latitude, c.longitude, reg ? 'ver' : 'oth', reg ? 15 : 12)
-          .addTo(map)
-          .bindPopup(popupHtml({
-            npi: c.npi, name: c.name, specialty: c.primary_taxonomy,
-            address: c.address, city: c.city, state: c.state, zip: c.zip,
-            registered: !!reg,
-            co_located: (c._src === 'individual' && clinicHere && clinicHere !== c.name) ? clinicHere : null,
-            secondary: c._src === 'secondary'
-          }, false));
-        added++;
-      });
-      // A claimed listing can publish more than one practice location, and the
-      // clinics table only ever knows the one tied to the NPI. Draw the rest
-      // from what the provider published, ringed by whether the federal
-      // registry actually confirms that address -- a self-reported site must
-      // not wear the same ring as a verified one.
-      var extraSites = 0, selfSites = 0;
-      Object.keys(registeredNpis).forEach(function (npi) {
-        var r = registeredNpis[npi] || {};
-        (r.locations || []).forEach(function (loc) {
-          // No coordinates means the address was never geocoded, or geocoding
-          // failed. There is nowhere to put the pin, so skip it silently.
-          if (!loc.latitude || !loc.longitude) return;
-          // registeredNpis is every claimed listing in the country, so restrict
-          // to the ZIPs this map is actually showing.
-          if (!zipsInPlay[String(loc.zip || '').padStart(5, '0')]) return;
-          var key = (+loc.latitude).toFixed(4) + ',' + (+loc.longitude).toFixed(4);
-          if (drawnAt[key]) return;
-          drawnAt[key] = true;
-          pin(loc.latitude, loc.longitude, loc.verified ? 'ver' : 'self', loc.verified ? 15 : 13)
-            .addTo(map)
-            .bindPopup(popupHtml({
-              npi: npi,
-              name: (r.name || '') + (loc.label ? ' \u2014 ' + loc.label : ''),
-              specialty: r.specialty,
-              address: loc.address_line, city: loc.city, state: loc.state, zip: loc.zip,
-              phone: loc.phone || r.phone,
-              registered: true,
-              self_reported: !loc.verified
-            }, false));
-          extraSites++;
-          if (!loc.verified) selfSites++;
-        });
-      });
-      added += extraSites;
-
-      // Say plainly when pins come from outside the searched ZIP — a patient
-      // judging travel needs to know that without clicking every marker.
-      var zipList = Object.keys(otherZips).sort();
-      var from = zipList.length
-        ? ', including ' + borrowed + ' in nearby ZIP' + (zipList.length === 1 ? ' ' : 's ') + zipList.join(' and ')
-        : '';
-      note.textContent = recs.length
-        ? 'Showing your ' + recs.length + ' recommended provider' + (recs.length === 1 ? '' : 's') +
-          (added ? ' and ' + added + ' other matching clinic' + (added === 1 ? '' : 's') + from + '.'
-                 : '. No other matching clinics nearby.')
-        : (added ? 'Showing ' + added + ' matching clinic' + (added === 1 ? '' : 's') + from + '.'
-                 : 'No matching clinics found near ' + (s.zip || 'you') + '.');
-    });
-  });
-}
-
-// Popup markup is a string because Leaflet wants HTML; every interpolated value
-// is escaped first, since these come from the API and the database.
-function esc(v) {
-  return String(v === null || v === undefined ? '' : v)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-function popupHtml(p, isRec) {
-  var line = [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ');
-  return '<div class="mpop">' +
-    (isRec ? '<span class="tag rec">★ Recommended for you</span>' : '') +
-    (p.registered && !isRec && !p.self_reported
-      ? '<span class="tag ver">✓ Verified listing</span>' : '') +
-    // Claimed, but this particular address is not the one in the federal
-    // registry. Never let it borrow the verified badge.
-    (p.self_reported
-      ? '<span class="tag self">Address self-reported</span>' : '') +
-    (p.secondary
-      ? '<span class="tag self">Additional practice location</span>' : '') +
-    '<strong>' + esc(p.name || 'Provider') + '</strong>' +
-    (p.specialty ? '<span class="sp">' + esc(p.specialty) + '</span>' : '') +
-    (line ? '<span class="ad">' + esc(line) + '</span>' : '') +
-    (p.phone ? '<a class="tel" href="tel:' + esc(p.phone) + '">📞 ' + esc(p.phone) + '</a>' : '') +
-    // Same-address inference, not a confirmed affiliation -- see providerRowsQuery.
-    (p.co_located ? '<div class="ad" style="opacity:.75">May practice at ' + esc(p.co_located) + '</div>' : '') +
-    '</div>';
-}
-
 // NPI -> registered listing, loaded once when the map first opens
 var registeredNpis = {};
+var registeredLoading = null;
 function loadRegistered() {
-  return api('/providers-public?all=1', { auth: false })
-    .then(function (d) { registeredNpis = (d && d.providers) || {}; })
-    .catch(function () {});
+  if (!registeredLoading) {
+    registeredLoading = api('/providers-public?all=1', { auth: false })
+      .then(function (d) { registeredNpis = (d && d.providers) || {}; })
+      .catch(function () { registeredLoading = null; });
+  }
+  return registeredLoading;
 }
 
 /* ---------- provider card ------------------------------------------------- */
 function badgesFor(p) {
   var out = [];
-  var payer = (state.profile && state.profile.insurance_payer) || 'your insurance';
+  var payer = (state.search && state.search.payer) || (state.profile && state.profile.insurance_payer) || 'your insurance';
   if (p.registered) out.push(h('span', { class: 'badge verified' }, '✓ Verified listing'));
 
   // undefined is NOT false. patient-match only sets takes_your_insurance when the
@@ -695,220 +397,616 @@ function summariseHours(h) {
   }).join(' · ') || 'Not listed';
 }
 
-function providerCard(p, i) {
-  var acts = [];
-  // Actions are hidden when the data is missing rather than shown disabled:
-  // phone is '' when NPPES had none, and both geocoders can fail.
-  if (p.phone) acts.push(h('a', { class: 'act primary', href: 'tel:' + p.phone }, '📞 Call'));
-  // No Directions button: it handed the patient off to Google Maps, which leaves
-  // the app. Restore it once the Directions API is integrated in-app.
-  if (p.lat && p.lng) acts.push(h('button', { class: 'act', type: 'button',
-    onclick: function () { showOnMap(p.npi); } }, 'Show on map'));
-  // Request-to-book only for claimed listings: an unclaimed NPPES record has
-  // nobody on our side to confirm it, so those keep Call as the way in.
-  if (p.registered) acts.push(h('button', { class: 'act primary', type: 'button',
-    onclick: function () { location.hash = '#/book/' + p.npi; } }, '📅 Request appointment'));
-  acts.push(h('button', { class: 'act', type: 'button', onclick: function () { location.hash = '#/p/' + p.npi; } }, 'Details'));
+/* ---------- find: search, results, map --------------------------------------
+   The patient home. A Zocdoc-style search: what (specialty or plain-language
+   condition), where (ZIP), how far (radius in miles) and which insurance, then
+   a full results list beside a large map.
 
-  return h('article', { class: 'card', style: '--i:' + i },
-    h('div', { class: 'card-top' },
-      h('span', { class: 'rank' }, String(i + 1)),
-      h('div', {}, h('h3', {}, p.name || 'Provider'), h('div', { class: 'spec' }, p.specialty || ''))
-    ),
-    h('div', { class: 'badges' }, badgesFor(p)),
-    (p.registered && p.payers && p.payers.length)
-      ? h('div', { class: 'payers' }, 'Accepts: ', h('b', {}, p.payers.slice(0, 8).join(', ')),
-          p.payers.length > 8 ? ' +' + (p.payers.length - 8) + ' more' : null)
-      : null,
-    // "Is it open?" is the most common reason finding a doctor still fails
-    p.office_hours ? h('div', { class: 'payers' }, 'Hours: ', h('b', {}, summariseHours(p.office_hours))) : null,
-    h('div', { class: 'addr' },
-      p.address ? p.address + ', ' : '',
-      [p.city, p.state].filter(Boolean).join(', '), ' ',
-      p.zip ? h('span', { class: 'z' }, p.zip) : null,
-      p.phone ? null : ' · no phone on file'),
-    h('div', { class: 'actions' }, acts)
-  );
-}
+   Results come straight from the directory tables (clinics, provider_individuals,
+   clinic_secondary_locations) through the publishable key, the same public data
+   the provider dashboard reads, so a search never waits on the AI and still
+   works if the assistant is down. Claimed listings are overlaid from
+   providers-public: that is what adds verified, accepting-new-patients,
+   telehealth, insurance and request-to-book.
 
-/* ---------- transcript ---------------------------------------------------- */
-function transcriptEl() {
-  var wrap = h('div', { class: 'col transcript', id: 'transcript' });
-  state.messages.forEach(function (m) {
-    if (m.role === 'user') wrap.appendChild(h('div', { class: 'turn-user' }, m.content));
-    else wrap.appendChild(h('div', { class: 'turn-bot' },
-      h('div', { class: 'bot-mark' }, '✚'),
-      h('div', { class: 'bot-body' }, h('p', {}, m.content),
-        m.providers ? h('div', { class: 'cards' }, m.providers.map(providerCard)) : null,
-        m.providers && m.providers.length
-          ? h('div', { class: 'actions' }, h('button', { class: 'act', type: 'button', onclick: function () { showOnMap(null); } }, '🗺 See these on the map'))
-          : null)));
-  });
-  if (state.pending) wrap.appendChild(pendingEl());
-  if (state.reviewing) wrap.appendChild(reviewEl());
-  return wrap;
-}
+   The AI navigator is an optional helper (#/ask) that only fills in the search.
+   -------------------------------------------------------------------------- */
+var RADIUS_CHOICES = [5, 10, 25, 50];
+var DEFAULT_RADIUS = 10;
+var RESULTS_PAGE = 25;
+var MAPTILER_KEY = '5LQ8tmZJYC4eWN4l4hdi';   // client-side map key, restricted by domain in MapTiler
 
-var STAGES = [
-  [900,   'Searching the national registry'],
-  [3500,  'Checking who takes your insurance'],
-  [7000,  'Pinning locations'],
-  [11000, 'Still working — this search is taking longer than usual'],
-  [18000, 'Almost there']
+// Plain-language words a patient types, mapped onto a SPECIALTIES label. Word
+// boundaries throughout: "ear" must not fire on "near", "ent" on "patient".
+var CONDITION_HINTS = [
+  [/\b(diabet|thyroid|hormon|endocrin)/, 'Diabetes & hormones'],
+  [/\b(heart|cardi|chest pain|blood pressure|hypertens|palpitat)/, 'Heart / cardiology'],
+  [/\b(skin|rash|acne|eczema|psoria|mole|derma)/, 'Skin / dermatology'],
+  [/\b(anxi|depress|therap(y|ist)|counsel|mental|adhd|bipolar|ptsd|psychiat|psycholog)/, 'Mental health & counseling'],
+  [/\b(tooth|teeth|dent|gum)/, 'Dental'],
+  [/\b(eye|vision|glasses|contacts|optom|ophthal)/, 'Eye care'],
+  [/\b(chiropract|spine adjust)/, 'Chiropractic'],
+  [/\b(physical therap|rehab|occupational therap)/, 'Physical & occupational therapy'],
+  [/\b(knee|shoulder|hip|fracture|sprain|sports injur|ortho|broken bone)/, 'Orthopedics & sports injury'],
+  [/\b(kid|child|baby|infant|toddler|pediatr)/, 'Pediatrics (children)'],
+  [/\b(pregnan|prenatal|obgyn|ob-gyn|gyne|women'?s health|period|menopaus)/, "Women's health / OB-GYN"],
+  [/\b(asthma|copd|lung|breath|sleep apnea|snor|pulmon)/, 'Lung, breathing & sleep'],
+  [/\b(stomach|gut|acid reflux|reflux|ibs|colon|gastro|digest|crohn)/, 'Digestive / gastroenterology'],
+  [/\b(kidney|renal|nephro|dialysis)/, 'Kidney / nephrology'],
+  [/\b(cancer|tumou?r|oncolog|chemo)/, 'Cancer care / oncology'],
+  [/\b(arthritis|lupus|gout|rheumat)/, 'Arthritis / rheumatology'],
+  [/\b(headache|migraine|seizure|epilep|stroke|neuro|numbness|memory)/, 'Brain & nerves / neurology'],
+  [/\b(ear|nose|throat|sinus|tonsil|ent)\b/, 'Ear, nose & throat'],
+  [/\b(urin|bladder|prostate|urolog)/, 'Urology'],
+  [/\b(foot|feet|ankle|heel|bunion|podiat)/, 'Foot & ankle / podiatry'],
+  [/\b(chronic pain|pain management|back pain|neck pain)/, 'Pain management'],
+  [/\b(allerg|immunolog)/, 'Allergy & immunology'],
+  [/\b(urgent|emergency)\b/, 'Urgent care & emergency'],
+  [/\b(diet|nutrition|weight loss)/, 'Nutrition & dietitian'],
+  [/\b(x-?ray|mri|ct scan|imaging|blood test|lab work)/, 'Imaging & lab'],
+  [/\b(check ?up|physical|primary care|family doctor|general doctor|flu|cold|fever|annual)/, 'Primary care / family doctor']
 ];
-var stageTimers = [];
 
-function pendingEl() {
-  var txt = h('span', { id: 'stageText' }, 'Reading your profile');
-  var stopBtn = h('button', { class: 'stop', type: 'button', hidden: true, id: 'stopBtn',
-    onclick: function () { if (state.ctrl) state.ctrl.abort(); } }, 'Stop');
+function specialtyByLabel(label) {
+  for (var i = 0; i < SPECIALTIES.length; i++) if (SPECIALTIES[i][0] === label) return SPECIALTIES[i];
+  return null;
+}
 
-  stageTimers.forEach(clearTimeout); stageTimers = [];
-  STAGES.forEach(function (s) {
-    stageTimers.push(setTimeout(function () {
-      var el = document.getElementById('stageText');
-      if (el) el.textContent = s[1];
-    }, s[0]));
+// Free text -> {label, terms}. Specialty names first, then condition words.
+// null means "we could not tell", which hands the text to the AI helper.
+function resolveQuery(text) {
+  var t = String(text || '').trim().toLowerCase();
+  if (!t) return null;
+  var i, s;
+  for (i = 0; i < SPECIALTIES.length; i++) {
+    s = SPECIALTIES[i];
+    if (s[0].toLowerCase() === t || s[2].toLowerCase() === t) return { label: s[0], terms: s[1].split(',') };
+  }
+  for (i = 0; i < SPECIALTIES.length; i++) {
+    s = SPECIALTIES[i];
+    var names = s[0].toLowerCase().split(/[\/&,()]+/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 2; });
+    if (names.some(function (n) { return t.indexOf(n) !== -1 || n.indexOf(t) === 0; }) ||
+        s[2].toLowerCase().indexOf(t) === 0) return { label: s[0], terms: s[1].split(',') };
+  }
+  for (i = 0; i < CONDITION_HINTS.length; i++) {
+    if (CONDITION_HINTS[i][0].test(t)) {
+      s = specialtyByLabel(CONDITION_HINTS[i][1]);
+      if (s) return { label: s[0], terms: s[1].split(',') };
+    }
+  }
+  return null;
+}
+
+function milesBetween(aLat, aLng, bLat, bLng) {
+  var R = 3958.8, rad = Math.PI / 180;
+  var dLat = (bLat - aLat) * rad, dLng = (bLng - aLng) * rad;
+  var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+}
+
+// The ZIP's centre: its real ZCTA centroid, else the average of its own listings.
+function locateZip(zip) {
+  return zctaCentroid([zip]).then(function (c) {
+    if (c[zip]) return c[zip];
+    return clinicsQuery('or=' + zipOr([zip])).then(function (rows) {
+      var pts = (rows || []).filter(function (r) { return r.latitude && r.longitude; });
+      if (!pts.length) return null;
+      var lat = 0, lng = 0;
+      pts.forEach(function (r) { lat += +r.latitude; lng += +r.longitude; });
+      return { lat: lat / pts.length, lng: lng / pts.length };
+    });
   });
-  stageTimers.push(setTimeout(function () {
-    var b = document.getElementById('stopBtn'); if (b) b.hidden = false;
-  }, 4000));
-
-  return h('div', { class: 'turn-bot' },
-    h('div', { class: 'bot-mark' }, '✚'),
-    h('div', { class: 'bot-body' },
-      h('div', { class: 'status', role: 'status', 'aria-live': 'polite' }, h('span', { class: 'dot' }), txt, stopBtn),
-      h('div', { class: 'cards' }, [0, 1, 2].map(function () {
-        return h('div', { class: 'skel' },
-          h('div', { class: 'sk', style: 'width:56%' }),
-          h('div', { class: 'sk', style: 'width:34%' }),
-          h('div', { class: 'sk', style: 'width:72%' }));
-      })))
-  );
 }
 
-/* ---------- search -------------------------------------------------------- */
-function currentZip() {
-  return (state.lastSearch && state.lastSearch.zip) || (state.profile && state.profile.zip) || '';
+// A coarse server-side prefilter: the first word of each term as an ilike. It
+// can only over-include; taxMatches() still decides the final answer. Without
+// it a 25-mile box in a city returns every listing of every kind and hits the
+// row cap long before the specialty that was asked for.
+function taxonomyPrefilter(terms) {
+  var words = {};
+  terms.forEach(function (t) {
+    var w = String(t).split(/\s+/)[0].replace(/[^A-Za-z]/g, '');
+    if (w.length >= 3) words[w.toLowerCase()] = true;
+  });
+  var keys = Object.keys(words);
+  if (!keys.length) return '';
+  return '&or=(' + keys.map(function (w) { return 'primary_taxonomy.ilike.*' + w + '*'; }).join(',') + ')';
 }
 
-function runSearch(opts) {
-  opts = opts || {};
-  var zip = opts.zip || currentZip();
-  state.lastSearch = {
-    zip: zip,
-    mapTerms: opts.mapTerms || (state.lastSearch && state.lastSearch.mapTerms) || [],
-    specialty: opts.specialty || '',
-    label: opts.label || ''
+function initials(name) {
+  var parts = String(name || '').replace(/[^A-Za-z ]/g, ' ').trim().split(/\s+/);
+  return ((parts[0] || '?').charAt(0) + (parts.length > 1 ? parts[parts.length - 1].charAt(0) : '')).toUpperCase();
+}
+function hueFor(key) {
+  var n = 0; key = String(key || '');
+  for (var i = 0; i < key.length; i++) n = (n * 31 + key.charCodeAt(i)) % 360;
+  return n;
+}
+function titleCase(s) {
+  s = String(s || '');
+  // NPPES and the bulk tables store names in capitals; shout-case reads as a
+  // data dump. Only re-case strings that are entirely upper case.
+  if (s !== s.toUpperCase()) return s;
+  return s.toLowerCase().replace(/\b([a-z])/g, function (m) { return m.toUpperCase(); })
+    .replace(/\b(Md|Do|Np|Pa|Dds|Dmd|Od|Pc|Pllc|Llc|Inc|Fnp|Aprn|Lcsw|Lpc)\b/g, function (m) { return m.toUpperCase(); });
+}
+
+function newSearch() {
+  var p = state.profile || {};
+  return {
+    text: '', label: '', terms: [],
+    zip: /^\d{5}$/.test(String(p.zip || '')) ? p.zip : '',
+    miles: DEFAULT_RADIUS,
+    payer: p.insurance_payer || '',
+    center: null, all: [], shown: RESULTS_PAGE,
+    filters: { accepting: false, insurance: false, telehealth: false, verified: false },
+    sort: 'near', loading: false, error: '', truncated: false, ran: false,
+    suggested: {}, active: null, seq: 0
   };
-  state.pending = true;
-  render();
+}
 
-  api('/patient-match', {
-    method: 'POST', track: true,
-    body: { messages: state.messages, specialty: opts.specialty || '', zip: zip }
-  }).then(function (data) {
-    state.pending = false;
-    state.results = data.providers || [];
-    // Chip searches carry a hand-verified superset of map terms; union can only
-    // widen the map filter, never mis-target it.
-    var server = data.map_taxonomies || data.taxonomies || [];
-    var merged = (state.lastSearch.mapTerms || []).concat(server).filter(function (v, i, a) { return v && a.indexOf(v) === i; });
-    state.lastSearch.mapTerms = merged;
-    if (data.zip) state.lastSearch.zip = data.zip;
-    state.messages.push({ role: 'assistant', content: data.reply || '', providers: state.results });
-    render();
-  }).catch(function (err) {
-    state.pending = false;
-    if (err.status === 401) { state.replay = function () { runSearch(opts); }; render(); return; }
-    state.messages.push({ role: 'assistant', content: '', error: err });
-    render();
-    showSearchError(err, opts);
+function runProviderSearch() {
+  var s = state.search;
+  if (!s.terms.length) { s.error = 'Choose a specialty, or describe what you need.'; paintFind(); return; }
+  if (!/^\d{5}$/.test(s.zip)) { s.error = 'Enter a 5-digit ZIP code.'; paintFind(); return; }
+  var seq = ++s.seq;
+  s.loading = true; s.error = ''; s.ran = true; s.shown = RESULTS_PAGE; s.active = null;
+  paintFind();
+
+  Promise.all([locateZip(s.zip), loadRegistered()]).then(function (res) {
+    if (seq !== s.seq) return;
+    var c = res[0];
+    if (!c) { s.loading = false; s.all = []; s.center = null; s.error = 'We couldn\'t find ZIP ' + s.zip + '. Check it and try again.'; paintFind(); return; }
+    s.center = c;
+    var dLat = s.miles / 69, dLng = s.miles / (69 * Math.max(0.2, Math.cos(c.lat * Math.PI / 180)));
+    var box = 'latitude=gte.' + (c.lat - dLat).toFixed(5) + '&latitude=lte.' + (c.lat + dLat).toFixed(5) +
+              '&longitude=gte.' + (c.lng - dLng).toFixed(5) + '&longitude=lte.' + (c.lng + dLng).toFixed(5);
+    return providerRowsQuery(box + taxonomyPrefilter(s.terms)).then(function (rows) {
+      if (seq !== s.seq) return;
+      s.truncated = !!rows.truncated;
+      s.all = buildResults(rows, s);
+      s.loading = false;
+      paintFind(true);
+      logSearch(s);
+    });
+  }).catch(function () {
+    if (seq !== s.seq) return;
+    s.loading = false; s.error = 'Search is unavailable right now. Please try again.'; paintFind();
   });
 }
 
-function showSearchError(err, opts) {
-  state.messages.pop();  // drop the placeholder turn
-  var msg, hint;
-  if (err.status === 403) { msg = 'This is a provider account'; hint = 'Sign in with a patient account to search for care.'; }
-  else if (err.status === 503) { msg = 'Search is temporarily unavailable'; hint = 'Please try again shortly.'; }
-  else if (err.body && err.body.aborted) { msg = 'That search was stopped'; hint = 'You can run it again, or browse the map instead.'; }
-  else if (err.status === 0) { msg = 'Couldn\'t reach the navigator'; hint = 'Check your connection and try again.'; }
-  else { msg = 'The assistant didn\'t respond in time'; hint = 'Your search wasn\'t lost. Try again, or browse the map — that works even when the assistant is down.'; }
-
-  var acts = [h('button', { class: 'act primary', type: 'button', onclick: function () { runSearch(opts); } }, 'Try again')];
-  // The deterministic fallback: needs no AI and no backend at all.
-  // The in-app map reads Supabase directly, so it still works when the navigator
-  // is unavailable — which is precisely when this fallback is offered.
-  if (/^\d{5}$/.test(currentZip()) && (state.lastSearch && (state.lastSearch.mapTerms || []).length)) {
-    acts.push(h('button', { class: 'act', type: 'button', onclick: function () { showOnMap(null); } },
-      'Browse ' + (state.lastSearch.label || 'providers') + ' on the map'));
+// Rows -> one result per NPI (its nearest site), with claimed-listing detail.
+function buildResults(rows, s) {
+  var c = s.center, byNpi = {};
+  function consider(r) {
+    if (!r.lat || !r.lng) return;
+    r.miles = milesBetween(c.lat, c.lng, r.lat, r.lng);
+    if (r.miles > s.miles) return;
+    var cur = byNpi[r.npi];
+    if (!cur) { r.sites = 1; byNpi[r.npi] = r; return; }
+    cur.sites++;
+    if (r.miles < cur.miles) { r.sites = cur.sites; byNpi[r.npi] = r; }
   }
-
-  var t = document.getElementById('transcript');
-  if (!t) return;
-  t.appendChild(h('div', { class: 'turn-bot' },
-    h('div', { class: 'bot-mark' }, '✚'),
-    h('div', { class: 'bot-body' },
-      h('div', { class: 'notice' }, h('h4', {}, msg), h('p', {}, hint)),
-      h('div', { class: 'actions' }, acts))));
-  t.scrollIntoView({ block: 'end' });
-}
-
-function ask(text, opts) {
-  if (!text) return;
-  state.messages.push({ role: 'user', content: text });
-  runSearch(opts || {});
-}
-
-/* ---------- home ---------------------------------------------------------- */
-var TOP_CHIPS = [0, 4, 3, 1, 5, 27, 10, 7];   // indexes into SPECIALTIES
-
-function homeEl() {
-  var ta = h('textarea', { rows: '1', placeholder: 'e.g. a primary care doctor who takes my insurance…',
-    'aria-label': 'Describe the care you need',
-    onkeydown: function (e) {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
-    },
-    oninput: function (e) { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'; }
+  (rows || []).forEach(function (row) {
+    if (!row.npi || !taxMatches(row.primary_taxonomy, s.terms)) return;
+    consider({
+      npi: String(row.npi), name: titleCase(row.name), specialty: row.primary_taxonomy || '',
+      address: titleCase(row.address), city: titleCase(row.city), state: row.state, zip: row.zip,
+      lat: +row.latitude, lng: +row.longitude, src: row._src
+    });
   });
-  function submit() {
-    var v = ta.value.trim();
-    if (v) ask(v, {});
+  // Claimed listings publish sites the bulk tables never saw.
+  Object.keys(registeredNpis).forEach(function (npi) {
+    var r = registeredNpis[npi] || {};
+    if (!taxMatches(r.specialty, s.terms)) return;
+    (r.locations || []).forEach(function (loc) {
+      if (!loc.latitude || !loc.longitude) return;
+      consider({ npi: String(npi), name: r.name, specialty: r.specialty || '', address: loc.address_line,
+        city: loc.city, state: loc.state, zip: loc.zip, lat: +loc.latitude, lng: +loc.longitude,
+        phone: loc.phone, src: loc.verified ? 'claimed' : 'self' });
+    });
+  });
+
+  var want = String(s.payer || '').trim().toLowerCase();
+  return Object.keys(byNpi).map(function (npi) {
+    var p = byNpi[npi], reg = registeredNpis[npi];
+    // A bulk secondary-location row is aliased to its parent's NPI (migration
+    // 014): it must not wear the parent's verified badge.
+    if (reg && p.src !== 'secondary') {
+      p.registered = true;
+      p.name = reg.name || p.name;
+      p.phone = p.phone || reg.phone;
+      p.accepting_new_patients = reg.accepting_new_patients;
+      p.telehealth = reg.telehealth;
+      p.payers = reg.payers || [];
+      p.office_hours = reg.office_hours;
+      p.bio = reg.bio;
+      if (want && p.payers.length) p.takes_your_insurance = p.payers.some(function (x) { return String(x).trim().toLowerCase() === want; });
+    }
+    return p;
+  });
+}
+
+function visibleResults() {
+  var s = state.search, f = s.filters;
+  var list = s.all.filter(function (p) {
+    if (f.verified && !p.registered) return false;
+    if (f.accepting && p.accepting_new_patients !== true) return false;
+    if (f.insurance && p.takes_your_insurance !== true) return false;
+    if (f.telehealth && p.telehealth !== true) return false;
+    return true;
+  });
+  list.sort(function (a, b) {
+    if (s.sort === 'verified' && !!a.registered !== !!b.registered) return a.registered ? -1 : 1;
+    if (!!s.suggested[a.npi] !== !!s.suggested[b.npi]) return s.suggested[a.npi] ? -1 : 1;
+    return a.miles - b.miles;
+  });
+  return list;
+}
+
+// Aggregate demand (migration 008) plus the ZIP backfill queue. Fire and forget:
+// neither may slow or break a search.
+function logSearch(s) {
+  api('/patient-match', { method: 'POST', body: { mode: 'log', zip: s.zip, taxonomies: [s.label], matched: s.all.length } }).catch(function () {});
+  fetch(FN + '/zip-enrich-request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ zip: s.zip }) }).catch(function () {});
+}
+
+/* ---------- find: view ---------------------------------------------------- */
+var findEls = null;       // stable DOM for the mounted view
+var findMap = { map: null, layer: null, ring: null, markers: {} };
+
+function findView() {
+  var s = state.search;
+  var fWhat = h('input', { type: 'search', list: 'specList', value: s.text || s.label, autocomplete: 'off',
+    placeholder: 'Specialty or condition, e.g. dermatology, back pain', 'aria-label': 'Specialty or condition' });
+  var dl = h('datalist', { id: 'specList' }, SPECIALTIES.map(function (x) { return h('option', { value: x[0] }); }));
+  var fZip = h('input', { value: s.zip, maxlength: '5', inputmode: 'numeric', placeholder: 'ZIP', 'aria-label': 'ZIP code' });
+  var fMiles = h('select', { 'aria-label': 'Distance' }, RADIUS_CHOICES.map(function (m) {
+    return h('option', { value: String(m), selected: m === s.miles }, 'Within ' + m + ' mi');
+  }));
+  var fPayer = h('select', { 'aria-label': 'Insurance' }, h('option', { value: '' }, 'Any insurance'));
+  function paintPayers(list) {
+    clear(fPayer);
+    fPayer.appendChild(h('option', { value: '' }, 'Any insurance'));
+    var names = list.map(function (x) { return x.name; });
+    if (s.payer && names.indexOf(s.payer) === -1) names.unshift(s.payer);
+    names.forEach(function (n) { fPayer.appendChild(h('option', { value: n, selected: n === s.payer }, n)); });
   }
-
-  var chips = TOP_CHIPS.map(function (i) {
-    var s = SPECIALTIES[i];
-    if (!s) return null;
-    return h('button', { class: 'chip', type: 'button', onclick: function () { pickSpecialty(i); } }, s[0]);
+  loadPayers(s.zip).then(paintPayers);
+  fZip.addEventListener('change', function () {
+    var z = fZip.value.trim();
+    if (/^\d{5}$/.test(z)) loadPayers(z).then(paintPayers);
   });
-  chips.push(h('button', { class: 'chip more', type: 'button', onclick: function () { location.hash = '#/specialties'; } },
-    'All ' + SPECIALTIES.length + ' specialties →'));
 
-  var name = (state.profile && state.profile.first_name) ? String(state.profile.first_name).trim().split(' ')[0] : '';
+  function submit(e) {
+    if (e) e.preventDefault();
+    s.zip = fZip.value.trim();
+    s.miles = parseInt(fMiles.value, 10) || DEFAULT_RADIUS;
+    s.payer = fPayer.value;
+    var text = fWhat.value.trim();
+    if (!text && s.terms.length) { runProviderSearch(); return; }
+    var hit = resolveQuery(text);
+    if (!hit) { state.askDraft = text; location.hash = '#/ask'; return; }
+    s.text = hit.label; fWhat.value = hit.label;
+    s.label = hit.label; s.terms = hit.terms; s.suggested = {};
+    runProviderSearch();
+  }
+  // Changing distance or insurance re-runs a search that already has a subject.
+  fMiles.addEventListener('change', function () { if (s.terms.length) submit(); });
+  fPayer.addEventListener('change', function () {
+    s.payer = fPayer.value;
+    if (s.all.length) { rescorePayer(); paintFind(); }
+  });
 
-  return h('div', { class: 'home' }, h('div', { class: 'col' },
-    h('h1', {}, name ? 'What kind of care ' : 'What kind of care ', h('em', {}, 'do you need?')),
-    h('p', { class: 'sub' }, 'Describe it in your own words, or pick a specialty. You never have to share symptoms to search.'),
-    h('div', { class: 'composer' }, ta,
-      h('button', { class: 'icon-btn', type: 'button', title: 'Upload a medical document',
-        'aria-label': 'Upload a medical document', onclick: function () { location.hash = '#/documents'; } }, '📎'),
-      h('button', { class: 'send', type: 'button', 'aria-label': 'Search', onclick: submit }, '↑')),
-    h('div', { class: 'chips-label' }, 'Common searches'),
-    h('div', { class: 'chips' }, chips)
-  ));
+  var form = h('form', { class: 'sbar', onsubmit: submit },
+    h('label', { class: 'sfield what' }, h('span', { class: 'slbl' }, 'Find'), fWhat, dl),
+    h('label', { class: 'sfield zip' }, h('span', { class: 'slbl' }, 'Near'), fZip),
+    h('label', { class: 'sfield miles' }, h('span', { class: 'slbl' }, 'Distance'), fMiles),
+    h('label', { class: 'sfield payer' }, h('span', { class: 'slbl' }, 'Insurance'), fPayer),
+    h('button', { class: 'sgo', type: 'submit' }, 'Search'));
+
+  var helper = h('button', { class: 'ask-link', type: 'button', onclick: function () { state.askDraft = fWhat.value.trim(); location.hash = '#/ask'; } },
+    '✦ Not sure who to see? Describe it and we\'ll pick the specialty');
+
+  var filters = h('div', { class: 'fbar' });
+  var results = h('div', { class: 'results', id: 'results' });
+  var mapEl = h('div', { id: 'findMap' });
+  var toggle = h('button', { class: 'map-toggle', type: 'button', onclick: function () {
+    var on = body.classList.toggle('show-map');
+    toggle.textContent = on ? '☰ List' : '🗺 Map';
+    // The map was laid out while hidden (zero size), so re-measure it and
+    // re-fit to the search radius, or it opens zoomed to nothing.
+    if (on && findMap.map) setTimeout(function () {
+      findMap.map.invalidateSize(); paintMarkers(visibleResults(), true);
+      body.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }, 50);
+  } }, '🗺 Map');
+  var body = h('div', { class: 'find-body' }, results, h('div', { class: 'mapwrap' }, mapEl), toggle);
+
+  findEls = { filters: filters, results: results, map: mapEl, what: fWhat };
+  var view = h('section', { class: 'find' }, h('div', { class: 'find-top' }, form, helper, filters), body);
+  setTimeout(function () { mountMap(); paintFind(true); }, 0);
+  return view;
+}
+
+function rescorePayer() {
+  var want = String(state.search.payer || '').trim().toLowerCase();
+  state.search.all.forEach(function (p) {
+    delete p.takes_your_insurance;
+    if (want && p.registered && p.payers && p.payers.length) {
+      p.takes_your_insurance = p.payers.some(function (x) { return String(x).trim().toLowerCase() === want; });
+    }
+  });
+}
+
+function chip(label, on, onclick) {
+  return h('button', { class: 'fchip' + (on ? ' on' : ''), type: 'button', 'aria-pressed': on ? 'true' : 'false', onclick: onclick }, label);
+}
+
+function paintFind(refit) {
+  if (!findEls) return;
+  var s = state.search, f = s.filters;
+  var list = visibleResults();
+
+  // filters
+  clear(findEls.filters);
+  function toggle(k) { return function () { f[k] = !f[k]; s.shown = RESULTS_PAGE; paintFind(); }; }
+  var sort = h('select', { class: 'fsort', 'aria-label': 'Sort results', onchange: function (e) { s.sort = e.target.value; paintFind(); } },
+    h('option', { value: 'near', selected: s.sort === 'near' }, 'Nearest first'),
+    h('option', { value: 'verified', selected: s.sort === 'verified' }, 'Verified first'));
+  findEls.filters.appendChild(h('div', { class: 'fchips' },
+    chip('Accepting new patients', f.accepting, toggle('accepting')),
+    chip(s.payer ? 'Takes ' + s.payer : 'Takes my insurance', f.insurance, toggle('insurance')),
+    chip('Telehealth', f.telehealth, toggle('telehealth')),
+    chip('✓ Verified on ProviderPulse', f.verified, toggle('verified'))));
+  findEls.filters.appendChild(sort);
+
+  // results
+  var r = findEls.results;
+  clear(r);
+  if (s.loading) {
+    r.appendChild(h('div', { class: 'rhead' }, h('span', { class: 'spin' }), 'Searching ' + (s.label || 'providers') + ' within ' + s.miles + ' mi of ' + s.zip + '…'));
+    for (var i = 0; i < 5; i++) r.appendChild(h('div', { class: 'res skel' }, h('div', { class: 'sk', style: 'width:52%' }), h('div', { class: 'sk', style: 'width:34%' }), h('div', { class: 'sk', style: 'width:70%' })));
+  } else if (s.error) {
+    r.appendChild(h('div', { class: 'empty' }, h('h3', {}, 'Let\'s fix the search'), h('p', {}, s.error)));
+  } else if (!s.ran) {
+    r.appendChild(startEl());
+  } else {
+    var filtered = list.length !== s.all.length;
+    r.appendChild(h('div', { class: 'rhead' },
+      h('b', {}, list.length.toLocaleString() + ' ' + (s.label || 'providers')),
+      ' within ' + s.miles + ' mi of ' + s.zip,
+      filtered ? h('span', { class: 'muted' }, ' · ' + (s.all.length - list.length) + ' hidden by filters') : null));
+    if (s.truncated) r.appendChild(h('div', { class: 'note' }, 'This area has more listings than we can show at once, so these are a sample. Try a shorter distance.'));
+    if (!list.length) {
+      r.appendChild(h('div', { class: 'empty' },
+        h('h3', {}, s.all.length ? 'No matches with these filters' : 'No ' + (s.label || 'providers') + ' within ' + s.miles + ' miles'),
+        h('p', {}, s.all.length ? 'Filters like "Accepting new patients" only apply to practices verified on ProviderPulse. Try turning some off.'
+          : 'Try a wider distance or a nearby ZIP.'),
+        !s.all.length && s.miles < 50 ? h('button', { class: 'act primary', type: 'button', onclick: function () {
+          s.miles = RADIUS_CHOICES.filter(function (m) { return m > s.miles; })[0] || 50; runProviderSearch();
+        } }, 'Search within ' + (RADIUS_CHOICES.filter(function (m) { return m > s.miles; })[0] || 50) + ' miles') : null));
+    }
+    list.slice(0, s.shown).forEach(function (p) { r.appendChild(resultCard(p)); });
+    if (list.length > s.shown) {
+      r.appendChild(h('button', { class: 'more', type: 'button', onclick: function () { s.shown += RESULTS_PAGE; paintFind(); } },
+        'Show ' + Math.min(RESULTS_PAGE, list.length - s.shown) + ' more of ' + (list.length - s.shown).toLocaleString()));
+    }
+  }
+  paintMarkers(list, refit);
+}
+
+function startEl() {
+  var p = state.profile || {};
+  var name = p.first_name ? String(p.first_name).trim().split(' ')[0] : '';
+  var picks = [0, 3, 4, 10, 5, 1, 9, 27, 8, 2];
+  return h('div', { class: 'start' },
+    h('h2', {}, name ? 'Hi ' + name + ', what kind of care do you need?' : 'What kind of care do you need?'),
+    h('p', {}, 'Search by specialty or describe it in your own words. We show every match within your distance, with verified practices you can request an appointment from.'),
+    h('div', { class: 'tiles' }, picks.map(function (i) {
+      var sp = SPECIALTIES[i];
+      if (!sp) return null;
+      return h('button', { class: 'tile', type: 'button', onclick: function () { pickSpecialty(i); } }, sp[0]);
+    })),
+    h('button', { class: 'ask-link', type: 'button', onclick: function () { location.hash = '#/specialties'; } }, 'Browse all ' + SPECIALTIES.length + ' specialties →'));
 }
 
 function pickSpecialty(i) {
-  var s = SPECIALTIES[i];
-  if (!s) return;
-  var zip = currentZip();
-  ask('I\'m looking for ' + s[0].toLowerCase() + (zip ? ' near ' + zip : '') + '.', {
-    specialty: s[2],
-    mapTerms: s[1].split(','),
-    label: s[0],
-    zip: zip
+  var sp = SPECIALTIES[i];
+  if (!sp) return;
+  var s = state.search;
+  s.text = sp[0]; s.label = sp[0]; s.terms = sp[1].split(','); s.suggested = {};
+  if (findEls) findEls.what.value = sp[0];
+  if (!/^\d{5}$/.test(s.zip)) { s.ran = true; s.error = 'Enter your ZIP code, then press Search.'; paintFind(); return; }
+  runProviderSearch();
+}
+
+function fmtMiles(m) { return m < 0.1 ? '< 0.1 mi' : (m < 10 ? m.toFixed(1) : Math.round(m)) + ' mi'; }
+
+function resultCard(p) {
+  var s = state.search;
+  var badges = [];
+  if (s.suggested[p.npi]) badges.push(h('span', { class: 'badge sug' }, '✦ Suggested for you'));
+  if (p.registered) badges.push(h('span', { class: 'badge verified' }, '✓ Verified'));
+  if (p.accepting_new_patients === true) badges.push(h('span', { class: 'badge good' }, 'Accepting new patients'));
+  if (p.takes_your_insurance === true) badges.push(h('span', { class: 'badge good' }, 'Takes ' + s.payer));
+  else if (p.takes_your_insurance === false) badges.push(h('span', { class: 'badge caution' }, s.payer + ' not listed'));
+  if (p.telehealth === true) badges.push(h('span', { class: 'badge tele' }, 'Telehealth'));
+  if (p.src === 'self') badges.push(h('span', { class: 'badge unknown' }, 'Self-reported address'));
+
+  var acts = [];
+  if (p.registered) acts.push(h('button', { class: 'act primary', type: 'button', onclick: function (e) { e.stopPropagation(); location.hash = '#/book/' + p.npi; } }, 'Request appointment'));
+  if (p.phone) acts.push(h('a', { class: 'act', href: 'tel:' + p.phone, onclick: function (e) { e.stopPropagation(); } }, 'Call ' + p.phone));
+  acts.push(h('button', { class: 'act', type: 'button', onclick: function (e) { e.stopPropagation(); location.hash = '#/p/' + p.npi; } }, 'Details'));
+
+  var card = h('article', { class: 'res' + (s.active === p.npi ? ' active' : ''), 'data-npi': p.npi, tabindex: '0',
+    onmouseenter: function () { highlight(p.npi, false); },
+    onmouseleave: function () { highlight(null, false); },
+    onclick: function () { focusResult(p.npi, true); } },
+    h('div', { class: 'res-av', style: '--h:' + hueFor(p.npi) }, initials(p.name)),
+    h('div', { class: 'res-main' },
+      h('div', { class: 'res-top' },
+        h('h3', {}, p.name || 'Provider'),
+        h('span', { class: 'dist' }, fmtMiles(p.miles))),
+      h('div', { class: 'res-spec' }, p.specialty),
+      h('div', { class: 'res-addr' }, [p.address, p.city].filter(Boolean).join(', '),
+        p.sites > 1 ? h('span', { class: 'muted' }, ' · ' + (p.sites - 1) + ' more location' + (p.sites > 2 ? 's' : '')) : null),
+      badges.length ? h('div', { class: 'badges' }, badges) : null,
+      p.office_hours ? h('div', { class: 'res-hours' }, 'Hours: ', summariseHours(p.office_hours)) : null,
+      h('div', { class: 'actions' }, acts)));
+  return card;
+}
+
+/* ---------- find: map ----------------------------------------------------- */
+function mountMap() {
+  if (!findEls || findMap.map) return;
+  loadLeaflet().then(function (ok) {
+    if (!ok || !findEls || findMap.map) return;
+    var c = state.search.center;
+    var map = L.map(findEls.map, { zoomControl: false, preferCanvas: true })
+      .setView(c ? [c.lat, c.lng] : [39.5, -98.35], c ? 11 : 4);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    // Light, high-contrast streets at retina resolution. The previous dark
+    // "dataviz" style made roads and labels nearly invisible.
+    L.tileLayer('https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}@2x.png?key=' + MAPTILER_KEY, {
+      tileSize: 512, zoomOffset: -1, maxZoom: 19,
+      attribution: '&copy; MapTiler &copy; OpenStreetMap contributors'
+    }).addTo(map);
+    findMap.map = map;
+    findMap.layer = L.layerGroup().addTo(map);
+    paintFind(true);
+    // The profile ZIP is known before any search: show that area straight away.
+    var s = state.search;
+    if (!s.center && /^\d{5}$/.test(s.zip)) locateZip(s.zip).then(function (cc) {
+      if (cc && !s.center) { s.center = cc; paintMarkers(visibleResults(), true); }
+    });
   });
+}
+
+function markerStyle(p, hot) {
+  var ver = p.registered;
+  return {
+    radius: hot ? 11 : (ver ? 8 : 6),
+    color: '#ffffff', weight: hot ? 3 : 2,
+    fillColor: hot ? '#4f46e5' : (ver ? '#0d9488' : '#2563eb'),
+    fillOpacity: hot ? 1 : 0.9
+  };
+}
+
+function paintMarkers(list, refit) {
+  var m = findMap.map;
+  if (!m) return;
+  var s = state.search;
+  findMap.layer.clearLayers();
+  findMap.markers = {};
+  if (s.center) {
+    L.circle([s.center.lat, s.center.lng], {
+      radius: s.miles * 1609.34, color: '#4f46e5', weight: 1.5, dashArray: '6 6',
+      fillColor: '#4f46e5', fillOpacity: 0.04, interactive: false
+    }).addTo(findMap.layer);
+    L.circleMarker([s.center.lat, s.center.lng], { radius: 5, color: '#fff', weight: 2, fillColor: '#111827', fillOpacity: 1, interactive: false })
+      .addTo(findMap.layer);
+  }
+  // Draw nearest last so they sit on top of the pile.
+  list.slice().reverse().forEach(function (p) {
+    var mk = L.circleMarker([p.lat, p.lng], markerStyle(p, s.active === p.npi));
+    mk.bindTooltip(p.name || 'Provider', { direction: 'top', offset: [0, -6] });
+    mk.on('click', function () { focusResult(p.npi, false); });
+    mk.addTo(findMap.layer);
+    findMap.markers[p.npi] = { mk: mk, p: p };
+  });
+  if (refit && s.center) {
+    var dLat = s.miles / 69, dLng = s.miles / (69 * Math.cos(s.center.lat * Math.PI / 180));
+    m.fitBounds([[s.center.lat - dLat, s.center.lng - dLng], [s.center.lat + dLat, s.center.lng + dLng]], { padding: [20, 20] });
+  }
+}
+
+function highlight(npi, pan) {
+  Object.keys(findMap.markers).forEach(function (k) {
+    var o = findMap.markers[k];
+    var hot = k === npi || k === state.search.active;
+    o.mk.setStyle(markerStyle(o.p, hot));
+    if (hot) o.mk.bringToFront();
+  });
+  if (pan && npi && findMap.markers[npi] && findMap.map) {
+    var ll = findMap.markers[npi].mk.getLatLng();
+    if (!findMap.map.getBounds().pad(-0.15).contains(ll)) findMap.map.panTo(ll);
+  }
+}
+
+// Select one result: ring it on the map and bring its card into view.
+function focusResult(npi, fromList) {
+  var s = state.search;
+  s.active = npi;
+  document.querySelectorAll('.res.active').forEach(function (n) { n.classList.remove('active'); });
+  var list = visibleResults();
+  var idx = -1;
+  for (var i = 0; i < list.length; i++) if (list[i].npi === npi) { idx = i; break; }
+  if (idx >= s.shown) { s.shown = idx + 1; paintFind(); }
+  var card = document.querySelector('.res[data-npi="' + npi + '"]');
+  if (card) {
+    card.classList.add('active');
+    if (!fromList) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  highlight(npi, true);
+  if (!fromList) {
+    var body = document.querySelector('.find-body');
+    if (body && body.classList.contains('show-map') && findMap.markers[npi]) findMap.markers[npi].mk.openTooltip();
+  }
+}
+
+/* ---------- ask: the optional AI helper ----------------------------------- */
+function stripMarkdown(t) {
+  return String(t || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/^\s*[-*]\s+/gm, '• ').replace(/[*_`#]/g, '');
+}
+
+function askSheet() {
+  var s = state.search;
+  var ta = h('textarea', { maxlength: '600', placeholder: 'e.g. I keep getting headaches and my vision is blurry', 'aria-label': 'Describe what you need' });
+  ta.value = state.askDraft || '';
+  var out = h('div', { class: 'ask-out' });
+  var btn = h('button', { class: 'btn-full', type: 'button', onclick: go }, 'Find the right kind of doctor');
+
+  function go() {
+    var text = ta.value.trim();
+    if (!text) { ta.focus(); return; }
+    btn.disabled = true;
+    clear(out);
+    out.appendChild(h('p', { class: 'muted' }, h('span', { class: 'spin' }), ' Thinking about the right specialty…'));
+    api('/patient-match', { method: 'POST', timeout: 26000,
+      body: { messages: [{ role: 'user', content: text }], zip: /^\d{5}$/.test(s.zip) ? s.zip : '' } })
+      .then(function (d) {
+        btn.disabled = false;
+        clear(out);
+        var terms = (d.map_taxonomies && d.map_taxonomies.length) ? d.map_taxonomies : (d.taxonomies || []);
+        var label = (d.taxonomies || [])[0] || 'Providers';
+        out.appendChild(h('div', { class: 'ask-reply' }, stripMarkdown(d.reply)));
+        if (terms.length) {
+          out.appendChild(h('button', { class: 'btn-full', type: 'button', onclick: function () {
+            s.text = label; s.label = label; s.terms = terms; s.suggested = {};
+            (d.providers || []).forEach(function (p) { if (p.npi) s.suggested[String(p.npi)] = true; });
+            if (d.zip && /^\d{5}$/.test(d.zip)) s.zip = d.zip;
+            state.askDraft = '';
+            location.hash = '';
+            if (findEls) findEls.what.value = label;
+            runProviderSearch();
+          } }, 'Show all ' + label + ' near ' + (d.zip || s.zip || 'me')));
+        }
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        clear(out);
+        out.appendChild(h('p', { class: 'msg err' }, err.status === 0 || err.status >= 500
+          ? 'The assistant is unavailable right now. You can still search by specialty.' : err.message));
+      });
+  }
+  if (ta.value) setTimeout(go, 0);
+  return sheet('Not sure who to see?', [
+    h('p', { class: 'muted', style: 'margin-bottom:12px' },
+      'Describe what\'s going on in your own words. We\'ll suggest the right kind of provider and show every one near you. This is not medical advice; in an emergency call 911.'),
+    h('div', { class: 'field' }, ta), btn, out
+  ]);
 }
 
 /* ---------- document upload + review -------------------------------------- */
@@ -934,7 +1032,7 @@ function reviewEl() {
         return api('/profile').then(function (p) { state.profile = p.profile || state.profile; return data; });
       })
       .then(function (data) {
-        state.messages.push({ role: 'assistant', content: data.message || 'Added to your profile.' });
+        toast(data.message || 'Added to your profile.');
         render();
         // A referral is a specialty the patient's own doctor already chose.
         // Offering to find it is carrying out that instruction, not advising.
@@ -945,20 +1043,15 @@ function reviewEl() {
             if (SPECIALTIES[i][0].toLowerCase().indexOf(term.toLowerCase()) !== -1 ||
                 SPECIALTIES[i][2].toLowerCase().indexOf(term.toLowerCase()) !== -1) { match = i; break; }
           }
-          var t = document.getElementById('transcript');
-          if (t) t.appendChild(h('div', { class: 'col' }, h('div', { class: 'actions' },
-            h('button', { class: 'act primary', type: 'button', onclick: function () {
-              if (match !== null) pickSpecialty(match);
-              else ask('I need to see ' + term + '.', { specialty: term, label: term });
-            } }, 'Find ' + term + ' near me'))));
+          // Straight into the search the referral names.
+          if (match !== null) pickSpecialty(match);
+          else { state.askDraft = 'My doctor referred me to ' + term + '.'; location.hash = '#/ask'; }
         }
       })
       .catch(function (err) { toast(err.message, true); });
   }
 
-  return h('div', { class: 'turn-bot' },
-    h('div', { class: 'bot-mark' }, '✚'),
-    h('div', { class: 'bot-body' },
+  return sheet('Review your document', [h('div', {},
       h('p', {}, r.facts.length
         ? 'Here\'s what I found in that ' + (r.document_kind || 'document') + '. Choose what to add to your profile — I only read what the document says, I don\'t interpret results.'
         : 'I couldn\'t find anything to add from that document.'),
@@ -966,8 +1059,7 @@ function reviewEl() {
       h('div', { class: 'actions' },
         r.facts.length ? h('button', { class: 'act primary', type: 'button', onclick: apply }, 'Add selected to my profile') : null,
         h('button', { class: 'act', type: 'button', onclick: function () { state.reviewing = null; render(); } },
-          r.facts.length ? 'Not now' : 'OK')))
-  );
+          r.facts.length ? 'Not now' : 'OK')))]);
 }
 
 function uploadDocument(file) {
@@ -995,8 +1087,6 @@ function uploadDocument(file) {
     state.reviewing = { document_id: docId, document_kind: data.document_kind, facts: data.facts || [] };
     location.hash = '';
     render();
-    var t = document.getElementById('transcript');
-    if (t) t.scrollIntoView({ block: 'end' });
   }).catch(function (err) {
     toast(err.status === 503 ? 'Document upload isn\'t available yet.' : err.message, true);
   });
@@ -1060,8 +1150,7 @@ function fmtWhen(iso) {
 }
 
 function bookSheet(npi) {
-  var p = null;
-  for (var i = 0; i < state.results.length; i++) if (String(state.results[i].npi) === String(npi)) p = state.results[i];
+  var p = findResult(npi);
   if (!p || !p.registered) {
     return sheet('Request an appointment', [h('p', { style: 'color:var(--muted)' },
       'That provider is no longer in your results, or does not take requests here yet. Search again, or call them.')]);
@@ -1174,8 +1263,7 @@ function specialtiesSheet() {
 }
 
 function detailSheet(npi) {
-  var p = null;
-  for (var i = 0; i < state.results.length; i++) if (String(state.results[i].npi) === String(npi)) p = state.results[i];
+  var p = findResult(npi);
   if (!p) return sheet('Provider', [h('p', { style: 'color:var(--muted)' }, 'That provider is no longer in your results.')]);
 
   var cms = h('div', { style: 'color:var(--muted);font-size:13.5px' }, 'Loading credentials…');
@@ -1194,6 +1282,23 @@ function detailSheet(npi) {
     })
     .catch(function () { clear(cms); cms.appendChild(document.createTextNode('Credential lookup is unavailable right now.')); });
 
+  // Unclaimed rows carry no phone. NPPES has the practice line, so fetch it
+  // when someone actually opens the listing rather than for every result.
+  var phoneDd = h('dd', { class: 'm' }, p.phone || 'Looking up…');
+  var callSlot = h('span', {}, p.phone ? h('a', { class: 'act primary', href: 'tel:' + p.phone }, '📞 Call') : null);
+  if (!p.phone) {
+    api('/nppes-lookup?npi=' + encodeURIComponent(p.npi), { auth: false, timeout: 10000 }).then(function (d) {
+      var rec = d && d.results && d.results[0];
+      var addrs = (rec && rec.addresses) || [];
+      var loc = addrs.filter(function (a) { return a.address_purpose === 'LOCATION'; })[0] || addrs[0] || {};
+      if (loc.telephone_number) {
+        p.phone = loc.telephone_number;
+        phoneDd.textContent = p.phone;
+        callSlot.appendChild(h('a', { class: 'act primary', href: 'tel:' + p.phone }, '📞 Call'));
+      } else phoneDd.textContent = 'Not listed';
+    }).catch(function () { phoneDd.textContent = 'Not listed'; });
+  }
+
   return sheet(p.name || 'Provider', [
     h('div', { class: 'badges', style: 'margin-top:0' }, badgesFor(p)),
     p.bio ? h('p', { style: 'margin-top:14px;color:var(--muted);font-size:14px' }, p.bio) : null,
@@ -1201,15 +1306,18 @@ function detailSheet(npi) {
       h('dt', {}, 'Specialty'), h('dd', {}, p.specialty || '—'),
       h('dt', {}, 'NPI'), h('dd', { class: 'm' }, p.npi),
       h('dt', {}, 'Address'), h('dd', {}, [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ') || '—'),
-      h('dt', {}, 'Phone'), h('dd', { class: 'm' }, p.phone || '—'),
+      p.miles != null ? h('dt', {}, 'Distance') : null, p.miles != null ? h('dd', {}, fmtMiles(p.miles) + ' from ' + state.search.zip) : null,
+      h('dt', {}, 'Phone'), phoneDd,
       (p.registered && p.payers && p.payers.length) ? h('dt', {}, 'Accepts') : null,
       (p.registered && p.payers && p.payers.length) ? h('dd', {}, p.payers.join(', ')) : null),
     h('div', { class: 'sec-label' }, 'From Medicare records'), cms,
     h('div', { class: 'actions' },
       p.registered ? h('button', { class: 'act primary', type: 'button',
         onclick: function () { location.hash = '#/book/' + p.npi; } }, '📅 Request appointment') : null,
-      p.phone ? h('a', { class: 'act primary', href: 'tel:' + p.phone }, '📞 Call') : null,
-      (p.lat && p.lng) ? h('button', { class: 'act', type: 'button', onclick: function () { showOnMap(p.npi); } }, 'Show on map') : null)
+      callSlot,
+      (p.lat && p.lng) ? h('button', { class: 'act', type: 'button', onclick: function () {
+        location.hash = ''; setTimeout(function () { focusResult(p.npi, false); }, 0);
+      } }, 'Show on map') : null)
   ]);
 }
 
@@ -1373,8 +1481,6 @@ function toast(text, isErr) {
 
 function paintHeader() {
   var p = state.profile || {};
-  var z = currentZip();
-  $('#zipVal').textContent = z || 'set ZIP';
   var initial = (p.first_name || '?').trim().charAt(0).toUpperCase() || '?';
   $('#acctBtn').textContent = initial;
 }
@@ -1408,9 +1514,17 @@ function route() {
   return { name: parts[0] || '', arg: parts[1] || '' };
 }
 
+// The find view (search bar, results, map) is built once and kept: sheets open
+// over it, so opening a listing or the account never rebuilds the map.
+var findMounted = false;
+function unmountFind() {
+  findMounted = false; findEls = null;
+  if (findMap.map) { try { findMap.map.remove(); } catch (e) {} }
+  findMap = { map: null, layer: null, ring: null, markers: {} };
+}
+
 function render() {
   var main = $('#main');
-  clear(main);
   document.querySelectorAll('.scrim, .sheet').forEach(function (n) { n.remove(); });
 
   var r = route();
@@ -1418,41 +1532,28 @@ function render() {
   $('#hdr').hidden = !authed;
 
   if (!authed) {
+    unmountFind();
+    clear(main);
     main.appendChild(gateEl(r.name === 'join' ? 'register' : 'login'));
     return;
   }
 
   paintHeader();
-
-  // Wide screens get a persistent map beside the conversation, so results and
-  // geography are visible together. Narrow screens keep the #/map sheet, which
-  // is the only sensible shape on a phone.
-  var wide = window.matchMedia && window.matchMedia('(min-width: 1100px)').matches;
-  var col = main;
-  if (wide && state.results.length) {
-    var split = h('div', { class: 'split' });
-    col = h('div', { class: 'split-conv' });
-    var pane = h('div', { class: 'split-map' }, h('div', { id: 'mapCanvas' }),
-      h('div', { class: 'map-legend' },
-        h('span', {}, h('i', { class: 'pin rec' }), 'Recommended'),
-        h('span', {}, h('i', { class: 'pin ver' }), 'Verified'),
-        h('span', {}, h('i', { class: 'pin oth' }), 'Other clinics')));
-    split.appendChild(col); split.appendChild(pane);
-    main.appendChild(split);
-    setTimeout(function () { loadRegistered().then(function () { initMap(pane.querySelector('#mapCanvas'), h('span', {})); }); }, 0);
+  if (!findMounted) {
+    if (!state.search) state.search = newSearch();
+    clear(main);
+    main.appendChild(findView());
+    findMounted = true;
   }
-  col.appendChild(state.messages.length || state.pending || state.reviewing ? transcriptEl() : homeEl());
 
   if (r.name === 'p' && r.arg) document.body.appendChild(detailSheet(r.arg));
   else if (r.name === 'account') document.body.appendChild(accountSheet());
   else if (r.name === 'documents') { document.body.appendChild(documentsSheet()); loadDocuments(); }
   else if (r.name === 'specialties') document.body.appendChild(specialtiesSheet());
-  else if (r.name === 'map') { loadRegistered(); document.body.appendChild(mapSheet()); }
   else if (r.name === 'book' && r.arg) document.body.appendChild(bookSheet(r.arg));
   else if (r.name === 'appointments') document.body.appendChild(appointmentsSheet());
-
-  var t = document.getElementById('transcript');
-  if (t && (state.pending || state.messages.length)) t.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  else if (r.name === 'ask') document.body.appendChild(askSheet());
+  else if (state.reviewing) document.body.appendChild(reviewEl());
 }
 
 /* ---------- wire up ------------------------------------------------------- */
@@ -1461,15 +1562,7 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && location.hash) closeSheet();
 });
 $('#acctBtn').addEventListener('click', function () { location.hash = '#/account'; });
-$('#zipPill').addEventListener('click', function () {
-  var z = window.prompt('Search near which ZIP code?', currentZip());
-  if (z === null) return;
-  z = z.trim();
-  if (!/^\d{5}$/.test(z)) { toast('Enter a 5-digit ZIP code.', true); return; }
-  state.lastSearch = state.lastSearch || {};
-  state.lastSearch.zip = z;
-  paintHeader();
-});
+$('#apptBtn').addEventListener('click', function () { location.hash = '#/appointments'; });
 
 state.session = loadSession();
 if (state.session) {

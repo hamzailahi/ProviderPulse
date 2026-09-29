@@ -328,8 +328,9 @@ function logDemand(env, { zip, taxonomies, payer, source, matched }) {
       matched_count: Number.isFinite(Number(matched)) ? Number(matched) : null
     };
 
-    // Not awaited. The response must not wait on analytics.
-    fetch(`${env.SUPABASE_URL}/rest/v1/demand_log`, {
+    // Not awaited on the navigator path: the response must not wait on
+    // analytics. Returned so the log-only mode below can await it.
+    return fetch(`${env.SUPABASE_URL}/rest/v1/demand_log`, {
       method: 'POST',
       headers: {
         apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -377,6 +378,23 @@ exports.handler = async (event) => {
   });
   const profRows = await profRes.json();
   const p = (Array.isArray(profRows) && profRows[0]) || {};
+
+  // Log-only mode. The patient app now searches the directory tables directly
+  // (no model involved), and calls this just to record the SHAPE of that
+  // search in demand_log -- which is what providers' "local demand" reads --
+  // and to queue the ZIP for the background NPI backfill. Same rules as
+  // logDemand: ZIP, specialty label, payer name and a count, never the person.
+  if (body.mode === 'log') {
+    const zip = String(body.zip || '').trim();
+    const taxonomies = (Array.isArray(body.taxonomies) ? body.taxonomies : []).map(t => String(t).slice(0, 120)).slice(0, 3);
+    if (/^\d{5}$/.test(zip) && taxonomies.length) {
+      await Promise.all([
+        logDemand(env, { zip, taxonomies, payer: p.insurance_payer, source: 'specialty_browser', matched: body.matched }),
+        requestZipEnrichment(env, zip)
+      ].map(x => Promise.resolve(x).catch(() => {})));
+    }
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) };
+  }
 
   // Extract ZIP from chat if patient typed one, overrides missing profile ZIP
   const allChatText = history.map(m => String(m.content || '')).join(' ');
@@ -489,7 +507,7 @@ ${specialty
   ? `- The patient chose to browse "${specialty}" providers directly and has NOT described any symptoms. Greet them by first name in a few words and go straight to the list. Do not mention health conditions, do not ask what is wrong, and do not ask them to describe symptoms.`
   : '- On the first message, greet the patient by first name and briefly, kindly acknowledge the health concerns they listed. One sentence, no drama.'}
 - Present ALL providers in the list above, in the exact order given. For each: name, specialty, city, and phone.
-- A single "Open these on the map" link appears automatically under your reply, which shows their whole area on the map with these providers highlighted. Do not list URLs yourself.
+- After your reply the app shows every matching provider near them on a map and in a list, with these ones marked as suggested. Do not list URLs yourself.
 - If the list is empty AND no ZIP is on file, ask them to share their 5-digit ZIP so you can search.
 - If the list is empty AND a ZIP was provided, tell them there are no matches in that area for that specialty and offer to try a different specialty or nearby area.
 - Insurance: a provider with "takes_your_insurance": true has confirmed with us that they accept ${patientContext.insurance} — say so plainly and mention they are a verified listing. For anyone with "registered": true, their "payers" list is what they told us they accept. For everyone else insurance is simply unknown, so tell the patient to call ahead and confirm; never guess.
@@ -497,7 +515,7 @@ ${specialty
 - You are not a doctor. Never diagnose, never recommend treatments or medications. If asked for medical advice, gently redirect to seeing a provider.
 - The patient may have uploaded their own medical documents, and details from them can appear in the conditions or concerns above. Those are for choosing WHICH KIND of provider to search for, nothing else. Never interpret a test result, never say whether something is normal or worrying, never explain what a measurement means, and never guess at a diagnosis — even if the patient asks directly, and even if the answer seems obvious. Say that reading results is their doctor's job, and offer to help them find the right kind of doctor instead. If a document referred them to a specialty, help them find that specialty near them; that is carrying out their doctor's instruction, which is exactly what you are for.
 - If the patient describes an emergency (chest pain, difficulty breathing, stroke signs, suicidal thoughts), tell them to call 911 or go to the nearest emergency room immediately.
-- Keep every reply under 150 words. Plain text only, no markdown.`;
+- Keep every reply under 150 words. Plain text only: no markdown, no asterisks, no bold.`;
 
   const messages = history.length
     ? history.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content || '').slice(0, 2000) }))
