@@ -42,6 +42,13 @@
   status = 301
   force = true
 
+# The provider portal (portal.html): overview, appointments, listing,
+# locations, competition. /dashboard is its Market tab.
+[[redirects]]
+  from = "/portal"
+  to = "/portal.html"
+  status = 200
+
 # One auth surface for both sides. Same page, different starting mode — the
 # role toggle and sign-in/join state live in the hash, so these are rewrites
 # (200) rather than redirects, and the URL the visitor typed is what they keep.

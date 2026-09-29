@@ -216,7 +216,7 @@ function routeByRole(serverRole) {
   // The destination re-checks the session itself, so if this role does not
   // belong there it bounces again rather than trusting this hop.
   if (next && (serverRole === 'provider' || serverRole === 'patient')) { location.href = next; return; }
-  if (serverRole === 'provider') { location.href = '/register-provider.html'; return; }
+  if (serverRole === 'provider') { location.href = '/portal'; return; }
   if (serverRole === 'patient')  { location.href = '/'; return; }
   setMsg('siMsg', 'That account has no role assigned. Contact support.', false);
 }

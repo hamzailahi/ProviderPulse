@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>ProviderPulse · Provider portal</title>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/portal.css">
+<!-- Signed-out visitors and patients never see the portal paint. The real
+     checks are server-side (profile, appointment-request, provider-locations
+     all verify the token); this only avoids a flash of the wrong page. -->
+<script>
+(function () {
+  var s = null;
+  try { s = JSON.parse(sessionStorage.getItem('pp.session.v1') || localStorage.getItem('pp.session.v1') || 'null'); } catch (e) {}
+  if (!s || !s.access_token) { location.replace('/signin?next=' + encodeURIComponent(location.pathname + location.hash)); return; }
+  if (s.role === 'patient') location.replace('/');
+})();
+</script>
+</head>
+<body>
+<header class="ptop">
+  <a class="brand" href="#/overview"><span class="mark" aria-hidden="true">✚</span> ProviderPulse <span class="tag">Provider</span></a>
+  <div class="spacer"></div>
+  <span class="who" id="who"></span>
+  <button class="ghost" id="signOut" type="button">Sign out</button>
+</header>
+<div class="shell">
+  <nav class="pnav" id="pnav" aria-label="Portal"></nav>
+  <main class="pmain" id="pmain" tabindex="-1"></main>
+</div>
+
+<!-- Every view is built with the h() helper in portal.js: values from the API
+     are placed with textContent, never interpolated into innerHTML. -->
+<script src="assets/specialties.js"></script>
+<script src="assets/directory.js"></script>
+<script src="assets/portal.js"></script>
+</body>
+</html>

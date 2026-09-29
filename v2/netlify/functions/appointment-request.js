@@ -211,10 +211,24 @@ exports.handler = async (event) => {
       return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: `Cannot move from ${from} to ${nextStatus}` }) };
     }
 
+    const change = { status: nextStatus, updated_at: new Date().toISOString() };
+    // A provider may confirm at a different time than the patient asked for
+    // ("confirm for Tuesday 10am instead"). Only the provider, only on confirm,
+    // and only a valid future time; the patient sees the new time in their list.
+    if (body.requested_time != null && body.requested_time !== '') {
+      if (role !== 'provider' || nextStatus !== 'confirmed') {
+        return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Only a provider confirming a request can set its time' }) };
+      }
+      const t = new Date(String(body.requested_time));
+      if (isNaN(t.getTime())) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'That date and time is not valid' }) };
+      if (t.getTime() < Date.now() - 5 * 60000) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Pick a time in the future' }) };
+      change.requested_time = t.toISOString();
+    }
+
     const upRes = await fetch(`${env.SUPABASE_URL}/rest/v1/appointment_requests?id=eq.${id}`, {
       method: 'PATCH',
       headers: { ...userHeaders, Prefer: 'return=representation' },
-      body: JSON.stringify({ status: nextStatus, updated_at: new Date().toISOString() })
+      body: JSON.stringify(change)
     });
     if (!upRes.ok) {
       const detail = await upRes.text().catch(() => '');
@@ -222,7 +236,7 @@ exports.handler = async (event) => {
     }
     const updated = await upRes.json();
 
-    await audit(env, { actor: user.id, actor_role: role, action: 'appointment_status_changed', target: id, detail: { from, to: nextStatus }, ip });
+    await audit(env, { actor: user.id, actor_role: role, action: 'appointment_status_changed', target: id, detail: { from, to: nextStatus, rescheduled: !!change.requested_time }, ip });
 
     const u = updated[0] || null;
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ appointment: u && { id: u.id, status: u.status, requested_time: u.requested_time, reason: u.reason, updated_at: u.updated_at } }) };

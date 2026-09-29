@@ -58,19 +58,19 @@
             <div class="logo-text">ProviderPulse</div>
         </div>
         <div class="divider"></div>
-        <!-- Surface switcher: the "one product" nav. Makes the two-sided nature
-             visible instead of each surface pretending to be the whole thing. -->
-        <nav id="surface-switch" aria-label="Switch product area">
-            <a href="/">Find care</a>
-            <a href="/register-provider.html">For providers</a>
-            <span class="active" aria-current="page">Market Strategy</span>
+        <!-- The provider portal's nav. This dashboard is the portal's Market
+             tab (portal.html has the other five), so it carries the same links
+             and no patient-side ones: patients never reach this page. -->
+        <nav id="surface-switch" aria-label="Provider portal">
+            <a href="/portal#/overview">Overview</a>
+            <a href="/portal#/appointments">Appointments</a>
+            <a href="/portal#/listing">My listing</a>
+            <a href="/portal#/competition">Competition</a>
+            <span class="active" aria-current="page">Market</span>
         </nav>
         <div id="omnibar-slot"></div>
         <div class="right">
             <span id="sessionInfo" style="font-size:10px;color:var(--text-muted);"></span>
-            <!-- Patients arrive here from the care navigator's map link; give them
-                 a way back rather than stranding them in the analyst tool. -->
-            <a href="/" style="font-size:10px;color:var(--accent,var(--accent));text-decoration:none;margin-left:12px;">← Find care</a>
         </div>
     </div>
 
@@ -3779,33 +3779,6 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
             }
         });
     
-        /* ====================================================================
-           ROLE-AWARE ENTRY
-           Patients never get this far: the sign-in gate in <head> sends them
-           home, because this is the provider's market tool and the patient app
-           has its own, narrower map. What is left here is the provider nicety
-           of a link back to their own listing.
-           ==================================================================== */
-        (function roleAwareEntry() {
-            var s = null;
-            try {
-                s = JSON.parse(sessionStorage.getItem('pp.session.v1')
-                    || localStorage.getItem('pp.session.v1') || 'null');
-            } catch (e) { return; }
-            if (!s || !s.role) return;
-
-            if (s.role === 'provider') {
-                // Signed-in provider: say so, and give them a way back to their listing.
-                var right = document.querySelector('#topbar-v2 .right');
-                if (!right) return;
-                var a = document.createElement('a');
-                a.href = 'register-provider.html';
-                a.textContent = 'Your listing';
-                a.style.cssText = 'font-size:11px;color:var(--a1);text-decoration:none;margin-left:12px';
-                right.appendChild(a);
-            }
-        })();
-
         /* ====================================================================
            REDESIGN WIRING
            Kept in one block at the end so it can be read (or reverted) as a
