@@ -1,0 +1,11 @@
+{
+  "name": "providerpulse-v2",
+  "private": true,
+  "description": "Netlify Functions dependencies. The frontend has no build step.",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.129.0"
+  }
+}

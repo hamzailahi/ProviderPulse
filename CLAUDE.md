@@ -2,7 +2,10 @@
 
 Healthcare provider directory ("ProviderPulse"), deployed on Netlify with
 Supabase as the auth and database backend. Static HTML frontends, Netlify
-Functions backend, no build step.
+Functions backend, no build step. The functions have one npm dependency,
+`@anthropic-ai/sdk`, declared in `v2/package.json` with a committed lockfile;
+Netlify installs it on deploy and CI runs `npm ci --prefix v2`. Keep it the
+only one unless there's a strong reason.
 
 **This repository is public.** Nothing secret goes in this file or anywhere
 else in git: no keys, no passwords, no service-role tokens. Secrets live in
@@ -93,7 +96,7 @@ documents already uploaded.
 
 Netlify Functions have a **26-second hard timeout**, and the *default* is 10s.
 `netlify.toml` raises everything that chains external calls: 26s for
-`ai-query`, `report-generate`, `patient-match`, `auth-register-provider`,
+`market-assistant`, `report-generate`, `patient-match`, `auth-register-provider`,
 `doc-extract`, `provider-locations`, `audit-run`, `audit-narrate`; 20s for
 `cms-provider`, `appointment-briefing` and `market-score`. Each entry carries a
 comment naming the chain that justifies it. Keep those comments current: an
@@ -144,7 +147,7 @@ too.
   `provider_profiles` row exists for the user (service role);
   `isStaff()` checks the email against `STAFF_EMAILS`, and staff count as
   providers.
-- **The dashboard is provider-only.** `ai-query` and `report-generate` require
+- **The dashboard is provider-only.** `market-assistant` and `report-generate` require
   `isProvider`. `index.html`'s `requireSession()` also sends patients back to
   `/` unless the session is staff; that redirect is the UX half, the function
   checks are the enforcement half.
@@ -240,8 +243,10 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   `available:false` with a reason rather than a synthesized score.
 - **demand-stats.js**: public aggregate read of `demand_log` with suppression
   (see demand logging).
-- **ai-query.js**: provider-only. The dashboard tool loop reasons over clinics
-  already loaded in the browser; `mode:'market_memo'` is the two-step agent.
+- **market-assistant.js**: provider-only (staff included). The dashboard's
+  Ask AI. See "The market assistant" below. (It replaced `ai-query.js` on
+  2026-09-29; that endpoint accepted a client-written system prompt and only
+  saw clinics loaded in the browser.)
 - **patient-match.js**: AI care navigator, signed-in patients only. Maps
   conditions and chat keywords to NPPES taxonomy terms
   (`CONDITION_TAXONOMY` / `KEYWORD_TAXONOMY`; chat intent overrides profile
@@ -561,7 +566,9 @@ search behavior.
 - The published surface, to re-read before shipping any change to it:
   `providers-public.js` (`PUBLIC_COLUMNS`), `demand-stats.js` (`MIN_GROUP`),
   `lib/query-plan.js` (`TABLES`), `appointment-briefing.js`
-  (`BRIEFING_FIELDS`), and `market-score.js` (aggregate public data only).
+  (`BRIEFING_FIELDS`), `market-score.js` (aggregate public data only), and
+  `market-assistant.js` (`TOOLS`: anything a tool returns reaches the model
+  and then the user).
 - All API values placed in the DOM go through `textContent` (the `h()` / `el()`
   builders), never `innerHTML`. Where the dashboard still builds HTML strings,
   values must be escaped.
@@ -620,11 +627,48 @@ total is withheld when it could reconstruct them, and suppression runs
 **before** sorting so the ranking can't leak. Every extra dimension slices the
 same rows thinner; re-derive the threshold before adding one.
 
-## The market memo is a two-step agent, and the plan is the boundary
+## The market assistant (`market-assistant.js`)
 
-`ai-query.js` `mode:'market_memo'`. Claude turns a question into **one JSON
-query plan**; `lib/query-plan.js` decides whether it may run; the server
-executes it; Claude writes a memo over **pre-summarized** results.
+A manual tool-use loop on Claude Opus 5.5 (`effort: low`), called by the Ask
+AI tab in `dashboard-v3.js`.
+
+- **Stepped, because of the 26s ceiling.** An invocation stops starting model
+  calls at 12s and tool runs at 16s; every model call and tool races a 23.5s
+  deadline. It then returns `done:false` with the conversation, and the
+  browser posts `{continue:true, messages}` until `done:true`. Pending
+  `tool_use` blocks carry across steps.
+- **History is append-only and echoed verbatim.** The browser stores the API
+  messages exactly as returned (thinking blocks included) and sends them back.
+  Never edit or reorder earlier turns: that invalidates preserved thinking.
+  Only `user`/`assistant` roles are accepted from the client; a new question
+  is refused (409) while an assistant turn still has unanswered tool calls.
+- **The system prompt is the server's.** Per-turn context (mode, ZIP,
+  specialty) rides in a `<dashboard>` text block at the start of the user
+  turn, so the cached prefix (tools + system) never changes.
+- **Tools** (all read-only): `get_market_insights` and `compare_markets`
+  (call `market-score.js`'s handler in-process, cached 10 min per warm
+  instance), `find_providers` (clinics + provider_individuals around a ZIP,
+  word-boundary taxonomy match, distance filter), `query_database` (a plan
+  through `lib/query-plan.js`), and two browser effects: `update_map`
+  (returned as `actions`) and `create_deliverable` (returned as
+  `deliverables`, rendered as a document card). All but `query_database` use
+  `strict: true`.
+- **Stop reasons:** `refusal` drops the declined question from history;
+  `max_tokens` with a cut-off tool call answers it with an error result and
+  never runs it; `pause_turn` continues.
+- **Degrades instead of breaking.** Requests opt into strict schemas and
+  server-side refusal fallbacks (`fallbacks: "default"`); a 400 on that
+  request shape retries once without them and stays plain for the instance.
+- **Rendering:** the browser draws model output with a small markdown-to-DOM
+  renderer (text nodes only). Never `innerHTML` model text.
+
+Covered by `scripts/test-market-assistant.mjs` (fake client, no network).
+
+## The query plan is the boundary
+
+The assistant's `query_database` tool: Claude proposes **one JSON query
+plan**; `lib/query-plan.js` decides whether it may run; the server executes
+it and returns **pre-summarized** results.
 
 **The model never touches the database.** Only `clinics`, `demographics_raw`,
 `hpsa_designations` and `npi_activity` (aggregates) are reachable. Patient,
@@ -634,8 +678,8 @@ construction**. `select *` is never permitted.
 Two things that broke it:
 
 - **The planner invented vocabulary** (a `Primary Care` category with zero rows
-  in Tennessee). The planner prompt now carries the real values and the
-  vocabulary warning.
+  in Tennessee). The `query_database` tool description carries the real
+  values and the vocabulary warning; keep them there.
 - **The filtered column must be selected.** The builder force-adds the taxonomy
   column and pushes an `ilike` prefilter into PostgREST so the filter isn't
   applied after the row limit.
@@ -647,9 +691,7 @@ Covered by `scripts/test-query-plan.mjs`.
 | Surface | Model | What reaches the prompt |
 |---|---|---|
 | `patient-match.js` navigator | `claude-haiku-4-5-20251001` | the patient's own profile and **only specialty-relevant** providers |
-| `ai-query.js` memo planner | `claude-haiku-4-5-20251001` | the question + the allowlist |
-| `ai-query.js` memo writer | `claude-haiku-4-5-20251001` | pre-summarized aggregates |
-| `ai-query.js` dashboard tool loop | `claude-sonnet-5` | clinics already loaded in the browser |
+| `market-assistant.js` | `claude-opus-5-5`, effort `low` | the conversation, the dashboard context, and read-only tool results (market score, directory listings, allowlisted query summaries) |
 | `audit-narrate.js` | `claude-haiku-4-5-20251001` | the `signals` array only |
 | `doc-extract.js` | `claude-sonnet-5` | an uploaded document. **PHI**, BAA-gated, off |
 | `appointment-briefing.js` | `claude-haiku-4-5-20251001` | concern, conditions, and patient-**approved** facts |
@@ -835,6 +877,7 @@ node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) 
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
+node scripts/test-market-assistant.mjs    # 32: the assistant (needs npm ci in v2/)
 ```
 
 Frontends are verified in headless Chromium (Playwright) against mocked

@@ -21,6 +21,11 @@ jobs:
         with:
           node-version: "22"
 
+      # The functions' one dependency (the Anthropic SDK), so every function
+      # can be loaded below exactly as Netlify bundles it.
+      - name: Install function dependencies
+        run: npm ci --prefix v2 --no-audit --no-fund
+
       # Catches a syntax error in any function before Netlify deploys it.
       - name: Syntax-check functions, assets and scripts
         run: |
@@ -45,3 +50,6 @@ jobs:
 
       - name: Market opportunity model
         run: node scripts/test-market-model.mjs
+
+      - name: Market assistant (stepped agent, tools, history rules)
+        run: node scripts/test-market-assistant.mjs

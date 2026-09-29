@@ -11,7 +11,7 @@
 //
 // WHAT THE MODEL IS GIVEN: the decomposed `signals` array and nothing else.
 // No raw NPPES payloads, no clinic rows -- those are large, mostly irrelevant,
-// and the payload-size lesson from ai-query. Every fact the narrative can state
+// and the payload-size lesson from the retired ai-query endpoint. Every fact the narrative can state
 // is therefore a fact the scorer already recorded and a reader can audit.
 //
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AUDIT_ADMIN_KEY, ANTHROPIC_API_KEY

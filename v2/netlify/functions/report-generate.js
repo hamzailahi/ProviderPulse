@@ -117,7 +117,7 @@ exports.handler = async function(event) {
 
     // Signed-in callers only: this path spends ANTHROPIC_API_KEY on whatever
     // question it is sent. The directory_audit branch above has its own key.
-    // Providers only, same rule as ai-query: the market tools are a provider feature.
+    // Providers only, same rule as market-assistant: the market tools are a provider feature.
     const caller = await getUser(process.env, event);
     if (!caller) {
         return { statusCode: 401, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Please sign in again to generate a report.' }) };

@@ -180,7 +180,7 @@
                     <!-- AI as the primary entry point, not a buried tab -->
                     <button id="ai-command" type="button" onclick="switchTab('ai')">
                         <span class="ai-mark">✦</span>
-                        <span class="ai-ph">Ask this market anything — “where should a cardiology clinic open?”</span>
+                        <span class="ai-ph">Ask this market anything, like “where should a cardiology clinic open?”</span>
                         <kbd>⌘K</kbd>
                     </button>
                 </div>
@@ -298,29 +298,8 @@
                 </div>
             </div>
 
-            <div id="ai-panel">
-                <div id="ai-messages">
-                    <div class="ai-msg-ai">
-                        <strong>ProviderPulse AI</strong><br>
-                        Ask me anything about the clinics currently loaded on the map. For example:<br><br>
-                        <em style="color:var(--text-muted);">
-                        "List all cardiologists in this area"<br>
-                        "Which clinics share complementary specialties with family medicine?"<br>
-                        "Show me all NPIs with their addresses sorted by ZIP"<br>
-                        "Find specialists who could refer patients to primary care"
-                        </em>
-                    </div>
-                </div>
-                <div id="ai-input-area">
-                    <textarea id="ai-input" placeholder="Ask about the loaded clinics..." rows="1"></textarea>
-                    <button id="ai-send" onclick="sendAIQuery()">Send</button>
-                    <!-- Market memo queries the DATABASE directly through a
-                         validated query plan, rather than reasoning over the
-                         clinics currently loaded in the browser. It therefore
-                         answers questions the loaded set cannot. -->
-                    <button id="ai-memo" onclick="sendMarketMemo()" title="Query the database directly and write a market memo">Memo</button>
-                </div>
-            </div>
+            <!-- Filled by assets/dashboard-v3.js (the market assistant). -->
+            <div id="ai-panel"></div>
 
             <div id="reports-panel">
                 <div id="reportScopeNote">📍 Scope: <span id="reportZipList">no ZIPs loaded yet — search a location first</span></div>
@@ -440,7 +419,7 @@
         const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
 
         // ── Session for the AI endpoints ─────────────────────────────
-        // ai-query and report-generate require a signed-in caller (they spend
+        // market-assistant and report-generate require a signed-in caller (they spend
         // the Anthropic key), so send the stored access token. Refreshed first
         // when it is about to expire, since an analyst can sit on this page for
         // longer than a token lives. Supabase rotates the refresh token, so the
@@ -2942,116 +2921,7 @@
             });
         }
 
-        // Practice locations published by a claimed listing (migration 006).
-        // The clinics table only knows the address tied to the NPI, so a
-        // provider's other sites exist nowhere else on this map -- which is why
-        // a second office could be entered carefully and still never appear.
-        //
-        // Ring convention extends the existing one: solid teal stays "NPPES
-        // verified", hollow teal is self-reported. They must not look alike or
-        // the verified ring stops carrying information.
-        // ---------------------------------------------------------------
-        // MARKET MEMO
-        //
-        // Unlike sendAIQuery, this does NOT ship the loaded clinics to the
-        // model. It sends the question only; the function turns it into a
-        // validated query plan, runs that server-side against an allowlisted
-        // set of tables, and writes a memo over the summarised results. So it
-        // can answer questions about ZIPs that are not currently on screen --
-        // and it will refuse anything touching patient or account data.
-        // ---------------------------------------------------------------
-        async function sendMarketMemo() {
-            const input = document.getElementById('ai-input');
-            const q = (input.value || '').trim();
-            if (!q) { input.focus(); return; }
 
-            appendAIMessage('user', q);
-            input.value = '';
-            const btn = document.getElementById('ai-memo');
-            const send = document.getElementById('ai-send');
-            btn.disabled = true; send.disabled = true;
-            const label = btn.textContent; btn.textContent = 'Working…';
-
-            try {
-                const r = await fetch('/.netlify/functions/ai-query', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-                    body: JSON.stringify({ mode: 'market_memo', question: q })
-                });
-                const d = await r.json();
-
-                if (d.refused) {
-                    // Show the validator's own words. A refusal that explains
-                    // itself teaches the next question; a generic one does not.
-                    appendAIMessage('ai', 'I can\'t answer that from the market tables.\n\n' + (d.reason || ''));
-                    return;
-                }
-                if (d.error) { appendAIMessage('ai', d.error); return; }
-
-                const res = d.results || {};
-                const bits = [];
-                bits.push(d.memo || '(no memo)');
-                bits.push('');
-                bits.push('— based on ' + (res.matched != null ? res.matched.toLocaleString() : '?') +
-                          ' matching rows from ' + (res.table || '?') +
-                          (d.plan && d.plan.taxonomy ? ' filtered to ' + d.plan.taxonomy : ''));
-                appendMemoResult(bits.join('\n'), d);
-            } catch (e) {
-                appendAIMessage('ai', 'The memo service is unavailable right now.');
-            } finally {
-                btn.disabled = false; send.disabled = false; btn.textContent = label;
-            }
-        }
-
-        // Memo results get two affordances the chat messages do not: a copy
-        // button, and the query plan that produced them. Showing the plan is
-        // deliberate -- an analyst should see exactly what was run before
-        // quoting the number to anyone.
-        function appendMemoResult(text, detail) {
-            const box = document.getElementById('ai-messages');
-            if (!box) return;
-            const wrap = document.createElement('div');
-            wrap.className = 'ai-msg-ai';
-
-            const body = document.createElement('div');
-            body.textContent = text;              // textContent, never innerHTML
-            wrap.appendChild(body);
-
-            const tools = document.createElement('div');
-            tools.className = 'ai-memo-tools';
-
-            const copy = document.createElement('button');
-            copy.type = 'button';
-            copy.textContent = 'Copy';
-            copy.onclick = function () {
-                navigator.clipboard.writeText(text).then(function () {
-                    copy.textContent = 'Copied';
-                    setTimeout(function () { copy.textContent = 'Copy'; }, 1500);
-                }).catch(function () { copy.textContent = 'Copy failed'; });
-            };
-            tools.appendChild(copy);
-            wrap.appendChild(tools);
-
-            if (detail && detail.plan) {
-                const show = document.createElement('button');
-                show.type = 'button';
-                show.textContent = 'Show query';
-                const pre = document.createElement('pre');
-                pre.className = 'ai-plan';
-                pre.style.display = 'none';
-                pre.textContent = JSON.stringify(detail.plan, null, 2);
-                show.onclick = function () {
-                    const on = pre.style.display === 'none';
-                    pre.style.display = on ? 'block' : 'none';
-                    show.textContent = on ? 'Hide query' : 'Show query';
-                };
-                tools.appendChild(show);
-                wrap.appendChild(pre);
-            }
-
-            box.appendChild(wrap);
-            box.scrollTop = box.scrollHeight;
-        }
 
         function drawLocationPins() {
             if (!Object.keys(registeredProviders || {}).length) return;
@@ -3197,18 +3067,6 @@
         document.getElementById('addressInput').addEventListener('keydown', e => {
             if (e.key === 'Enter') goToAddress(document.getElementById('addressInput').value);
         });
-        function buildNPPESContext() {
-            if (Object.keys(nppesCache).length === 0) return null;
-            return Object.values(nppesCache).map(info => ({
-                npi: info.npi,
-                type: info.type,
-                phone: info.phone,
-                fax: info.fax,
-                authorized_official: info.authorized_official,
-                authorized_title: info.authorized_title,
-                status: info.status
-            }));
-        }
         let proceduresRawData = {}; // store for search filtering
 
         function filterProcedures(query) {
@@ -3596,187 +3454,9 @@
             return rows.length > 0 ? rows.slice(0, 500) : null;
         }
 
-        async function sendAIQuery() {
-            const input = document.getElementById('ai-input');
-            const query = input.value.trim();
-            if (!query) return;
 
-            const clinics = buildClinicContext();
-            if (clinics.length === 0) {
-                appendAIMessage('ai', 'No clinics are currently loaded. Search for a location first.');
-                return;
-            }
 
-            appendAIMessage('user', query);
-            input.value = '';
-            document.getElementById('ai-send').disabled = true;
-            const loadingId = appendAIMessage('ai', '⏳ Thinking...');
 
-            try {
-                // Hard caps to keep payload under 50KB
-                const contextClinics = clinics.slice(0, 500).map(c => ({
-                    npi: c.npi, name: c.name, taxonomy: c.taxonomy,
-                    zip: c.zip, city: c.city, state: c.state
-                }));
-
-                // Demographics as summary totals only — not per-ZIP array
-                const demRows = buildDemographicsContext() || [];
-                const demSummary = demRows.reduce((acc, d) => ({
-                    total_population: acc.total_population + (d.total_population || 0),
-                    adult_population: acc.adult_population + (d.adult_population_18plus || 0),
-                    insured_population: acc.insured_population + (d.insured_population || 0),
-                    zip_count: acc.zip_count + 1
-                }), { total_population: 0, adult_population: 0, insured_population: 0, zip_count: 0 });
-                if (demSummary.total_population > 0) {
-                    demSummary.insured_pct = Math.round((demSummary.insured_population / demSummary.total_population) * 100);
-                }
-
-                // Procedures — top 100 by patient volume only
-                const procRows = [];
-                if (proceduresRawData) {
-                    Object.entries(proceduresRawData).forEach(([specialty, procs]) => {
-                        Object.values(procs).forEach(p => {
-                            procRows.push({
-                                specialty,
-                                hcpcs_cd: p.hcpcs_cd,
-                                hcpcs_desc: (p.hcpcs_desc || '').substring(0, 50),
-                                tot_benes: Math.round(p.tot_benes),
-                                avg_mdcr_pymt: p.count > 0 ? Math.round(p.avg_mdcr_pymt_amt / p.count) : 0
-                            });
-                        });
-                    });
-                    procRows.sort((a, b) => b.tot_benes - a.tot_benes);
-                    procRows.splice(100);
-                }
-
-                // Restructure procedures as specialty-keyed object for tools
-                const procBySpec = {};
-                procRows.forEach(p => {
-                    if (!procBySpec[p.specialty]) procBySpec[p.specialty] = {};
-                    procBySpec[p.specialty][p.hcpcs_cd] = {
-                        hcpcs_cd: p.hcpcs_cd,
-                        hcpcs_desc: p.hcpcs_desc,
-                        tot_benes: p.tot_benes,
-                        tot_srvcs: p.tot_benes,
-                        avg_mdcr_pymt_amt: p.avg_mdcr_pymt,
-                        count: 1
-                    };
-                });
-
-                const systemPrompt = `You are a healthcare market intelligence assistant embedded in ProviderPulse, a provider mapping tool.
-
-You have tools to query data loaded on the user's map. Always use tools to answer — never guess or make up numbers.
-
-Available data:
-- CLINICS: ${contextClinics.length} providers (capped at 500 of ${clinics.length} total; name, npi, taxonomy, zip, state)
-- DEMOGRAPHICS: ${demSummary.zip_count} ZIPs · Pop ${demSummary.total_population?.toLocaleString()} · ${demSummary.insured_pct}% insured
-- PROCEDURES: ${procRows.length} top procedures across ${Object.keys(procBySpec).length} specialties
-- PLACES: ${window.placesDataCache && Object.keys(window.placesDataCache).length > 0 ? Object.keys(window.placesDataCache).length + ' health metrics loaded' : 'not loaded'}
-- CMS: ${window.cmsDataCache && Object.keys(window.cmsDataCache).length > 0 ? 'county utilization loaded' : 'not loaded'}
-- NPPES: ${Object.keys(nppesCache).length > 0 ? Object.keys(nppesCache).length + ' providers enriched' : 'none — click markers to load'}
-
-For tables use markdown pipe format. Be concise. Always use tools for counts, rankings, calculations.`;
-
-                const clientData = {
-                    clinics: contextClinics,
-                    demographics: demRows.slice(0, 50),
-                    procedures: procBySpec,
-                    places: window.placesDataCache || {},
-                    cms: window.cmsDataCache || {},
-                    nppes: buildNPPESContext() || []
-                };
-
-                const response = await fetch('/.netlify/functions/ai-query', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-                    body: JSON.stringify({
-                        system: systemPrompt,
-                        messages: [{ role: 'user', content: query }],
-                        clientData
-                    })
-                });
-
-                const data = await response.json();
-                const text = data.content?.find(b => b.type === 'text')?.text || data.error || 'No response received.';
-
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
-                appendAIMessage('ai', text);
-
-            } catch(e) {
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
-                appendAIMessage('ai', `Error: ${e.message}`);
-            }
-
-            document.getElementById('ai-send').disabled = false;
-        }
-
-        function appendAIMessage(role, text) {
-            const messages = document.getElementById('ai-messages');
-            const id = 'msg-' + Date.now();
-            const div = document.createElement('div');
-            div.id = id;
-            div.className = role === 'user' ? 'ai-msg-user' : 'ai-msg-ai';
-
-            if (role === 'ai') {
-                // Convert markdown table to HTML table
-                div.innerHTML = markdownToHTML(text);
-            } else {
-                div.textContent = text;
-            }
-
-            messages.appendChild(div);
-            messages.scrollTop = messages.scrollHeight;
-            return id;
-        }
-
-        function markdownToHTML(text) {
-            // Escape first. This renders model output, and the model is fed clinic
-            // names and other third-party text that could carry markup, so raw
-            // HTML in a reply must display as text, never execute.
-            let html = escHtml(text);
-
-            // Convert markdown tables
-
-            // Tables
-            const tableRegex = /(\|.+\|\n)+/g;
-            html = html.replace(tableRegex, match => {
-                const rows = match.trim().split('\n').filter(r => r.trim());
-                const isSeparator = r => /^\|[\s\-|]+\|$/.test(r.trim());
-                let tableHTML = '<table><thead>';
-                let inBody = false;
-                rows.forEach((row, i) => {
-                    if (isSeparator(row)) {
-                        tableHTML += '</thead><tbody>';
-                        inBody = true;
-                        return;
-                    }
-                    const cells = row.split('|').filter((c, idx, arr) => idx > 0 && idx < arr.length - 1).map(c => c.trim());
-                    const tag = inBody ? 'td' : 'th';
-                    tableHTML += '<tr>' + cells.map(c => `<${tag}>${c}</${tag}>`).join('') + '</tr>';
-                });
-                tableHTML += inBody ? '</tbody></table>' : '</thead></table>';
-                return tableHTML;
-            });
-
-            // Bold
-            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-            // Italic
-            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-            // Line breaks
-            html = html.replace(/\n/g, '<br>');
-
-            return html;
-        }
-
-        // Send on Enter (Shift+Enter for newline)
-        document.getElementById('ai-input').addEventListener('keydown', e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendAIQuery();
-            }
-        });
     
         /* ====================================================================
            REDESIGN WIRING

@@ -412,7 +412,10 @@ function paintInsights() {
   p.appendChild(el('div', { class: 'ins-card' },
     el('div', { class: 'ins-eyebrow' }, 'Go deeper'),
     el('div', { class: 'ins-actions' },
-      el('button', { type: 'button', class: 'ins-btn primary', onclick: function () { switchTab('ai'); } }, '✦ Ask AI about this market'),
+      el('button', { type: 'button', class: 'ins-btn primary', onclick: function () {
+        switchTab('ai');
+        if (window.PPAssistant) window.PPAssistant.ask('Walk me through this market: what drives the score, and what would you do here?');
+      } }, '✦ Ask AI about this market'),
       el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('reports'); } }, 'Generate a report'),
       el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('demographics'); } }, 'Demographics'),
       el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('health'); } }, 'Health data')),
@@ -547,6 +550,278 @@ if (mode === 'mine') {
     })
     .catch(function () {});
 }
+
+/* ---------- 7. Ask AI: the market assistant ---------------------------------
+   Replaces the old single-shot chat (which only saw clinics loaded in the
+   browser and sent its own system prompt). Talks to market-assistant.js,
+   which runs in steps: a response with done:false is continued until done.
+   The API conversation (`api`) is stored and echoed exactly as the server
+   returned it; `ui` is what we draw. Model output is rendered by building DOM
+   nodes from a small markdown subset, never through innerHTML. */
+(function assistant() {
+  var panel = $('ai-panel');
+  if (!panel) return;
+  var KEY = 'pp.dash.chat.v1';
+  var chat = { api: [], ui: [] };
+  try { var saved = JSON.parse(sessionStorage.getItem(KEY) || 'null'); if (saved && Array.isArray(saved.api)) chat = saved; } catch (e) {}
+  // A reload mid-answer leaves nothing running; don't draw a spinner for it.
+  chat.ui.forEach(function (m) {
+    if (m.pending) { m.pending = false; if (!m.text) { m.text = 'Interrupted. Ask again to continue.'; m.error = true; } }
+  });
+  var busy = false;
+
+  while (panel.firstChild) panel.removeChild(panel.firstChild);
+  var list = el('div', { class: 'as-list', id: 'ai-messages', role: 'log', 'aria-live': 'polite' });
+  var input = el('textarea', { id: 'ai-input', class: 'as-input', rows: '1', placeholder: 'Ask about this market…', 'aria-label': 'Ask the market assistant' });
+  var send = el('button', { type: 'button', class: 'as-send', 'aria-label': 'Send', onclick: function () { ask(input.value); } }, '↑');
+  panel.appendChild(el('div', { class: 'as-head' },
+    el('div', {}, el('b', {}, '✦ Market assistant'), el('span', { class: 'as-sub', id: 'as-sub' })),
+    el('button', { type: 'button', class: 'as-new', onclick: function () { if (busy) return; chat = { api: [], ui: [] }; save(); draw(); } }, 'New chat')));
+  panel.appendChild(list);
+  panel.appendChild(el('div', { class: 'as-compose' }, input, send));
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input.value); } });
+  input.addEventListener('input', function () { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 140) + 'px'; });
+
+  function save() { try { sessionStorage.setItem(KEY, JSON.stringify(chat)); } catch (e) {} }
+
+  function currentSpec() {
+    if (focusSpec) return focusSpec;
+    if (mode === 'mine' && mySpec) return mySpec.label;
+    var s = $('specialty-select');
+    return (s && s.value) || null;
+  }
+  function context() {
+    var a = $('addressInput');
+    return { mode: mode, zip: lastZip || null, specialty: currentSpec(), place: a ? a.value : '' };
+  }
+
+  function suggestions() {
+    var z = lastZip, sp = currentSpec() || 'primary care', spl = String(sp).toLowerCase();
+    if (!z) return ['Which specialties are underserved around 38017?', 'Compare 38017 and 38138 for dermatology', 'How many cardiologists are in Tennessee?'];
+    var arch = null;
+    if (lastScore && lastScore.model && lastScore.model.specialties) {
+      var hit = lastScore.model.specialties.filter(function (x) { return x.specialty === currentSpec(); })[0];
+      if (hit) arch = hit.archetype_name;
+    }
+    return [
+      arch ? 'Why is ' + spl + ' "' + arch + '" in ' + z + '?' : 'What does the ' + spl + ' market look like in ' + z + '?',
+      'Which specialties have the biggest opening around ' + z + '?',
+      'Show me ' + spl + ' providers within 10 miles of ' + z,
+      'Write a one-pager on opening a ' + spl + ' practice near ' + z
+    ];
+  }
+
+  // ---- drawing --------------------------------------------------------------
+  function updateSub() {
+    var sub = $('as-sub');
+    if (sub) sub.textContent = lastZip ? 'Looking at ' + lastZip + (currentSpec() ? ' · ' + currentSpec() : '') : 'Search a market to ground answers';
+  }
+  function draw() {
+    while (list.firstChild) list.removeChild(list.firstChild);
+    updateSub();
+    if (!chat.ui.length) {
+      list.appendChild(el('div', { class: 'as-empty' },
+        el('h3', {}, 'Ask about any market'),
+        el('p', {}, 'Answers come from the same data as Insights: the market model, federal provider listings, Census and CDC data. It can move the map, compare ZIPs, and write memos you can share.'),
+        el('div', { class: 'as-chips' }, suggestions().map(function (q) {
+          return el('button', { type: 'button', class: 'as-chip', onclick: function () { ask(q); } }, q);
+        }))));
+      return;
+    }
+    chat.ui.forEach(function (m) { list.appendChild(bubble(m)); });
+    list.scrollTop = list.scrollHeight;
+  }
+
+  function bubble(m) {
+    if (m.role === 'user') return el('div', { class: 'as-msg user' }, m.text);
+    var box = el('div', { class: 'as-msg bot' + (m.error ? ' err' : '') });
+    if (m.steps && m.steps.length) {
+      box.appendChild(el('ul', { class: 'as-steps' }, m.steps.map(function (s, i) {
+        var live = m.pending && i === m.steps.length - 1;
+        return el('li', { class: live ? 'live' : '' }, el('i', { 'aria-hidden': 'true' }, live ? '' : '✓'), s);
+      })));
+    }
+    if (m.pending) box.appendChild(el('div', { class: 'as-typing' }, el('span'), el('span'), el('span')));
+    if (m.text) box.appendChild(renderMarkdown(m.text));
+    (m.actions || []).forEach(function (a) {
+      box.appendChild(el('div', { class: 'as-action' }, '◎ Map: ' + [a.zip, a.specialty].filter(Boolean).join(' · ')));
+    });
+    (m.docs || []).forEach(function (d) { box.appendChild(docCard(d)); });
+    if (m.error && m.retry) box.appendChild(el('button', { type: 'button', class: 'as-retry', onclick: m.retry }, 'Try again'));
+    return box;
+  }
+
+  // Markdown subset: headings, bullets, numbered lists, tables, bold, code.
+  function inline(text, parent) {
+    String(text).split(/(\*\*[^*]+\*\*|`[^`]+`)/g).forEach(function (part) {
+      if (!part) return;
+      if (/^\*\*[^*]+\*\*$/.test(part)) parent.appendChild(el('strong', {}, part.slice(2, -2)));
+      else if (/^`[^`]+`$/.test(part)) parent.appendChild(el('code', {}, part.slice(1, -1)));
+      else parent.appendChild(document.createTextNode(part));
+    });
+    return parent;
+  }
+  function renderMarkdown(md) {
+    var root = el('div', { class: 'as-md' });
+    var lines = String(md).replace(/\r/g, '').split('\n');
+    var i = 0;
+    while (i < lines.length) {
+      var ln = lines[i];
+      if (!ln.trim()) { i++; continue; }
+      var h = ln.match(/^(#{1,4})\s+(.*)$/);
+      if (h) { root.appendChild(inline(h[2], el(h[1].length <= 2 ? 'h4' : 'h5'))); i++; continue; }
+      if (/^\s*\|/.test(ln)) {
+        var rows = [];
+        while (i < lines.length && /^\s*\|/.test(lines[i])) { rows.push(lines[i]); i++; }
+        var table = el('table');
+        var head = true;
+        rows.forEach(function (r) {
+          if (/^\s*\|[\s:\-|]+\|\s*$/.test(r)) { head = false; return; }
+          var cells = r.trim().replace(/^\||\|$/g, '').split('|');
+          table.appendChild(el('tr', {}, cells.map(function (c) { return inline(c.trim(), el(head ? 'th' : 'td')); })));
+          if (head && rows.length === 1) head = false;
+        });
+        root.appendChild(el('div', { class: 'as-table' }, table));
+        continue;
+      }
+      if (/^\s*([-*]|\d+[.)])\s+/.test(ln)) {
+        var ordered = /^\s*\d/.test(ln);
+        var listEl = el(ordered ? 'ol' : 'ul');
+        while (i < lines.length && /^\s*([-*]|\d+[.)])\s+/.test(lines[i])) {
+          listEl.appendChild(inline(lines[i].replace(/^\s*([-*]|\d+[.)])\s+/, ''), el('li')));
+          i++;
+        }
+        root.appendChild(listEl);
+        continue;
+      }
+      var para = [];
+      while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|\s*\||\s*([-*]|\d+[.)])\s+)/.test(lines[i])) { para.push(lines[i].trim()); i++; }
+      root.appendChild(inline(para.join(' '), el('p')));
+    }
+    return root;
+  }
+
+  var KIND = { market_memo: 'Market memo', expansion_one_pager: 'Expansion one-pager', client_pitch: 'Client pitch' };
+  function docCard(d) {
+    var body = renderMarkdown(d.body);
+    var card = el('div', { class: 'as-doc collapsed' },
+      el('div', { class: 'as-doc-head' }, el('span', { class: 'as-doc-kind' }, KIND[d.kind] || 'Document'), el('b', {}, d.title)),
+      body);
+    var toggle = el('button', { type: 'button', class: 'as-doc-btn', onclick: function () {
+      card.classList.toggle('collapsed'); toggle.textContent = card.classList.contains('collapsed') ? 'Expand' : 'Collapse';
+    } }, 'Expand');
+    card.appendChild(el('div', { class: 'as-doc-actions' },
+      toggle,
+      el('button', { type: 'button', class: 'as-doc-btn', onclick: function (e) {
+        var b = e.currentTarget;
+        (navigator.clipboard ? navigator.clipboard.writeText(d.body) : Promise.reject()).then(function () { b.textContent = 'Copied'; }, function () { b.textContent = 'Copy failed'; });
+      } }, 'Copy'),
+      el('button', { type: 'button', class: 'as-doc-btn', onclick: function () {
+        var a = el('a', { href: URL.createObjectURL(new Blob([d.body], { type: 'text/markdown' })), download: (d.title || 'memo').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') + '.md' });
+        document.body.appendChild(a); a.click(); a.remove();
+      } }, 'Download'),
+      el('button', { type: 'button', class: 'as-doc-btn', onclick: function () { printDoc(d); } }, 'Print / PDF')));
+    return card;
+  }
+  // The rendered node is text-only DOM, so serializing it is safe.
+  function printDoc(d) {
+    var w = window.open('', '_blank');
+    if (!w) return;
+    var holder = el('div', {}, el('h1', {}, d.title), renderMarkdown(d.body),
+      el('p', { class: 'src' }, 'Prepared with ProviderPulse · ' + new Date().toLocaleDateString()));
+    w.document.write('<!doctype html><meta charset="utf-8"><title></title><style>' +
+      'body{font:14px/1.55 -apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;max-width:720px;margin:40px auto;padding:0 24px}' +
+      'h1{font-size:24px;letter-spacing:-.02em}h4{font-size:16px;margin:20px 0 6px}h5{font-size:14px;margin:16px 0 4px}' +
+      'table{border-collapse:collapse;width:100%;margin:10px 0}td,th{border:1px solid #e2e8f0;padding:6px 8px;text-align:left;font-size:13px}' +
+      '.src{color:#64748b;font-size:12px;margin-top:28px}</style>' + holder.innerHTML);
+    w.document.title = d.title;
+    w.document.close();
+    setTimeout(function () { w.focus(); w.print(); }, 250);
+  }
+
+  // ---- the stepped request loop ---------------------------------------------
+  async function post(body) {
+    var h = typeof authHeaders === 'function' ? await authHeaders() : authHeadersSync();
+    var r = await fetch('/.netlify/functions/market-assistant', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, h),
+      body: JSON.stringify(body)
+    });
+    var d = {};
+    try { d = await r.json(); } catch (e) {}
+    if (!r.ok) throw new Error(d.error || 'The assistant is unavailable right now.');
+    return d;
+  }
+
+  function applyActions(actions) {
+    (actions || []).forEach(function (a) {
+      if (a.type !== 'update_map') return;
+      var terms = null;
+      if (a.specialty) {
+        var s = SPECIALTIES.filter(function (x) { return x[0] === a.specialty; })[0];
+        if (s) terms = s[1].split(',');
+      }
+      if (a.zip) {
+        var i = $('addressInput'); if (i) i.value = a.zip;
+        location.hash = '#zip=' + a.zip + (terms ? '&tax=' + encodeURIComponent(terms.join(',')) : '');
+        if (a.specialty) setTimeout(function () { applySpecialty(a.specialty); }, 0);
+      } else if (a.specialty) {
+        applySpecialty(a.specialty);
+      }
+    });
+  }
+
+  async function run(first) {
+    var slot = { role: 'assistant', pending: true, steps: [], actions: [], docs: [] };
+    chat.ui.push(slot); draw();
+    busy = true; send.disabled = true;
+    var body = first, resumable = false;
+    try {
+      for (var hop = 0; hop < 6; hop++) {
+        var d = await post(body);
+        chat.api = d.messages || chat.api;
+        resumable = !d.done;
+        (d.steps || []).forEach(function (s) { slot.steps.push(s.label); });
+        (d.actions || []).forEach(function (a) { slot.actions.push(a); });
+        (d.deliverables || []).forEach(function (x) { slot.docs.push(x); });
+        applyActions(d.actions);
+        save(); draw();
+        if (d.done) { slot.text = d.reply || ''; break; }
+        body = { continue: true, messages: chat.api, npi: profile && profile.npi };
+      }
+      if (!slot.text && !slot.docs.length) slot.text = 'That took longer than expected. Ask again to pick it up.';
+    } catch (e) {
+      slot.error = true;
+      slot.text = e.message;
+      // Resume from whatever the server last confirmed: mid-answer, continue;
+      // before any step landed, ask the same question again.
+      var resume = resumable;
+      slot.retry = function () {
+        if (busy) return;
+        chat.ui.splice(chat.ui.indexOf(slot), 1);
+        run(resume ? { continue: true, messages: chat.api, npi: profile && profile.npi } : first);
+      };
+    }
+    slot.pending = false;
+    busy = false; send.disabled = false;
+    save(); draw();
+    input.focus();
+  }
+
+  function ask(q) {
+    q = String(q || '').trim();
+    if (!q || busy) return;
+    input.value = ''; input.style.height = 'auto';
+    chat.ui.push({ role: 'user', text: q });
+    run({ question: q, messages: chat.api, context: context(), npi: profile && profile.npi });
+  }
+
+  // Redraw the empty state's suggestions when the market changes.
+  var origVerdict = window.renderVerdict;
+  window.renderVerdict = function (z) { origVerdict(z); if (!chat.ui.length) draw(); else updateSub(); };
+  draw();
+  window.PPAssistant = { ask: ask };
+})();
 
 function authHeadersSync() {
   return session && session.access_token ? { Authorization: 'Bearer ' + session.access_token } : {};

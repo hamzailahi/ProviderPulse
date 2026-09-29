@@ -149,10 +149,25 @@ Filters stay off the map until asked for, and a specialty picker replaces
 hundreds of raw taxonomy codes (the codes are still there under "Exact
 taxonomies"). Dots are colored by six specialty groups with a matching
 key. The **Insights** tab comes first and carries the market opportunity
-model described next. Demographics, health data, procedures, reports and
-the AI "market memo" are all still there as tabs. The memo takes a
-plain-language question, turns it into a query plan, and writes a memo
-over the results; the interesting part is the plan (see below).
+model described next. Demographics, health data, procedures and reports
+are all still there as tabs.
+
+**Ask AI: the market assistant.** A chat tab beside Insights that answers
+from the same data. It remembers the conversation, suggests questions
+about the market on screen, and shows what it is doing as it works
+("Scoring 38017 for cardiology"). It can:
+
+- explain a market with the opportunity model (archetype, factors,
+  confidence, caveats), citing the numbers;
+- compare two to four ZIPs for a specialty side by side;
+- count and list nearby providers of a specialty within a radius;
+- answer statewide or cross-market counts through the query-plan allowlist
+  described below;
+- move the map and set the specialty filter ("show me dermatologists
+  near 38138");
+- write a market memo, expansion one-pager or pitch summary for a
+  prospective client, as a card that can be copied, downloaded or printed
+  to PDF.
 
 ## The market opportunity model
 
@@ -276,10 +291,10 @@ system prompt is advisory, and a determined-enough input can talk a model
 out of it. An absent database table or a pre-filtered candidate list
 can't be bypassed that way.
 
-The clearest example is the market memo on the dashboard. It's a two-step
-process. One model call turns a natural-language question into a single
-JSON query plan. Then a separate, non-AI allowlist decides whether that
-plan is even allowed to run before anything touches the database. The
+The clearest example is the dashboard assistant's database tool. The model
+never writes a query; it proposes a single JSON query plan, and a separate,
+non-AI allowlist decides whether that plan is even allowed to run before
+anything touches the database. The
 model never sees credentials, never writes SQL, and cannot name a table
 outside four specific ones (none of which hold patient data, provider
 contact information, or audit logs), because those tables aren't in the
@@ -287,6 +302,16 @@ allowlist's vocabulary at all. `select *` is rejected outright, so a
 future column added to an allowed table doesn't silently start leaking
 through an old query plan. This was tested against adversarial phrasings,
 including a plan that tried to smuggle in a raw `SELECT`.
+
+The assistant as a whole follows the same rule. Its instructions live on
+the server, not in the browser, and every tool it has is read-only over
+public aggregate data: the market score, the provider directory, and the
+allowlisted tables. Moving the map and writing a document are handed back
+to the browser to perform; nothing the model does writes to the database.
+Netlify stops a function at 26 seconds, so the assistant works in steps:
+each call does what fits in about 12 seconds and returns, and the browser
+continues from there. The conversation is echoed back exactly as the API
+returned it, never edited.
 
 The care navigator only ever sees that patient's own profile, and only
 sees candidate providers already filtered to the searched specialty. The
@@ -299,15 +324,15 @@ the model only sees facts the patient has already approved, never the
 source documents, with the same deterministic fallback.
 
 Every JSON-producing call (document extraction, audit narration, the
-market-memo planner) is constrained with the API's own schema enforcement
+assistant's tool inputs) is constrained with the API's own schema enforcement
 rather than a prompt asking nicely for "JSON only, no prose." The earlier
 approach mostly worked and occasionally didn't, in a way that was hard to
 tell apart from a real parsing bug until it happened in production. A
 guarded parse is still kept everywhere, because a refusal or a token-limit
 cutoff can produce a response that never reaches the schema check.
 
-The AI market memo and report generation require a signed-in provider;
-they are not open endpoints.
+The market assistant and report generation require a signed-in provider
+(or an allowlisted staff account); they are not open endpoints.
 
 ## Access control
 
@@ -351,13 +376,16 @@ briefings being available for unconfirmed appointments.
 ## Architecture
 
 Static HTML and vanilla JavaScript on the frontend: no framework, no build
-step, no `npm install` to serve the pages. The backend is Netlify
+step, no `npm install` to serve the pages. The functions have exactly one
+dependency, Anthropic's SDK (`v2/package.json`), which Netlify installs
+and bundles on deploy. The backend is Netlify
 Functions calling Supabase's REST API directly (no ORM), with Postgres,
 authentication and row-level security handled by Supabase. Maps are
 Leaflet with MapTiler tiles. AI features run on Anthropic's Claude models,
 split by latency and task weight: the fastest model for anything in the
-critical path of a user request, a larger one for longer-form generation
-where a few extra seconds don't matter.
+critical path of a patient request, a larger one for longer-form
+generation, and Claude Opus 5.5 at low effort for the dashboard assistant,
+where reasoning across several tools matters most.
 
 ```
 v2/app.html                  patient app (search, map, booking)
@@ -390,7 +418,7 @@ as a script instead.
 
 ## Running it locally
 
-No build step and no `package.json` for the frontend; it's served as
+No build step for the frontend (the `package.json` in `v2/` is for the functions only); it's served as
 static files. You need the [Netlify CLI](https://docs.netlify.com/cli/get-started/)
 for the functions and a Supabase project for the database.
 
@@ -398,6 +426,7 @@ for the functions and a Supabase project for the database.
 npm install -g netlify-cli
 git clone https://github.com/hamzailahi/ProviderPulse.git
 cd ProviderPulse/v2
+npm ci          # the functions' one dependency (Anthropic's SDK)
 # create .env with the variables below
 netlify dev
 ```
@@ -412,7 +441,7 @@ hand, in the Supabase SQL editor. The latest is
 | Variable | Required for |
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | every function |
-| `ANTHROPIC_API_KEY` | care navigator, market memo, audit narration, report generation, briefings |
+| `ANTHROPIC_API_KEY` | care navigator, market assistant, audit narration, report generation, briefings |
 | `GOOGLE_GEOCODING_KEY` | primary geocoder; without it, geocoding falls back to Nominatim |
 | `STAFF_EMAILS` | comma-separated emails allowed into the dashboard for demos without a provider profile |
 | `ADMIN_PASSWORD` | the OIG review queue (`admin-review.html`) |
@@ -449,9 +478,10 @@ every pull request and push to main.
 
 ```bash
 node scripts/test-accuracy-signals.mjs    # the directory-accuracy scoring engine
-node scripts/test-query-plan.mjs          # the market-memo query allowlist
+node scripts/test-query-plan.mjs          # the query-plan allowlist behind the assistant's database tool
 node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings
 node scripts/test-market-model.mjs        # the market opportunity model
+node scripts/test-market-assistant.mjs    # the assistant: steps, tools, history rules (needs npm ci in v2/)
 ```
 
 The frontends are checked by driving them in a headless browser against
@@ -504,6 +534,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-29
+- **Market assistant.** Ask AI on the dashboard is rebuilt as a
+  conversational assistant that uses the market model, compares ZIPs,
+  finds nearby providers, moves the map, and writes memos, one-pagers and
+  client pitches you can copy, download or print. It replaces the old
+  single-question chat and the separate Memo button, which only saw the
+  clinics loaded in the browser. The functions now carry one dependency,
+  Anthropic's SDK, which Netlify installs on deploy.
+- The map's zoom buttons no longer sit under the dashboard sidebar.
 - **Engineering notes restored.** The project's `CLAUDE.md` (architecture
   rules, security boundaries, data gotchas, incident history) is back in the
   repo, updated for this week's changes. Secrets and local machine details

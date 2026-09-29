@@ -69,7 +69,11 @@
   to = "/404.html"
   status = 404
 
-[functions."ai-query"]
+[functions."market-assistant"]
+  # One step of the dashboard assistant: Claude calls plus read-only tools
+  # (market-score, directory queries). The function stops starting model
+  # calls at 12s and tool runs at 16s, and every call must finish by 23.5s,
+  # then the browser continues in a new invocation. Needs the full ceiling.
   timeout = 26
 
 [functions."report-generate"]
