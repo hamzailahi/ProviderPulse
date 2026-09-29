@@ -441,7 +441,7 @@ hand, in the Supabase SQL editor. The latest is
 | Variable | Required for |
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | every function |
-| `ANTHROPIC_API_KEY` | care navigator, market assistant, audit narration, report generation, briefings |
+| `ANTHROPIC_API_KEY` | care navigator, market assistant, audit narration, report generation, briefings. This is the project's own Anthropic API account, separate from any personal account, so all AI usage bills there |
 | `GOOGLE_GEOCODING_KEY` | primary geocoder; without it, geocoding falls back to Nominatim |
 | `STAFF_EMAILS` | comma-separated emails allowed into the dashboard for demos without a provider profile |
 | `ADMIN_PASSWORD` | the OIG review queue (`admin-review.html`) |
@@ -534,6 +534,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-29
+- Documented that the Anthropic API key belongs to the project's own
+  account, separate from personal accounts.
 - **Market assistant.** Ask AI on the dashboard is rebuilt as a
   conversational assistant that uses the market model, compares ZIPs,
   finds nearby providers, moves the map, and writes memos, one-pagers and

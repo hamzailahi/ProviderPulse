@@ -860,6 +860,11 @@ a coverage hole. Territories and PR are not loaded.
 
 ## Credentials
 
+`ANTHROPIC_API_KEY` (Netlify, Functions scope) belongs to the **project's own
+Anthropic API account**, separate from the founder's personal account. Every
+model call in `v2/netlify/functions/` bills there; cost and rate-limit
+questions are about that account.
+
 `AUDIT_ADMIN_KEY` gates `audit-run`, `audit-narrate` and `report-generate` in
 audit mode. Founder-only; **no frontend may ever reference it**. It is a Netlify
 secret scoped to Functions, and functions only pick up new env vars on a
