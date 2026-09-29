@@ -1269,9 +1269,13 @@ function detailSheet(npi) {
 
   var cms = h('div', { style: 'color:var(--muted);font-size:13.5px' });
   // CMS's clinician file (dataset mj5m-pzi6) only covers individual
-  // clinicians. An organisation's NPI can never be in it, so do not make the
-  // patient wait on a lookup that cannot succeed.
-  var isOrg = p.src === 'clinic' || p.src === 'secondary';
+  // clinicians, so an organisation (NPI-2) is not looked up. Which table a row
+  // came from is NOT a reliable signal -- `clinics` holds individual NPIs too --
+  // so the NPPES record decides, fetched once below and shared with the phone
+  // lookup.
+  var nppes = api('/nppes-lookup?npi=' + encodeURIComponent(p.npi), { auth: false, timeout: 10000 })
+    .then(function (d) { return (d && d.results && d.results[0]) || null; })
+    .catch(function () { return null; });
   function lookupCms() {
     clear(cms);
     cms.appendChild(h('span', {}, h('span', { class: 'spin' }), ' Checking Medicare records…'));
@@ -1299,16 +1303,20 @@ function detailSheet(npi) {
     cms.appendChild(h('span', {}, 'Medicare\'s records service didn\'t answer in time. '));
     cms.appendChild(h('button', { class: 'act', type: 'button', onclick: lookupCms }, 'Try again'));
   }
-  if (isOrg) cms.appendChild(document.createTextNode('Medicare publishes these details for individual clinicians, not for clinics and organizations.'));
-  else lookupCms();
+  cms.appendChild(h('span', {}, h('span', { class: 'spin' }), ' Checking Medicare records…'));
+  nppes.then(function (rec) {
+    if (rec && rec.enumeration_type === 'NPI-2') {
+      clear(cms);
+      cms.appendChild(document.createTextNode('This is an organization. Medicare publishes these details for individual clinicians, so open a clinician at this practice to see theirs.'));
+    } else lookupCms();   // NPI-1, or NPPES unreachable: let CMS answer
+  });
 
   // Unclaimed rows carry no phone. NPPES has the practice line, so fetch it
   // when someone actually opens the listing rather than for every result.
   var phoneDd = h('dd', { class: 'm' }, p.phone || 'Looking up…');
   var callSlot = h('span', {}, p.phone ? h('a', { class: 'act primary', href: 'tel:' + p.phone }, '📞 Call') : null);
   if (!p.phone) {
-    api('/nppes-lookup?npi=' + encodeURIComponent(p.npi), { auth: false, timeout: 10000 }).then(function (d) {
-      var rec = d && d.results && d.results[0];
+    nppes.then(function (rec) {
       var addrs = (rec && rec.addresses) || [];
       var loc = addrs.filter(function (a) { return a.address_purpose === 'LOCATION'; })[0] || addrs[0] || {};
       if (loc.telephone_number) {
