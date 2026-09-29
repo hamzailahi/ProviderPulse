@@ -104,7 +104,13 @@ function fetchFromCMS(npi) {
                 try {
                     const parsed = JSON.parse(data);
                     console.log(`[CMS] NPI ${npi} status:${res.statusCode} results:${parsed?.results?.length || 0}`);
-                    resolve({ confirmed: true, row: parsed?.results?.[0] || null });
+                    // Only a 2xx with a results array is an answer. A 4xx/5xx
+                    // body is also valid JSON, and reading it as "no results"
+                    // cached a CMS error as a confirmed miss for 7 days.
+                    if (res.statusCode < 200 || res.statusCode >= 300 || !Array.isArray(parsed?.results)) {
+                        return reject(new Error('CMS HTTP ' + res.statusCode));
+                    }
+                    resolve({ confirmed: true, row: parsed.results[0] || null });
                 } catch(e) {
                     console.log(`[CMS] JSON parse error: ${e.message} raw: ${data.substring(0,200)}`);
                     reject(e);
@@ -136,7 +142,10 @@ function fetchFromCMSGet(npi) {
                 try {
                     const parsed = JSON.parse(data);
                     console.log(`[CMS-GET] NPI ${npi} status:${res.statusCode} results:${parsed?.results?.length || 0}`);
-                    resolve({ confirmed: true, row: parsed?.results?.[0] || null });
+                    if (res.statusCode < 200 || res.statusCode >= 300 || !Array.isArray(parsed?.results)) {
+                        return reject(new Error('CMS-GET HTTP ' + res.statusCode));
+                    }
+                    resolve({ confirmed: true, row: parsed.results[0] || null });
                 } catch (e) {
                     console.log(`[CMS-GET] parse error: ${e.message} raw: ${data.substring(0,200)}`);
                     reject(e);

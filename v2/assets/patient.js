@@ -529,7 +529,8 @@ function titleCase(s) {
   // data dump. Only re-case strings that are entirely upper case.
   if (s !== s.toUpperCase()) return s;
   return s.toLowerCase().replace(/\b([a-z])/g, function (m) { return m.toUpperCase(); })
-    .replace(/\b(Md|Do|Np|Pa|Dds|Dmd|Od|Pc|Pllc|Llc|Inc|Fnp|Aprn|Lcsw|Lpc)\b/g, function (m) { return m.toUpperCase(); });
+    .replace(/\b(Md|Do|Np|Pa|Dds|Dmd|Od|Pc|Pllc|Llc|Inc|Fnp|Aprn|Lcsw|Lpc)\b/g, function (m) { return m.toUpperCase(); })
+    .replace(/(\S) (Of|And|The|At|For|In)\b/g, function (m, a, w) { return a + ' ' + w.toLowerCase(); });
 }
 
 function newSearch() {
@@ -1266,21 +1267,40 @@ function detailSheet(npi) {
   var p = findResult(npi);
   if (!p) return sheet('Provider', [h('p', { style: 'color:var(--muted)' }, 'That provider is no longer in your results.')]);
 
-  var cms = h('div', { style: 'color:var(--muted);font-size:13.5px' }, 'Loading credentials…');
-  // Lazy, detail-only: cms-provider hits data.cms.gov and would add seconds to
-  // the results render. Both "not found" outcomes arrive as HTTP 200.
-  api('/cms-provider?npi=' + encodeURIComponent(p.npi), { auth: false, timeout: 10000 })
-    .then(function (d) {
-      clear(cms);
-      if (d.unavailable) { cms.appendChild(document.createTextNode('Credential lookup is unavailable right now.')); return; }
-      if (!d.found) { cms.appendChild(document.createTextNode('No Medicare record found — common for clinics and newer practices.')); return; }
-      cms.appendChild(h('dl', { class: 'f' },
-        d.credential ? h('dt', {}, 'Credential') : null, d.credential ? h('dd', {}, d.credential) : null,
-        d.medical_school ? h('dt', {}, 'Medical school') : null, d.medical_school ? h('dd', {}, d.medical_school) : null,
-        d.graduation_year ? h('dt', {}, 'Graduated') : null, d.graduation_year ? h('dd', { class: 'm' }, d.graduation_year) : null,
-        h('dt', {}, 'Medicare'), h('dd', {}, d.medicare_participant ? 'Participating' : 'Not participating')));
-    })
-    .catch(function () { clear(cms); cms.appendChild(document.createTextNode('Credential lookup is unavailable right now.')); });
+  var cms = h('div', { style: 'color:var(--muted);font-size:13.5px' });
+  // CMS's clinician file (dataset mj5m-pzi6) only covers individual
+  // clinicians. An organisation's NPI can never be in it, so do not make the
+  // patient wait on a lookup that cannot succeed.
+  var isOrg = p.src === 'clinic' || p.src === 'secondary';
+  function lookupCms() {
+    clear(cms);
+    cms.appendChild(h('span', {}, h('span', { class: 'spin' }), ' Checking Medicare records…'));
+    // Lazy, detail-only. The function allows CMS up to ~18s (netlify.toml,
+    // cms-provider timeout 20) because data.cms.gov is regularly slower than
+    // 10s. The old 10s client timeout gave up first, so the first look at
+    // almost any provider read "unavailable".
+    api('/cms-provider?npi=' + encodeURIComponent(p.npi), { auth: false, timeout: 22000 })
+      .then(function (d) {
+        clear(cms);
+        if (d.unavailable) return unavailable();
+        if (!d.found) { cms.appendChild(document.createTextNode('No Medicare record on file. That\'s common for newer practices and providers who don\'t bill Medicare.')); return; }
+        cms.appendChild(h('dl', { class: 'f' },
+          d.credential ? h('dt', {}, 'Credential') : null, d.credential ? h('dd', {}, d.credential) : null,
+          d.primary_specialty ? h('dt', {}, 'Medicare specialty') : null, d.primary_specialty ? h('dd', {}, titleCase(d.primary_specialty)) : null,
+          d.medical_school ? h('dt', {}, 'Medical school') : null, d.medical_school ? h('dd', {}, titleCase(d.medical_school)) : null,
+          d.graduation_year ? h('dt', {}, 'Graduated') : null, d.graduation_year ? h('dd', { class: 'm' }, d.graduation_year) : null,
+          d.facility ? h('dt', {}, 'Practice') : null, d.facility ? h('dd', {}, titleCase(d.facility)) : null,
+          h('dt', {}, 'Medicare'), h('dd', {}, d.medicare_participant ? 'Accepts Medicare' : 'Not listed as accepting Medicare assignment')));
+      })
+      .catch(unavailable);
+  }
+  function unavailable() {
+    clear(cms);
+    cms.appendChild(h('span', {}, 'Medicare\'s records service didn\'t answer in time. '));
+    cms.appendChild(h('button', { class: 'act', type: 'button', onclick: lookupCms }, 'Try again'));
+  }
+  if (isOrg) cms.appendChild(document.createTextNode('Medicare publishes these details for individual clinicians, not for clinics and organizations.'));
+  else lookupCms();
 
   // Unclaimed rows carry no phone. NPPES has the practice line, so fetch it
   // when someone actually opens the listing rather than for every result.
