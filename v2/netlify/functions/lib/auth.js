@@ -29,11 +29,22 @@ async function getUser(env, event) {
   }
 }
 
+// Staff (the company's own accounts) get provider-level access to the market
+// tools so the dashboard can be demoed to prospective clients without an NPI.
+// STAFF_EMAILS is a comma-separated allowlist set in Netlify. The email comes
+// from Supabase's verified auth record, not from anything the user can edit.
+function isStaff(env, user) {
+  const list = String(env.STAFF_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+  const email = String((user && user.email) || '').toLowerCase();
+  return !!email && list.includes(email);
+}
+
 // True when this user owns a provider listing. Checked against
 // provider_profiles under the service role, never against user_metadata.role:
 // a provider row only comes from the NPPES-verified registration path, so it is
 // the one role signal an account holder cannot forge.
 async function isProvider(env, user) {
+  if (isStaff(env, user)) return true;
   if (!user || !user.id || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return false;
   try {
     const res = await fetch(
@@ -51,4 +62,4 @@ async function isProvider(env, user) {
   }
 }
 
-module.exports = { getUser, isProvider };
+module.exports = { getUser, isProvider, isStaff };

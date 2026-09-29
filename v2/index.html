@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html data-theme="light">
 <head>
     <meta charset="utf-8" />
     <title>Healthcare Provider Map - Demographics & Insurance Analysis</title>
@@ -32,7 +32,7 @@
         // signed-in patient is sent home rather than shown every provider and
         // the market panels. The server enforces the same rule on the AI
         // endpoints (lib/auth.js isProvider); this redirect is the UX half.
-        if (live && s.role === 'patient') { location.replace('/'); return; }
+        if (live && s.role === 'patient' && !s.staff) { location.replace('/'); return; }
         if (live) return;
         // Carry where they were headed so the deep link survives the detour.
         var back = location.pathname + location.search + location.hash;
@@ -48,14 +48,17 @@
     
     <link rel="stylesheet" href="assets/tokens.css">
     <link rel="stylesheet" href="assets/dashboard.css">
+    <link rel="stylesheet" href="assets/dashboard-v3.css">
+    <script src="assets/taxonomy-groups.js"></script>
+    <script src="assets/specialties.js"></script>
 </head>
 <body>
     <h2>Provider Market Strategy Dashboard</h2>
 
     <div id="topbar-v2">
         <div class="brand">
-            <div class="logo-mark">P</div>
-            <div class="logo-text">ProviderPulse</div>
+            <a href="/portal" class="brand-link"><span class="logo-mark">✚</span>
+            <span class="logo-text">ProviderPulse</span><span class="brand-tag">Provider</span></a>
         </div>
         <div class="divider"></div>
         <!-- The provider portal's nav. This dashboard is the portal's Market
@@ -463,7 +466,8 @@
                     if (r.ok) {
                         const d = await r.json();
                         s = { access_token: d.access_token, refresh_token: d.refresh_token,
-                              role: d.role || s.role, expiresAt: Date.now() + (d.expires_in || 3600) * 1000 };
+                              role: d.role || s.role, staff: !!(d.staff || s.staff),
+                              expiresAt: Date.now() + (d.expires_in || 3600) * 1000 };
                         (store || sessionStorage).setItem(KEY, JSON.stringify(s));
                     }
                 } catch (e) { /* fall through with the old token; the server answers 401 */ }
@@ -1007,7 +1011,7 @@
             });
 
             const taxArray = Array.from(taxonomies).sort();
-            taxArray.forEach((t, i) => taxonomyColors[t] = getColor(i, taxArray.length));
+            taxArray.forEach(t => taxonomyColors[t] = TaxonomyGroups.colorFor(t));   // 6 specialty groups (assets/taxonomy-groups.js), not a hue per raw taxonomy
             selectedTaxonomies = new Set(taxArray);
 
             buildTaxDropdown(taxArray); updateLegend();
@@ -1266,15 +1270,10 @@
             const isFiltered = selectedTaxonomies.size > 0 && selectedTaxonomies.size < allTax.length;
 
             // Build display color map — use dynamic colors when filtered
+            // Colours are the specialty GROUP (see taxonomyColors) and must not
+            // change when a filter is applied, or the map legend stops being true.
             const displayColors = {};
-            if (isFiltered && activeTax.length > 0) {
-                activeTax.forEach((t, i) => {
-                    displayColors[t] = getColor(i, activeTax.length);
-                });
-                allTax.forEach(t => { if (!displayColors[t]) displayColors[t] = '#444'; });
-            } else {
-                allTax.forEach(t => { displayColors[t] = taxonomyColors[t]; });
-            }
+            allTax.forEach(t => { displayColors[t] = taxonomyColors[t]; });
 
             // Update marker colors to match display
             window._displayColors = displayColors;
@@ -1927,7 +1926,7 @@
 
                 // Rebuild taxonomy colors to include any new taxonomies from neighbors
                 const taxArray = Array.from(taxonomies).sort();
-                taxArray.forEach((t, i) => taxonomyColors[t] = getColor(i, taxArray.length));
+                taxArray.forEach(t => taxonomyColors[t] = TaxonomyGroups.colorFor(t));   // 6 specialty groups (assets/taxonomy-groups.js), not a hue per raw taxonomy
                 selectedTaxonomies = new Set(taxArray);
                 updateLegend();
 
@@ -4052,5 +4051,6 @@ For tables use markdown pipe format. Be concise. Always use tools for counts, ra
         }
 
     </script>
+    <script src="assets/dashboard-v3.js"></script>
 </body>
 </html>

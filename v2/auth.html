@@ -276,6 +276,7 @@ $('formSignin').onsubmit = async e => {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
         role: data.role,
+        staff: !!data.staff,
         expiresAt: Date.now() + (data.expires_in || 3600) * 1000
       });
       (stay ? localStorage : sessionStorage).setItem(SESSION_KEY, payload);
@@ -287,6 +288,8 @@ $('formSignin').onsubmit = async e => {
       pickRole(data.role);
       setMsg('siMsg', 'Signed in as a ' + data.role + '. Taking you to your ' + data.role + ' view…', true);
     }
+    // Staff without a provider listing land on the market dashboard (demos).
+    if (data.staff && data.role !== 'provider') { location.href = safeNext() || '/dashboard'; return; }
     routeByRole(data.role);
   } catch (err) {
     setMsg('siMsg', 'Could not reach the server. Try again.', false);

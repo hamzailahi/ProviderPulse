@@ -41,12 +41,18 @@ exports.handler = async (event) => {
   }
 
   const role = (data.user && data.user.user_metadata && data.user.user_metadata.role) || '';
+  // Company accounts on the STAFF_EMAILS allowlist may open the market
+  // dashboard for demos. A hint for routing only: the AI endpoints re-check it
+  // server-side (lib/auth.js isProvider).
+  const { isStaff } = require('./lib/auth');
+  const staff = isStaff(env, data.user);
   return {
     statusCode: 200,
     headers: CORS,
     body: JSON.stringify({
       ok: true,
       role,
+      staff,
       access_token: data.access_token,
       refresh_token: data.refresh_token,
       expires_in: data.expires_in
