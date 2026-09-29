@@ -582,7 +582,11 @@ if (mode === 'mine') {
   input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input.value); } });
   input.addEventListener('input', function () { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 140) + 'px'; });
 
-  function save() { try { sessionStorage.setItem(KEY, JSON.stringify(chat)); } catch (e) {} }
+  var listeners = [];
+  function save() {
+    try { sessionStorage.setItem(KEY, JSON.stringify(chat)); } catch (e) {}
+    listeners.forEach(function (f) { try { f(); } catch (e) {} });
+  }
 
   function currentSpec() {
     if (focusSpec) return focusSpec;
@@ -808,19 +812,120 @@ if (mode === 'mine') {
     input.focus();
   }
 
-  function ask(q) {
+  // `shown` is what the chat bubble says when the prompt itself is long
+  // (the Reports tab sends a full brief but shows a one-line request).
+  function ask(q, shown) {
     q = String(q || '').trim();
-    if (!q || busy) return;
+    if (!q || busy) return false;
     input.value = ''; input.style.height = 'auto';
-    chat.ui.push({ role: 'user', text: q });
+    chat.ui.push({ role: 'user', text: shown || q });
     run({ question: q, messages: chat.api, context: context(), npi: profile && profile.npi });
+    return true;
   }
 
   // Redraw the empty state's suggestions when the market changes.
   var origVerdict = window.renderVerdict;
   window.renderVerdict = function (z) { origVerdict(z); if (!chat.ui.length) draw(); else updateSub(); };
   draw();
-  window.PPAssistant = { ask: ask };
+  window.PPAssistant = {
+    ask: ask,
+    isBusy: function () { return busy; },
+    currentSpec: currentSpec,
+    documents: function () {
+      var out = [];
+      chat.ui.forEach(function (m) { (m.docs || []).forEach(function (d) { out.unshift(d); }); });
+      return out;
+    },
+    docCard: docCard,
+    onChange: function (f) { listeners.push(f); }
+  };
+})();
+
+/* ---------- 8. Reports: a builder on top of the assistant -------------------
+   One engine, two doors. The Reports tab gathers a brief (document type,
+   specialty, comparison ZIPs, audience, focus), hands it to the assistant,
+   and keeps a library of every document written this session. */
+(function reports() {
+  var panel = $('reports-panel');
+  var A = window.PPAssistant;
+  if (!panel || !A) return;
+  while (panel.firstChild) panel.removeChild(panel.firstChild);
+
+  var TYPES = [
+    ['market_memo', 'Market memo', 'A one-page read on the market: the score, what drives it, and the risks.'],
+    ['expansion_one_pager', 'Expansion one-pager', 'Should we open here? The case, the competition and the numbers behind it.'],
+    ['client_pitch', 'Client pitch', 'A summary for a prospective client, framed around their practice.']
+  ];
+  var kind = 'market_memo';
+
+  var typeRow = el('div', { class: 'rp-types', role: 'radiogroup', 'aria-label': 'Document type' });
+  function drawTypes() {
+    while (typeRow.firstChild) typeRow.removeChild(typeRow.firstChild);
+    TYPES.forEach(function (t) {
+      typeRow.appendChild(el('button', { type: 'button', role: 'radio', 'aria-checked': String(kind === t[0]), class: 'rp-type' + (kind === t[0] ? ' on' : ''),
+        onclick: function () { kind = t[0]; drawTypes(); forWho.hidden = kind !== 'client_pitch'; } },
+        el('b', {}, t[1]), el('span', {}, t[2])));
+    });
+  }
+  var spec = el('select', { class: 'rp-input', 'aria-label': 'Specialty' },
+    SPECIALTIES.map(function (s) { return el('option', { value: s[0] }, s[0]); }));
+  var compare = el('input', { class: 'rp-input', placeholder: 'e.g. 38138, 38139', 'aria-label': 'ZIPs to compare with' });
+  var who = el('input', { class: 'rp-input', placeholder: 'e.g. Dr. Rivera, Midsouth Dermatology', 'aria-label': 'Prepared for' });
+  var forWho = el('label', { class: 'rp-field', hidden: true }, el('span', {}, 'Prepared for'), who);
+  var focus = el('textarea', { class: 'rp-input', rows: '2', placeholder: 'Anything it must answer? e.g. "Is there room for a second location?"', 'aria-label': 'Focus question' });
+  var market = el('div', { class: 'rp-market' });
+  var note = el('p', { class: 'rp-note', role: 'status' });
+  var go = el('button', { type: 'button', class: 'ins-btn primary rp-go', onclick: generate }, '✦ Write it');
+  var library = el('div', { class: 'rp-library' });
+
+  panel.appendChild(el('div', { class: 'rp-wrap' },
+    el('div', { class: 'ins-card' },
+      el('div', { class: 'ins-eyebrow' }, 'Report builder'),
+      el('p', {}, 'Written by the market assistant from the same data as Insights, with every figure traceable to its source.'),
+      market,
+      typeRow,
+      el('label', { class: 'rp-field' }, el('span', {}, 'Specialty'), spec),
+      el('label', { class: 'rp-field' }, el('span', {}, 'Compare with (optional)'), compare),
+      forWho,
+      el('label', { class: 'rp-field' }, el('span', {}, 'Focus (optional)'), focus),
+      go, note),
+    el('div', { class: 'ins-card' }, el('div', { class: 'ins-eyebrow' }, 'Documents this session'), library)));
+  drawTypes();
+
+  function refresh() {
+    var z = lastZip;
+    while (market.firstChild) market.removeChild(market.firstChild);
+    market.appendChild(document.createTextNode(z ? 'Market: ZIP ' + z + ' and the area within 25 miles' : 'Search a ZIP, city or state first; the report is written about the market on the map.'));
+    if (!spec.dataset.touched) spec.value = A.currentSpec() || 'Primary care / family doctor';
+    go.disabled = !z || A.isBusy();
+    while (library.firstChild) library.removeChild(library.firstChild);
+    var docs = A.documents();
+    if (!docs.length) library.appendChild(el('p', { class: 'rp-empty' }, 'Reports you create, here or in Ask AI, collect here for copying, downloading or printing.'));
+    docs.forEach(function (d) { library.appendChild(A.docCard(d)); });
+  }
+  spec.addEventListener('change', function () { spec.dataset.touched = '1'; });
+
+  function generate() {
+    var z = lastZip;
+    if (!z) return;
+    if (A.isBusy()) { note.textContent = 'The assistant is finishing another answer. Try again in a moment.'; return; }
+    var label = TYPES.filter(function (t) { return t[0] === kind; })[0][1];
+    var others = (compare.value.match(/\b\d{5}\b/g) || []).filter(function (x) { return x !== z; }).slice(0, 3);
+    var brief = 'Write a ' + label.toLowerCase() + ' about opening or growing a ' + spec.value + ' practice around ZIP ' + z + '.';
+    if (others.length) brief += ' Compare it with ZIP' + (others.length > 1 ? 's ' : ' ') + others.join(', ') + '.';
+    if (kind === 'client_pitch' && who.value.trim()) brief += ' It is prepared for ' + who.value.trim().slice(0, 120) + '.';
+    if (focus.value.trim()) brief += ' Make sure it answers: ' + focus.value.trim().slice(0, 400);
+    brief += '\nGather the numbers with your tools first, then deliver it with create_deliverable (kind "' + kind + '").';
+    var shown = label + ': ' + spec.value + ' around ' + z + (others.length ? ' vs ' + others.join(', ') : '') + (focus.value.trim() ? '. ' + focus.value.trim() : '');
+    note.textContent = '';
+    switchTab('ai');
+    A.ask(brief, shown);
+  }
+
+  A.onChange(refresh);
+  var prev = window.renderVerdict;
+  window.renderVerdict = function (zv) { prev(zv); refresh(); };
+  refresh();
 })();
 
 function authHeadersSync() {

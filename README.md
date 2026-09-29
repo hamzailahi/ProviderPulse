@@ -149,8 +149,12 @@ Filters stay off the map until asked for, and a specialty picker replaces
 hundreds of raw taxonomy codes (the codes are still there under "Exact
 taxonomies"). Dots are colored by six specialty groups with a matching
 key. The **Insights** tab comes first and carries the market opportunity
-model described next. Demographics, health data, procedures and reports
-are all still there as tabs.
+model described next. Demographics, health data and procedures are all
+still there as tabs. **Reports** is a builder on top of the assistant
+below: pick a market memo, expansion one-pager or client pitch, the
+specialty, optional ZIPs to compare, who it is for and what it must
+answer, and the assistant writes it. Every document from the session
+collects there for copying, downloading or printing.
 
 **Ask AI: the market assistant.** A chat tab beside Insights that answers
 from the same data. It remembers the conversation, suggests questions
@@ -331,8 +335,8 @@ tell apart from a real parsing bug until it happened in production. A
 guarded parse is still kept everywhere, because a refusal or a token-limit
 cutoff can produce a response that never reaches the schema check.
 
-The market assistant and report generation require a signed-in provider
-(or an allowlisted staff account); they are not open endpoints.
+The market assistant requires a signed-in provider (or an allowlisted
+staff account); it is not an open endpoint.
 
 ## Access control
 
@@ -441,11 +445,11 @@ hand, in the Supabase SQL editor. The latest is
 | Variable | Required for |
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | every function |
-| `ANTHROPIC_API_KEY` | care navigator, market assistant, audit narration, report generation, briefings. This is the project's own Anthropic API account, separate from any personal account, so all AI usage bills there |
+| `ANTHROPIC_API_KEY` | care navigator, market assistant (including reports), audit narration, briefings. This is the project's own Anthropic API account, separate from any personal account, so all AI usage bills there |
 | `GOOGLE_GEOCODING_KEY` | primary geocoder; without it, geocoding falls back to Nominatim |
 | `STAFF_EMAILS` | comma-separated emails allowed into the dashboard for demos without a provider profile |
 | `ADMIN_PASSWORD` | the OIG review queue (`admin-review.html`) |
-| `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, `report-generate` in audit mode) |
+| `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, and `report-generate`, which now only renders audits) |
 | `PATIENT_SIGNUP_ENABLED` | patient registration kill switch; defaults closed, since patient PHI storage isn't live until a Supabase BAA is in place |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
 | `HUD_API_TOKEN` | `zip-county-crosswalk-import.yml` only; a free HUD USER token stored as a GitHub secret, not a Netlify variable |
@@ -534,6 +538,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-29
+- **Reports runs on the assistant.** The Reports tab is now a builder:
+  choose a market memo, expansion one-pager or client pitch, the specialty,
+  ZIPs to compare, the audience and a focus question, and the assistant
+  writes it from the market model. Documents collect in the tab for copy,
+  download and print. The old single-shot report writer, which only saw
+  clinics loaded in the browser, is retired.
 - Documented that the Anthropic API key belongs to the project's own
   account, separate from personal accounts.
 - **Market assistant.** Ask AI on the dashboard is rebuilt as a

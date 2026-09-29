@@ -147,7 +147,7 @@ too.
   `provider_profiles` row exists for the user (service role);
   `isStaff()` checks the email against `STAFF_EMAILS`, and staff count as
   providers.
-- **The dashboard is provider-only.** `market-assistant` and `report-generate` require
+- **The dashboard is provider-only.** `market-assistant` requires
   `isProvider`. `index.html`'s `requireSession()` also sends patients back to
   `/` unless the session is staff; that redirect is the UX half, the function
   checks are the enforcement half.
@@ -224,10 +224,11 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   budget reasons. One call per audit. The model sees the `signals` array and
   nothing else. Deterministic fallback on parse failure; the response says
   which path ran.
-- **report-generate.js**: the market report (provider-only), plus
-  `{type:'directory_audit', audit_id}`, which renders a stored audit as one
-  self-contained HTML document (no external assets; it gets printed and
-  forwarded). Same `x-audit-key` gate for audits.
+- **report-generate.js**: only `{type:'directory_audit', audit_id}` now, which
+  renders a stored audit as one self-contained HTML document (no external
+  assets; it gets printed and forwarded), behind `x-audit-key`. Anything else
+  returns 410: the dashboard's market reports moved to the assistant
+  (2026-09-29), and the Reports tab is a builder that sends it a brief.
 - **market-score.js**: public. The ZIP opportunity verdict plus, since
   2026-09-29, the per-specialty **`model`** (see "Market opportunity model").
   ZIP-level score is `40% under-supply + 30% payer mix + 30% shortage`, with
@@ -695,7 +696,6 @@ Covered by `scripts/test-query-plan.mjs`.
 | `audit-narrate.js` | `claude-haiku-4-5-20251001` | the `signals` array only |
 | `doc-extract.js` | `claude-sonnet-5` | an uploaded document. **PHI**, BAA-gated, off |
 | `appointment-briefing.js` | `claude-haiku-4-5-20251001` | concern, conditions, and patient-**approved** facts |
-| `report-generate.js` market report | `claude-sonnet-5` | the dashboard's figures |
 | `report-generate.js` audit | none | renders stored rows |
 
 JSON-producing calls use Structured Outputs (`output_config.format`) plus a

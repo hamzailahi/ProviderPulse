@@ -77,6 +77,9 @@
   timeout = 26
 
 [functions."report-generate"]
+  # Now only renders a stored directory audit (two Supabase reads, up to 8s
+  # each, in parallel; no model call). Kept above the 10s default because a
+  # large audit's findings read can run long.
   timeout = 26
 
 [functions."cms-provider"]

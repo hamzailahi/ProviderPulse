@@ -301,16 +301,8 @@
             <!-- Filled by assets/dashboard-v3.js (the market assistant). -->
             <div id="ai-panel"></div>
 
-            <div id="reports-panel">
-                <div id="reportScopeNote">📍 Scope: <span id="reportZipList">no ZIPs loaded yet — search a location first</span></div>
-
-                <textarea id="reportQuestion" rows="3" placeholder="What should this report answer? e.g. 'Is this a good market to open a neurology practice?'"></textarea>
-
-                <button id="generateReportBtn" onclick="generateReport()">Generate Report</button>
-
-                <div id="reportOutput"></div>
-                <div id="reportWordCount"></div>
-            </div>
+            <!-- Report builder, filled by assets/dashboard-v3.js; reports are written by the market assistant. -->
+            <div id="reports-panel"></div>
                 </div> <!-- /sidebar -->
             </div> <!-- /main-area -->
         </div> <!-- /map-column -->
@@ -419,7 +411,7 @@
         const SUPABASE_KEY = "sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ";
 
         // ── Session for the AI endpoints ─────────────────────────────
-        // market-assistant and report-generate require a signed-in caller (they spend
+        // market-assistant requires a signed-in caller (they spend
         // the Anthropic key), so send the stored access token. Refreshed first
         // when it is about to expire, since an analyst can sit on this page for
         // longer than a token lives. Supabase rotates the refresh token, so the
@@ -2493,7 +2485,6 @@
             });
 
             if (tab === 'ai') document.getElementById('ai-input')?.focus();
-            if (tab === 'reports') updateReportScopeNote();
         }
 
         // --- RESIZABLE PANELS ---
@@ -3293,105 +3284,8 @@
             btn.classList.toggle('active', rail.classList.contains('open'));
         }
 
-        function getLoadedZips() {
-            const zips = new Set();
-            Object.keys(zipDemographics || {}).forEach(z => {
-                if (z && z !== 'undefined') zips.add(String(z).padStart(5, '0'));
-            });
-            if (zips.size === 0) {
-                Object.values(groupedData || {}).forEach(loc => {
-                    loc.practices.forEach(p => {
-                        const z = p['ZIP Code'];
-                        if (z) zips.add(String(z).padStart(5, '0'));
-                    });
-                });
-            }
-            return [...zips];
-        }
 
-        function updateReportScopeNote() {
-            const zips = getLoadedZips();
-            const el = document.getElementById('reportZipList');
-            if (!el) return;
-            el.textContent = zips.length === 0
-                ? 'no ZIPs loaded yet — search a location first'
-                : `${zips.length} ZIP${zips.length > 1 ? 's' : ''}: ${zips.slice(0, 10).join(', ')}${zips.length > 10 ? ` +${zips.length - 10} more` : ''}`;
-        }
 
-        async function generateReport() {
-            const zips = getLoadedZips();
-            const question = document.getElementById('reportQuestion').value.trim();
-            const btn = document.getElementById('generateReportBtn');
-            const output = document.getElementById('reportOutput');
-            const wc = document.getElementById('reportWordCount');
-
-            if (zips.length === 0) {
-                output.style.display = 'block';
-                output.textContent = 'No ZIP codes are currently loaded. Search a location on the map first, then generate the report.';
-                wc.textContent = '';
-                return;
-            }
-            if (!question) {
-                output.style.display = 'block';
-                output.textContent = 'Enter a question for the report to answer above.';
-                wc.textContent = '';
-                return;
-            }
-
-            btn.disabled = true;
-            btn.textContent = 'Generating…';
-            output.style.display = 'block';
-            output.textContent = '⏳ Writing report scoped to ' + zips.length + ' ZIP(s)...';
-            wc.textContent = '';
-
-            try {
-                const allClinics = buildClinicContext().filter(c => zips.includes(String(c.zip).padStart(5, '0')));
-
-                // Pull demographics directly scoped to loaded zips
-                const demScoped = zips.map(z => zipDemographics[z] || zipDemographics[String(parseInt(z))]).filter(Boolean);
-
-                const res = await fetch('/.netlify/functions/report-generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-                    body: JSON.stringify({
-                        question,
-                        zips,
-                        clinics: allClinics,
-                        demographics: demScoped.slice(0, 30),
-                        places: window.placesDataCache || {},
-                        cms: window.cmsDataCache || {}
-                    })
-                });
-
-                const data = await res.json();
-                const text = data.report || data.error || 'No report generated.';
-                output.textContent = text;
-                const words = text.trim().split(/\s+/).filter(Boolean).length;
-                wc.textContent = `${words} words · scoped to ${zips.length} ZIP${zips.length > 1 ? 's' : ''}`;
-
-            } catch(e) {
-                output.textContent = `Error generating report: ${e.message}`;
-            }
-
-            btn.disabled = false;
-            btn.textContent = 'Generate Report';
-        }
-        function buildClinicContext() {
-            const clinics = [];
-            Object.values(groupedData).forEach(loc => {
-                loc.practices.forEach(p => {
-                    clinics.push({
-                        name: p['Name'] || '',
-                        npi: p['NPI'] || '',
-                        taxonomy: p['Primary Taxonomy'] || '',
-                        address: p['Primary Practice Address'] || '',
-                        zip: p['ZIP Code'] || '',
-                        state: p['State'] || ''
-                    });
-                });
-            });
-            return clinics;
-        }
 
         function buildDemographicsContext() {
             const ADULT_KEYS = [

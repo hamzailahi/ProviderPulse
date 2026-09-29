@@ -1,10 +1,10 @@
 // lib/auth.js
 // Resolves the Supabase user behind a request's bearer token.
 //
-// Used by the dashboard's AI endpoints (market-assistant, report-generate).
-// Both spend ANTHROPIC_API_KEY, so an unchecked caller could use them as a free
-// proxy to it. The market dashboard is a provider tool, so both endpoints
-// require getUser() AND isProvider().
+// Used by the dashboard's market assistant (market-assistant.js), which spends
+// ANTHROPIC_API_KEY, so an unchecked caller could use it as a free proxy to
+// it. The market dashboard is a provider tool, so it requires getUser() AND
+// isProvider().
 //
 // Neither function reads user_metadata.role: it is writable by the account
 // holder, so a role taken from it is not a trust boundary.
