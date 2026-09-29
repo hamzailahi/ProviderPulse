@@ -95,7 +95,9 @@ async function tallyTable(table) {
   const tally = new Map();
   let total = 0, next = 0;
   const worker = async () => {
-    while (next < SLICES.length) total += await tallySlice(table, SLICES[next++], tally);
+    // Not `total += await ...`: that reads `total` before awaiting, so
+    // parallel workers overwrite each other (the first run logged 1.8M of ~9M).
+    while (next < SLICES.length) { const n = await tallySlice(table, SLICES[next++], tally); total += n; }
   };
   await Promise.all(Array.from({ length: 6 }, worker));
   console.log(`  ${table}: ${total.toLocaleString()} rows, ${tally.size} distinct taxonomies`);
@@ -124,7 +126,7 @@ async function main() {
   console.log('\nReading every listing\'s taxonomy (this takes a few minutes)');
   const clinics = await tallyTable('clinics');
   const individuals = await tallyTable('provider_individuals');
-  if (clinics.total + individuals.total < 1e6) throw new Error('fewer than 1M listings read; NPPES load incomplete?');
+  if (clinics.total + individuals.total < 5e6) throw new Error('fewer than 5M listings read; NPPES load incomplete?');
   const merged = new Map(clinics.tally);
   for (const [t, n] of individuals.tally) merged.set(t, (merged.get(t) || 0) + n);
 

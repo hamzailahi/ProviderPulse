@@ -504,6 +504,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-29
+- **National benchmarks built.** The first full run wrote benchmarks for 29
+  health measures and all 33 specialties, so the Insights tab now compares
+  each specialty against its own national rate. The builder's log
+  undercounted rows read (a race between parallel workers); the saved
+  benchmarks were unaffected, and the count and its sanity floor are fixed.
 - **Market opportunity model.** The Insights tab now classifies all 33
   specialties with a score, archetype, strategy, confidence, reasons and
   data notes (see [above](#the-market-opportunity-model)). Adds
