@@ -504,6 +504,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-29
+- **Engineering notes restored.** The project's `CLAUDE.md` (architecture
+  rules, security boundaries, data gotchas, incident history) is back in the
+  repo, updated for this week's changes. Secrets and local machine details
+  were left out, since the repo is public.
 - **National benchmarks built.** The first full run wrote benchmarks for 29
   health measures and all 33 specialties, so the Insights tab now compares
   each specialty against its own national rate. The builder's log
