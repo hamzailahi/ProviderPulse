@@ -49,3 +49,7 @@ const SPECIALTIES = [
   ['Nursing & assisted living', 'Skilled Nursing Facility,Assisted Living Facility,Adult Care Home Facility,Nursing', 'Skilled Nursing Facility'],
   ['Medical equipment & supplies', 'Durable Medical Equipment,Prosthetic/Orthotic Supplier,Customized Equipment,Hearing  Aid Equipment,Medical Equipment & Supplies', 'Durable Medical Equipment & Medical Supplies']
 ];
+
+// Also loaded by Netlify Functions (market-score via lib/market-model), so the
+// scoring model scores exactly the specialties patients search for.
+if (typeof module !== 'undefined' && module.exports) module.exports = SPECIALTIES;

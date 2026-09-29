@@ -42,3 +42,6 @@ jobs:
 
       - name: Claimed-listing specialty gating
         run: node scripts/test-claimed-relevance.mjs
+
+      - name: Market opportunity model
+        run: node scripts/test-market-model.mjs

@@ -54,6 +54,40 @@ const TaxonomyGroups = require('../../assets/taxonomy-groups.js');
 // CDC PLACES -> per-taxonomy need, and the national supply rate. See that file
 // for what the prevalence figures are and, more importantly, what they are not.
 const HealthDemand = require('../../assets/health-demand.js');
+// The explainable per-specialty opportunity model (archetype, score,
+// confidence, reasons). See that file's header for the five factors.
+const MarketModel = require('../../assets/market-model.js');
+const SPECIALTIES = require('../../assets/specialties.js');
+
+// Census columns the model reads for age mix and income (demographics_raw).
+const AGE_INCOME_COLS = [
+  'Total: Under 6 years', 'Total: 6 to 18 years', 'Total: 19 to 25 years', 'Total: 26 to 34 years',
+  'Total: 35 to 44 years', 'Total: 65 to 74 years', 'Total: 75 years and older',
+  'Total: HH Income Pop', 'Total: $75,000 to $99,999', 'Total: $100,000 and over'
+];
+const qcol = c => '%22' + encodeURIComponent(c) + '%22';
+const DEM_EXTRA = AGE_INCOME_COLS.map(qcol).join(',');
+
+// Shares the model ranks within the state. null when the row lacks the data.
+function demoShares(r) {
+  const n = k => Number(r && r[k]) || 0;
+  const pop = n('Total Population'), hh = n('Total: HH Income Pop');
+  if (!pop) return null;
+  return {
+    insured: n('Insured Population') / pop,
+    over65: (n('Total: 65 to 74 years') + n('Total: 75 years and older')) / pop,
+    under18: (n('Total: Under 6 years') + n('Total: 6 to 18 years')) / pop,
+    age19to44: (n('Total: 19 to 25 years') + n('Total: 26 to 34 years') + n('Total: 35 to 44 years')) / pop,
+    income75: hh ? (n('Total: $75,000 to $99,999') + n('Total: $100,000 and over')) / hh : null
+  };
+}
+
+// hpsa_designations.county stores names with the suffix stripped; CMS county
+// names may carry it. Normalise both sides the same way before comparing. The
+// match is reported (basis 'county' vs 'state'), never assumed.
+const countyKey = s => String(s || '').toLowerCase()
+  .replace(/\b(city and borough|census area|municipality|borough|parish|county|city)\b/g, ' ')
+  .replace(/\bst\.?\s/g, 'saint ').replace(/[^a-z]/g, '');
 
 // ---------------------------------------------------------------------------
 // THE CATCHMENT, AND WHY THE PER-GROUP SCORE IS NOT A ZIP-LEVEL SCORE
@@ -136,6 +170,7 @@ const median = (xs) => {
   return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
 };
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const taxNorm = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' };
@@ -197,7 +232,10 @@ exports.handler = async (event) => {
 
   try {
     // 1. This ZIP's demographics
-    const demRows = await get(`demographics_raw?zip=eq.${zip}&select=zip,state,%22Total%20Population%22,%22Insured%20Population%22&limit=1`);
+    // The age/income columns only feed the model; if they ever fail to
+    // resolve, retry without them rather than lose the whole score.
+    let demRows = await get(`demographics_raw?zip=eq.${zip}&select=zip,state,%22Total%20Population%22,%22Insured%20Population%22,${DEM_EXTRA}&limit=1`);
+    if (!demRows.length) demRows = await get(`demographics_raw?zip=eq.${zip}&select=zip,state,%22Total%20Population%22,%22Insured%20Population%22&limit=1`);
     const dem = demRows[0];
     if (!dem) {
       return { statusCode: 200, headers: CORS, body: JSON.stringify({ zip, available: false, reason: 'No demographic data for this ZIP' }) };
@@ -237,7 +275,7 @@ exports.handler = async (event) => {
     const [clinicPage, individualPage, stateDemPage] = await Promise.all([
       pagedGet(`clinics?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy`, 'npi'),
       pagedGet(`provider_individuals?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy`, 'npi'),
-      pagedGet(`demographics_raw?state=eq.${encodeURIComponent(state)}&select=zip,%22Total%20Population%22,%22Insured%20Population%22`, 'zip')
+      pagedGet(`demographics_raw?state=eq.${encodeURIComponent(state)}&select=zip,%22Total%20Population%22,%22Insured%20Population%22,${DEM_EXTRA}`, 'zip')
     ]);
     const clinicRows = clinicPage.rows;
     const individualRows = individualPage.rows;
@@ -301,13 +339,14 @@ exports.handler = async (event) => {
     // this ZIP (not yet imported, or a territory outside the 50 states + DC
     // it covers) or when none of the matched counties have usable data.
     let medicareMix = { available: false, reason: 'No Medicare enrollment data imported yet for this state' };
+    const countyNames = [];   // this ZIP's county(ies), for the local HPSA match
     if (crosswalkPage.rows.length) {
       const fipsList = [...new Set(crosswalkPage.rows.map(r => r.fips))];
       const zipCountyPage = await pagedGet(
-        `medicare_county_enrollment?fips=in.(${fipsList.join(',')})&select=fips,total_benes,original_medicare_benes,ma_and_other_benes,data_month,data_year`,
+        `medicare_county_enrollment?fips=in.(${fipsList.join(',')})&select=fips,county,total_benes,original_medicare_benes,ma_and_other_benes,data_month,data_year`,
         'fips', { cap: 50 });
       const byFips = {};
-      zipCountyPage.rows.forEach(r => { byFips[r.fips] = r; });
+      zipCountyPage.rows.forEach(r => { byFips[r.fips] = r; if (r.county) countyNames.push(r.county); });
       let total = 0, original = 0, ma = 0, matchedCounties = 0, first = null;
       for (const cw of crosswalkPage.rows) {
         const r = byFips[cw.fips];
@@ -397,7 +436,7 @@ exports.handler = async (event) => {
     // dashboard read `score`, `label`, `finding`, `components` and `metrics`,
     // and this block only ADDS `groups`. A consumer that ignores it is
     // unaffected.
-    let groups = null, catchment = null;
+    let groups = null, catchment = null, model = null;
 
     try {
       const home = await get(
@@ -441,12 +480,12 @@ exports.handler = async (event) => {
         const zipVariants = [...new Set(memberZips.flatMap(z => [z, String(parseInt(z, 10))]))];
 
         const [clinicPage, individualPage, placesPage] = await Promise.all([
-          pagedGet(`clinics?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy`,
+          pagedGet(`clinics?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,latitude,longitude`,
             'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
-          pagedGet(`provider_individuals?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy`,
+          pagedGet(`provider_individuals?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,latitude,longitude`,
             'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
           pagedGet(`cdc_places?zip=in.(${memberZips.join(',')})` +
-            `&measureid=in.(${HealthDemand.measureIds().join(',')})` +
+            `&measureid=in.(${[...new Set(HealthDemand.measureIds().concat(MarketModel.measureIds()))].join(',')})` +
             `&select=zip,measureid,value,pop_18plus,data_year`, 'zip', { cap: 4000, ms: 7000 })
         ]);
 
@@ -558,6 +597,84 @@ exports.handler = async (event) => {
           basis: 'ZCTA centroid distance; approximates adjacency, not drive time',
           weights: PER_GROUP_WEIGHTS
         };
+
+        // ---- per-specialty opportunity model (assets/market-model.js) ------
+        // Isolated: a failure here drops `model` and nothing else.
+        try {
+          // Catchment prevalence per measure, population-weighted across ZIPs.
+          const places = {}, pw = {};
+          for (const r of placesPage.rows) {
+            const pop = Number((members.find(m => m.zip === r.zip) || {}).pop) || 0;
+            const v = Number(r.value);
+            if (!pop || !isFinite(v)) continue;
+            places[r.measureid] = (places[r.measureid] || 0) + v * pop;
+            pw[r.measureid] = (pw[r.measureid] || 0) + pop;
+          }
+          Object.keys(places).forEach(k => { places[k] = places[k] / pw[k]; });
+
+          // Age mix and payers, ranked against every ZIP in the state.
+          const sample = stateDem.map(demoShares).filter(Boolean);
+          const mine = demoShares(dem) || {};
+          const rank = k => MarketModel.rankIn(sample.map(x => x[k]).filter(v => v != null && isFinite(v)), mine[k]);
+          const demo = { over65: rank('over65'), under18: rank('under18'), age19to44: rank('age19to44') };
+          const pay = { insuredPct: rank('insured'), incomePct: rank('income75') };
+
+          // Federal shortage for this ZIP's own county when it can be matched,
+          // else the state median, and the response says which.
+          const keys = new Set(countyNames.map(countyKey).filter(Boolean));
+          const shortage = {};
+          [['primary', /primary/i], ['dental', /dental/i], ['mental', /mental/i]].forEach(([k, rx]) => {
+            const disc = hpsaRows.filter(h => rx.test(h.discipline || ''));
+            const local = keys.size ? disc.filter(h => keys.has(countyKey(h.county))) : [];
+            const matchedAny = keys.size && hpsaRows.some(h => keys.has(countyKey(h.county)));
+            if (local.length) shortage[k] = { score: Math.max(...local.map(h => Number(h.hpsa_score) || 0)), basis: 'county' };
+            else if (matchedAny) shortage[k] = { score: 0, basis: 'county' };   // county found, no designation for this discipline
+            else {
+              const med = median(disc.map(h => Number(h.hpsa_score)).filter(n => isFinite(n)));
+              if (med !== null) shortage[k] = { score: med, basis: 'state' };
+            }
+          });
+
+          // Group-level fallbacks from the breakdown computed just above.
+          const groupNeedPct = {}, groupAccess = {};
+          Object.keys(groups).forEach(k => {
+            const g = groups[k] || {};
+            if (g.need_percentile != null) groupNeedPct[k] = g.need_percentile;
+            if (g.supply_score != null) groupAccess[k] = g.supply_score;
+            else if (g.verdict === 'unserved') groupAccess[k] = 100;
+          });
+
+          // National benchmarks (scripts/build-market-benchmarks.mjs). Absent
+          // until that job has run; the model then falls back and says so.
+          const bmRows = await get('market_benchmarks?select=kind,key,data&limit=500', 4000);
+          const benchmarks = { measures: {}, specialties: {} };
+          (Array.isArray(bmRows) ? bmRows : []).forEach(r => {
+            if (r.kind === 'measure') benchmarks.measures[r.key] = r.data;
+            if (r.kind === 'specialty') benchmarks.specialties[r.key] = r.data;
+          });
+
+          const selfNpi = /^\d{10}$/.test(String((event.queryStringParameters || {}).npi || '')) ? String(event.queryStringParameters.npi) : '';
+          const scored = MarketModel.score({
+            specialties: SPECIALTIES,
+            groupOf: label => TaxonomyGroups.keyFor((SPECIALTIES.find(x => x[0] === label) || [0, ''])[1].split(',')[0]),
+            // ?npi= is the viewing provider: their own listing is not a competitor.
+            rows: clinicPage.rows.concat(individualPage.rows).filter(r => !selfNpi || String(r.npi) !== selfNpi),
+            taxMatches: (stored, terms) => terms.some(t => (' ' + taxNorm(stored)).includes(' ' + taxNorm(t))),
+            milesBetween, center: { lat: oLat, lng: oLon }, adults: catchmentAdults,
+            places, demo, pay, shortage, groupNeedPct, groupAccess,
+            benchmarks: Object.keys(benchmarks.measures).length || Object.keys(benchmarks.specialties).length ? benchmarks : null,
+            catchmentTruncated: catchment.truncated, radiusMiles: CATCHMENT_MAX_MILES
+          });
+          const want = String((event.queryStringParameters || {}).specialty || '');
+          model = {
+            version: scored.version, weights: scored.weights,
+            benchmarks: scored.specialties.some(x => x.evidence.access && x.evidence.access.basis === 'specialty') ? 'specialty' : 'group',
+            headline: scored.specialties.some(x => x.specialty === want) ? want : 'Primary care / family doctor',
+            specialties: scored.specialties
+          };
+        } catch (e) {
+          model = null;
+        }
       }
     } catch (e) {
       // The ZIP-level verdict is the product; the per-group breakdown is an
@@ -609,6 +726,9 @@ exports.handler = async (event) => {
         // ZIP-only heading.
         groups,
         catchment,
+        // Per-specialty archetype / score / confidence (assets/market-model.js).
+        // `headline` is ?specialty= when given, else primary care.
+        model,
         // Named so the UI can cite them, and so a missing one is visible
         sources: [
           'NPPES via clinics and provider_individuals', 'US Census / demographics_raw', 'HRSA HPSA',

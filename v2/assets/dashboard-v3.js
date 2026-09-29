@@ -141,6 +141,7 @@ function specFor(desc) {
 })();
 
 function applySpecialty(label) {
+  focusSpec = label || null;       // the Insights headline follows the filter
   var sel = $('specialty-select');
   if (sel && sel.value !== label) sel.value = label;
   var count = $('filters-count');
@@ -257,7 +258,11 @@ window.renderVerdict = function (zip) {
   if (zip === lastZip && lastScore) { paintInsights(); return; }
   lastZip = zip; lastScore = 'loading';
   paintInsights();
-  fetch('/.netlify/functions/market-score?zip=' + encodeURIComponent(zip))
+  var q = '?zip=' + encodeURIComponent(zip) +
+    (profile && /^\d{10}$/.test(String(profile.npi || '')) ? '&npi=' + profile.npi : '') +
+    (mySpec ? '&specialty=' + encodeURIComponent(mySpec.label) : '');
+  focusSpec = null; showAllSpecs = false;
+  fetch('/.netlify/functions/market-score' + q)
     .then(function (r) { return r.json(); })
     .then(function (d) { if (lastZip === zip) { lastScore = d; paintInsights(); } })
     .catch(function () { if (lastZip === zip) { lastScore = { available: false, reason: 'Scoring is unavailable right now' }; paintInsights(); } });
@@ -311,8 +316,10 @@ function paintInsights() {
     : cls === 'balanced' ? 'Supply roughly matches need. Growth depends on standing out: insurance, availability, specialty focus.'
     : 'Already well supplied. Expect competition; look at the specialty breakdown for gaps.';
 
-  // Score card
-  p.appendChild(el('div', { class: 'ins-score ' + cls },
+  var M = d.model && d.model.specialties && d.model.specialties.length ? d.model : null;
+  if (M) paintModel(p, d, M);
+  // Legacy all-specialty card, when the model is unavailable
+  else p.appendChild(el('div', { class: 'ins-score ' + cls },
     el('div', { class: 'ins-ring', style: '--p:' + Math.max(0, Math.min(100, d.score)) },
       el('b', {}, String(d.score)), el('span', {}, 'of 100')),
     el('div', { class: 'ins-verdict' },
@@ -347,6 +354,10 @@ function paintInsights() {
 
   // Findings in plain English
   var F = [];
+  if (M) {
+    F.push([cls === 'under' ? 'good' : 'neutral', 'Whole-area score',
+      'All specialties together score ' + d.score + ' (' + titleWord(d.label).toLowerCase() + ') for ZIP ' + d.zip + '. ' + meaning]);
+  }
   if (m.providers_per_1k != null && m.benchmark_per_1k) {
     var r = m.providers_per_1k / m.benchmark_per_1k;
     F.push([r < 0.9 ? 'good' : r > 1.1 ? 'bad' : 'neutral', 'Provider supply',
@@ -406,6 +417,110 @@ function paintInsights() {
       el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('demographics'); } }, 'Demographics'),
       el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('health'); } }, 'Health data')),
     el('p', { class: 'ins-src' }, visibleCount() ? fmtN(visibleCount()) + ' providers visible on the map. ' : '', 'Sources: ', (d.sources || []).join(' · '))));
+}
+
+/* ---------- 5b. Market model: archetype, factors, ranked specialties ------ */
+var focusSpec = null, showAllSpecs = false;
+var ARCH_TONE = { prime: 'good', unserved: 'good', safety_net: 'warm', latent: 'warm', balanced: 'neutral',
+  crowded_premium: 'cool', saturated: 'bad', insufficient: 'muted' };
+var FACTORS = [
+  ['need', 'Health need', 'How common the conditions this specialty treats are here, vs US ZIPs'],
+  ['access', 'Access gap', 'Higher when there are fewer clinicians per adult than nationally'],
+  ['pay', 'Ability to pay', 'Insured rate and household income, ranked within the state'],
+  ['shortage', 'Federal shortage', 'HRSA shortage-area score for the matching discipline'],
+  ['competition', 'Room from competitors', 'Higher when the nearest same-specialty listing is far away']
+];
+function ordinal(v) {
+  var n = Math.round(v), t = n % 100, u = n % 10;
+  return n + (t >= 11 && t <= 13 ? 'th' : u === 1 ? 'st' : u === 2 ? 'nd' : u === 3 ? 'rd' : 'th');
+}
+function evidenceLine(k, e) {
+  if (!e) return 'No data for this area';
+  if (k === 'need') {
+    return (e.parts || []).slice().sort(function (a, b) { return b.percentile - a.percentile; }).slice(0, 3)
+      .map(function (x) { return (x.inverted ? 'low ' : '') + (x.label || x.measure) + ' ' + ordinal(x.percentile); }).join(' · ');
+  }
+  if (k === 'access' && !e.clinicians) return 'None within the catchment' + (e.national_per_1k ? ' (' + e.national_per_1k + ' per 1,000 nationally)' : '');
+  if (k === 'access') return fmtN(e.clinicians) + ' within the catchment' + (e.per_1k != null ? ', ' + e.per_1k + ' per 1,000 adults' : '') +
+    (e.national_per_1k ? ' vs ' + e.national_per_1k + ' nationally' : ' (compared at group level)');
+  if (k === 'pay') return 'Insured ' + ordinal(e.insured_pct) + (e.income_pct != null ? ' · $75k+ households ' + ordinal(e.income_pct) : '') + ' percentile in state';
+  if (k === 'shortage') return 'HPSA ' + e.hpsa + ' of ~25, ' + e.discipline + ' care, ' + (e.basis === 'county' ? 'this county' : 'state median');
+  if (k === 'competition') return e.nearest_miles == null ? 'None within the catchment' : 'Nearest ' + e.nearest_miles + ' mi away';
+  return '';
+}
+function pickHeadline(M) {
+  var by = {}; M.specialties.forEach(function (x) { by[x.specialty] = x; });
+  var sel = $('specialty-select');
+  var want = focusSpec || (mode === 'mine' && mySpec && mySpec.label) || (sel && sel.value) || null;
+  if (want && by[want]) return by[want];
+  return rankSpecs(M)[0];
+}
+function rankSpecs(M) {
+  return M.specialties.slice().sort(function (a, b) {
+    var ia = a.archetype === 'insufficient' || a.score == null, ib = b.archetype === 'insufficient' || b.score == null;
+    return ia !== ib ? (ia ? 1 : -1) : (b.score || 0) - (a.score || 0);
+  });
+}
+
+function paintModel(p, d, M) {
+  var h = pickHeadline(M);
+  var tn = ARCH_TONE[h.archetype] || 'neutral';
+  var sw = el('select', { class: 'ins-spec', 'aria-label': 'Specialty to score' },
+    rankSpecs(M).map(function (x) { return el('option', { value: x.specialty }, x.specialty); }));
+  sw.value = h.specialty;
+  sw.addEventListener('change', function () { focusSpec = sw.value; paintInsights(); });
+
+  p.appendChild(el('div', { class: 'ins-model t-' + tn },
+    el('div', { class: 'ins-eyebrow' }, 'Opportunity · ZIP ' + d.zip + (d.state ? ', ' + d.state : '')),
+    sw,
+    el('div', { class: 'ins-mtop' },
+      el('div', { class: 'ins-ring', style: '--p:' + Math.max(0, Math.min(100, h.score || 0)) },
+        el('b', {}, h.score == null ? '—' : String(h.score)), el('span', {}, 'of 100')),
+      el('div', { class: 'ins-verdict' },
+        el('h3', {}, h.archetype_name),
+        el('span', { class: 'ins-conf c-' + h.confidence, title: 'How much of the model is backed by local data' },
+          h.confidence.charAt(0).toUpperCase() + h.confidence.slice(1) + ' confidence'))),
+    el('p', { class: 'ins-strategy' }, h.strategy),
+    h.reasons.length ? el('ul', { class: 'ins-reasons' }, h.reasons.map(function (r) {
+      return el('li', { class: r.direction === 'up' ? 'up' : 'down' }, el('i', { 'aria-hidden': 'true' }, r.direction === 'up' ? '▲' : '▼'), el('span', {}, r.text));
+    })) : null));
+  if (anchorNote) p.appendChild(el('p', { class: 'ins-note' }, anchorNote));
+
+  // Factor breakdown: every input, its weight, and the evidence behind it
+  var W = M.weights || {};
+  p.appendChild(el('div', { class: 'ins-card' },
+    el('div', { class: 'ins-eyebrow' }, 'How the score is built'),
+    el('div', { class: 'ins-factors' }, FACTORS.map(function (f) {
+      var v = h.factors[f[0]];
+      var missing = v == null;
+      return el('div', { class: 'ins-factor' + (missing ? ' missing' : ''), title: f[2] },
+        el('div', { class: 'ins-fhead' },
+          el('b', {}, f[1]),
+          el('span', { class: 'ins-fw' }, Math.round((W[f[0]] || 0) * 100) + '% weight'),
+          el('span', { class: 'ins-fv' }, missing ? 'n/a' : String(v))),
+        el('div', { class: 'ins-bar' }, el('i', { style: 'width:' + (missing ? 0 : v) + '%' })),
+        el('div', { class: 'ins-fev' }, evidenceLine(f[0], h.evidence[f[0]])));
+    })),
+    h.caveats.length ? el('details', { class: 'ins-caveats' },
+      el('summary', {}, 'Data notes (' + h.caveats.length + ')'),
+      el('ul', {}, h.caveats.map(function (c) { return el('li', {}, c); }))) : null));
+
+  // Every specialty, ranked: the view to walk a prospect through
+  var ranked = rankSpecs(M);
+  var shown = showAllSpecs ? ranked : ranked.slice(0, 8);
+  p.appendChild(el('div', { class: 'ins-card' },
+    el('div', { class: 'ins-eyebrow' }, 'Opportunities by specialty · within ' + ((d.catchment && d.catchment.radius_miles) || 25) + ' miles'),
+    el('ol', { class: 'ins-rank' }, shown.map(function (x) {
+      return el('li', {}, el('button', { type: 'button', class: x.specialty === h.specialty ? 'on' : '',
+        onclick: function () { focusSpec = x.specialty; paintInsights(); insightsPanel.scrollTop = 0; } },
+        el('span', { class: 'ins-rname' }, x.specialty),
+        el('span', { class: 'ins-achip t-' + (ARCH_TONE[x.archetype] || 'neutral') }, x.archetype_name),
+        el('b', {}, x.score == null ? '—' : String(x.score))));
+    })),
+    ranked.length > 8 ? el('button', { type: 'button', class: 'ins-more', onclick: function () { showAllSpecs = !showAllSpecs; paintInsights(); } },
+      showAllSpecs ? 'Show top 8' : 'Show all ' + ranked.length) : null,
+    el('p', { class: 'ins-src' }, 'Model ' + M.version + '. ' + (M.benchmarks === 'specialty'
+      ? 'Benchmarked against national rates per specialty.' : 'National per-specialty benchmarks not built yet; compared at specialty-group level.'))));
 }
 
 function titleWord(s) { return String(s || '').toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }

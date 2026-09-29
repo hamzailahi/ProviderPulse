@@ -1,0 +1,50 @@
+name: Build market benchmarks
+
+# Feeds market_benchmarks (migration 021): national percentile anchors per CDC
+# PLACES measure and national listings-per-1k-adults per specialty, which the
+# market model in v2/assets/market-model.js scores each catchment against.
+# Runs after the quarterly crosswalk import and whenever triggered by hand
+# (run it once right after applying migration 021).
+on:
+  schedule:
+    - cron: '0 9 27 1,4,7,10 *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Compute and print the benchmarks without writing to Supabase'
+        type: boolean
+        default: false
+
+concurrency: market-benchmarks
+
+jobs:
+  build:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"
+            exit 1
+          fi
+
+      - name: Build benchmarks
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "${IN_DRY_RUN:-}" = "true" ]; then
+            node scripts/build-market-benchmarks.mjs --dry-run
+          else
+            node scripts/build-market-benchmarks.mjs
+          fi
