@@ -12,11 +12,16 @@
 //
 //   kind 'specialty' key = specialty label from assets/specialties.js
 //                    data = { rate_per_1k, clinicians, adults }
-//                    Listings nationally whose primary_taxonomy contains any of
-//                    the specialty's mapTerms, per 1,000 US adults. ilike is a
-//                    substring match where the live code matches at a word
-//                    start; on these taxonomy strings the two agree, and the
-//                    count is a rate denominator, not a listing.
+//                    Listings nationally whose primary_taxonomy matches any of
+//                    the specialty's mapTerms, per 1,000 US adults, using the
+//                    same word-start match market-score.js applies locally.
+//
+// WHY A FULL SCAN, NOT count=exact + ilike. primary_taxonomy has no index, so
+// an ilike count over ~7M rows hits the statement timeout (57014, confirmed
+// on the first run). Instead every row's taxonomy is read in 1,000-row pages
+// keyed on npi (the primary key / unique index on both tables, so each page
+// is an index range scan), split into 20 NPI-prefix slices fetched in
+// parallel, and tallied per distinct taxonomy string here.
 //
 // Until this has run, market-score.js falls back to the six broad groups and
 // says so in every specialty's caveats and confidence.
@@ -66,13 +71,35 @@ function quantile(sorted, q) {
   return Number((sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo)).toFixed(3));
 }
 
-async function countWhere(table, terms) {
-  const or = terms.map(t => `primary_taxonomy.ilike."*${t.replace(/"/g, '')}*"`).join(',');
-  const res = await rest(`${table}?select=npi&or=(${encodeURIComponent(or)})&limit=1`,
-    { headers: { Prefer: 'count=exact', Range: '0-0' } });
-  const total = Number((res.headers.get('content-range') || '').split('/')[1]);
-  if (!isFinite(total)) throw new Error(`${table}: no count in Content-Range`);
-  return total;
+const taxNorm = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+const taxMatches = (stored, terms) => terms.some(t => (' ' + taxNorm(stored)).includes(' ' + taxNorm(t)));
+
+// NPIs are 10 digits beginning 1 or 2: slices "10".."29" cover every row.
+const SLICES = Array.from({ length: 20 }, (_, i) => String(10 + i));
+
+async function tallySlice(table, prefix, tally) {
+  const upper = String(Number(prefix) + 1);
+  let last = null, n = 0;
+  for (;;) {
+    const seek = last ? `npi=gt.${last}` : `npi=gte.${prefix}`;
+    const res = await rest(`${table}?select=npi,primary_taxonomy&${seek}&npi=lt.${upper}&order=npi&limit=1000`);
+    const rows = await res.json();
+    for (const r of rows) { const t = r.primary_taxonomy || ''; tally.set(t, (tally.get(t) || 0) + 1); }
+    n += rows.length;
+    if (rows.length < 1000) return n;
+    last = rows[rows.length - 1].npi;
+  }
+}
+
+async function tallyTable(table) {
+  const tally = new Map();
+  let total = 0, next = 0;
+  const worker = async () => {
+    while (next < SLICES.length) total += await tallySlice(table, SLICES[next++], tally);
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  console.log(`  ${table}: ${total.toLocaleString()} rows, ${tally.size} distinct taxonomies`);
+  return { tally, total };
 }
 
 async function main() {
@@ -94,18 +121,20 @@ async function main() {
     rows.push({ kind: 'measure', key: id, data });
   }
 
+  console.log('\nReading every listing\'s taxonomy (this takes a few minutes)');
+  const clinics = await tallyTable('clinics');
+  const individuals = await tallyTable('provider_individuals');
+  if (clinics.total + individuals.total < 1e6) throw new Error('fewer than 1M listings read; NPPES load incomplete?');
+  const merged = new Map(clinics.tally);
+  for (const [t, n] of individuals.tally) merged.set(t, (merged.get(t) || 0) + n);
+
   for (const [label, mapTerms] of SPECIALTIES) {
     const terms = mapTerms.split(',').map(s => s.trim()).filter(Boolean);
-    try {
-      const [c, i] = await Promise.all([countWhere('clinics', terms), countWhere('provider_individuals', terms)]);
-      const clinicians = c + i;
-      const data = { rate_per_1k: Number(((clinicians / adults) * 1000).toFixed(4)), clinicians, adults };
-      console.log(`  ${label}: ${clinicians.toLocaleString()} listings, ${data.rate_per_1k}/1k`);
-      if (clinicians > 0) rows.push({ kind: 'specialty', key: label, data });
-    } catch (e) {
-      // One slow count must not sink the rest; that specialty falls back.
-      console.log(`  ${label}: count failed (${e.message}), left out`);
-    }
+    let clinicians = 0;
+    for (const [t, n] of merged) if (taxMatches(t, terms)) clinicians += n;
+    const data = { rate_per_1k: Number(((clinicians / adults) * 1000).toFixed(4)), clinicians, adults };
+    console.log(`  ${label}: ${clinicians.toLocaleString()} listings, ${data.rate_per_1k}/1k`);
+    if (clinicians > 0) rows.push({ kind: 'specialty', key: label, data });
   }
 
   console.log(`\n${rows.length} benchmark rows`);
