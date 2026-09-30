@@ -257,7 +257,7 @@ async function getMarketInsights({ zip, specialty }, ctx) {
     zip: d.zip, state: d.state,
     whole_area: { score: d.score, label: d.label },
     population: m.population, insured_rate: m.insured_rate, state_insured_rate: m.state_insured_rate,
-    listings_per_1k_residents: m.providers_per_1k, national_listings_per_1k: m.benchmark_per_1k,
+    listings_per_1k_residents: m.providers_per_1k, state_average_listings_per_1k: m.benchmark_per_1k, state: d.state,
     medicare: d.medicare && d.medicare.available ? {
       beneficiaries: d.medicare.total_beneficiaries, medicare_advantage_pct: d.medicare.medicare_advantage_pct,
       level: d.medicare.level, as_of: d.medicare.as_of

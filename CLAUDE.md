@@ -238,11 +238,15 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   `provider_individuals` (NPI-1), merged; before 2026-08-19 it counted clinics
   alone and undercounted 2-10x (ZIP 38017: 544 individuals vs 217 clinics).
   `clinic_secondary_locations` is excluded from counts (extra sites of an NPI
-  already counted). **Known flaw:** the density benchmark `NATIONAL_PER_1K =
-  5.8` is a hard-coded constant from organizations only (about 1.9M / 330M),
-  while the local count is organizations plus individuals, so "x% above the
-  national average" is inflated. Fix by deriving the benchmark from the same
-  tables (see `market_benchmarks`), not by adjusting the constant. `hpsa_designations` stores **full** state names while
+  already counted). The whole-area density is compared with **its
+  state's** listings per 1,000 residents (`market_benchmarks`, kind
+  `state_density`, built by the benchmark job), never a national constant: the
+  old hard-coded 5.8 came from organizations only while the local count
+  included individuals, so almost every market read as well supplied.
+  Numerator and denominator must stay like for like (every `clinics` +
+  `provider_individuals` row over Census population). No benchmark means the
+  supply term is dropped and the score re-weights over payer and shortage;
+  `metrics.benchmark_per_1k` is `null`, with `benchmark_scope: 'state'`. `hpsa_designations` stores **full** state names while
   `clinics` stores codes; the mapping is in the file. The `medicare` field is
   ZIP-level via `zip_county_crosswalk` (`level: 'zip'`), falling back to the
   state aggregate (`level: 'state'`). Accepts `?specialty=` (model headline) and
@@ -564,8 +568,9 @@ Tables:
 - `zip_county_crosswalk`: HUD ZIP-to-county with residential-address ratio
   (020). ZIP 38017 is 91% Shelby / 9% Fayette by address count vs a misleading
   43%/57% by the Census land-area file; that is why HUD was chosen.
-- `market_benchmarks`: national benchmarks for the market model (021), keyed
-  `(kind, key)`. Public read, service-role write.
+- `market_benchmarks`: benchmarks for the market model (021), keyed
+  `(kind, key)`: `measure`, `specialty`, and `state_density`. Public read,
+  service-role write.
 
 **Migration 008's four tables (`npi_activity`, `directory_audits`,
 `audit_findings`, `demand_log`) have RLS enabled and NO policies.** That is the
@@ -791,7 +796,9 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
 - **ZIP-county crosswalk** (`import-zip-county-crosswalk.mjs`, quarterly 25th):
   HUD API, 51 state-level calls; `year`/`quarter` are siblings of `results[]`,
   not per-row fields. Needs `HUD_API_TOKEN`.
-- **Market benchmarks** (`build-market-benchmarks.mjs`, quarterly 27th).
+- **Market benchmarks** (`build-market-benchmarks.mjs`, quarterly 27th):
+  measure percentiles, per-specialty national rates, and per-state density
+  (`state_density`). Run it by hand after changing what it computes.
 - **CDC PLACES** (`import-cdc-places.mjs`, yearly Sept 20).
 - **NPI ZIP enrichment** (`enrich-npi-zips.mjs`, hourly): see below.
 - **Tests** (`tests.yml`): every pull request and push to main.
@@ -901,6 +908,7 @@ node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the re
 node scripts/test-market-model.mjs        # 30: the market opportunity model
 node scripts/test-market-assistant.mjs    # 32: the assistant (needs npm ci in v2/)
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
+node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
 ```
 
 Frontends are verified in headless Chromium (Playwright) against mocked

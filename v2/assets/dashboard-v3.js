@@ -360,10 +360,11 @@ function paintInsights() {
   }
   if (m.providers_per_1k != null && m.benchmark_per_1k) {
     var r = m.providers_per_1k / m.benchmark_per_1k;
+    var scope = 'the ' + (m.benchmark_state || 'state') + ' average';
     F.push([r < 0.9 ? 'good' : r > 1.1 ? 'bad' : 'neutral', 'Provider supply',
       m.providers_per_1k.toFixed(1) + ' listings per 1,000 residents, ' +
       (r < 0.9 ? Math.round((1 - r) * 100) + '% below' : r > 1.1 ? Math.round((r - 1) * 100) + '% above' : 'in line with') +
-      ' the national ' + m.benchmark_per_1k + '. ' + fmtN(m.organizations) + ' organizations and ' + fmtN(m.individual_physicians) + ' individual clinicians.']);
+      ' ' + scope + ' of ' + m.benchmark_per_1k + '. ' + fmtN(m.organizations) + ' organizations and ' + fmtN(m.individual_physicians) + ' individual clinicians.']);
   }
   if (m.insured_rate != null && m.state_insured_rate != null) {
     var dpts = (m.insured_rate - m.state_insured_rate) * 100;
@@ -379,6 +380,11 @@ function paintInsights() {
     F.push(['neutral', 'Medicare',
       fmtN(d.medicare.total_beneficiaries) + ' beneficiaries ' + (d.medicare.level === 'zip' ? 'in this ZIP' : 'statewide') + ', ' +
       d.medicare.medicare_advantage_pct + '% on Medicare Advantage (' + d.medicare.as_of + '). A high MA share means network contracts matter.']);
+  }
+  if (m.providers_per_1k != null && !m.benchmark_per_1k) {
+    F.push(['neutral', 'Provider supply',
+      m.providers_per_1k.toFixed(1) + ' listings per 1,000 residents. ' + fmtN(m.organizations) + ' organizations and ' + fmtN(m.individual_physicians) +
+      ' individual clinicians. Not compared: the ' + (d.state || 'state') + ' benchmark has not been built yet, so this area\'s score rests on payer mix and shortage only.']);
   }
   var groups = d.groups && d.groups.available !== false ? d.groups : null;
   if (groups) {

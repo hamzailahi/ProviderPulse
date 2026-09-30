@@ -304,11 +304,20 @@ exports.handler = async (event) => {
     }
     const stateRate = median(rates);
 
-    // Density benchmark needs provider counts per ZIP, which is too many queries
-    // to do live. Use the national reference instead and say so in the payload.
-    // Like-for-like with an all-listings count: 1.9M listings / ~330M people.
-    const NATIONAL_PER_1K = 5.8;
-    const benchDensity = NATIONAL_PER_1K;
+    // Density benchmark: this state's listings per 1,000 residents, precomputed
+    // by scripts/build-market-benchmarks.mjs from the SAME tables and the SAME
+    // counting rule used locally (every clinics + provider_individuals row over
+    // Census population), so the comparison is like for like. It replaces a
+    // hard-coded national 5.8 that was built from organizations alone while the
+    // local count included individual clinicians, which overstated supply.
+    //
+    // Unknown is never average: until the builder has run (or for a state it
+    // skipped) there is no benchmark, the supply term is left out, and the
+    // remaining terms are re-weighted. The payload says so.
+    const stateBenchRows = await get(
+      `market_benchmarks?kind=eq.state_density&key=eq.${encodeURIComponent(String(state || '').toUpperCase())}&select=data&limit=1`, 4000);
+    const sb = Array.isArray(stateBenchRows) && stateBenchRows[0] && stateBenchRows[0].data;
+    const benchDensity = sb && Number(sb.per_1k) > 0 ? Number(sb.per_1k) : null;
 
     // 4. Designated shortage: HPSA is county-level, so match on state and take
     //    the strongest primary-care designation available.
@@ -398,7 +407,7 @@ exports.handler = async (event) => {
 
     // ---- sub-scores, each 0-100 ------------------------------------------
     // Under-supply: fewer providers per capita than the benchmark scores higher.
-    const supply = per1k === null ? 50
+    const supply = (per1k === null || benchDensity === null) ? null
       : clamp(100 - (per1k / benchDensity) * 50, 0, 100);
     // Payer mix: a higher insured rate than the state median scores higher.
     const payer = (insuredRate === null || stateRate === null) ? 50
@@ -406,7 +415,11 @@ exports.handler = async (event) => {
     // Shortage: HPSA runs roughly 0-25; higher means more underserved.
     const shortage = hpsaScore === null ? 50 : clamp((hpsaScore / 25) * 100, 0, 100);
 
-    const score = Math.round(supply * WEIGHTS.supply + payer * WEIGHTS.payer + shortage * WEIGHTS.shortage);
+    // Weighted mean over the terms we have. Without a benchmark the supply term
+    // (40%) drops out and payer and shortage carry the whole score.
+    const terms = [[supply, WEIGHTS.supply], [payer, WEIGHTS.payer], [shortage, WEIGHTS.shortage]].filter(t => t[0] !== null);
+    const wsum = terms.reduce((a, t) => a + t[1], 0);
+    const score = Math.round(terms.reduce((a, t) => a + t[0] * t[1], 0) / wsum);
 
     const label = score >= 70 ? 'UNDERSERVED MARKET'
       : score >= 50 ? 'BALANCED MARKET'
@@ -418,11 +431,15 @@ exports.handler = async (event) => {
       // One framing only. Quoting both "1 per N residents" and "x thinner than
       // average" in the same line reads as a contradiction, because a small N
       // sounds dense while the ratio says sparse.
-      const ratio = per1k / benchDensity;
-      const rel = ratio < 0.9 ? `${(1 / ratio).toFixed(1)}× fewer than the national average`
-        : ratio > 1.1 ? `${ratio.toFixed(1)}× more than the national average`
-        : 'in line with the national average';
-      parts.push(`${per1k.toFixed(1)} providers per 1,000 residents — ${rel}`);
+      if (benchDensity === null) {
+        parts.push(`${per1k.toFixed(1)} providers per 1,000 residents (no ${state || 'state'} benchmark built yet, so not compared)`);
+      } else {
+        const ratio = per1k / benchDensity;
+        const rel = ratio < 0.9 ? `${(1 / ratio).toFixed(1)}× fewer than the ${state} average`
+          : ratio > 1.1 ? `${ratio.toFixed(1)}× more than the ${state} average`
+          : `in line with the ${state} average`;
+        parts.push(`${per1k.toFixed(1)} providers per 1,000 residents, ${rel}`);
+      }
     }
     if (insuredRate !== null && stateRate !== null) {
       const d = (insuredRate - stateRate) * 100;
@@ -689,7 +706,7 @@ exports.handler = async (event) => {
         zip, state, available: true, score, label,
         finding: parts.join(' · '),
         components: {
-          supply: Math.round(supply),
+          supply: supply === null ? null : Math.round(supply),
           payer: Math.round(payer),
           shortage: Math.round(shortage),
           weights: WEIGHTS
@@ -709,7 +726,12 @@ exports.handler = async (event) => {
           organizations: organizations,
           individual_physicians: individuals,
           providers_per_1k: per1k,
-          benchmark_per_1k: benchDensity,
+          // This state's density (see the benchmark note above), or null when
+          // it has not been built. `benchmark_scope` says what it is a
+          // benchmark OF, so no consumer has to guess it is national.
+          benchmark_per_1k: benchDensity !== null ? Math.round(benchDensity * 10) / 10 : null,
+          benchmark_scope: 'state',
+          benchmark_state: state || null,
           hpsa_score: hpsaScore
         },
         // Medicare Advantage vs. Original Medicare split, allocated to this

@@ -10,6 +10,16 @@
 //                    the question the model asks is "how does this catchment
 //                    compare with a typical US ZIP", not with a typical adult.
 //
+//   kind 'state_density' key = 2-letter state code
+//                    data = { per_1k, listings, organizations, individuals, population, zips }
+//                    ALL listings (clinics + provider_individuals, every taxonomy)
+//                    per 1,000 residents in that state. The whole-area "Provider
+//                    supply" line in Insights compares a ZIP with this, so numerator
+//                    and denominator must match what market-score.js counts locally:
+//                    every listing, both tables, over Census population. (It used to
+//                    compare with a hard-coded 5.8 built from organizations alone,
+//                    which overstated supply.)
+//
 //   kind 'specialty' key = specialty label from assets/specialties.js
 //                    data = { rate_per_1k, clinicians, adults }
 //                    Listings nationally whose primary_taxonomy matches any of
@@ -77,14 +87,18 @@ const taxMatches = (stored, terms) => terms.some(t => (' ' + taxNorm(stored)).in
 // NPIs are 10 digits beginning 1 or 2: slices "10".."29" cover every row.
 const SLICES = Array.from({ length: 20 }, (_, i) => String(10 + i));
 
-async function tallySlice(table, prefix, tally) {
+async function tallySlice(table, prefix, tally, stateTally) {
   const upper = String(Number(prefix) + 1);
   let last = null, n = 0;
   for (;;) {
     const seek = last ? `npi=gt.${last}` : `npi=gte.${prefix}`;
-    const res = await rest(`${table}?select=npi,primary_taxonomy&${seek}&npi=lt.${upper}&order=npi&limit=1000`);
+    const res = await rest(`${table}?select=npi,primary_taxonomy,state&${seek}&npi=lt.${upper}&order=npi&limit=1000`);
     const rows = await res.json();
-    for (const r of rows) { const t = r.primary_taxonomy || ''; tally.set(t, (tally.get(t) || 0) + 1); }
+    for (const r of rows) {
+      const t = r.primary_taxonomy || ''; tally.set(t, (tally.get(t) || 0) + 1);
+      const st = String(r.state || '').trim().toUpperCase();
+      if (st) stateTally.set(st, (stateTally.get(st) || 0) + 1);
+    }
     n += rows.length;
     if (rows.length < 1000) return n;
     last = rows[rows.length - 1].npi;
@@ -92,16 +106,36 @@ async function tallySlice(table, prefix, tally) {
 }
 
 async function tallyTable(table) {
-  const tally = new Map();
+  const tally = new Map(), stateTally = new Map();
   let total = 0, next = 0;
   const worker = async () => {
     // Not `total += await ...`: that reads `total` before awaiting, so
     // parallel workers overwrite each other (the first run logged 1.8M of ~9M).
-    while (next < SLICES.length) { const n = await tallySlice(table, SLICES[next++], tally); total += n; }
+    while (next < SLICES.length) { const n = await tallySlice(table, SLICES[next++], tally, stateTally); total += n; }
   };
   await Promise.all(Array.from({ length: 6 }, worker));
   console.log(`  ${table}: ${total.toLocaleString()} rows, ${tally.size} distinct taxonomies`);
-  return { tally, total };
+  return { tally, stateTally, total };
+}
+
+// Census population and ZIP count by state. zip is unique in demographics_raw,
+// so keyset on it is safe. ZIPs with a NULL population (PO boxes, mostly)
+// contribute nothing, exactly as they contribute nothing locally.
+async function statePopulation() {
+  const pop = new Map(), zips = new Map();
+  let last = '';
+  for (;;) {
+    const res = await rest(`demographics_raw?select=zip,state,%22Total%20Population%22${last ? `&zip=gt.${last}` : ''}&order=zip&limit=1000`);
+    const rows = await res.json();
+    for (const r of rows) {
+      const st = String(r.state || '').trim().toUpperCase(), p = Number(r['Total Population']) || 0;
+      if (!st || p <= 0) continue;
+      pop.set(st, (pop.get(st) || 0) + p);
+      zips.set(st, (zips.get(st) || 0) + 1);
+    }
+    if (rows.length < 1000) return { pop, zips };
+    last = rows[rows.length - 1].zip;
+  }
 }
 
 async function main() {
@@ -126,9 +160,28 @@ async function main() {
   console.log('\nReading every listing\'s taxonomy (this takes a few minutes)');
   const clinics = await tallyTable('clinics');
   const individuals = await tallyTable('provider_individuals');
-  if (clinics.total + individuals.total < 5e6) throw new Error('fewer than 5M listings read; NPPES load incomplete?');
+  // MIN_LISTINGS exists only so a test can run this against a small fake database.
+  const minListings = Number(process.env.MIN_LISTINGS) || 5e6;
+  if (clinics.total + individuals.total < minListings) throw new Error(`fewer than ${minListings.toLocaleString()} listings read; NPPES load incomplete?`);
   const merged = new Map(clinics.tally);
   for (const [t, n] of individuals.tally) merged.set(t, (merged.get(t) || 0) + n);
+
+  // Like-for-like density per state: every listing over Census population.
+  const { pop, zips: zipCount } = await statePopulation();
+  const totalPop = [...pop.values()].reduce((a, b) => a + b, 0);
+  console.log(`\nCensus population across ${pop.size} states/territories: ${totalPop.toLocaleString()}`);
+  if (totalPop < 250e6) throw new Error(`population total ${totalPop} is implausibly low; demographics_raw incomplete?`);
+  let allListings = 0;
+  for (const [st, popN] of [...pop.entries()].sort()) {
+    const orgs = clinics.stateTally.get(st) || 0, people = individuals.stateTally.get(st) || 0;
+    const listings = orgs + people;
+    if (!listings || popN < 100000) { console.log(`  ${st}: skipped (${listings} listings, population ${popN})`); continue; }
+    allListings += listings;
+    const data = { per_1k: Number(((listings / popN) * 1000).toFixed(2)), listings, organizations: orgs, individuals: people, population: popN, zips: zipCount.get(st) || 0 };
+    console.log(`  ${st}: ${listings.toLocaleString()} listings / ${popN.toLocaleString()} people = ${data.per_1k}/1k`);
+    rows.push({ kind: 'state_density', key: st, data });
+  }
+  console.log(`  all states: ${(allListings / totalPop * 1000).toFixed(2)} listings per 1,000 residents`);
 
   for (const [label, mapTerms] of SPECIALTIES) {
     const terms = mapTerms.split(',').map(s => s.trim()).filter(Boolean);

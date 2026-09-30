@@ -469,7 +469,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `medicare-enrollment-import.yml` | monthly, the 18th | CMS Medicare Monthly Enrollment, newest month only, overwriting the table rather than accumulating history |
 | `medicare-advantage-payers-import.yml` | monthly, the 22nd | CMS MA enrollment by state joined to the MA Contract Directory, so plans show the brand name patients recognize rather than the legal entity |
 | `zip-county-crosswalk-import.yml` | quarterly, the 25th of Jan/Apr/Jul/Oct | HUD USPS ZIP Code Crosswalk API: which county each ZIP falls in, weighted by residential addresses |
-| `market-benchmarks.yml` | quarterly, the 27th of Jan/Apr/Jul/Oct | builds national benchmarks for the market model from CDC PLACES and the provider tables |
+| `market-benchmarks.yml` | quarterly, the 27th of Jan/Apr/Jul/Oct | builds the market model's benchmarks from CDC PLACES and the provider tables: national health-measure percentiles, national listings per specialty, and each state's listings per 1,000 residents |
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched |
 | `tests.yml` | every pull request and push to main | syntax check, loading every function, and the test scripts below |
@@ -485,6 +485,7 @@ node scripts/test-accuracy-signals.mjs    # the directory-accuracy scoring engin
 node scripts/test-query-plan.mjs          # the query-plan allowlist behind the assistant's database tool
 node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings
 node scripts/test-market-model.mjs        # the market opportunity model
+node scripts/test-density-benchmark.mjs   # the state comparison is like for like, and honest when unavailable
 node scripts/test-signup-gate.mjs         # patient sign-up is closed unless explicitly opened
 node scripts/test-market-assistant.mjs    # the assistant: steps, tools, history rules (needs npm ci in v2/)
 ```
@@ -521,17 +522,6 @@ Census ZCTA relationship file was tried first and rejected: ZIP 38017 is
 43%/57% by land area. When the crosswalk has no rows for a ZIP, the figure
 falls back to the state-wide number, and both levels are labeled.
 
-The whole-area "Provider supply" line in Insights compares listings per
-1,000 residents with a single hard-coded national figure of 5.8
-(`NATIONAL_PER_1K` in `market-score.js`), the same for every ZIP. That figure
-was derived from organization listings alone (about 1.9 million over about
-330 million people), but the local count has included individual clinicians
-since 2026-08-19, so the comparison is not like for like and overstates how
-well supplied a market is. Treat that line, and the whole-area score it feeds,
-as unreliable until the benchmark is rebuilt from the same listings it is
-compared with. The per-specialty scores are not affected: they use national
-rates built from the same tables (`market_benchmarks`).
-
 The HRSA shortage score in the market model now uses the ZIP's own county
 when its name can be matched to `hpsa_designations` (which strips the
 "County"/"Parish"/"Borough" suffix, so both sides are normalized the same
@@ -550,6 +540,18 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-30
+- **"Provider supply" now compares a market with its own state.** Insights
+  used to compare listings per 1,000 residents with one hard-coded national
+  figure (5.8) that counted organizations only, while the local number also
+  counted individual clinicians, so nearly every market looked well
+  supplied. The comparison is now this state's listings per 1,000 residents,
+  built from the same tables and the same counting rule, and the text says
+  which state ("42% below the TN average of 24.9"). The whole-area score
+  (40% of it is this comparison) and its label change accordingly. If a
+  state's benchmark has not been built, the comparison is left out and the
+  score rests on payer mix and shortage, rather than assuming an average.
+  **Run the "Build market benchmarks" workflow once to create the state
+  figures** (it is the same job as before and reads the same tables).
 - **Patient sign-up is now closed by default.** It previously stayed open
   unless `PATIENT_SIGNUP_ENABLED` was set to `false`, contrary to the docs,
   so an unset variable allowed health information to be collected before the

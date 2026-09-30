@@ -262,7 +262,7 @@ $('formZip').onsubmit = async e => {
     if (m.providers_per_1k != null) {
       html += '<div class="fig"><b>' + m.providers_per_1k.toFixed(1) + '</b>' +
         '<span>providers per 1,000 residents' +
-        (m.benchmark_per_1k ? ' · national ' + m.benchmark_per_1k : '') + '</span></div>';
+        (m.benchmark_per_1k ? ' · ' + esc(m.benchmark_state || 'state') + ' average ' + m.benchmark_per_1k : '') + '</span></div>';
     }
     // Breakdown behind the total above: as of 2026-08-19 "providers" is
     // organizations + individual physicians merged (see market-score.js), so
