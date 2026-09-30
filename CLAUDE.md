@@ -656,10 +656,16 @@ A manual tool-use loop on Claude Opus 5.5 (`effort: low`), called by the Ask
 AI tab in `dashboard-v3.js`.
 
 - **Stepped, because of the 26s ceiling.** An invocation stops starting model
-  calls at 12s and tool runs at 16s; every model call and tool races a 23.5s
-  deadline. It then returns `done:false` with the conversation, and the
-  browser posts `{continue:true, messages}` until `done:true`. Pending
-  `tool_use` blocks carry across steps.
+  calls once fewer than 18s remain (`MODEL_MIN_BUDGET_MS`, so past ~5.5s in)
+  and tool runs after 16s; every model call and tool races a 23.5s deadline.
+  It then returns `done:false` with the conversation, and the browser posts
+  `{continue:true, messages}` until `done:true` (up to 8 hops). Pending
+  `tool_use` blocks carry across steps. **A model call that writes a
+  document needs 15 to 20s, so it must never start late.** Until 2026-09-30 a
+  call could start at 12s with the leftover ~11s, and every one-pager that
+  followed tool lookups timed out with "That took too long". If a later call
+  in an invocation times out anyway, the step is handed back to retry with a
+  fresh clock; a first call that times out returns 504.
 - **History is append-only and echoed verbatim.** The browser stores the API
   messages exactly as returned (thinking blocks included) and sends them back.
   Never edit or reorder earlier turns: that invalidates preserved thinking.
@@ -906,7 +912,7 @@ node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) 
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
-node scripts/test-market-assistant.mjs    # 32: the assistant (needs npm ci in v2/)
+node scripts/test-market-assistant.mjs    # 38: the assistant (needs npm ci in v2/)
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
 ```

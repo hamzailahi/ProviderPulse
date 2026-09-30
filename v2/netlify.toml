@@ -71,9 +71,10 @@
 
 [functions."market-assistant"]
   # One step of the dashboard assistant: Claude calls plus read-only tools
-  # (market-score, directory queries). The function stops starting model
-  # calls at 12s and tool runs at 16s, and every call must finish by 23.5s,
-  # then the browser continues in a new invocation. Needs the full ceiling.
+  # (market-score, directory queries). A model call starts only with at
+  # least 18s left (a written document takes 15 to 20s), tool runs stop
+  # starting at 16s, and every call must finish by 23.5s; then the browser
+  # continues in a new invocation. Needs the full ceiling.
   timeout = 26
 
 [functions."report-generate"]

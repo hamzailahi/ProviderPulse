@@ -39,6 +39,8 @@ globalThis.fetch = async (url) => {
   return J([]);
 };
 
+const SDK = require('../v2/node_modules/@anthropic-ai/sdk');
+const A = SDK.default || SDK;
 const fn = require('../v2/netlify/functions/market-assistant.js');
 const I = fn._internals;
 
@@ -66,6 +68,7 @@ function fakeClient(script) {
       const next = script.shift();
       if (!next) throw new Error('fake client ran out of scripted responses');
       if (next.delay) await new Promise(r => setTimeout(r, next.delay));
+      if (next.throw) throw next.throw;
       return next.res;
     } } }
   };
@@ -143,10 +146,36 @@ const cmp = JSON.parse(r.body.messages[r.body.messages.length - 1].content[0].co
 check('compare_markets returns one row per ZIP', cmp.markets.length === 2 && cmp.markets[0].specialty_score === 72);
 fake = fakeClient([turn('end_turn', [{ type: 'text', text: '38017 wins.' }])]);
 fn._setClient(fake);
-const r2 = await call({ continue: true, messages: r.body.messages });
+let r2 = await call({ continue: true, messages: r.body.messages });
 check('continue picks up where the step stopped', r2.body.done && r2.body.reply === '38017 wins.' && fake.calls[0].messages.length === r.body.messages.length);
 r = await call({ question: 'new question', messages: r.body.messages.slice(0, 2).concat([{ role: 'assistant', content: [toolUse('p', 'update_map', { zip: '38017', specialty: null })] }]) });
 check('a new question cannot interrupt pending tool calls', r.status === 409);
+
+console.log('\n5b. A long answer never starts late in an invocation');
+check('a model call needs at least 18s of clock, so it can write a full document', I.HARD_BUDGET_MS - I.STEP_BUDGET_MS >= 18000 && I.MODEL_MIN_BUDGET_MS >= 18000);
+fake = fakeClient([
+  Object.assign(turn('tool_use', [toolUse('late', 'update_map', { zip: '38017', specialty: null })]), { delay: I.STEP_BUDGET_MS + 300 }),
+  turn('end_turn', [{ type: 'text', text: 'should not be reached in this invocation' }])
+]);
+fn._setClient(fake);
+r = await call({ question: 'move the map', context: CTX });
+check('after slow work it hands the step back instead of starting the next call', r.body.done === false && fake.calls.length === 1, `done=${r.body.done} calls=${fake.calls.length}`);
+r2 = await call({ continue: true, messages: r.body.messages });
+check('the next invocation makes that call with the whole clock', r2.body.done && fake.calls.length === 2);
+
+const timeoutErr = () => new A.APIConnectionTimeoutError({ message: 'Request timed out.' });
+fake = fakeClient([{ throw: timeoutErr() }]);
+fn._setClient(fake);
+r = await call({ question: 'huge document', context: CTX });
+check('the first call of an invocation that times out is a 504 (it had the whole clock)', r.status === 504 && /too long/.test(r.body.error), JSON.stringify(r));
+fake = fakeClient([
+  turn('tool_use', [toolUse('quick', 'update_map', { zip: '38017', specialty: null })]),
+  { throw: timeoutErr() }
+]);
+fn._setClient(fake);
+r = await call({ question: 'move then write', context: CTX });
+check('a later call that times out is handed back to retry in a fresh invocation', r.status === 200 && r.body.done === false, JSON.stringify(r).slice(0, 200));
+check('... with the tool results kept and nothing half-written', r.body.messages[r.body.messages.length - 1].role === 'user' && r.body.messages[r.body.messages.length - 1].content[0].type === 'tool_result');
 
 console.log('\n6. Tool behaviour');
 fake = fakeClient([
@@ -185,8 +214,6 @@ check('strict schemas list every property as required', I.TOOLS.filter(t => t.st
 check('the specialty enum covers all 33 labels plus null', I.TOOLS[0].input_schema.properties.specialty.enum.length === 34);
 
 console.log('\n9. A rejected request shape degrades instead of breaking (keep last: it flips module state)');
-const SDK = require('../v2/node_modules/@anthropic-ai/sdk');
-const A = SDK.default || SDK;
 const bad = Object.create(A.BadRequestError.prototype);
 bad.message = 'tools.0.strict: not supported';
 let n = 0;

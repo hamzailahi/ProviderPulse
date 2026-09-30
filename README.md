@@ -313,8 +313,11 @@ public aggregate data: the market score, the provider directory, and the
 allowlisted tables. Moving the map and writing a document are handed back
 to the browser to perform; nothing the model does writes to the database.
 Netlify stops a function at 26 seconds, so the assistant works in steps:
-each call does what fits in about 12 seconds and returns, and the browser
-continues from there. The conversation is echoed back exactly as the API
+a model call only starts when it has close to the whole clock (about 18
+seconds), so a long answer such as a one-pager is written at the start of a
+fresh call and never squeezed into the tail of one that spent its time on
+lookups. Otherwise the step is handed back and the browser continues from
+there. The conversation is echoed back exactly as the API
 returned it, never edited.
 
 The care navigator only ever sees that patient's own profile, and only
@@ -540,6 +543,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-30
+- **Long assistant answers no longer time out.** Asking for a document
+  (an expansion one-pager, for example) ended in "That took too long"
+  whenever the assistant had spent its first seconds on lookups, because the
+  write started with only about 11 seconds left. A model call now starts only
+  when it has close to a full clock, and the step is handed back to continue
+  with a fresh one otherwise. Documents are also asked to stay under 450
+  words. If it still says it took too long, try a narrower question.
 - **"Provider supply" now compares a market with its own state.** Insights
   used to compare listings per 1,000 residents with one hard-coded national
   figure (5.8) that counted organizations only, while the local number also

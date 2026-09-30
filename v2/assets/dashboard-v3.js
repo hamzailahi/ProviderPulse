@@ -787,7 +787,7 @@ if (mode === 'mine') {
     busy = true; send.disabled = true;
     var body = first, resumable = false;
     try {
-      for (var hop = 0; hop < 6; hop++) {
+      for (var hop = 0; hop < 8; hop++) {
         var d = await post(body);
         chat.api = d.messages || chat.api;
         resumable = !d.done;

@@ -39,9 +39,16 @@ const SPECIALTIES = require('../../assets/specialties.js');
 const marketScore = require('./market-score.js');
 
 const MODEL = 'claude-opus-5-5';
-const STEP_BUDGET_MS = 12000;     // stop starting new model calls after this
+// A model call that writes a document (~900 tokens) needs 15 to 20 seconds, so
+// it must never start late in an invocation. It is only started while at least
+// MODEL_MIN_BUDGET_MS remain before HARD_BUDGET_MS; otherwise the step is handed
+// back (done:false) and the browser continues in a fresh invocation whose clock
+// starts near zero. (Until 2026-09-30 a call could start at 12s and got the
+// remaining ~11s, so any long answer that followed tool lookups timed out.)
+const HARD_BUDGET_MS = 23500;     // every model call and tool must finish before this
+const MODEL_MIN_BUDGET_MS = 18000; // only start a model call with at least this much left
 const TOOL_START_BUDGET_MS = 16000; // stop starting tool runs after this
-const HARD_BUDGET_MS = 23500;     // a model call must finish before this
+const STEP_BUDGET_MS = HARD_BUDGET_MS - MODEL_MIN_BUDGET_MS;   // = 5500ms into an invocation
 const MAX_ROUNDS_PER_QUESTION = 8;
 const MAX_HISTORY_BYTES = 350000;
 const SPEC_LABELS = SPECIALTIES.map(s => s[0]);
@@ -73,7 +80,7 @@ How to answer:
 - For questions about a market, call get_market_insights first. Explain results in plain language: the archetype and what it means, the factors that drove the score, and the confidence level. Mention a caveat when the tool reports one that affects the answer.
 - To compare places, call compare_markets. To count or list nearby providers of a specialty, call find_providers. For statewide or cross-market counts the other tools cannot answer, call query_database with a plan.
 - When the user wants to see something on the map ("show me", "zoom to", "switch to"), call update_map. Say briefly what you changed.
-- When the user asks for a memo, one-pager, summary for a client, pitch or report, gather the numbers first, then call create_deliverable with the full document. Keep the document under 600 words, organized with short headings and bullets, every figure traceable to a tool result, and a short "Data notes" section listing sources and caveats. After creating it, reply with one or two sentences; do not repeat the document.
+- When the user asks for a memo, one-pager, summary for a client, pitch or report, gather the numbers first, then call create_deliverable with the full document. Keep the document under 450 words, organized with short headings and bullets, every figure traceable to a tool result, and a short "Data notes" section listing sources and caveats. After creating it, reply with one or two sentences; do not repeat the document.
 - Independent tool calls can go in the same turn.
 
 The market model, for explaining results:
@@ -513,6 +520,7 @@ exports.handler = async (event) => {
     done: true, messages, actions: ctx.actions, deliverables: ctx.deliverables, steps: ctx.steps
   }, extra || {}));
 
+  let modelCalls = 0;
   while (true) {
     const elapsed = Date.now() - started;
 
@@ -528,19 +536,28 @@ exports.handler = async (event) => {
       continue;
     }
 
-    if (elapsed > STEP_BUDGET_MS) return partial();
+    if (elapsed > STEP_BUDGET_MS) return partial();   // not enough time left for a model call
     if (roundsSinceQuestion(messages) >= MAX_ROUNDS_PER_QUESTION) {
       return done({ reply: 'I ran out of steps on that one. Try asking a narrower question.', stopped: 'rounds' });
     }
 
     let res;
     try {
-      res = await createTurn(messages, Math.max(5000, HARD_BUDGET_MS - elapsed));
+      res = await createTurn(messages, HARD_BUDGET_MS - elapsed);
+      modelCalls++;
     } catch (e) {
       // No history is returned on failure: the browser keeps what it had and
       // can retry the same step, so nothing half-finished is ever stored.
       if (e instanceof Anthropic.RateLimitError) return reply(429, { error: 'The assistant is busy. Try again in a moment.' });
-      if (e instanceof Anthropic.APIConnectionTimeoutError) return reply(504, { error: 'That took too long. Try a narrower question, or ask for a shorter document.' });
+      if (e instanceof Anthropic.APIConnectionTimeoutError) {
+        // A later call in this invocation had a shortened budget: a fresh
+        // invocation gives the retry the whole clock, so hand the step back
+        // instead of failing. The FIRST call of an invocation already had
+        // (nearly) all of it; if that timed out, the answer really is too big
+        // for one call, and looping would only repeat the cost.
+        if (modelCalls > 0) return partial();
+        return reply(504, { error: 'That took too long. Try a narrower question, or ask for a shorter document.' });
+      }
       if (e instanceof Anthropic.APIError) return reply(502, { error: 'The assistant is unavailable right now (' + (e.status || 'error') + ').' });
       return reply(502, { error: 'The assistant is unavailable right now.' });
     }
@@ -608,4 +625,4 @@ function pendingCalls(assistantTurn) {
 
 // For tests.
 exports._setClient = _setClient;
-exports._internals = { TOOLS, SYSTEM, cleanHistory, contextBlock, roundsSinceQuestion, updateMap, createDeliverable, stepLabel, STEP_BUDGET_MS };
+exports._internals = { TOOLS, SYSTEM, cleanHistory, contextBlock, roundsSinceQuestion, updateMap, createDeliverable, stepLabel, STEP_BUDGET_MS, HARD_BUDGET_MS, MODEL_MIN_BUDGET_MS };
