@@ -48,6 +48,9 @@ jobs:
       - name: Claimed-listing specialty gating
         run: node scripts/test-claimed-relevance.mjs
 
+      - name: Patient sign-up stays closed unless opened
+        run: node scripts/test-signup-gate.mjs
+
       - name: Market opportunity model
         run: node scripts/test-market-model.mjs
 

@@ -171,8 +171,10 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   `provider_profiles` row seeded from NPPES via the service role, and
   `provider_insurance` rows (max 50).
 - **auth-register-patient.js**: stores PHI (DOB, conditions, concern) in
-  `patient_profiles`. Kill switch `PATIENT_SIGNUP_ENABLED=false` returns 503. Do
-  not enable in production until a Supabase BAA is in place. Passwords are at
+  `patient_profiles`. **Closed by default**: it runs only when `PATIENT_SIGNUP_ENABLED` is exactly
+  `true`, otherwise 503 (this was an opt-out until 2026-09-30, which left it
+  open when unset; keep it opt-in, like `DOCUMENT_UPLOAD_ENABLED`). Do not
+  enable in production until a Supabase BAA is in place. Passwords are at
   least 12 characters on both flows.
 - **auth-login.js**: password grant proxied through the server. Generic 401 so
   email existence isn't leaked. Returns tokens, `role` and `staff`.
@@ -894,6 +896,7 @@ node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
 node scripts/test-market-assistant.mjs    # 32: the assistant (needs npm ci in v2/)
+node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 ```
 
 Frontends are verified in headless Chromium (Playwright) against mocked

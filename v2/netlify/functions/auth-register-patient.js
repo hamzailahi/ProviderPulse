@@ -2,7 +2,10 @@
 // Patient self-registration. Stores PHI (dob, conditions) in patient_profiles.
 // DO NOT enable in production until a Supabase BAA is in place (Team plan or above).
 // Env vars: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
-// Optional kill switch: set PATIENT_SIGNUP_ENABLED=false to disable this endpoint.
+// Closed by default: the endpoint only runs when PATIENT_SIGNUP_ENABLED is exactly
+// "true", the same rule the document endpoints use for DOCUMENT_UPLOAD_ENABLED.
+// Until 2026-09-30 this was an opt-out ("false" closed it), so an unset variable
+// left PHI sign-up open. Set it to "true" in Netlify only once the BAA is signed.
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -30,8 +33,8 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'POST only' }) };
 
   const env = process.env;
-  if (env.PATIENT_SIGNUP_ENABLED === 'false') {
-    return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Patient registration is temporarily unavailable' }) };
+  if (env.PATIENT_SIGNUP_ENABLED !== 'true') {
+    return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Patient accounts are not open yet. You can still search for care without an account.' }) };
   }
   const ip = event.headers['x-nf-client-connection-ip'] || event.headers['x-forwarded-for'] || '';
 

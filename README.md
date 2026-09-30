@@ -450,7 +450,7 @@ hand, in the Supabase SQL editor. The latest is
 | `STAFF_EMAILS` | comma-separated emails allowed into the dashboard for demos without a provider profile |
 | `ADMIN_PASSWORD` | the OIG review queue (`admin-review.html`) |
 | `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, and `report-generate`, which now only renders audits) |
-| `PATIENT_SIGNUP_ENABLED` | patient registration kill switch; defaults closed, since patient PHI storage isn't live until a Supabase BAA is in place |
+| `PATIENT_SIGNUP_ENABLED` | opens patient registration. **Closed unless set to exactly `true`**, since patient PHI storage isn't live until a Supabase BAA is in place. Existing patients can still sign in |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
 | `HUD_API_TOKEN` | `zip-county-crosswalk-import.yml` only; a free HUD USER token stored as a GitHub secret, not a Netlify variable |
 
@@ -485,6 +485,7 @@ node scripts/test-accuracy-signals.mjs    # the directory-accuracy scoring engin
 node scripts/test-query-plan.mjs          # the query-plan allowlist behind the assistant's database tool
 node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings
 node scripts/test-market-model.mjs        # the market opportunity model
+node scripts/test-signup-gate.mjs         # patient sign-up is closed unless explicitly opened
 node scripts/test-market-assistant.mjs    # the assistant: steps, tools, history rules (needs npm ci in v2/)
 ```
 
@@ -538,6 +539,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-30
+- **Patient sign-up is now closed by default.** It previously stayed open
+  unless `PATIENT_SIGNUP_ENABLED` was set to `false`, contrary to the docs,
+  so an unset variable allowed health information to be collected before the
+  Supabase BAA. It now opens only when the variable is exactly `true`, the
+  same rule the document endpoints use. Sign-in for existing accounts and
+  provider registration are unaffected, and the sign-up form tells visitors
+  they can still search for care without an account.
 - **Neighboring ZIPs fixed.** "Add Neighbors" on the dashboard now adds
   only ZIPs that share a border with the selected one, instead of every ZIP
   whose bounding box overlaps it. Clicking again adds the next ring out.
