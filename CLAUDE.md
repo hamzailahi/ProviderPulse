@@ -238,7 +238,11 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   `provider_individuals` (NPI-1), merged; before 2026-08-19 it counted clinics
   alone and undercounted 2-10x (ZIP 38017: 544 individuals vs 217 clinics).
   `clinic_secondary_locations` is excluded from counts (extra sites of an NPI
-  already counted). `hpsa_designations` stores **full** state names while
+  already counted). **Known flaw:** the density benchmark `NATIONAL_PER_1K =
+  5.8` is a hard-coded constant from organizations only (about 1.9M / 330M),
+  while the local count is organizations plus individuals, so "x% above the
+  national average" is inflated. Fix by deriving the benchmark from the same
+  tables (see `market_benchmarks`), not by adjusting the constant. `hpsa_designations` stores **full** state names while
   `clinics` stores codes; the mapping is in the file. The `medicare` field is
   ZIP-level via `zip_county_crosswalk` (`level: 'zip'`), falling back to the
   state aggregate (`level: 'state'`). Accepts `?specialty=` (model headline) and

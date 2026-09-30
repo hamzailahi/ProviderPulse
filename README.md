@@ -521,6 +521,17 @@ Census ZCTA relationship file was tried first and rejected: ZIP 38017 is
 43%/57% by land area. When the crosswalk has no rows for a ZIP, the figure
 falls back to the state-wide number, and both levels are labeled.
 
+The whole-area "Provider supply" line in Insights compares listings per
+1,000 residents with a single hard-coded national figure of 5.8
+(`NATIONAL_PER_1K` in `market-score.js`), the same for every ZIP. That figure
+was derived from organization listings alone (about 1.9 million over about
+330 million people), but the local count has included individual clinicians
+since 2026-08-19, so the comparison is not like for like and overstates how
+well supplied a market is. Treat that line, and the whole-area score it feeds,
+as unreliable until the benchmark is rebuilt from the same listings it is
+compared with. The per-specialty scores are not affected: they use national
+rates built from the same tables (`market_benchmarks`).
+
 The HRSA shortage score in the market model now uses the ZIP's own county
 when its name can be matched to `hpsa_designations` (which strips the
 "County"/"Parish"/"Borough" suffix, so both sides are normalized the same
