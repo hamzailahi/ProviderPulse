@@ -544,6 +544,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-30
+- **State benchmarks are live.** The benchmark build completed after migration 022 and wrote 114 rows, including a listings-per-1,000 figure for every state. Insights now compares a market with its own state's average.
 - **Fixed the state benchmark build failing on save.** The first run computed
   every state's listings per 1,000 residents but the database refused to store
   them, because the table only allowed two kinds of row. Migration 022 widens

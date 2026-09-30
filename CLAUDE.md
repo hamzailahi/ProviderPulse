@@ -515,7 +515,7 @@ Base tables were created in the dashboard; everything since is in
 `supabase/migrations/`, applied **by hand in the SQL editor**. There is no
 migration runner, so a file in that folder is not necessarily applied.
 
-Applied as of 2026-09-29: `001`, `003` through `015`, `017` through `021`. **`022` (allows `state_density` in `market_benchmarks`) is written but not applied; the benchmark build fails with `23514` until it is.**
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`.
 `016` (clinics NPI uniqueness) is not confirmed applied. Held back: `002`
 (patient documents) pending a Supabase BAA, so briefings are profile-only.
 Migrations use `drop policy if exists` before `create policy` so a re-run is
@@ -569,7 +569,7 @@ Tables:
   (020). ZIP 38017 is 91% Shelby / 9% Fayette by address count vs a misleading
   43%/57% by the Census land-area file; that is why HUD was chosen.
 - `market_benchmarks`: benchmarks for the market model (021), keyed
-  `(kind, key)`: `measure`, `specialty`, and `state_density` (the last needs 022's widened check constraint). Public read,
+  `(kind, key)`: `measure`, `specialty`, and `state_density` (the last needs 022's widened check constraint; first written 2026-09-30, 114 rows). Public read,
   service-role write.
 
 **Migration 008's four tables (`npi_activity`, `directory_audits`,
