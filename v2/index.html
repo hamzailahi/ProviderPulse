@@ -1700,7 +1700,9 @@
         let neighborSeedZip = null; // The ZIP that neighbors were loaded around
 
         function showNeighborButtons(show) {
-            document.getElementById('neighborsBtn').style.display = show ? 'inline-block' : 'none';
+            const nb = document.getElementById('neighborsBtn');
+            nb.textContent = neighborZipSet.size ? '+ Add next ring' : '+ Add Neighbors';
+            nb.style.display = show ? 'inline-block' : 'none';
             document.getElementById('clearZipsBtn').style.display = show ? 'none' : 'none';
         }
 
@@ -1779,26 +1781,107 @@
             'PR':[]
         };
 
-        async function loadNeighboringZips() {
-            if (!lockedZip && neighborZipSet.size === 0) return;
+        // ZIPs that share a border with a set of source ZIP layers. Bounding
+        // boxes are not enough: a large or oddly shaped ZIP's box covers ZIPs
+        // that never touch it. Two ZCTAs touch when a vertex of one lies within
+        // TOUCH_DEG of an edge of the other (the boundary files are simplified,
+        // so shared edges don't always share exact vertices). Checked in both
+        // directions, with a grid index so large ZIPs stay fast.
+        const TOUCH_DEG = 0.0008;   // ~80 m
+        function layerRings(layer) {
+            const g = layer.feature && layer.feature.geometry;
+            if (!g) return [];
+            const polys = g.type === 'MultiPolygon' ? g.coordinates : g.type === 'Polygon' ? [g.coordinates] : [];
+            const rings = [];
+            polys.forEach(poly => poly.forEach(ring => rings.push(ring)));
+            return rings;
+        }
+        function segmentIndex(rings) {
+            const cell = 0.01, idx = new Map();
+            rings.forEach(ring => {
+                for (let i = 1; i < ring.length; i++) {
+                    const a = ring[i - 1], b = ring[i];
+                    const x0 = Math.floor((Math.min(a[0], b[0]) - TOUCH_DEG) / cell), x1 = Math.floor((Math.max(a[0], b[0]) + TOUCH_DEG) / cell);
+                    const y0 = Math.floor((Math.min(a[1], b[1]) - TOUCH_DEG) / cell), y1 = Math.floor((Math.max(a[1], b[1]) + TOUCH_DEG) / cell);
+                    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+                        const k = x + ':' + y;
+                        if (!idx.has(k)) idx.set(k, []);
+                        idx.get(k).push([a, b]);
+                    }
+                }
+            });
+            return { cell, idx };
+        }
+        function nearIndex(p, si) {
+            const segs = si.idx.get(Math.floor(p[0] / si.cell) + ':' + Math.floor(p[1] / si.cell));
+            if (!segs) return false;
+            for (const [a, b] of segs) {
+                const dx = b[0] - a[0], dy = b[1] - a[1], len = dx * dx + dy * dy;
+                const t = len ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len)) : 0;
+                const ex = a[0] + t * dx - p[0], ey = a[1] + t * dy - p[1];
+                if (ex * ex + ey * ey <= TOUCH_DEG * TOUCH_DEG) return true;
+            }
+            return false;
+        }
+        function touchingZips(sourceZips) {
+            const srcRings = [], exclude = new Set(sourceZips);
+            let box = null;
+            zipGeoJSONLayer.eachLayer(l => {
+                const z = String(l.feature.properties.ZCTA5CE10).padStart(5, '0');
+                if (!exclude.has(z)) return;
+                layerRings(l).forEach(r => srcRings.push(r));
+                box = box ? box.extend(l.getBounds()) : L.latLngBounds(l.getBounds().getSouthWest(), l.getBounds().getNorthEast());
+            });
+            if (!box) return null;
+            const srcIdx = segmentIndex(srcRings), padded = box.pad(0.02), found = [];
+            zipGeoJSONLayer.eachLayer(l => {
+                const z = String(l.feature.properties.ZCTA5CE10).padStart(5, '0');
+                if (exclude.has(z) || !padded.intersects(l.getBounds())) return;
+                const rings = layerRings(l);
+                let hit = rings.some(r => r.some(p => nearIndex(p, srcIdx)));
+                if (!hit) {
+                    const own = segmentIndex(rings);
+                    hit = srcRings.some(r => r.some(p => nearIndex(p, own)));
+                }
+                if (hit) found.push({ zip: z, layer: l });
+            });
+            return found;
+        }
 
-            const seedZip = lockedZip;
-            neighborSeedZip = seedZip;
+        let neighborLoadInFlight = false;
+        async function loadNeighboringZips() {
+            // One run at a time: a double click used to start a second run that
+            // found every ZIP already loaded and reported "No neighboring ZIPs".
+            if (neighborLoadInFlight) return;
+            const seedZip = lockedZip || neighborSeedZip;
+            if (!seedZip) return;
+            neighborLoadInFlight = true;
+            document.getElementById('neighborsBtn').style.display = 'none';
+            try { await addNeighborRing(seedZip); }
+            finally { neighborLoadInFlight = false; }
+        }
+
+        async function addNeighborRing(seedZip) {
             const seedPadded = String(seedZip).padStart(5, '0');
             const statusEl = document.getElementById('dbStatus');
+            // The first ring grows from the clicked ZIP. Clicking again while
+            // that ZIP is inside the loaded area grows the whole area by one
+            // more ring. A clicked ZIP outside the area starts from itself.
+            if (!neighborSeedZip) neighborSeedZip = seedPadded;
+            const area = new Set([String(neighborSeedZip).padStart(5, '0'), ...neighborZipSet]);
+            const sources = area.has(seedPadded) ? [...area] : [seedPadded];
+            if (!area.has(seedPadded)) neighborZipSet.add(seedPadded);
 
-            // Find seed ZIP boundary layer and which state it's in
             let seedBounds = null;
             let seedState = null;
             zipGeoJSONLayer.eachLayer(l => {
                 const z = String(l.feature.properties.ZCTA5CE10).padStart(5, '0');
-                if (z === seedPadded) {
-                    seedBounds = l.getBounds();
-                }
+                if (z === seedPadded) seedBounds = l.getBounds();
             });
 
             if (!seedBounds) {
                 statusEl.textContent = '❌ ZIP boundary not visible';
+                document.getElementById('neighborsBtn').style.display = 'inline-block';
                 return;
             }
 
@@ -1827,19 +1910,13 @@
 
             statusEl.textContent = '🔄 Finding neighboring ZIPs...';
 
-            // Find all ZIP boundaries that intersect with seed ZIP bounds
-            let foundNeighbors = [];
-            zipGeoJSONLayer.eachLayer(l => {
-                const z = String(l.feature.properties.ZCTA5CE10).padStart(5, '0');
-                if (z === seedPadded) return;
-                if (neighborZipSet.has(z)) return;
-                if (seedBounds.intersects(l.getBounds())) {
-                    foundNeighbors.push({ zip: z, layer: l });
-                }
-            });
-
+            const foundNeighbors = touchingZips(sources) || [];
             if (foundNeighbors.length === 0) {
-                statusEl.textContent = '❌ No neighboring ZIPs found';
+                // Not an error when an area is already loaded: say what's true.
+                statusEl.textContent = neighborZipSet.size
+                    ? 'ℹ️ Every ZIP bordering this area is already loaded'
+                    : '❌ No bordering ZIP boundaries found for ' + seedPadded;
+                if (neighborZipSet.size) document.getElementById('clearZipsBtn').style.display = 'inline-block';
                 return;
             }
 
@@ -1851,6 +1928,10 @@
 
             const neighborZipList = foundNeighbors.map(n => n.zip);
             statusEl.textContent = `🔄 Loading providers for ${neighborZipList.length} neighboring ZIPs...`;
+
+            // Remember the filter as it was before new taxonomies arrive.
+            const taxBefore = new Set(taxonomies);
+            const filterWasAll = selectedTaxonomies.size === 0 || [...taxBefore].every(t => selectedTaxonomies.has(t));
 
             try {
                 // Try both padded and stripped ZIP formats
@@ -1898,11 +1979,30 @@
                 // Rebuild taxonomy colors to include any new taxonomies from neighbors
                 const taxArray = Array.from(taxonomies).sort();
                 taxArray.forEach(t => taxonomyColors[t] = TaxonomyGroups.colorFor(t));   // 6 specialty groups (assets/taxonomy-groups.js), not a hue per raw taxonomy
-                selectedTaxonomies = new Set(taxArray);
+
+                // Keep the user's filter. This used to reset to every taxonomy,
+                // so a filtered map showed everything once neighbors loaded.
+                // Unfiltered stays unfiltered (new taxonomies included). A
+                // filtered map keeps its selection, and a taxonomy seen for the
+                // first time joins it only if it matches the chosen specialty.
+                if (filterWasAll) {
+                    selectedTaxonomies = new Set(taxArray);
+                } else {
+                    const terms = activeSpecialtyTerms();
+                    const next = new Set([...selectedTaxonomies].filter(t => t !== '\u0000no-match'));
+                    taxArray.forEach(t => { if (!taxBefore.has(t) && terms.length && taxonomyMatchesAny(t, terms)) next.add(t); });
+                    selectedTaxonomies = next.size ? next : new Set(['\u0000no-match']);
+                }
+                // New taxonomies need checkboxes too, ticked to match the filter.
+                buildTaxDropdown(taxArray);
+                const boxes = document.querySelectorAll('.tax-chk');
+                boxes.forEach(chk => { chk.checked = selectedTaxonomies.has(chk.value); });
+                document.getElementById('chk-all').checked = [...boxes].every(chk => chk.checked);
+                updateDropdownLabel();
                 updateLegend();
 
-                // Show aggregate demographics for seed + neighbors
-                const allZips = [seedPadded, ...neighborZipList];
+                // Show aggregate demographics for the whole loaded area
+                const allZips = [String(neighborSeedZip).padStart(5, '0'), ...neighborZipSet];
                 let agg = {};
                 allZips.forEach(z => {
                     const row = zipDemographics[z] || zipDemographics[String(parseInt(z, 10))];
@@ -1917,7 +2017,7 @@
 
                 document.getElementById('dashboard-title').textContent = `${allZips.length} ZIP CODES`;
                 document.getElementById('dashboard-context').innerHTML = `
-                    <span style="color:var(--accent);font-weight:600;font-size:12px;">${seedZip} + ${neighborZipList.length} neighbors</span>
+                    <span style="color:var(--accent);font-weight:600;font-size:12px;">${neighborSeedZip} + ${neighborZipSet.size} neighbors</span>
                     <button onclick="clearNeighbors()" style="margin-left:8px;padding:3px 8px;font-size:11px;background:var(--bg-elevated);border:1px solid #da3633;color:#f85149;border-radius:4px;cursor:pointer;font-family:'DM Sans',sans-serif;">✕ Clear</button>
                     <br/><span style="font-size:10px;color:var(--text-muted);">Click any ZIP to see its individual demographics</span>`;
                 document.getElementById('closePanelBtn').style.display = 'none';
@@ -1925,17 +2025,38 @@
                 renderMap();
 
                 // Auto-load procedures and PLACES for all loaded ZIPs
-                const allNeighborZips = [seedPadded, ...neighborZipList];
+                const allNeighborZips = allZips;
                 fetchProceduresData(allNeighborZips);
                 fetchPLACESData(allNeighborZips);
 
-                statusEl.textContent = `✅ Loaded ${clinicData.length} clinics from ${neighborZipList.length} neighboring ZIPs`;
+                statusEl.textContent = `✅ Added ${neighborZipList.length} bordering ZIP${neighborZipList.length === 1 ? '' : 's'} (${clinicData.length} listings). Area: ${allZips.length} ZIPs`;
                 document.getElementById('clearZipsBtn').style.display = 'inline-block';
-                document.getElementById('neighborsBtn').style.display = 'none';
+                const nb = document.getElementById('neighborsBtn');
+                nb.textContent = '+ Add next ring';
+                nb.style.display = 'inline-block';
 
             } catch(e) {
                 statusEl.textContent = `❌ ${e.message}`;
+                document.getElementById('neighborsBtn').style.display = 'inline-block';
             }
+        }
+
+        // The specialty chosen in the filter rail, or the taxonomy terms from a
+        // #tax= deep link, as match terms. Empty when neither is set.
+        function activeSpecialtyTerms() {
+            const sel = document.getElementById('specialty-select');
+            if (sel && sel.value && typeof SPECIALTIES !== 'undefined') {
+                const spec = SPECIALTIES.find(s => s[0] === sel.value);
+                if (spec) return spec[1].split(',').map(t => t.trim()).filter(Boolean);
+            }
+            const m = String(location.hash).match(/[#&]tax=([^&]*)/);
+            return m ? decodeURIComponent(m[1]).split(',').map(t => t.trim()).filter(Boolean) : [];
+        }
+        // The shared word-boundary rule (see CLAUDE.md, taxonomy section).
+        function taxonomyMatchesAny(stored, terms) {
+            const norm = v => String(v || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+            const nt = ' ' + norm(stored);
+            return terms.some(t => nt.includes(' ' + norm(t)));
         }
 
         // --- PLACES HEALTH METRICS ---

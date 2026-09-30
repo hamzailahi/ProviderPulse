@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-09-29. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-09-30. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -536,6 +536,18 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 Newest first. Every change pushed to `main` gets an entry here.
+
+### 2026-09-30
+- **Neighboring ZIPs fixed.** "Add Neighbors" on the dashboard now adds
+  only ZIPs that share a border with the selected one, instead of every ZIP
+  whose bounding box overlaps it. Clicking again adds the next ring out.
+  A double click no longer ends in a false "No neighboring ZIPs found", and
+  when every bordering ZIP is already loaded it says so. Area totals now
+  cover every ZIP loaded, not just the latest ring.
+- **Filters survive loading neighbors.** A specialty or taxonomy filter
+  used to reset to "everything" when neighboring ZIPs loaded. It now stays;
+  taxonomies that appear for the first time join it only if they match the
+  chosen specialty, and every new taxonomy gets its checkbox.
 
 ### 2026-09-29
 - **Reports runs on the assistant.** The Reports tab is now a builder:

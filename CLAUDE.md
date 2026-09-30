@@ -397,6 +397,17 @@ drives `applyNavigatorTaxonomyFilter`. **Insights** is the first tab. The
 dashboard loads **every** adjacent ZIP on demand for market sizing; the patient
 side deliberately does not. Keep those separate.
 
+**Neighboring ZIPs** (`loadNeighboringZips` / `addNeighborRing` in
+`index.html`): "neighbor" means **shares a border**, tested by
+`touchingZips()` (a vertex of one ZCTA within ~80 m of an edge of the other,
+both directions, grid-indexed). Never go back to bounding-box intersection: an
+L-shaped or large ZIP's box covers ZIPs that don't touch it. Each click adds
+one ring around the whole loaded area; one run at a time. Loading neighbors
+must **not** reset `selectedTaxonomies`: an unfiltered map stays unfiltered,
+a filtered one keeps its selection, and a first-seen taxonomy joins only if it
+matches the active specialty (`activeSpecialtyTerms()`). Rebuild the checkbox
+list after new taxonomies arrive.
+
 `dashboard-v3.js` overrides `window.renderVerdict`. For a city or county
 search there is no single ZIP, so it anchors the score on the most populous
 loaded ZIP and says so.
