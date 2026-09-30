@@ -261,7 +261,7 @@ window.renderVerdict = function (zip) {
   var q = '?zip=' + encodeURIComponent(zip) +
     (profile && /^\d{10}$/.test(String(profile.npi || '')) ? '&npi=' + profile.npi : '') +
     (mySpec ? '&specialty=' + encodeURIComponent(mySpec.label) : '');
-  focusSpec = null; showAllSpecs = false;
+  focusSpec = null; showAllSpecs = false; scen = null;
   fetch('/.netlify/functions/market-score' + q)
     .then(function (r) { return r.json(); })
     .then(function (d) { if (lastZip === zip) { lastScore = d; paintInsights(); } })
@@ -514,6 +514,8 @@ function paintModel(p, d, M) {
       el('summary', {}, 'Data notes (' + h.caveats.length + ')'),
       el('ul', {}, h.caveats.map(function (c) { return el('li', {}, c); }))) : null));
 
+  p.appendChild(whatIfCard(d, h));
+
   // Every specialty, ranked: the view to walk a prospect through
   var ranked = rankSpecs(M);
   var shown = showAllSpecs ? ranked : ranked.slice(0, 8);
@@ -530,6 +532,54 @@ function paintModel(p, d, M) {
       showAllSpecs ? 'Show top 8' : 'Show all ' + ranked.length) : null,
     el('p', { class: 'ins-src' }, 'Model ' + M.version + '. ' + (M.benchmarks === 'specialty'
       ? 'Benchmarked against national rates per specialty.' : 'National per-specialty benchmarks not built yet; compared at specialty-group level.'))));
+}
+
+/* "What if?": re-score this ZIP and specialty with N more clinicians. Supply
+   only; the server's assumptions text is shown with every result. */
+var scen = null;   // { zip, spec, n, status: 'loading'|'ok'|'error', data }
+function runScenario(zip, spec, n) {
+  scen = { zip: zip, spec: spec, n: n, status: 'loading' };
+  paintInsights();
+  var me = scen;
+  var q = '?zip=' + encodeURIComponent(zip) + '&specialty=' + encodeURIComponent(spec) + '&add=' + n +
+    (profile && /^\d{10}$/.test(String(profile.npi || '')) ? '&npi=' + profile.npi : '');
+  fetch('/.netlify/functions/market-score' + q)
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (scen !== me) return;
+      var sc = d && d.model && d.model.scenario;
+      me.status = sc ? 'ok' : 'error'; me.data = sc; paintInsights();
+    })
+    .catch(function () { if (scen === me) { me.status = 'error'; paintInsights(); } });
+}
+function whatIfCard(d, h) {
+  var mine = scen && scen.zip === d.zip && scen.spec === h.specialty ? scen : null;
+  var row = function (label, before, after) {
+    return el('div', { class: 'wi-row' }, el('span', {}, label), el('b', {}, String(before == null ? 'n/a' : before)),
+      el('i', { 'aria-hidden': 'true' }, '→'), el('b', {}, String(after == null ? 'n/a' : after)));
+  };
+  var out = el('div', { class: 'ins-card wi' },
+    el('div', { class: 'ins-eyebrow' }, 'What if?'),
+    el('p', { class: 'wi-ask' }, 'How would ' + h.specialty.toLowerCase() + ' in ZIP ' + d.zip + ' score if more opened here?'),
+    el('div', { class: 'wi-btns' }, [1, 2, 3].map(function (n) {
+      return el('button', { type: 'button', class: 'wi-btn' + (mine && mine.n === n ? ' on' : ''),
+        onclick: function () { runScenario(d.zip, h.specialty, n); } }, n === 1 ? '1 more' : n + ' more');
+    })));
+  if (mine && mine.status === 'loading') out.appendChild(el('p', { class: 'wi-note' }, 'Re-scoring…'));
+  if (mine && mine.status === 'error') out.appendChild(el('p', { class: 'wi-note' }, 'The scenario could not be scored for this ZIP and specialty.'));
+  if (mine && mine.status === 'ok' && mine.data) {
+    var sc = mine.data, b = sc.before, a = sc.after;
+    out.appendChild(el('div', { class: 'wi-grid' },
+      el('div', { class: 'wi-head' }, el('span', {}, ''), el('b', {}, 'Now'), el('i', {}), el('b', {}, 'With ' + sc.added)),
+      row('Score', b.score, a.score),
+      row('Type', b.archetype, a.archetype),
+      row('Clinicians nearby', b.clinicians, a.clinicians),
+      row('Per 1,000 adults', b.listings_per_1k_adults, a.listings_per_1k_adults),
+      row('Room from competitors', b.factors.competition, a.factors.competition),
+      row('Access gap', b.factors.access, a.factors.access)));
+    out.appendChild(el('p', { class: 'wi-note' }, sc.assumptions));
+  }
+  return out;
 }
 
 function titleWord(s) { return String(s || '').toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }

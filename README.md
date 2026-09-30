@@ -488,6 +488,7 @@ node scripts/test-accuracy-signals.mjs    # the directory-accuracy scoring engin
 node scripts/test-query-plan.mjs          # the query-plan allowlist behind the assistant's database tool
 node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings
 node scripts/test-market-model.mjs        # the market opportunity model
+node scripts/test-scenario.mjs            # the what-if re-score changes supply only
 node scripts/test-answer-check.mjs        # assistant figures must trace to tool results
 node scripts/test-density-benchmark.mjs   # the state comparison is like for like, and honest when unavailable
 node scripts/test-signup-gate.mjs         # patient sign-up is closed unless explicitly opened
@@ -544,6 +545,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-30
+- **"What if?" on Insights and in Ask AI.** Under the score breakdown, pick
+  "1 more", "2 more" or "3 more" to see how the chosen specialty would score
+  in this ZIP if that many clinicians opened at its centre: score, type,
+  clinicians nearby, listings per 1,000 adults, room from competitors and
+  access. Ask AI answers "what if I open here" the same way. Only supply
+  changes; payer mix, practice size and capacity are not modelled, and the
+  result says so. If you are signed in, your own listing is left out of "Now".
 - **State benchmarks are live.** The benchmark build completed after migration 022 and wrote 114 rows, including a listings-per-1,000 figure for every state. Insights now compares a market with its own state's average.
 - **Fixed the state benchmark build failing on save.** The first run computed
   every state's listings per 1,000 residents but the database refused to store

@@ -52,12 +52,15 @@ const marketScore = require('../v2/netlify/functions/market-score.js');
 const SPEC = { specialty: 'Heart / cardiology', score: 72, archetype_name: 'Prime expansion', strategy: 'Open here.',
   confidence: 'high', clinicians: 4, factors: { need: 80 }, evidence: {}, reasons: [{ text: 'High need.' }], caveats: [] };
 let scoreCalls = 0;
+const scoreQueries = [];
 marketScore.handler = async (ev) => {
   scoreCalls++;
   const z = ev.queryStringParameters.zip;
+  scoreQueries.push(ev.queryStringParameters);
+  const add = Number(ev.queryStringParameters.add) || 0;
   return { statusCode: 200, body: JSON.stringify({ available: true, zip: z, state: 'TN', score: 64, label: 'BALANCED',
     metrics: { population: 50000, insured_rate: 0.93 }, catchment: { radius_miles: 25, zip_count: 30, adults_18plus: 400000 },
-    model: { benchmarks: 'specialty', specialties: [SPEC, Object.assign({}, SPEC, { specialty: 'Skin / dermatology', score: 40, archetype_name: 'Saturated' })] } }) };
+    model: { benchmarks: 'specialty', scenario: add ? { specialty: ev.queryStringParameters.specialty, added: add, at: z, before: { score: 72, archetype: 'Prime expansion', clinicians: 4 }, after: { score: 65, archetype: 'Balanced', clinicians: 4 + add }, score_change: -7, assumptions: 'Adds ' + add + ' listings. Only supply changes.' } : undefined, specialties: [SPEC, Object.assign({}, SPEC, { specialty: 'Skin / dermatology', score: 40, archetype_name: 'Saturated' })] } }) };
 };
 
 // ---- fake Claude ------------------------------------------------------------
@@ -196,6 +199,28 @@ check('find_providers splits organizations and individuals', found.organizations
 check('query_database refuses tables outside the allowlist', res[1].is_error === true && /refused|not/i.test(res[1].content));
 check('update_map with nothing valid is an error, not an action', res[2].is_error === true && r.body.actions.length === 0);
 
+console.log('\n6b. The what-if tool');
+fake = fakeClient([
+  turn('tool_use', [toolUse('s1', 'run_scenario', { zip: '38017', specialty: 'Heart / cardiology', clinicians: 2 })]),
+  turn('end_turn', [{ type: 'text', text: 'Opening 2 more would move the score from 72 to 65.' }])
+]);
+fn._setClient(fake);
+scoreQueries.length = 0;
+r = await call({ question: 'what if two cardiologists open in 38017', context: CTX, npi: '1234567893' });
+const scRes = JSON.parse(fake.calls[1].messages[fake.calls[1].messages.length - 1].content[0].content);
+check('the tool asks market-score for the scenario, with the viewer\'s NPI', scoreQueries.some(q => q.add === '2' && q.specialty === 'Heart / cardiology' && q.npi === '1234567893'));
+check('before, after and assumptions come back', scRes.before.score === 72 && scRes.after.score === 65 && scRes.score_change === -7 && /Only supply changes/.test(scRes.assumptions));
+check('the answer\'s figures trace to the scenario result', r.body.verification && r.body.verification.unverified.length === 0);
+check('the step is labelled', r.body.steps.map(s => s.label).join('|').includes('Modelling 2 new heart / cardiology in 38017'));
+fake = fakeClient([
+  turn('tool_use', [toolUse('s2', 'run_scenario', { zip: '38017', specialty: 'Heart / cardiology', clinicians: 50 })]),
+  turn('end_turn', [{ type: 'text', text: 'Done.' }])
+]);
+fn._setClient(fake);
+scoreQueries.length = 0;
+await call({ question: 'what if fifty open', context: CTX });
+check('the clinician count is capped at 5', scoreQueries.some(q => q.add === '5'));
+
 console.log('\n7. Truncation and refusals');
 fake = fakeClient([
   turn('max_tokens', [toolUse('cut', 'create_deliverable', { kind: 'market_memo', title: 'Half' })]),
@@ -305,7 +330,7 @@ const origLog = console.log; console.log = () => {};
 r = await call({ question: 'hello', context: CTX });
 console.log = origLog;
 check('a 400 on the request shape retries once, plain', r.body.done && r.body.reply === 'Still here.' && flaky.calls.length === 2);
-check('the retry drops strict and fallbacks but keeps the tools', !flaky.calls[1].fallbacks && flaky.calls[1].tools.length === 6 && flaky.calls[1].tools.every(t => !t.strict));
+check('the retry drops strict and fallbacks but keeps the tools', !flaky.calls[1].fallbacks && flaky.calls[1].tools.length === 7 && flaky.calls[1].tools.every(t => !t.strict));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

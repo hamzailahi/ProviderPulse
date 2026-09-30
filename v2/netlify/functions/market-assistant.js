@@ -158,7 +158,7 @@ Each user turn starts with a <dashboard> block describing what the user is looki
 How to answer:
 - Ground every number in a tool result from this conversation. Never estimate, extrapolate or invent figures. State each figure as a tool returned it (rounding is fine). If you compute a difference, ratio or percent change, put the two figures it comes from on the same line. The server checks every figure in your answers and documents against the tool results, and an untraceable one is rejected. If the data does not cover something (rents, salaries, reimbursement rates, referral patterns, patient search volume), say so plainly.
 - For questions about a market, call get_market_insights first. Explain results in plain language: the archetype and what it means, the factors that drove the score, and the confidence level. Mention a caveat when the tool reports one that affects the answer.
-- To compare places, call compare_markets. To count or list nearby providers of a specialty, call find_providers. For statewide or cross-market counts the other tools cannot answer, call query_database with a plan.
+- For "what if I open here" or "what if another practice opens", call run_scenario and report the before and after with its assumptions; say plainly that only supply changes. To compare places, call compare_markets. To count or list nearby providers of a specialty, call find_providers. For statewide or cross-market counts the other tools cannot answer, call query_database with a plan.
 - When the user wants to see something on the map ("show me", "zoom to", "switch to"), call update_map. Say briefly what you changed.
 - When the user asks for a memo, one-pager, summary for a client, pitch or report, gather the numbers first, then call create_deliverable with the full document. Keep the document under 450 words, organized with short headings and bullets, every figure traceable to a tool result, and a short "Data notes" section listing sources and caveats. After creating it, reply with one or two sentences; do not repeat the document.
 - Independent tool calls can go in the same turn.
@@ -206,6 +206,21 @@ const TOOLS = [
         specialty: Object.assign({ description: 'Specialty to compare' }, specEnum)
       },
       required: ['zips', 'specialty'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'run_scenario',
+    description: 'What-if: re-scores one ZIP and specialty as if 1 to 5 more clinicians of that specialty opened at the centre of the ZIP. Returns the before and after score, archetype, factors, clinician count, listings per 1,000 adults and nearest competitor, plus the assumptions. Only supply changes; payers, need and shortage are held fixed. If the viewer has their own listing it is already left out of the before. Use for "what if I open here", "what happens if another practice opens" or "would this market still look good with N more".',
+    strict: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        zip: zipProp,
+        specialty: { type: 'string', enum: SPEC_LABELS, description: 'Specialty that would open' },
+        clinicians: { type: 'integer', description: 'How many clinicians open, 1 to 5' }
+      },
+      required: ['zip', 'specialty', 'clinicians'],
       additionalProperties: false
     }
   },
@@ -306,13 +321,14 @@ const milesBetween = (lat1, lon1, lat2, lon2) => {
 // Market scores are pure functions of public data that changes monthly at
 // most, so a warm instance reuses them across the steps of one conversation.
 const scoreCache = new Map();
-async function scoreFor(zip, specialty, npi) {
-  const key = [zip, specialty || '', npi || ''].join('|');
+async function scoreFor(zip, specialty, npi, add) {
+  const key = [zip, specialty || '', npi || '', add || ''].join('|');
   const hit = scoreCache.get(key);
   if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.data;
   const q = { zip };
   if (specialty) q.specialty = specialty;
   if (npi) q.npi = npi;
+  if (add) q.add = String(add);
   const res = await marketScore.handler({ httpMethod: 'GET', queryStringParameters: q, headers: {} });
   const data = JSON.parse(res.body || '{}');
   if (res.statusCode === 200 && data.available !== false) {
@@ -357,6 +373,20 @@ async function getMarketInsights({ zip, specialty }, ctx) {
     benchmarks: d.model ? d.model.benchmarks : null,
     all_specialties_ranked: ranked.map(x => [x.specialty, x.score, x.archetype_name, x.confidence, x.clinicians]),
     ranked_columns: ['specialty', 'score', 'archetype', 'confidence', 'clinicians']
+  };
+}
+
+async function runScenario({ zip, specialty, clinicians }, ctx) {
+  if (!isZip(zip)) return { error: 'zip must be 5 digits' };
+  if (!specialty) return { error: 'specialty is required' };
+  const n = Math.max(1, Math.min(5, Math.round(Number(clinicians)) || 1));
+  const d = await scoreFor(zip, specialty, ctx.npi, n);
+  if (!d.available) return { zip, available: false, reason: d.reason || d.error || 'No score for this ZIP' };
+  const sc = d.model && d.model.scenario;
+  if (!sc) return { zip, available: false, reason: 'The scenario could not be scored for this ZIP and specialty.' };
+  return {
+    zip: d.zip, state: d.state, specialty: sc.specialty, clinicians_added: sc.added,
+    before: sc.before, after: sc.after, score_change: sc.score_change, assumptions: sc.assumptions
   };
 }
 
@@ -483,6 +513,7 @@ function createDeliverable({ kind, title, body_markdown }, ctx) {
 const RUNNERS = {
   get_market_insights: getMarketInsights,
   compare_markets: compareMarkets,
+  run_scenario: runScenario,
   find_providers: findProviders,
   query_database: queryDatabase,
   update_map: updateMap,
@@ -495,6 +526,7 @@ function stepLabel(name, input) {
   const spec = i.specialty ? ' for ' + String(i.specialty).toLowerCase() : '';
   switch (name) {
     case 'get_market_insights': return `Scoring ${i.zip}${spec}`;
+    case 'run_scenario': return `Modelling ${i.clinicians || 1} new ${String(i.specialty || '').toLowerCase()} in ${i.zip}`;
     case 'compare_markets': return `Comparing ${(i.zips || []).join(', ')}${spec}`;
     case 'find_providers': return `Finding ${String(i.specialty || 'primary care').toLowerCase()} listings within ${i.radius_miles} mi of ${i.zip}`;
     case 'query_database': return `Querying ${i.table || 'the database'}`;

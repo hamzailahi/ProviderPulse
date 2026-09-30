@@ -671,7 +671,7 @@ exports.handler = async (event) => {
           });
 
           const selfNpi = /^\d{10}$/.test(String((event.queryStringParameters || {}).npi || '')) ? String(event.queryStringParameters.npi) : '';
-          const scored = MarketModel.score({
+          const baseInput = {
             specialties: SPECIALTIES,
             groupOf: label => TaxonomyGroups.keyFor((SPECIALTIES.find(x => x[0] === label) || [0, ''])[1].split(',')[0]),
             // ?npi= is the viewing provider: their own listing is not a competitor.
@@ -681,7 +681,8 @@ exports.handler = async (event) => {
             places, demo, pay, shortage, groupNeedPct, groupAccess,
             benchmarks: Object.keys(benchmarks.measures).length || Object.keys(benchmarks.specialties).length ? benchmarks : null,
             catchmentTruncated: catchment.truncated, radiusMiles: CATCHMENT_MAX_MILES
-          });
+          };
+          const scored = MarketModel.score(baseInput);
           const want = String((event.queryStringParameters || {}).specialty || '');
           model = {
             version: scored.version, weights: scored.weights,
@@ -689,6 +690,37 @@ exports.handler = async (event) => {
             headline: scored.specialties.some(x => x.specialty === want) ? want : 'Primary care / family doctor',
             specialties: scored.specialties
           };
+
+          // "What if I open here?" (?add=N&specialty=...). Re-scores the same
+          // catchment with N extra listings of that specialty at the centre of
+          // the ZIP. Everything else is held fixed, so the difference is the
+          // effect of supply alone. ?npi= already removed the viewer's own
+          // listing, so "before" is the market without them and "after" is
+          // the market with them. It says nothing about payers, size or
+          // capacity: the new listings are plain, identical, unpaid-for points.
+          const addN = Math.max(0, Math.min(5, parseInt((event.queryStringParameters || {}).add, 10) || 0));
+          const specRow = SPECIALTIES.find(x => x[0] === want);
+          if (addN && specRow) {
+            const term = specRow[1].split(',')[0].trim();
+            const fake = Array.from({ length: addN }, () => ({ npi: 'scenario', primary_taxonomy: term, latitude: oLat, longitude: oLon }));
+            const afterAll = MarketModel.score(Object.assign({}, baseInput, { rows: baseInput.rows.concat(fake) }));
+            const pick = x => x && ({
+              score: x.score, archetype: x.archetype_name, confidence: x.confidence, clinicians: x.clinicians, factors: x.factors,
+              listings_per_1k_adults: x.evidence.access ? x.evidence.access.per_1k : null,
+              nearest_competitor_miles: x.evidence.competition ? x.evidence.competition.nearest_miles : null
+            });
+            const b0 = scored.specialties.find(x => x.specialty === want), a0 = afterAll.specialties.find(x => x.specialty === want);
+            if (b0 && a0) {
+              model.scenario = {
+                specialty: want, added: addN, at: zip,
+                before: pick(b0), after: pick(a0),
+                score_change: b0.score != null && a0.score != null ? a0.score - b0.score : null,
+                assumptions: 'Adds ' + addN + ' ' + want.toLowerCase() + ' listing' + (addN > 1 ? 's' : '') +
+                  ' at the centre of ZIP ' + zip + ' and re-scores the same catchment. Need, payers and shortage are unchanged. ' +
+                  'Real results also depend on payer mix, practice size, hours and how patients choose, which this does not model.'
+              };
+            }
+          }
         } catch (e) {
           model = null;
         }

@@ -250,7 +250,10 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   `clinics` stores codes; the mapping is in the file. The `medicare` field is
   ZIP-level via `zip_county_crosswalk` (`level: 'zip'`), falling back to the
   state aggregate (`level: 'state'`). Accepts `?specialty=` (model headline) and
-  `?npi=` (the viewer's own listing is not a competitor). Returns
+  `?npi=` (the viewer's own listing is not a competitor), and `?add=1..5`
+  ("what if I open here": re-scores the same catchment with N extra listings of
+  that specialty at the ZIP centre and returns `model.scenario` with before,
+  after and assumptions; supply only, need, payers and shortage are held fixed). Returns
   `available:false` with a reason rather than a synthesized score.
 - **demand-stats.js**: public aggregate read of `demand_log` with suppression
   (see demand logging).
@@ -674,7 +677,8 @@ AI tab in `dashboard-v3.js`.
 - **The system prompt is the server's.** Per-turn context (mode, ZIP,
   specialty) rides in a `<dashboard>` text block at the start of the user
   turn, so the cached prefix (tools + system) never changes.
-- **Tools** (all read-only): `get_market_insights` and `compare_markets`
+- **Tools** (all read-only): `get_market_insights`, `compare_markets` and
+  `run_scenario` (1 to 5 more clinicians; before/after; capped server-side)
   (call `market-score.js`'s handler in-process, cached 10 min per warm
   instance), `find_providers` (clinics + provider_individuals around a ZIP,
   word-boundary taxonomy match, distance filter), `query_database` (a plan
@@ -942,7 +946,8 @@ node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) 
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
-node scripts/test-market-assistant.mjs    # 53: the assistant, figure repair, tracing (needs npm ci in v2/)
+node scripts/test-scenario.mjs            # 14: the what-if re-score changes supply only
+node scripts/test-market-assistant.mjs    # 58: the assistant, figure repair, tracing (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
