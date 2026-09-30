@@ -290,7 +290,7 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   print the queried address; patient searches can contain home addresses, so
   trim or remove that logging.
 - **lib/accuracy-signals.js**, **lib/query-plan.js**, **lib/audit-report.js**,
-  **lib/zip-enrichment.js**: pure logic, see their sections.
+  **lib/zip-enrichment.js**, **lib/answer-check.js**: pure logic, see their sections.
 
 ## The taxonomy vocabularies (the single biggest source of bugs here)
 
@@ -691,7 +691,37 @@ AI tab in `dashboard-v3.js`.
 - **Rendering:** the browser draws model output with a small markdown-to-DOM
   renderer (text nodes only). Never `innerHTML` model text.
 
-Covered by `scripts/test-market-assistant.mjs` (fake client, no network).
+**Figure checking (`lib/answer-check.js`).** Every digit-written figure in a
+final answer and in a `create_deliverable` body must trace to a tool result
+from the conversation (display rounding allowed: 13.9 for 13.904, 88% for
+0.88, 4.2M for 4,213,000; a 5-digit number such as a ZIP must match exactly),
+or be derived from two traced figures shown on the same line (sum, difference,
+ratio, percent change, share), or appear in the system prompt or the user's own
+words. Exempt: list markers, "top 3", the unit in "per 1,000", structure counts
+("3 reasons"), years, "of 100". Spelled-out numbers are not checked (known
+limit). Error results are never a source.
+
+- **Answers:** one automatic repair round. The draft is never shown; a
+  synthetic user turn starting `[automatic check]` names the untraced figures
+  and the model answers again. `roundsSinceQuestion` and `alreadyRepaired`
+  treat that turn as part of the same question. If it still fails, the answer
+  ships with `verification.unverified` and the browser shows an amber note.
+- **Documents:** refused at the tool call (is_error, figures named) up to twice
+  per question; the third attempt is issued with `doc.unverified`, shown on its
+  card. Clean answers cost no extra model call.
+- The browser shows "N figures checked against the data" from `verification`.
+
+**Tracing.** One `[assistant-trace]` JSON line per model call, tool run, check
+and invocation (`ev: model | tool | check | step | model_error`) in the function
+logs: timings, stop reason, token counts, estimated USD at list prices
+(`PRICES`, an estimate, not a bill), outcome, and how many figures failed. It
+**never** records the question, answer, document text, a ZIP or who asked. `cid`
+is a random per-chat id from the browser, only to group one chat's steps; it is
+validated against `/^[A-Za-z0-9_-]{8,64}$/` and reset by New chat. Keep it that
+way: do not add fields that carry content.
+
+Covered by `scripts/test-market-assistant.mjs` (fake client, no network) and
+`scripts/test-answer-check.mjs`.
 
 ## The query plan is the boundary
 
@@ -912,7 +942,8 @@ node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) 
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
-node scripts/test-market-assistant.mjs    # 38: the assistant (needs npm ci in v2/)
+node scripts/test-market-assistant.mjs    # 53: the assistant, figure repair, tracing (needs npm ci in v2/)
+node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
 ```

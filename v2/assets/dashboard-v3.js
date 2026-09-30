@@ -653,6 +653,14 @@ if (mode === 'mine') {
     }
     if (m.pending) box.appendChild(el('div', { class: 'as-typing' }, el('span'), el('span'), el('span')));
     if (m.text) box.appendChild(renderMarkdown(m.text));
+    var v = m.verification;
+    if (v && m.text && !m.error) {
+      if (v.unverified && v.unverified.length) {
+        box.appendChild(el('div', { class: 'as-check warn' }, 'Could not trace to the data: ' + v.unverified.join(', ') + '. Treat these as unverified.'));
+      } else if (v.checked > 0) {
+        box.appendChild(el('div', { class: 'as-check ok' }, '✓ ' + v.checked + (v.checked === 1 ? ' figure' : ' figures') + ' checked against the data'));
+      }
+    }
     (m.actions || []).forEach(function (a) {
       box.appendChild(el('div', { class: 'as-action' }, '◎ Map: ' + [a.zip, a.specialty].filter(Boolean).join(' · ')));
     });
@@ -716,6 +724,7 @@ if (mode === 'mine') {
     var body = renderMarkdown(d.body);
     var card = el('div', { class: 'as-doc collapsed' },
       el('div', { class: 'as-doc-head' }, el('span', { class: 'as-doc-kind' }, KIND[d.kind] || 'Document'), el('b', {}, d.title)),
+      d.unverified && d.unverified.length ? el('div', { class: 'as-check warn' }, 'Could not trace to the data: ' + d.unverified.join(', ') + '. Check these before sharing.') : null,
       body);
     var toggle = el('button', { type: 'button', class: 'as-doc-btn', onclick: function () {
       card.classList.toggle('collapsed'); toggle.textContent = card.classList.contains('collapsed') ? 'Expand' : 'Collapse';
@@ -752,6 +761,10 @@ if (mode === 'mine') {
   // ---- the stepped request loop ---------------------------------------------
   async function post(body) {
     var h = typeof authHeaders === 'function' ? await authHeaders() : authHeadersSync();
+    // A random per-chat id, sent only so the server's logs can group one chat's
+    // steps. It is not an account id and is reset by New chat.
+    if (!chat.cid) chat.cid = 'c' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+    body.cid = chat.cid;
     var r = await fetch('/.netlify/functions/market-assistant', {
       method: 'POST',
       headers: Object.assign({ 'Content-Type': 'application/json' }, h),
@@ -796,7 +809,7 @@ if (mode === 'mine') {
         (d.deliverables || []).forEach(function (x) { slot.docs.push(x); });
         applyActions(d.actions);
         save(); draw();
-        if (d.done) { slot.text = d.reply || ''; break; }
+        if (d.done) { slot.text = d.reply || ''; slot.verification = d.verification || null; break; }
         body = { continue: true, messages: chat.api, npi: profile && profile.npi };
       }
       if (!slot.text && !slot.docs.length) slot.text = 'That took longer than expected. Ask again to pick it up.';

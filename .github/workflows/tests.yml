@@ -48,6 +48,9 @@ jobs:
       - name: Claimed-listing specialty gating
         run: node scripts/test-claimed-relevance.mjs
 
+      - name: Assistant figures trace to tool results
+        run: node scripts/test-answer-check.mjs
+
       - name: Provider-density benchmark is like for like
         run: node scripts/test-density-benchmark.mjs
 

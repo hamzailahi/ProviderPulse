@@ -43,6 +43,8 @@ const SDK = require('../v2/node_modules/@anthropic-ai/sdk');
 const A = SDK.default || SDK;
 const fn = require('../v2/netlify/functions/market-assistant.js');
 const I = fn._internals;
+const traces = [];
+fn._setTraceSink(l => traces.push(JSON.parse(l.replace('[assistant-trace] ', ''))));
 
 // market-score is a separate function; stub its handler so these tests are
 // about the assistant, not the scorer.
@@ -207,6 +209,82 @@ fake = fakeClient([{ res: { stop_reason: 'refusal', content: [] } }]);
 fn._setClient(fake);
 r = await call({ question: 'something declined', context: CTX, messages: [] });
 check('a refused question is dropped from history', r.body.done && r.body.stopped === 'refusal' && r.body.messages.length === 0);
+
+console.log('\n7b. Figures are checked against tool results');
+const insightsCall = toolUse('i1', 'get_market_insights', { zip: '38017', specialty: 'Heart / cardiology' });
+// An answer that quotes a figure no tool returned gets one repair round.
+fake = fakeClient([
+  turn('tool_use', [insightsCall]),
+  turn('end_turn', [{ type: 'text', text: 'Heart / cardiology scores 72 and the catchment has 9,999 adults.' }]),
+  turn('end_turn', [{ type: 'text', text: 'Heart / cardiology scores 72 out of 100.' }])
+]);
+fn._setClient(fake);
+traces.length = 0;
+r = await call({ question: 'how does it look', context: CTX, npi: '1234567893' });
+const repairMsg = fake.calls[2].messages[fake.calls[2].messages.length - 1];
+check('an untraced figure triggers one repair round', fake.calls.length === 3 && repairMsg.role === 'user'
+  && repairMsg.content[0].text.startsWith(I.SYNTHETIC) && /9,999/.test(repairMsg.content[0].text));
+check('the repaired answer is what the user sees', r.body.reply === 'Heart / cardiology scores 72 out of 100.');
+check('verification says it was repaired and clean', r.body.verification && r.body.verification.repaired === true && r.body.verification.unverified.length === 0 && r.body.verification.traced >= 1);
+check('the automatic check is not mistaken for a new question', I.roundsSinceQuestion(r.body.messages) === 3);
+
+// Still wrong after the repair: shown, but flagged. Never a loop.
+fake = fakeClient([
+  turn('end_turn', [{ type: 'text', text: 'There are 4,321 cardiologists.' }]),
+  turn('end_turn', [{ type: 'text', text: 'There are still 4,321 cardiologists.' }])
+]);
+fn._setClient(fake);
+r = await call({ question: 'how many', context: CTX });
+check('a second failure is delivered flagged, not retried again', fake.calls.length === 2 && r.body.done
+  && r.body.verification.unverified.includes('4,321') && r.body.verification.repaired === true);
+
+// Clean answers cost no extra call.
+fake = fakeClient([turn('end_turn', [{ type: 'text', text: 'Hello. Ask me about a market.' }])]);
+fn._setClient(fake);
+r = await call({ question: 'hi', context: CTX });
+check('a clean answer makes no repair call', fake.calls.length === 1 && r.body.verification.unverified.length === 0);
+
+// Documents are held to the same rule, at the tool call.
+fake = fakeClient([
+  turn('tool_use', [insightsCall]),
+  turn('tool_use', [toolUse('d1', 'create_deliverable', { kind: 'client_pitch', title: 'Memo', body_markdown: '# Memo\n- Score 72\n- Demand up 34%' })]),
+  turn('tool_use', [toolUse('d2', 'create_deliverable', { kind: 'client_pitch', title: 'Memo', body_markdown: '# Memo\n- Score 72' })]),
+  turn('end_turn', [{ type: 'text', text: 'The memo is ready.' }])
+]);
+fn._setClient(fake);
+r = await call({ question: 'write a memo', context: CTX, npi: '1234567893' });
+const rejected = fake.calls[2].messages[fake.calls[2].messages.length - 1].content[0];
+check('a document with an untraced figure is refused and names it', rejected.is_error && /Not created/.test(rejected.content) && /34%/.test(rejected.content));
+check('the corrected document is created clean', r.body.deliverables.length === 1 && !r.body.deliverables[0].unverified && !/34%/.test(r.body.deliverables[0].body));
+
+// Persistent failure: the third attempt is issued, with the figures marked.
+const badDoc = n => turn('tool_use', [toolUse('x' + n, 'create_deliverable', { kind: 'client_pitch', title: 'Memo', body_markdown: '# Memo\n- Demand up 34%' })]);
+fake = fakeClient([badDoc(1), badDoc(2), badDoc(3), turn('end_turn', [{ type: 'text', text: 'Issued.' }])]);
+fn._setClient(fake);
+r = await call({ question: 'write a memo', context: CTX });
+check('after two rejections the document is issued with its figures marked', r.body.deliverables.length === 1
+  && r.body.deliverables[0].unverified && r.body.deliverables[0].unverified.includes('34%'));
+
+console.log('\n7c. Tracing records what happened, never what was said');
+fake = fakeClient([
+  turn('tool_use', [insightsCall]),
+  { res: { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Heart / cardiology scores 72.' }],
+    usage: { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 5000, cache_creation_input_tokens: 0 } } }
+]);
+fn._setClient(fake);
+traces.length = 0;
+r = await call({ question: 'a secret question about 38017', context: CTX, cid: 'chat_abc12345', npi: '1234567893' });
+const evs = traces.map(t => t.ev);
+check('a model, tool, check and step event are emitted', ['model', 'tool', 'check', 'step'].every(k => evs.includes(k)));
+const modelEv = traces.filter(t => t.ev === 'model').pop();
+check('token counts and estimated cost are recorded', modelEv.in === 1000 && modelEv.out === 100 && modelEv.cache_read === 5000 && Math.abs(modelEv.usd - I.estimateCostUsd(fake.calls.length && { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 5000 })) < 1e-9);
+check('cost uses list prices', Math.abs(I.estimateCostUsd({ input_tokens: 1e6, output_tokens: 1e6, cache_read_input_tokens: 1e6, cache_creation_input_tokens: 1e6 }) - 29.2) < 1e-9);
+const stepEv = traces.find(t => t.ev === 'step');
+check('the step summary carries outcome, counts and the chat id', stepEv.outcome === 'done' && stepEv.models === 2 && stepEv.tools === 1 && stepEv.cid === 'chat_abc12345');
+const all = JSON.stringify(traces);
+check('no question, answer or ZIP text appears in any trace', !/secret question/.test(all) && !/scores 72/.test(all) && !/38017/.test(all));
+await call({ question: 'hi', context: CTX, cid: 'bad id with spaces!!' });
+check('a malformed chat id is dropped', traces[traces.length - 1].cid === '');
 
 console.log('\n8. Tool schemas');
 check('every tool except query_database is strict', I.TOOLS.filter(t => t.name !== 'query_database').every(t => t.strict === true && t.input_schema.additionalProperties === false));

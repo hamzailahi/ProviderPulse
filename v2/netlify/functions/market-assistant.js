@@ -35,6 +35,7 @@ const AnthropicModule = require('@anthropic-ai/sdk');
 const Anthropic = AnthropicModule.default || AnthropicModule;
 const { getUser, isProvider } = require('./lib/auth.js');
 const { validatePlan, buildPath, summarise, TABLES, OPS } = require('./lib/query-plan.js');
+const { verifyText } = require('./lib/answer-check.js');
 const SPECIALTIES = require('../../assets/specialties.js');
 const marketScore = require('./market-score.js');
 
@@ -57,6 +58,85 @@ const GEO_MEASURE = 'DENTAL';     // the PLACES measure market-score reads centr
 const JSONH = { 'Content-Type': 'application/json' };
 const reply = (statusCode, body) => ({ statusCode, headers: JSONH, body: JSON.stringify(body) });
 
+// ---------------------------------------------------------------------------
+// Tracing. One JSON line per model call, tool run and invocation, in the
+// function logs, so cost and latency can be measured instead of guessed. It
+// records WHAT happened and how long it took: tool names, token counts,
+// timings, outcomes and how many figures failed verification. It never records
+// the question, the answer, a document, a ZIP or who asked. `cid` is a random
+// per-chat id made by the browser, only so one chat's steps can be grouped.
+// ---------------------------------------------------------------------------
+// USD per million tokens, list prices for MODEL (an estimate, not a bill).
+const PRICES = { input: 4, cache_write: 5, cache_read: 0.2, output: 20 };
+function estimateCostUsd(u) {
+  u = u || {};
+  return ((u.input_tokens || 0) * PRICES.input + (u.cache_creation_input_tokens || 0) * PRICES.cache_write +
+    (u.cache_read_input_tokens || 0) * PRICES.cache_read + (u.output_tokens || 0) * PRICES.output) / 1e6;
+}
+let traceSink = line => console.log(line);
+function trace(ev) { try { traceSink('[assistant-trace] ' + JSON.stringify(ev)); } catch (e) { /* tracing never breaks a request */ } }
+function _setTraceSink(f) { traceSink = f || (line => console.log(line)); }
+
+// ---------------------------------------------------------------------------
+// Figure checking (lib/answer-check.js). Every figure in an answer or document
+// must trace to a tool result from this conversation, be derived from two
+// traced figures on the same line, or be part of the assistant's own method
+// (the system prompt) or the user's own words. An error result is never a
+// source: the rejection message itself lists the untraced figures.
+// ---------------------------------------------------------------------------
+const SYNTHETIC = '[automatic check]';
+const MAX_DOC_REJECTIONS = 2;
+
+function blocksOf(m) { return Array.isArray(m.content) ? m.content : []; }
+function isRealQuestion(m) {
+  return m.role === 'user' && (typeof m.content === 'string' ||
+    blocksOf(m).some(b => b.type === 'text' && !String(b.text).startsWith(SYNTHETIC)));
+}
+// The messages since the last thing the user actually typed.
+function sinceQuestion(messages) {
+  for (let i = messages.length - 1; i >= 0; i--) if (isRealQuestion(messages[i])) return messages.slice(i + 1);
+  return messages.slice();
+}
+function toolResultTexts(messages) {
+  const out = [];
+  for (const m of messages) {
+    if (m.role !== 'user') continue;
+    for (const b of blocksOf(m)) {
+      if (b.type === 'tool_result' && !b.is_error) out.push(typeof b.content === 'string' ? b.content : JSON.stringify(b.content));
+    }
+  }
+  return out;
+}
+function userTexts(messages) {
+  const out = [];
+  for (const m of messages) {
+    if (m.role !== 'user') continue;
+    if (typeof m.content === 'string') out.push(m.content);
+    else for (const b of blocksOf(m)) if (b.type === 'text' && !String(b.text).startsWith(SYNTHETIC)) out.push(b.text);
+  }
+  return out;
+}
+function checkText(text, messages) {
+  return verifyText(text, toolResultTexts(messages), [SYSTEM].concat(userTexts(messages)));
+}
+function figureList(check) { return [...new Set(check.unverified.map(u => u.raw))].slice(0, 12); }
+function alreadyRepaired(messages) {
+  return sinceQuestion(messages).some(m => m.role === 'user' && blocksOf(m).some(b => b.type === 'text' && String(b.text).startsWith(SYNTHETIC)));
+}
+function documentRejections(messages) {
+  let n = 0;
+  for (const m of sinceQuestion(messages)) {
+    if (m.role !== 'user') continue;
+    for (const b of blocksOf(m)) if (b.type === 'tool_result' && b.is_error && String(b.content).includes('Not created: these figures')) n++;
+  }
+  return n;
+}
+function traceCheck(tr, where, check, repaired) {
+  if (!tr) return;
+  trace({ ev: 'check', cid: tr.cid, where, checked: check.checked, traced: check.traced, derived: check.derived,
+    exempt: check.exempt, unverified: check.unverified.length, figures: figureList(check), repaired: !!repaired });
+}
+
 let client = null;
 function getClient() {
   if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 0 });
@@ -76,7 +156,7 @@ Who you help: healthcare providers deciding where to open, expand or compete, an
 Each user turn starts with a <dashboard> block describing what the user is looking at (mode, ZIP, specialty). Treat "here", "this market" or "my area" as that ZIP and that specialty unless the user names others.
 
 How to answer:
-- Ground every number in a tool result from this conversation. Never estimate, extrapolate or invent figures. If the data does not cover something (rents, salaries, reimbursement rates, referral patterns, patient search volume), say so plainly.
+- Ground every number in a tool result from this conversation. Never estimate, extrapolate or invent figures. State each figure as a tool returned it (rounding is fine). If you compute a difference, ratio or percent change, put the two figures it comes from on the same line. The server checks every figure in your answers and documents against the tool results, and an untraceable one is rejected. If the data does not cover something (rents, salaries, reimbursement rates, referral patterns, patient search volume), say so plainly.
 - For questions about a market, call get_market_insights first. Explain results in plain language: the archetype and what it means, the factors that drove the score, and the confidence level. Mention a caveat when the tool reports one that affects the answer.
 - To compare places, call compare_markets. To count or list nearby providers of a specialty, call find_providers. For statewide or cross-market counts the other tools cannot answer, call query_database with a plan.
 - When the user wants to see something on the map ("show me", "zoom to", "switch to"), call update_map. Say briefly what you changed.
@@ -384,7 +464,18 @@ function updateMap({ zip, specialty }, ctx) {
 function createDeliverable({ kind, title, body_markdown }, ctx) {
   const body = String(body_markdown || '').slice(0, 20000);
   if (!body.trim()) return { error: 'body_markdown is empty' };
+  // A document gets forwarded, so it is held to the same rule as an answer:
+  // every figure traced. Rejected up to twice, with the offending figures named
+  // so the model can fix them; after that it is issued with the figures marked.
+  const check = checkText(body, ctx.messages || []);
+  const rejected = documentRejections(ctx.messages || []);
+  traceCheck(ctx.tr, 'document', check, rejected > 0);
+  if (check.unverified.length && rejected < MAX_DOC_REJECTIONS) {
+    return { error: 'Not created: these figures do not appear in any tool result from this conversation: ' + figureList(check).join(', ') +
+      '. Remove them, or call a tool that returns them, then call create_deliverable again. State each figure exactly as a tool returned it, and show any figure you derive (a difference, ratio or percent change) on the same line as the two figures it comes from.' };
+  }
   const doc = { id: 'd' + Date.now().toString(36) + ctx.deliverables.length, kind, title: String(title || 'Market memo').slice(0, 200), body };
+  if (check.unverified.length) doc.unverified = figureList(check);
   ctx.deliverables.push(doc);
   return { ok: true, id: doc.id, shown_to_user: true };
 }
@@ -416,6 +507,7 @@ function stepLabel(name, input) {
 // Every tool races the invocation's remaining budget, so a slow lookup comes
 // back as an error result instead of the 26s kill taking the whole step.
 async function runTool(block, ctx, budgetMs) {
+  const t0 = Date.now();
   const fn = RUNNERS[block.name];
   let out;
   try {
@@ -433,6 +525,7 @@ async function runTool(block, ctx, budgetMs) {
   }
   const result = { type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(out) };
   if (out && (out.error || out.refused)) result.is_error = true;
+  if (ctx.tr) { ctx.tr.tools++; trace({ ev: 'tool', cid: ctx.tr.cid, name: block.name, ms: Date.now() - t0, error: !!result.is_error }); }
   return result;
 }
 
@@ -464,13 +557,7 @@ function contextBlock(c) {
 
 // Rounds since the last real question (user text, not tool results).
 function roundsSinceQuestion(messages) {
-  let n = 0;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role === 'assistant') n++;
-    if (m.role === 'user' && (typeof m.content === 'string' || m.content.some(b => b.type === 'text'))) break;
-  }
-  return n;
+  return sinceQuestion(messages).filter(m => m.role === 'assistant').length;
 }
 
 function textOf(content) {
@@ -479,6 +566,16 @@ function textOf(content) {
 
 // ---------------------------------------------------------------------------
 exports.handler = async (event) => {
+  const tr = { started: Date.now(), cid: '', outcome: '', models: 0, tools: 0, usd: 0 };
+  let res;
+  try { res = await handle(event, tr); return res; }
+  finally {
+    trace({ ev: 'step', cid: tr.cid, ms: Date.now() - tr.started, outcome: tr.outcome || ('http_' + (res ? res.statusCode : 'error')),
+      models: tr.models, tools: tr.tools, usd: Math.round(tr.usd * 1e5) / 1e5 });
+  }
+};
+
+async function handle(event, tr) {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: JSONH, body: '' };
   if (event.httpMethod !== 'POST') return reply(405, { error: 'POST only' });
   const started = Date.now();
@@ -494,6 +591,7 @@ exports.handler = async (event) => {
     return reply(413, { error: 'This conversation is too long. Start a new chat to continue.' });
   }
 
+  tr.cid = /^[A-Za-z0-9_-]{8,64}$/.test(String(body.cid || '')) ? String(body.cid) : '';
   const messages = cleanHistory(body.messages);
   if (!messages) return reply(400, { error: 'Invalid conversation history' });
 
@@ -513,12 +611,15 @@ exports.handler = async (event) => {
 
   const ctx = {
     npi: /^\d{10}$/.test(String(body.npi || '')) ? String(body.npi) : '',
-    actions: [], deliverables: [], steps: []
+    actions: [], deliverables: [], steps: [], messages, tr
   };
-  const partial = () => reply(200, { done: false, messages, actions: ctx.actions, deliverables: ctx.deliverables, steps: ctx.steps });
-  const done = (extra) => reply(200, Object.assign({
-    done: true, messages, actions: ctx.actions, deliverables: ctx.deliverables, steps: ctx.steps
-  }, extra || {}));
+  const partial = () => { tr.outcome = 'partial'; return reply(200, { done: false, messages, actions: ctx.actions, deliverables: ctx.deliverables, steps: ctx.steps }); };
+  const done = (extra) => {
+    tr.outcome = (extra && extra.stopped) || 'done';
+    return reply(200, Object.assign({
+      done: true, messages, actions: ctx.actions, deliverables: ctx.deliverables, steps: ctx.steps
+    }, extra || {}));
+  };
 
   let modelCalls = 0;
   while (true) {
@@ -543,9 +644,16 @@ exports.handler = async (event) => {
 
     let res;
     try {
+      const t0 = Date.now();
       res = await createTurn(messages, HARD_BUDGET_MS - elapsed);
-      modelCalls++;
+      modelCalls++; tr.models++;
+      const u = res.usage || {}, usd = estimateCostUsd(u);
+      tr.usd += usd;
+      trace({ ev: 'model', cid: tr.cid, ms: Date.now() - t0, stop: res.stop_reason, round: roundsSinceQuestion(messages) + 1,
+        in: u.input_tokens || 0, out: u.output_tokens || 0, cache_read: u.cache_read_input_tokens || 0,
+        cache_write: u.cache_creation_input_tokens || 0, usd: Math.round(usd * 1e5) / 1e5, plain: plainMode });
     } catch (e) {
+      trace({ ev: 'model_error', cid: tr.cid, kind: (e && e.constructor && e.constructor.name) || 'Error', status: e && e.status || null });
       // No history is returned on failure: the browser keeps what it had and
       // can retry the same step, so nothing half-finished is ever stored.
       if (e instanceof Anthropic.RateLimitError) return reply(429, { error: 'The assistant is busy. Try again in a moment.' });
@@ -584,10 +692,24 @@ exports.handler = async (event) => {
       })) });
       continue;
     }
-    if (res.stop_reason !== 'tool_use') return done({ reply: textOf(res.content) });
+    if (res.stop_reason !== 'tool_use') {
+      const text = textOf(res.content);
+      const check = checkText(text, messages);
+      const repaired = alreadyRepaired(messages);
+      traceCheck(tr, 'answer', check, repaired);
+      if (check.unverified.length && !repaired) {
+        // One automatic repair. The draft is never shown: the model is told
+        // which figures have no source and answers again. It is a plain user
+        // turn marked SYNTHETIC, so history stays append-only.
+        messages.push({ role: 'user', content: [{ type: 'text', text: SYNTHETIC + ' These figures in your last answer do not appear in any tool result from this conversation: ' +
+          figureList(check).join(', ') + '. Answer again: state only figures a tool returned, exactly as returned; call a tool if you need one; and show any figure you derive (a difference, ratio or percent change) on the same line as the two figures it comes from. Do not mention this check.' }] });
+        continue;
+      }
+      return done({ reply: text, verification: { checked: check.checked, traced: check.traced, derived: check.derived, unverified: figureList(check), repaired } });
+    }
     // tool_use: the top of the loop runs the calls (or hands them to the next step).
   }
-};
+}
 
 // One model turn. The request opts into strict tool schemas and server-side
 // refusal fallbacks; if the API rejects the request shape (a 400 on a feature
@@ -625,4 +747,5 @@ function pendingCalls(assistantTurn) {
 
 // For tests.
 exports._setClient = _setClient;
-exports._internals = { TOOLS, SYSTEM, cleanHistory, contextBlock, roundsSinceQuestion, updateMap, createDeliverable, stepLabel, STEP_BUDGET_MS, HARD_BUDGET_MS, MODEL_MIN_BUDGET_MS };
+exports._setTraceSink = _setTraceSink;
+exports._internals = { TOOLS, SYSTEM, cleanHistory, contextBlock, roundsSinceQuestion, updateMap, createDeliverable, stepLabel, STEP_BUDGET_MS, HARD_BUDGET_MS, MODEL_MIN_BUDGET_MS, estimateCostUsd, checkText, SYNTHETIC };

@@ -488,6 +488,7 @@ node scripts/test-accuracy-signals.mjs    # the directory-accuracy scoring engin
 node scripts/test-query-plan.mjs          # the query-plan allowlist behind the assistant's database tool
 node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings
 node scripts/test-market-model.mjs        # the market opportunity model
+node scripts/test-answer-check.mjs        # assistant figures must trace to tool results
 node scripts/test-density-benchmark.mjs   # the state comparison is like for like, and honest when unavailable
 node scripts/test-signup-gate.mjs         # patient sign-up is closed unless explicitly opened
 node scripts/test-market-assistant.mjs    # the assistant: steps, tools, history rules (needs npm ci in v2/)
@@ -543,6 +544,18 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-30
+- **The Ask AI assistant now checks its own numbers.** Every figure in an
+  answer or a generated document has to come from a market lookup made in that
+  conversation, or be a sum, difference, ratio or percent change shown beside
+  the figures it comes from. An answer with an untraceable figure is sent back
+  for one rewrite before you see it. A document that cannot be fixed is still
+  issued, with the figures flagged on its card. Answers show "N figures checked
+  against the data". Figures written as words ("two cardiologists") are not
+  checked.
+- **Assistant usage is now measured.** The function logs record, per step, how
+  long each model call and lookup took, token counts, an estimated cost and how
+  many figures failed the check. They never contain the question, the answer,
+  a document or who asked.
 - **Long assistant answers no longer time out.** Asking for a document
   (an expansion one-pager, for example) ended in "That took too long"
   whenever the assistant had spent its first seconds on lookups, because the
