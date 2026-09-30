@@ -441,7 +441,7 @@ netlify dev
 Schema changes live in `supabase/migrations/` but aren't applied
 automatically. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`021_market_benchmarks.sql`.
+`022_market_benchmarks_state_density.sql`.
 
 ## Environment variables
 
@@ -544,6 +544,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-30
+- **Fixed the state benchmark build failing on save.** The first run computed
+  every state's listings per 1,000 residents but the database refused to store
+  them, because the table only allowed two kinds of row. Migration 022 widens
+  it. Run it in the Supabase SQL editor, then re-run "Build market benchmarks".
 - **The Ask AI assistant now checks its own numbers.** Every figure in an
   answer or a generated document has to come from a market lookup made in that
   conversation, or be a sum, difference, ratio or percent change shown beside

@@ -13,7 +13,7 @@
 -- Run in the Supabase SQL editor.
 
 create table if not exists public.market_benchmarks (
-  kind          text not null check (kind in ('measure', 'specialty')),
+  kind          text not null check (kind in ('measure', 'specialty')),   -- 022 adds 'state_density'
   key           text not null,
   data          jsonb not null,
   refreshed_at  timestamptz not null default now(),
