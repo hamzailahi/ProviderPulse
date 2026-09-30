@@ -287,3 +287,18 @@ body.filters-open #map-legend { left: 306px; }
 .wi-row i, .wi-head i { font-style: normal; color: #94a3b8; text-align: center; }
 .wi-head b { font-size: 11px; color: #64748b; font-weight: 600; }
 .wi-note { margin: 8px 0 0; font-size: 12px; color: #64748b; line-height: 1.45; }
+
+/* Opportunity by specialty group, inside an Insights card (the base styles in
+   dashboard.css are scoped to #verdict-card). One row per group: name, bar, chip. */
+.ins-card .vgroups-note { font-size: 12px; color: #64748b; line-height: 1.45; margin: 0 0 10px; }
+.ins-card .vgroup-rows { display: flex; flex-direction: column; gap: 8px; }
+.ins-card .vgroup-row { display: grid; grid-template-columns: minmax(132px, 1.6fr) 1.4fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.ins-card .vgname { color: #334155; font-weight: 600; min-width: 0; }
+.ins-card .vgbar { display: block; height: 6px; border-radius: 99px; background: #eef2f6; overflow: hidden; }
+.ins-card .vgbar i { display: block; height: 100%; border-radius: 99px; background: #0d9488; }
+.ins-card .vgchip { justify-self: end; white-space: nowrap; padding: 2px 8px; border-radius: 6px; font: 700 10.5px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .05em; text-transform: uppercase; }
+.ins-card .vgchip.under { background: #dcfce7; color: #166534; }
+.ins-card .vgchip.balanced { background: #fef3c7; color: #92400e; }
+.ins-card .vgchip.served { background: #eef2f6; color: #475569; }
+.ins-card .vgunserved { grid-column: 2 / 4; font-size: 12px; color: #64748b; font-style: italic; }
+@media (max-width: 640px) { .ins-card .vgroup-row { grid-template-columns: 1fr auto; } .ins-card .vgbar { grid-column: 1 / -1; order: 3; } }

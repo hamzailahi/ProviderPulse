@@ -170,7 +170,7 @@ function specialtyHtml(groups, catchment, zip) {
   if (!rows) return '';
   return '<div class="specialty-note">Opportunity by specialty' +
     (radius ? ', within ' + radius + ' miles of ' + esc(zip) : '') +
-    ' — modelled from CDC health-measure prevalence, not patient searches.</div>' +
+    '. Modelled from CDC health-measure prevalence, not patient searches.</div>' +
     '<div class="specialty-rows">' + rows + '</div>';
 }
 

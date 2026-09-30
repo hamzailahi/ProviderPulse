@@ -545,6 +545,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-09-30
+- **Tidied the "Opportunity by specialty group" card on Insights.** It used to
+  run the group names into their labels in one unstyled block. Each group now
+  has its own row with a name, a bar for the score and a coloured label. The
+  explanatory sentence lost its dash too.
 - **"What if?" on Insights and in Ask AI.** Under the score breakdown, pick
   "1 more", "2 more" or "3 more" to see how the chosen specialty would score
   in this ZIP if that many clinicians opened at its centre: score, type,

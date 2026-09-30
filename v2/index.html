@@ -3592,7 +3592,7 @@
             var radius = catchment ? catchment.radius_miles : null;
             note.textContent = 'Opportunity by specialty' +
                 (radius ? ', within ' + radius + ' miles of ' + zip : '') +
-                ' — modelled from CDC health-measure prevalence, not patient searches.';
+                '. Modelled from CDC health-measure prevalence, not patient searches.';
             wrap.appendChild(note);
 
             var rows = document.createElement('div');
@@ -3607,6 +3607,13 @@
                 var name = document.createElement('span');
                 name.className = 'vgname'; name.textContent = VGROUP_LABEL[key] || key;
                 row.appendChild(name);
+                if (g.available && typeof g.score === 'number') {
+                    // Only the Insights card styles this; the verdict card leaves it empty.
+                    var bar = document.createElement('span'), fill = document.createElement('i');
+                    bar.className = 'vgbar'; bar.setAttribute('aria-hidden', 'true');
+                    fill.style.width = Math.max(0, Math.min(100, g.score)) + '%';
+                    bar.appendChild(fill); row.appendChild(bar);
+                }
                 if (!g.available) {
                     var unserved = document.createElement('span');
                     unserved.className = 'vgunserved';
