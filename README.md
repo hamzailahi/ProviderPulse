@@ -548,6 +548,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-01
+- **The Census import now explains and survives a bad API key.** The Census
+  answers an invalid or not-yet-activated key with a web page rather than data,
+  which made the first import run crash with a confusing error. It now prints
+  what the Census said and retries without the key.
 - **Detailed Census data by ZIP.** The Demographics tab has a new "Census
   detail" block: household income in eight bands up to $200k+ (the Census
   stores sixteen), median household income, poverty rate, the share of

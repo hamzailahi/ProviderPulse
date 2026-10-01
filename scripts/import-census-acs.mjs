@@ -25,15 +25,21 @@ const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CENSUS_API_KEY, ACS_YEAR } = pr
 if (!dryRun && (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY)) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
 const MIN_ZCTAS = Number(process.env.MIN_ZCTAS) || 30000;       // the Census publishes about 33,000
 const H = { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` };
-const keyParam = CENSUS_API_KEY ? `&key=${encodeURIComponent(CENSUS_API_KEY)}` : '';
+let keyParam = CENSUS_API_KEY ? `&key=${encodeURIComponent(CENSUS_API_KEY)}` : '';
 
 async function getJson(url, label, attempt = 1) {
   const res = await fetch(url, { headers: { 'User-Agent': 'ProviderPulse-import' } });
+  const text = await res.text();
   if (!res.ok) {
     if (attempt < 3 && res.status >= 500) { await new Promise(r => setTimeout(r, attempt * 3000)); return getJson(url, label, attempt + 1); }
-    const e = new Error(`${label}: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`); e.status = res.status; throw e;
+    const e = new Error(`${label}: HTTP ${res.status} ${text.slice(0, 200)}`); e.status = res.status; throw e;
   }
-  return res.json();
+  try { return JSON.parse(text); }
+  catch (e) {
+    // The Census answers a bad or inactive API key with an HTML page and a 200.
+    const err = new Error(`${label}: reply was not JSON: ${text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240)}`);
+    err.notJson = true; throw err;
+  }
 }
 
 async function pickYear() {
@@ -61,7 +67,14 @@ async function fetchAll(year) {
   const CHUNK = 45;                                              // the API allows 50 per call
   for (let i = 0; i < VARIABLES.length; i += CHUNK) {
     const vars = VARIABLES.slice(i, i + CHUNK);
-    const data = await getJson(`https://api.census.gov/data/${year}/acs/acs5?get=${vars.join(',')}&for=zip%20code%20tabulation%20area:*${keyParam}`, 'ACS data');
+    const call = () => getJson(`https://api.census.gov/data/${year}/acs/acs5?get=${vars.join(',')}&for=zip%20code%20tabulation%20area:*${keyParam}`, 'ACS data');
+    let data;
+    try { data = await call(); }
+    catch (e) {
+      if (!e.notJson || !keyParam) throw e;
+      console.log(`  ${e.message}\n  CENSUS_API_KEY looks invalid or not yet activated; retrying without it`);
+      keyParam = ''; data = await call();
+    }
     const head = data[0], zi = head.indexOf('zip code tabulation area');
     for (const row of data.slice(1)) {
       const zip = row[zi];

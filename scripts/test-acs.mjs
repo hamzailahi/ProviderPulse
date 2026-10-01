@@ -73,6 +73,7 @@ globalThis.fetch = async (url, init) => {
     return J({ variables: v });
   }
   if (u.includes('api.census.gov') && u.includes('?get=')) {
+    if (u.includes('key=') && process.env.BAD_KEY) return { ok: true, status: 200, text: async () => '<html><body>Invalid Key</body></html>' };
     const want = decodeURIComponent(u.split('get=')[1].split('&')[0]).split(',');
     return J([want.concat(['zip code tabulation area'])].concat(zips.map(z => want.map(k => String(rec[k])).concat([z]))));
   }
@@ -90,6 +91,8 @@ check('a clean run succeeds and writes', p.status === 0 && /written/.test(p.stdo
 check('every ZCTA is written once', written && written.length === 3 && new Set(written.map(r => r.zip)).size === 3);
 check('state comes from demographics_raw, upper-cased; unmatched ZIPs have none', written && written.find(r => r.zip === '38138').state === 'TN' && written.find(r => r.zip === '00501').state === null);
 check('the Census label check ran', /variable labels verified/.test(p.stdout));
+p = runImporter({ BAD_KEY: '1', CENSUS_API_KEY: 'nope' });
+check('an invalid Census key (HTML reply) is reported and retried without the key', p.status === 0 && /Invalid Key/.test(p.stdout) && /retrying without it/.test(p.stdout), p.stdout + p.stderr);
 p = runImporter({ BAD_LABEL: 'B19001_017E' });
 check('a renumbered table stops the import before anything is written', p.status !== 0 && /labels changed/.test(p.stderr), p.stderr.slice(0, 300));
 p = runImporter({ MIN_ZCTAS: '30000' });
