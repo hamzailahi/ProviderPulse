@@ -548,6 +548,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-01
+- **Demographics tab trimmed.** The two older charts that the Census detail
+  now covers better (age distribution and household income, both capped at
+  coarse bands) are gone. The insurance-rate charts by age, income and race
+  stay, because the detailed Census data has no insurance figures.
 - **The Census import needs a free API key.** The first runs failed because
   the Census refuses data requests without one ("Missing Key"). The workflow
   now checks for the `CENSUS_API_KEY` secret up front and says how to get one.
