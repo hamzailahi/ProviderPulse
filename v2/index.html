@@ -264,6 +264,30 @@
                     <h4>Total vs Insured by Race / Ethnicity</h4>
                     <div class="chart-wrapper" style="height: 220px;"><canvas id="raceChart"></canvas></div>
                 </div>
+
+                <div id="acs-detail" hidden>
+                    <div class="chart-card">
+                        <h4 id="acs-title">Census detail</h4>
+                        <div class="kpi-grid" id="acs-kpis"></div>
+                        <div id="acs-note" style="font-size:10.5px;color:var(--text-muted);line-height:1.45;"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Household Income, Detailed</h4>
+                        <div class="chart-wrapper" style="height: 170px;"><canvas id="acsIncomeChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Age by Sex, 5-Year Bands</h4>
+                        <div class="chart-wrapper" style="height: 200px;"><canvas id="acsAgeChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Race and Ethnicity (share of population)</h4>
+                        <div class="chart-wrapper" style="height: 200px;"><canvas id="acsRaceChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Education, Adults 25 and Over</h4>
+                        <div class="chart-wrapper" style="height: 170px;"><canvas id="acsEduChart"></canvas></div>
+                    </div>
+                </div>
             </div>
 
             <div id="health-panel" style="display:none;flex:1;overflow-y:auto;padding:14px;background:var(--bg-base);">
@@ -1599,6 +1623,7 @@
                 document.getElementById('closePanelBtn').textContent = backLabel + ' ✕';
                 let r = zipDemographics[lockedZip] || zipDemographics[String(lockedZip).padStart(5,'0')] || null;
                 const hasRealData = r && r['Total Population'] !== undefined;
+                acsView = [String(lockedZip).padStart(5, '0')];
                 renderDashboard(hasRealData ? r : null);
                 if (!hasRealData) {
                     ensureDemographicsLoaded([lockedZip]).then(fetchedAny => {
@@ -1652,6 +1677,7 @@
 
                 document.getElementById('dashboard-title').textContent = "CATCHMENT AREA";
                 document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span><br/>Capturing ${capturedZips.size} intersecting ZIP codes.<br/><span style="color:var(--text-muted);font-size:10px;">Click any ZIP for its individual demographics.</span>`;
+                acsView = [...capturedZips].map(z => String(z).padStart(5, '0'));
                 renderDashboard(agg);
 
                 ensureDemographicsLoaded(capturedZips).then(fetchedAny => {
@@ -1675,6 +1701,7 @@
 
                 document.getElementById('dashboard-title').textContent = "NEIGHBOR AREA";
                 document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span><br/>Covering ${allZips.size} ZIP codes (seed + neighbors).<br/><span style="color:var(--text-muted);font-size:10px;">Click any ZIP for its individual demographics.</span>`;
+                acsView = [...allZips];
                 renderDashboard(agg);
 
                 ensureDemographicsLoaded(allZips).then(fetchedAny => {
@@ -1688,6 +1715,7 @@
 
                 const agg = aggregateZips(uniqueZips);
 
+                acsView = uniqueZips.slice();
                 document.getElementById('dashboard-title').textContent = "MARKET OVERVIEW";
                 document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span> visible on map.`;
                 renderDashboard(agg);
@@ -2481,6 +2509,7 @@
                 if(dashCharts.age) dashCharts.age.destroy(); 
                 if(dashCharts.inc) dashCharts.inc.destroy(); 
                 if(dashCharts.race) dashCharts.race.destroy();
+                acsView = []; renderAcsDetail();
                 return;
             }
 
@@ -2498,11 +2527,121 @@
             document.getElementById('kpi-hh').textContent = totalHH >= 10000 ? (totalHH/1000).toFixed(1)+'k' : totalHH.toLocaleString();
 
             dashCharts = drawDashboardCharts(r, 'rawAgeChart', 'rawIncomeChart', 'ageChart', 'incomeChart', 'raceChart', dashCharts);
+            renderAcsDetail();
 
             // Lead with the verdict for whichever ZIP this panel is showing
             var vz = (lockedZip || (r['ZIP Code'] || r['zip'] || '')).toString().padStart(5, '0');
             renderVerdict(vz);
             if (compareArmed) addCompareZip(vz);
+        }
+
+        /* ---- ACS 5-year detail (census_acs_zcta, migration 023) -------------------
+           Finer than demographics_raw: 16 household income bands (the Census stops
+           at "$200,000 or more" for ZIPs), median income, poverty, age by sex,
+           race and ethnicity, education. Sums the ZIPs in view; a median cannot be
+           summed, so for an area it is the household-weighted average of ZIP medians
+           and says so. Hidden when the table is absent or has nothing for the view. */
+        let acsView = [], acsReq = 0, acsCharts = {};
+        const ACS_INCOME_GROUPS = [['<$25k', 0, 3], ['$25-50k', 4, 8], ['$50-75k', 9, 10], ['$75-100k', 11, 11],
+            ['$100-125k', 12, 12], ['$125-150k', 13, 13], ['$150-200k', 14, 14], ['$200k+', 15, 15]];
+        const ACS_AGE = ['<5', '5-9', '10-14', '15-19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '85+'];
+        const ACS_RACE = [['White', 'white'], ['Black', 'black'], ['Asian', 'asian'], ['Native American', 'aian'], ['Pacific Islander', 'nhpi'],
+            ['Other', 'other'], ['Two or more', 'two_plus'], ['Hispanic (any race)', 'hispanic']];
+        const ACS_EDU = [['Less than high school', 'less_than_hs'], ['High school', 'high_school'], ['Some college', 'some_college'],
+            ['Associate', 'associate'], ['Bachelor', 'bachelor'], ['Graduate', 'graduate']];
+
+        function acsDestroy() { Object.values(acsCharts).forEach(c => c && c.destroy()); acsCharts = {}; }
+        function acsFmtMoney(n) { return n == null ? '--' : '$' + Math.round(n).toLocaleString(); }
+
+        function renderAcsDetail() {
+            const card = document.getElementById('acs-detail');
+            if (!card) return;
+            const mine = ++acsReq;
+            const zips = [...new Set(acsView)].slice(0, 600);
+            if (!zips.length) { card.hidden = true; acsDestroy(); return; }
+            const chunks = [];
+            for (let i = 0; i < zips.length; i += 100) chunks.push(zips.slice(i, i + 100));
+            Promise.all(chunks.map(c => fetch(SUPABASE_URL + '/rest/v1/census_acs_zcta?zip=in.(' + c.join(',') + ')&select=*',
+                { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }).then(r => r.ok ? r.json() : [])))
+                .then(parts => {
+                    if (mine !== acsReq) return;                          // a newer view won
+                    const rows = [].concat(...parts).filter(x => x && Array.isArray(x.income_bands));
+                    if (!rows.length) { card.hidden = true; acsDestroy(); return; }
+                    paintAcs(card, rows, zips.length);
+                })
+                .catch(() => { if (mine === acsReq) { card.hidden = true; } });
+        }
+
+        function paintAcs(card, rows, asked) {
+            const N = v => Number(v) || 0;
+            const sumArr = (key, len) => { const a = new Array(len).fill(0); rows.forEach(r => (r[key] || []).forEach((v, i) => { a[i] += N(v); })); return a; };
+            const sumObj = (key) => { const o = {}; rows.forEach(r => Object.entries(r[key] || {}).forEach(([k, v]) => { o[k] = (o[k] || 0) + N(v); })); return o; };
+            const income = sumArr('income_bands', 16), male = sumArr('age_male', 18), female = sumArr('age_female', 18);
+            const race = sumObj('race'), edu = sumObj('education');
+            const hh = rows.reduce((a, r) => a + N(r.households), 0);
+            const popTotal = rows.reduce((a, r) => a + N(r.pop_total), 0);
+            const povU = rows.reduce((a, r) => a + N(r.poverty_universe), 0), povB = rows.reduce((a, r) => a + N(r.poverty_below), 0);
+            const single = rows.length === 1;
+            let median = null;
+            if (single) median = rows[0].median_hh_income;
+            else {
+                const w = rows.filter(r => r.median_hh_income != null && N(r.households) > 0);
+                const tw = w.reduce((a, r) => a + N(r.households), 0);
+                median = tw ? w.reduce((a, r) => a + N(r.median_hh_income) * N(r.households), 0) / tw : null;
+            }
+            const pct = (a, b) => (b ? (a / b * 100) : null);
+            const fmtPct = v => v == null ? '--' : v.toFixed(1) + '%';
+            const high100 = income.slice(12).reduce((a, b) => a + b, 0), high200 = income[15];
+            const bachPlus = N(edu.bachelor) + N(edu.graduate);
+
+            document.getElementById('acs-title').textContent = 'Census detail' + (single ? ' · ZIP ' + rows[0].zip : ' · ' + rows.length + ' ZIPs') +
+                ' (ACS ' + (rows[0].acs_year || '') + ' 5-year)';
+            const kp = document.getElementById('acs-kpis');
+            while (kp.firstChild) kp.removeChild(kp.firstChild);
+            [[single ? 'Median household income' : 'Median income (avg. of ZIPs)', acsFmtMoney(median)],
+             ['Below poverty line', fmtPct(pct(povB, povU))],
+             ['Households $100k+', fmtPct(pct(high100, hh))],
+             ['Households $200k+', fmtPct(pct(high200, hh))],
+             ["Bachelor's or higher", fmtPct(pct(bachPlus, N(edu.universe)))],
+             ['Median age band', (() => { const t = male.map((v, i) => v + female[i]), tot = t.reduce((a, b) => a + b, 0); let c = 0; for (let i = 0; i < t.length; i++) { c += t[i]; if (c >= tot / 2) return tot ? ACS_AGE[i] : '--'; } return '--'; })()]]
+                .forEach(([label, val]) => {
+                    const b = document.createElement('div'); b.className = 'kpi-box';
+                    const v = document.createElement('div'); v.className = 'kpi-val'; v.textContent = val;
+                    const l = document.createElement('div'); l.className = 'kpi-label'; l.textContent = label;
+                    b.appendChild(v); b.appendChild(l); kp.appendChild(b);
+                });
+            document.getElementById('acs-note').textContent =
+                'American Community Survey 5-year estimates. The Census does not publish ZIP-level household income above $200,000.' +
+                (asked > rows.length ? ' ' + (asked - rows.length) + ' of ' + asked + ' ZIPs in view have no ACS row yet and are left out.' : '') +
+                (single ? '' : ' Area medians are household-weighted averages of ZIP medians, not true medians.');
+
+            card.hidden = false;
+            acsDestroy();
+            const axis = { grid: { color: 'rgba(100,116,139,.2)' }, ticks: { font: { size: 9 } } };
+            const noGrid = { grid: { display: false }, ticks: { font: { size: 9 } } };
+            const asPct = (a, tot) => a.map(v => tot ? Math.round(v / tot * 1000) / 10 : 0);
+            const incGroups = ACS_INCOME_GROUPS.map(g => income.slice(g[1], g[2] + 1).reduce((a, b) => a + b, 0));
+            acsCharts.income = new Chart(document.getElementById('acsIncomeChart'), {
+                type: 'bar',
+                data: { labels: ACS_INCOME_GROUPS.map(g => g[0]), datasets: [{ label: '% of households', data: asPct(incGroups, hh), backgroundColor: CHART.good, borderRadius: 3 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y + '% (' + incGroups[c.dataIndex].toLocaleString() + ' households)' } } }, scales: { x: noGrid, y: axis } }
+            });
+            acsCharts.age = new Chart(document.getElementById('acsAgeChart'), {
+                type: 'bar',
+                data: { labels: ACS_AGE, datasets: [{ label: 'Male', data: male, backgroundColor: CHART.a2, borderRadius: 2 }, { label: 'Female', data: female, backgroundColor: CHART.a1, borderRadius: 2 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } }, scales: { x: noGrid, y: axis } }
+            });
+            const raceData = ACS_RACE.map(r => ({ l: r[0], v: N(race[r[1]]) })).sort((a, b) => b.v - a.v);
+            acsCharts.race = new Chart(document.getElementById('acsRaceChart'), {
+                type: 'bar',
+                data: { labels: raceData.map(r => r.l), datasets: [{ label: '% of population', data: raceData.map(r => race.total ? Math.round(r.v / race.total * 1000) / 10 : 0), backgroundColor: CHART.a1, borderRadius: 3 }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: axis, y: noGrid } }
+            });
+            acsCharts.edu = new Chart(document.getElementById('acsEduChart'), {
+                type: 'bar',
+                data: { labels: ACS_EDU.map(e => e[0]), datasets: [{ label: '% of adults 25+', data: ACS_EDU.map(e => edu.universe ? Math.round(N(edu[e[1]]) / edu.universe * 1000) / 10 : 0), backgroundColor: CHART.a2, borderRadius: 3 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: noGrid, y: axis } }
+            });
         }
 
         function drawDashboardCharts(r, rawAgeCanvasId, rawIncCanvasId, ageCanvasId, incCanvasId, raceCanvasId, existingInsts) {

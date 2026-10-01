@@ -48,6 +48,9 @@ jobs:
       - name: Claimed-listing specialty gating
         run: node scripts/test-claimed-relevance.mjs
 
+      - name: Census ACS detail import and income ranking
+        run: node scripts/test-acs.mjs
+
       - name: What-if scenario scoring
         run: node scripts/test-scenario.mjs
 

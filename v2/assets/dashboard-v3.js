@@ -452,7 +452,15 @@ function evidenceLine(k, e) {
   if (k === 'access' && !e.clinicians) return 'None within the catchment' + (e.national_per_1k ? ' (' + e.national_per_1k + ' per 1,000 nationally)' : '');
   if (k === 'access') return fmtN(e.clinicians) + ' within the catchment' + (e.per_1k != null ? ', ' + e.per_1k + ' per 1,000 adults' : '') +
     (e.national_per_1k ? ' vs ' + e.national_per_1k + ' nationally' : ' (compared at group level)');
-  if (k === 'pay') return 'Insured ' + ordinal(e.insured_pct) + (e.income_pct != null ? ' · $75k+ households ' + ordinal(e.income_pct) : '') + ' percentile in state';
+  if (k === 'pay') {
+    var det = e.income_detail;
+    if (e.income_basis === 'acs' && det) {
+      return 'Insured ' + ordinal(e.insured_pct) + (det.median_income != null ? ' · median household income $' + fmtN(det.median_income) + ' (' + ordinal(det.median_pct) + ')' : '') +
+        (det.share_100k != null ? ' · ' + det.share_100k + '% of households at $100k+ (' + ordinal(det.share_100k_pct) + ')' : '') +
+        (det.poverty_rate != null ? ' · ' + det.poverty_rate + '% in poverty' : '') + ', percentiles in state';
+    }
+    return 'Insured ' + ordinal(e.insured_pct) + (e.income_pct != null ? ' · $75k+ households ' + ordinal(e.income_pct) : '') + ' percentile in state';
+  }
   if (k === 'shortage') return 'HPSA ' + e.hpsa + ' of ~25, ' + e.discipline + ' care, ' + (e.basis === 'county' ? 'this county' : 'state median');
   if (k === 'competition') return e.nearest_miles == null ? 'None within the catchment' : 'Nearest ' + e.nearest_miles + ' mi away';
   return '';

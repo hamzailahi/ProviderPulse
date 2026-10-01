@@ -1,0 +1,51 @@
+name: Import Census ACS detail
+
+# Feeds census_acs_zcta (migration 023): household income in 16 bands, median
+# income, poverty, age by sex, race and ethnicity, education, by ZIP. The ACS
+# 5-year release lands each December, so this runs every January and whenever
+# triggered by hand (run it once right after applying migration 023).
+# CENSUS_API_KEY is optional; the job makes only a handful of calls.
+on:
+  schedule:
+    - cron: '0 10 15 1 *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Fetch and check the data without writing to Supabase'
+        type: boolean
+        default: false
+
+concurrency: import-census-acs
+
+jobs:
+  import:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"
+            exit 1
+          fi
+
+      - name: Import ACS detail
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "${IN_DRY_RUN:-}" = "true" ]; then
+            node scripts/import-census-acs.mjs --dry-run
+          else
+            node scripts/import-census-acs.mjs
+          fi

@@ -82,6 +82,27 @@ function demoShares(r) {
   };
 }
 
+// Finer income detail (census_acs_zcta, migration 023, ACS 5-year). Used for the
+// income half of the ability-to-pay factor when this ZIP and enough of its
+// state have it; otherwise the coarser demographics_raw share above is used and
+// the evidence says so. ACS top-codes ZIP household income at $200,000 or more.
+const ACS_COLS = 'zip,households,median_hh_income,poverty_universe,poverty_below,income_bands';
+function acsShares(r) {
+  if (!r) return null;
+  const hh = Number(r.households) || 0;
+  const bands = Array.isArray(r.income_bands) ? r.income_bands : null;
+  const high = bands && hh && bands.slice(12).every(x => x !== null && x !== undefined)
+    ? bands.slice(12).reduce((a, x) => a + Number(x), 0) / hh : null;            // bands 12..15 are $100k and over
+  const pu = Number(r.poverty_universe) || 0;
+  const med = r.median_hh_income === null || r.median_hh_income === undefined ? null : Number(r.median_hh_income);
+  return {
+    median: med !== null && isFinite(med) && med > 0 ? med : null,
+    high100: high,
+    poverty: pu && r.poverty_below !== null && r.poverty_below !== undefined ? Number(r.poverty_below) / pu : null
+  };
+}
+const ACS_MIN_SAMPLE = 30;      // ZIPs in the state needed before a within-state rank means anything
+
 // hpsa_designations.county stores names with the suffix stripped; CMS county
 // names may carry it. Normalise both sides the same way before comparing. The
 // match is reported (basis 'county' vs 'state'), never assumed.
@@ -272,10 +293,12 @@ exports.handler = async (event) => {
     // spaces (see "NPI-1 vs NPI-2" in CLAUDE.md), so concatenating the two
     // row sets is safe -- no NPI can appear in both.
     const stripped = String(parseInt(zip, 10));
-    const [clinicPage, individualPage, stateDemPage] = await Promise.all([
+    const [clinicPage, individualPage, stateDemPage, acsPage] = await Promise.all([
       pagedGet(`clinics?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy`, 'npi'),
       pagedGet(`provider_individuals?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy`, 'npi'),
-      pagedGet(`demographics_raw?state=eq.${encodeURIComponent(state)}&select=zip,%22Total%20Population%22,%22Insured%20Population%22,${DEM_EXTRA}`, 'zip')
+      pagedGet(`demographics_raw?state=eq.${encodeURIComponent(state)}&select=zip,%22Total%20Population%22,%22Insured%20Population%22,${DEM_EXTRA}`, 'zip'),
+      // Optional: a missing table or a failed read means "no ACS detail", never an error.
+      pagedGet(`census_acs_zcta?state=eq.${encodeURIComponent(state)}&select=${ACS_COLS}`, 'zip').catch(() => ({ rows: [] }))
     ]);
     const clinicRows = clinicPage.rows;
     const individualRows = individualPage.rows;
@@ -634,7 +657,31 @@ exports.handler = async (event) => {
           const mine = demoShares(dem) || {};
           const rank = k => MarketModel.rankIn(sample.map(x => x[k]).filter(v => v != null && isFinite(v)), mine[k]);
           const demo = { over65: rank('over65'), under18: rank('under18'), age19to44: rank('age19to44') };
-          const pay = { insuredPct: rank('insured'), incomePct: rank('income75') };
+          const pay = { insuredPct: rank('insured'), incomePct: rank('income75'), incomeBasis: 'census75' };
+          // Richer income, when this ZIP and enough of its state have ACS detail:
+          // median household income (50%), share of households at $100k+ (25%)
+          // and low poverty (25%), each ranked within the state. Any part that
+          // is unknown is left out and the rest renormalised.
+          const acsRows = Array.isArray(acsPage && acsPage.rows) ? acsPage.rows : [];
+          const myAcs = acsShares(acsRows.find(r => String(r.zip).padStart(5, '0') === zip));
+          if (myAcs && acsRows.length >= ACS_MIN_SAMPLE) {
+            const acsSample = acsRows.map(acsShares).filter(Boolean);
+            const arank = k => (myAcs[k] == null ? null : MarketModel.rankIn(acsSample.map(x => x[k]).filter(v => v != null && isFinite(v)), myAcs[k]));
+            const parts = [[arank('median'), 0.5], [arank('high100'), 0.25], [arank('poverty') == null ? null : 100 - arank('poverty'), 0.25]]
+              .filter(x => x[0] != null && isFinite(x[0]));
+            const w = parts.reduce((a, x) => a + x[1], 0);
+            if (w > 0) {
+              pay.incomePct = parts.reduce((a, x) => a + x[0] * x[1], 0) / w;
+              pay.incomeBasis = 'acs';
+              pay.incomeDetail = {
+                median_income: myAcs.median, median_pct: arank('median') == null ? null : Math.round(arank('median')),
+                share_100k: myAcs.high100 == null ? null : Math.round(myAcs.high100 * 1000) / 10,
+                share_100k_pct: arank('high100') == null ? null : Math.round(arank('high100')),
+                poverty_rate: myAcs.poverty == null ? null : Math.round(myAcs.poverty * 1000) / 10,
+                low_poverty_pct: arank('poverty') == null ? null : Math.round(100 - arank('poverty'))
+              };
+            }
+          }
 
           // Federal shortage for this ZIP's own county when it can be matched,
           // else the state median, and the response says which.

@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-09-30. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-01. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -186,7 +186,7 @@ Each specialty is scored 0 to 100 from five factors:
 |---|---|---|
 | Health need | 30% | How common the conditions this specialty treats are locally (CDC PLACES measures chosen per specialty, e.g. heart disease, blood pressure and stroke for cardiology), plus the age mix it serves, against national percentiles |
 | Access gap | 30% | Clinicians per 1,000 adults in the catchment vs the national rate for that specialty |
-| Ability to pay | 20% | Insured rate and share of $75k+ households, ranked within the state |
+| Ability to pay | 20% | Insured rate (70%) and household income (30%), ranked within the state. Income is median household income, the share of households at $100k+ and low poverty when the Census detail is loaded, else the share at $75k+ |
 | Federal shortage | 10% | HRSA shortage-area (HPSA) score for the matching discipline, using the ZIP's own county when it can be matched |
 | Room from competitors | 10% | Distance to the nearest same-specialty listing |
 
@@ -441,7 +441,7 @@ netlify dev
 Schema changes live in `supabase/migrations/` but aren't applied
 automatically. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`022_market_benchmarks_state_density.sql`.
+`023_census_acs_zcta.sql`.
 
 ## Environment variables
 
@@ -455,6 +455,7 @@ hand, in the Supabase SQL editor. The latest is
 | `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, and `report-generate`, which now only renders audits) |
 | `PATIENT_SIGNUP_ENABLED` | opens patient registration. **Closed unless set to exactly `true`**, since patient PHI storage isn't live until a Supabase BAA is in place. Existing patients can still sign in |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
+| `CENSUS_API_KEY` | `import-census-acs.yml` only; optional free Census API key stored as a GitHub secret. The import works without it at its low volume |
 | `HUD_API_TOKEN` | `zip-county-crosswalk-import.yml` only; a free HUD USER token stored as a GitHub secret, not a Netlify variable |
 
 The MapTiler key is public by design and restricted to the site's domain
@@ -472,6 +473,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `medicare-enrollment-import.yml` | monthly, the 18th | CMS Medicare Monthly Enrollment, newest month only, overwriting the table rather than accumulating history |
 | `medicare-advantage-payers-import.yml` | monthly, the 22nd | CMS MA enrollment by state joined to the MA Contract Directory, so plans show the brand name patients recognize rather than the legal entity |
 | `zip-county-crosswalk-import.yml` | quarterly, the 25th of Jan/Apr/Jul/Oct | HUD USPS ZIP Code Crosswalk API: which county each ZIP falls in, weighted by residential addresses |
+| `import-census-acs.yml` | yearly, January 15 (the ACS 5-year release lands each December) | ACS 5-year detail by ZIP into `census_acs_zcta`: household income in 16 bands, median income, poverty, age by sex, race and ethnicity, education |
 | `market-benchmarks.yml` | quarterly, the 27th of Jan/Apr/Jul/Oct | builds the market model's benchmarks from CDC PLACES and the provider tables: national health-measure percentiles, national listings per specialty, and each state's listings per 1,000 residents |
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched |
@@ -488,6 +490,7 @@ node scripts/test-accuracy-signals.mjs    # the directory-accuracy scoring engin
 node scripts/test-query-plan.mjs          # the query-plan allowlist behind the assistant's database tool
 node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings
 node scripts/test-market-model.mjs        # the market opportunity model
+node scripts/test-acs.mjs                 # the Census detail import, and the richer income ranking
 node scripts/test-scenario.mjs            # the what-if re-score changes supply only
 node scripts/test-answer-check.mjs        # assistant figures must trace to tool results
 node scripts/test-density-benchmark.mjs   # the state comparison is like for like, and honest when unavailable
@@ -543,6 +546,23 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 Newest first. Every change pushed to `main` gets an entry here.
+
+### 2026-10-01
+- **Detailed Census data by ZIP.** The Demographics tab has a new "Census
+  detail" block: household income in eight bands up to $200k+ (the Census
+  stores sixteen), median household income, poverty rate, the share of
+  households at $100k and $200k and over, age by sex in 18 five-year bands,
+  race and ethnicity, and education. For a selected ZIP it is exact; for an
+  area it sums the ZIPs in view. The Census does not publish ZIP-level
+  household income above $200,000, so there is no $200-500k split, and it
+  does not publish insurance by income beyond $100k+, so the existing
+  insurance-by-income chart is unchanged. To switch it on, apply migration
+  023, then run "Import Census ACS detail" once.
+- **Ability to pay uses the richer income.** Where the new data is loaded,
+  the income half of that factor is median household income, the share of
+  households at $100k and over, and low poverty, each ranked within the
+  state. Scores for those ZIPs can move. Without the data it falls back to the
+  share at $75k and over, as before, and the evidence line says which was used.
 
 ### 2026-09-30
 - **Tidied the "Opportunity by specialty group" card on Insights.** It used to

@@ -518,7 +518,7 @@ Base tables were created in the dashboard; everything since is in
 `supabase/migrations/`, applied **by hand in the SQL editor**. There is no
 migration runner, so a file in that folder is not necessarily applied.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. **`023` (`census_acs_zcta`) is written but not applied.**
 `016` (clinics NPI uniqueness) is not confirmed applied. Held back: `002`
 (patient documents) pending a Supabase BAA, so briefings are profile-only.
 Migrations use `drop policy if exists` before `create policy` so a re-run is
@@ -571,6 +571,16 @@ Tables:
 - `zip_county_crosswalk`: HUD ZIP-to-county with residential-address ratio
   (020). ZIP 38017 is 91% Shelby / 9% Fayette by address count vs a misleading
   43%/57% by the Census land-area file; that is why HUD was chosen.
+- `census_acs_zcta`: ACS 5-year detail by ZCTA (023), built by
+  `scripts/import-census-acs.mjs`: `income_bands` (16 household income bands,
+  Under $10k to $200k+; the Census top-codes ZIP income at $200,000 or more, so
+  no finer split exists), `median_hh_income`, poverty, `age_male`/`age_female`
+  (18 five-year bands), `race`, `education`. `state` is copied from
+  `demographics_raw` so `market-score` can rank within a state. Suppressed
+  Census values are `null`, never 0. Public read, service-role write. It sits
+  beside `demographics_raw`, which is untouched (its income stops at "$100,000
+  and over", and its insurance-by-income cut cannot be made finer: ACS does not
+  publish it).
 - `market_benchmarks`: benchmarks for the market model (021), keyed
   `(kind, key)`: `measure`, `specialty`, and `state_density` (the last needs 022's widened check constraint; first written 2026-09-30, 114 rows). Public read,
   service-role write.
@@ -776,7 +786,7 @@ within 25 miles (by centroid). For each of the 33 specialties:
 |---|---|---|
 | need | .30 | PLACES measures per specialty (`PROFILES`) as national percentiles, plus age-mix percentiles within the state |
 | access | .30 | `100 - per1k / nationalRate * 50`; **zero clinicians = 100** |
-| pay | .20 | insured-rate and $75k+ household percentiles within the state (70/30) |
+| pay | .20 | insured rate (70%) and income (30%) percentiles within the state. Income is ACS median household income (50%), share of households at $100k+ (25%) and low poverty (25%) when `census_acs_zcta` has this ZIP and at least 30 in its state; else the `demographics_raw` share at $75k+. `evidence.pay.income_basis` says which (`acs` or `census75`) |
 | shortage | .10 | HPSA score / 25 for the matching discipline (behavioral → mental, dental → dental, else primary) |
 | competition | .10 | nearest same-specialty listing: ≤1 mi → 30, ≥10 mi → 90, none → 95 |
 
@@ -836,6 +846,11 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
 - **ZIP-county crosswalk** (`import-zip-county-crosswalk.mjs`, quarterly 25th):
   HUD API, 51 state-level calls; `year`/`quarter` are siblings of `results[]`,
   not per-row fields. Needs `HUD_API_TOKEN`.
+- **Census ACS detail** (`import-census-acs.mjs`, yearly Jan 15): the newest
+  ACS 5-year by ZCTA into `census_acs_zcta`. The script resolves the year at
+  run time, checks every variable's Census label against `EXPECTED_LABELS`
+  (`scripts/lib/acs.mjs`) and refuses to write if one moved, requires 30,000
+  ZCTAs and bands that add up on 99% of rows. `CENSUS_API_KEY` is optional.
 - **Market benchmarks** (`build-market-benchmarks.mjs`, quarterly 27th):
   measure percentiles, per-specialty national rates, and per-state density
   (`state_density`). Run it by hand after changing what it computes.
@@ -946,6 +961,7 @@ node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) 
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
+node scripts/test-acs.mjs                 # 28: the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 14: the what-if re-score changes supply only
 node scripts/test-market-assistant.mjs    # 58: the assistant, figure repair, tracing (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced

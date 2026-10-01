@@ -21,8 +21,10 @@
      access      Clinicians of this specialty per 1,000 adults in the
                  catchment vs the national rate. 50 = national rate,
                  100 = none, 0 = twice the national rate.
-     pay         Insured rate and share of households at $75k+, as
-                 percentiles among ZIPs in the same state.
+     pay         Insured rate (70%) and household income (30%), as percentiles
+                 among ZIPs in the same state. Income is, when ACS detail is
+                 loaded, median household income (50%), share of households at
+                 $100k+ (25%) and low poverty (25%); otherwise the share at $75k+.
      shortage    Federal HPSA score for the matching discipline in the ZIP's
                  own county (via the HUD crosswalk), else the state median,
                  flagged.
@@ -220,7 +222,8 @@
       var pay = input.pay || {};
       if (pay.insuredPct != null) {
         f.pay = clamp(pay.incomePct != null ? pay.insuredPct * 0.7 + pay.incomePct * 0.3 : pay.insuredPct);
-        ev.pay = { insured_pct: Math.round(pay.insuredPct), income_pct: pay.incomePct == null ? null : Math.round(pay.incomePct) };
+        ev.pay = { insured_pct: Math.round(pay.insuredPct), income_pct: pay.incomePct == null ? null : Math.round(pay.incomePct),
+          income_basis: pay.incomePct == null ? null : (pay.incomeBasis || 'census75'), income_detail: pay.incomeDetail || null };
       }
 
       /* ---- shortage ---- */
@@ -319,7 +322,8 @@
         ? e.per_1k + ' ' + label.toLowerCase() + ' clinicians per 1,000 adults vs ' + e.national_per_1k + ' nationally.'
         : (hi ? 'Thinner' : lo ? 'Denser' : 'Typical') + ' supply than the national rate for this specialty group (' + e.clinicians + ' listings).';
     }
-    if (k === 'pay') return 'Payer mix ranks at the ' + ord(v) + ' percentile of ZIPs in the state (insured rate ' + ord(e.insured_pct) + (e.income_pct != null ? ', $75k+ households ' + ord(e.income_pct) : '') + ').';
+    if (k === 'pay') return 'Payer mix ranks at the ' + ord(v) + ' percentile of ZIPs in the state (insured rate ' + ord(e.insured_pct) +
+      (e.income_pct != null ? (e.income_basis === 'acs' ? ', household income ' : ', $75k+ households ') + ord(e.income_pct) : '') + ').';
     if (k === 'shortage') return e.hpsa > 0
       ? 'Federal ' + e.discipline + '-care shortage score ' + e.hpsa + ' of ~25 ' + (e.basis === 'county' ? 'in this county' : 'statewide median') + '.'
       : 'No federal ' + e.discipline + '-care shortage designation ' + (e.basis === 'county' ? 'in this county' : 'found') + '.';
