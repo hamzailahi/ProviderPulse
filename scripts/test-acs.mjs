@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-import { VARIABLES, EXPECTED_LABELS, INCOME_LABELS, AGE_LABELS, toRow, rowProblems, num } from './lib/acs.mjs';
+import { VARIABLES, EXPECTED_LABELS, INCOME_LABELS, AGE_LABELS, toRow, rowProblems, num, pickInsuranceVars, insuranceVarIds } from './lib/acs.mjs';
 
 let pass = 0, fail = 0;
 const check = (l, c, d) => { if (c) { pass++; console.log(`  PASS  ${l}`); } else { fail++; console.log(`  FAIL  ${l}${d ? '\n        ' + d : ''}`); } };
@@ -52,6 +52,24 @@ check('a suppressed age cell makes its band unknown, not smaller', sr.age_male[4
 check('an unknown band is not reported as a mismatch', rowProblems(sr).length === 0);
 check('ZIPs are zero-padded', toRow('501', fakeRecord('501'), 2024, null).zip === '00501');
 
+console.log('\n3b. Insurance coverage');
+const L = {
+  B27001_001E: 'Estimate!!Total:', B27001_005E: 'Estimate!!Total:!!Male:!!Under 6 years:!!No health insurance coverage', B27001_008E: 'Estimate!!Total:!!Male:!!6 to 18 years:!!No health insurance coverage',
+  B27001_004E: 'Estimate!!Total:!!Male:!!Under 6 years:!!With health insurance coverage', B27001_005M: 'Margin of Error!!Total:!!Male:!!Under 6 years:!!No health insurance coverage',
+  B27006_004E: 'Estimate!!Total:!!Male:!!Under 19 years:!!With Medicare coverage', B27006_005E: 'Estimate!!Total:!!Male:!!Under 19 years:!!No Medicare coverage', B27006_007E: 'Estimate!!Total:!!Male:!!19 to 64 years:!!With Medicare coverage',
+  B27007_004E: 'Estimate!!Total:!!Male:!!Under 19 years:!!With Medicaid/means-tested public coverage', B27007_005E: 'Estimate!!Total:!!Male:!!Under 19 years:!!No Medicaid/means-tested public coverage'
+};
+const picks = pickInsuranceVars(L);
+check('cells are found by label, "with" not "no", estimates not margins', picks && picks.uninsured.join() === 'B27001_005E,B27001_008E' && picks.medicare.join() === 'B27006_004E,B27006_007E' && picks.medicaid.join() === 'B27007_004E', JSON.stringify(picks));
+check('a table with no matching cells is "unavailable", not a guess', pickInsuranceVars({ B27001_005E: 'Estimate!!x!!No health insurance coverage' }) === null);
+check('the variables to request include the universe', insuranceVarIds(picks).includes('B27001_001E') && insuranceVarIds(picks).length === 6 && insuranceVarIds(null).length === 0);
+const irec = Object.assign(fakeRecord('x'), { B27001_001E: 1000, B27001_005E: 30, B27001_008E: 20, B27006_004E: 100, B27006_007E: 150, B27007_004E: 200 });
+const irow = toRow('38017', irec, 2024, 'TN', picks);
+check('counts are summed across the sex and age cells', irow.ins_universe === 1000 && irow.ins_uninsured === 50 && irow.ins_medicare === 250 && irow.ins_medicaid === 200, JSON.stringify([irow.ins_universe, irow.ins_uninsured, irow.ins_medicare, irow.ins_medicaid]));
+check('without picks the columns are null, never 0', toRow('38017', irec, 2024, 'TN', null).ins_uninsured === null);
+check('a suppressed cell makes the total unknown', toRow('38017', Object.assign({}, irec, { B27001_008E: '-666666666' }), 2024, 'TN', picks).ins_uninsured === null);
+check('a count above its universe means wrong cells: all null', toRow('38017', Object.assign({}, irec, { B27006_004E: 5000 }), 2024, 'TN', picks).ins_medicare === null);
+
 console.log('\n4. The importer, against a fake Census and Supabase');
 const dir = mkdtempSync(join(tmpdir(), 'acs-'));
 const out = join(dir, 'written.json');
@@ -62,7 +80,7 @@ import { writeFileSync } from 'node:fs';
 const labels = ${JSON.stringify(EXPECTED_LABELS)};
 const vars = ${JSON.stringify(VARIABLES)};
 const zips = ${JSON.stringify(fakeZips)};
-const rec = ${JSON.stringify(fakeRecord('x'))};
+const rec = Object.assign(${JSON.stringify(fakeRecord('x'))}, { B27001_001E: 1000, B27001_005E: 30, B27006_004E: 100, B27007_004E: 200 });
 const J = (b, ok = true, status = 200) => ({ ok, status, json: async () => b, text: async () => JSON.stringify(b) });
 globalThis.fetch = async (url, init) => {
   const u = String(url);
@@ -70,6 +88,9 @@ globalThis.fetch = async (url, init) => {
     const g = u.match(/groups\\/(\\w+)\\.json/)[1];
     const v = {};
     Object.entries(labels).filter(([k]) => k.startsWith(g)).forEach(([k, f]) => { v[k] = { label: process.env.BAD_LABEL === k ? 'Estimate!!Total:!!Something else' : 'Estimate!!Total:!!' + f }; });
+    if (g === 'B27001') Object.assign(v, { B27001_001E: { label: 'Estimate!!Total:' }, B27001_005E: { label: 'Estimate!!Total:!!Male:!!Under 6 years:!!No health insurance coverage' } });
+    if (g === 'B27006') v.B27006_004E = { label: 'Estimate!!Total:!!Male:!!Under 19 years:!!With Medicare coverage' };
+    if (g === 'B27007') v.B27007_004E = { label: process.env.NO_INS ? 'Something else' : 'Estimate!!Total:!!Male:!!Under 19 years:!!With Medicaid/means-tested public coverage' };
     return J({ variables: v });
   }
   if (u.includes('api.census.gov') && u.includes('?get=')) {
@@ -88,9 +109,12 @@ const runImporter = (extraEnv = {}, args = []) => spawnSync(process.execPath, ['
 let p = runImporter();
 const written = (() => { try { return JSON.parse(readFileSync(out, 'utf8')); } catch (e) { return null; } })();
 check('a clean run succeeds and writes', p.status === 0 && /written/.test(p.stdout) && Array.isArray(written), p.stdout + p.stderr);
+check('insurance counts are written', written && written[0].ins_universe === 1000 && written[0].ins_uninsured === 30 && written[0].ins_medicare === 100 && written[0].ins_medicaid === 200, JSON.stringify(written && written[0].ins_uninsured));
 check('every ZCTA is written once', written && written.length === 3 && new Set(written.map(r => r.zip)).size === 3);
 check('state comes from demographics_raw, upper-cased; unmatched ZIPs have none', written && written.find(r => r.zip === '38138').state === 'TN' && written.find(r => r.zip === '00501').state === null);
 check('the Census label check ran', /variable labels verified/.test(p.stdout));
+p = runImporter({ NO_INS: '1' });
+check('if the insurance labels are not found, the rest still imports and says so', p.status === 0 && /insurance: no cells matched/.test(p.stdout), p.stdout + p.stderr);
 p = runImporter({ BAD_KEY: '1', CENSUS_API_KEY: 'nope' });
 check('an invalid Census key (HTML reply) is reported and retried without the key', p.status === 0 && /Invalid Key/.test(p.stdout) && /retrying without it/.test(p.stdout), p.stdout + p.stderr);
 p = runImporter({ BAD_LABEL: 'B19001_017E' });

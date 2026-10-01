@@ -2581,6 +2581,20 @@
             const fmtPct = v => v == null ? '--' : v.toFixed(1) + '%';
             const high100 = income.slice(12).reduce((a, b) => a + b, 0), high200 = income[15];
             const bachPlus = N(edu.bachelor) + N(edu.graduate);
+            // Insurance coverage (ACS B27001/B27006/B27007). Counts only when every
+            // row in view has them; null means the import could not find them.
+            const hasIns = rows.every(r => r.ins_universe != null && r.ins_uninsured != null);
+            const insU = hasIns ? rows.reduce((a, r) => a + N(r.ins_universe), 0) : 0;
+            const insNo = hasIns ? rows.reduce((a, r) => a + N(r.ins_uninsured), 0) : 0;
+            const hasMc = rows.every(r => r.ins_medicare != null), hasMd = rows.every(r => r.ins_medicaid != null);
+            const insMc = hasMc ? rows.reduce((a, r) => a + N(r.ins_medicare), 0) : null;
+            const insMd = hasMd ? rows.reduce((a, r) => a + N(r.ins_medicaid), 0) : null;
+            // The top boxes use the Census's own uninsured count when it covers the whole view.
+            if (hasIns && insU > 0 && rows.length === asked) {
+                const k = v => v >= 10000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v).toLocaleString();
+                document.getElementById('kpi-uninsured').textContent = k(insNo);
+                document.getElementById('kpi-rate').textContent = ((1 - insNo / insU) * 100).toFixed(1) + '%';
+            }
 
             document.getElementById('acs-title').textContent = 'Census detail' + (single ? ' · ZIP ' + rows[0].zip : ' · ' + rows.length + ' ZIPs') +
                 ' (ACS ' + (rows[0].acs_year || '') + ' 5-year)';
@@ -2591,6 +2605,9 @@
              ['Households $100k+', fmtPct(pct(high100, hh))],
              ['Households $200k+', fmtPct(pct(high200, hh))],
              ["Bachelor's or higher", fmtPct(pct(bachPlus, N(edu.universe)))],
+             ...(hasIns ? [['Uninsured', Math.round(insNo).toLocaleString() + ' · ' + fmtPct(pct(insNo, insU))]] : []),
+             ...(insMc != null && insU ? [['On Medicare', Math.round(insMc).toLocaleString() + ' · ' + fmtPct(pct(insMc, insU))]] : []),
+             ...(insMd != null && insU ? [['On Medicaid', Math.round(insMd).toLocaleString() + ' · ' + fmtPct(pct(insMd, insU))]] : []),
              ['Median age band', (() => { const t = male.map((v, i) => v + female[i]), tot = t.reduce((a, b) => a + b, 0); let c = 0; for (let i = 0; i < t.length; i++) { c += t[i]; if (c >= tot / 2) return tot ? ACS_AGE[i] : '--'; } return '--'; })()]]
                 .forEach(([label, val]) => {
                     const b = document.createElement('div'); b.className = 'kpi-box';
@@ -2601,6 +2618,7 @@
             document.getElementById('acs-note').textContent =
                 'American Community Survey 5-year estimates. The Census does not publish ZIP-level household income above $200,000.' +
                 (asked > rows.length ? ' ' + (asked - rows.length) + ' of ' + asked + ' ZIPs in view have no ACS row yet and are left out.' : '') +
+                (hasIns ? ' Insurance counts cover the civilian non-institutionalized population. Medicare and Medicaid overlap (people with both are in each), so do not add them. The Uninsured and Insured Rate boxes above use these Census counts.' : '') +
                 (single ? '' : ' Area medians are household-weighted averages of ZIP medians, not true medians.');
 
             card.hidden = false;

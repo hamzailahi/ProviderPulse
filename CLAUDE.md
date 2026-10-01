@@ -518,7 +518,7 @@ Base tables were created in the dashboard; everything since is in
 `supabase/migrations/`, applied **by hand in the SQL editor**. There is no
 migration runner, so a file in that folder is not necessarily applied.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. **`023` (`census_acs_zcta`) is written but not applied.**
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). **`024` (insurance columns on it) is written but not applied.**
 `016` (clinics NPI uniqueness) is not confirmed applied. Held back: `002`
 (patient documents) pending a Supabase BAA, so briefings are profile-only.
 Migrations use `drop policy if exists` before `create policy` so a re-run is
@@ -580,7 +580,11 @@ Tables:
   Census values are `null`, never 0. Public read, service-role write. It sits
   beside `demographics_raw`, which is untouched (its income stops at "$100,000
   and over", and its insurance-by-income cut cannot be made finer: ACS does not
-  publish it).
+  publish it). Migration 024 adds `ins_universe`, `ins_uninsured`, `ins_medicare`,
+  `ins_medicaid` (ACS B27001, B27006, B27007: civilian noninstitutionalized
+  population; Medicare and Medicaid overlap, never add them). The import finds
+  those cells by Census label at run time (`pickInsuranceVars`) and leaves the
+  columns null, with a log line, if the labels are not found.
 - `market_benchmarks`: benchmarks for the market model (021), keyed
   `(kind, key)`: `measure`, `specialty`, and `state_density` (the last needs 022's widened check constraint; first written 2026-09-30, 114 rows). Public read,
   service-role write.

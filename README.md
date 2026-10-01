@@ -441,7 +441,7 @@ netlify dev
 Schema changes live in `supabase/migrations/` but aren't applied
 automatically. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`023_census_acs_zcta.sql`.
+`024_census_acs_insurance.sql`.
 
 ## Environment variables
 
@@ -548,6 +548,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-01
+- **Insurance from the Census, including Medicare and Medicaid.** The Census
+  detail block now shows how many people are uninsured, on Medicare and on
+  Medicaid, each with its share, from the American Community Survey. The
+  Uninsured and Insured Rate boxes at the top use the Census's own uninsured
+  count when it covers everything in view, instead of subtracting the older
+  insured figure from total population. Medicare and Medicaid overlap (people
+  with both appear in each), so the two must not be added. To switch it on,
+  apply migration 024, then run "Import Census ACS detail" again.
 - **Demographics tab trimmed.** The two older charts that the Census detail
   now covers better (age distribution and household income, both capped at
   coarse bands) are gone. The insurance-rate charts by age, income and race

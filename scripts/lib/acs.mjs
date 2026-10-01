@@ -51,7 +51,7 @@ export function num(v) {
 const sum = arr => (arr.some(x => x === null) ? null : arr.reduce((s, x) => s + x, 0));
 
 // `r` maps variable id -> raw value (string or number) for one ZCTA.
-export function toRow(zip, r, year, state) {
+export function toRow(zip, r, year, state, picks) {
   const n = k => num(r[k]);
   const income = Array.from({ length: 16 }, (_, i) => n(`B19001_${pad(i + 2)}E`));
   const male = AGE_GROUPS.map(g => sum(g.map(i => n(`B01001_${pad(i)}E`))));
@@ -78,6 +78,7 @@ export function toRow(zip, r, year, state) {
       universe: edu(1), less_than_hs: eduSum(2, 16), high_school: sum([edu(17), edu(18)]), some_college: sum([edu(19), edu(20)]),
       associate: edu(21), bachelor: edu(22), graduate: sum([edu(23), edu(24), edu(25)])
     },
+    ...insuranceFields(r, picks),
     refreshed_at: new Date().toISOString()
   };
 }
@@ -92,4 +93,44 @@ export function rowProblems(row) {
   const age = total(row.age_male.concat(row.age_female));
   if (age !== null && row.pop_total !== null && age !== row.pop_total) out.push(`age bands ${age} != population ${row.pop_total}`);
   return out;
+}
+
+// ---- Health insurance coverage -------------------------------------------------
+// B27001 (health insurance by sex and age) gives the uninsured; B27006 and B27007
+// give people with Medicare and with Medicaid/means-tested public coverage. Each
+// table is split by sex and age, so the totals are sums of the matching cells. The
+// cell numbers are found from the Census's own labels at run time (pickInsuranceVars)
+// rather than hard-coded, because they could not be checked against the live
+// metadata when this was written. Universe: the civilian noninstitutionalized
+// population. Medicare and Medicaid overlap (dual eligibles), so they must never be
+// added together.
+export const INSURANCE_GROUPS = ['B27001', 'B27006', 'B27007'];
+const INS_RULES = {
+  uninsured: { group: 'B27001', match: /!!No health insurance coverage$/ },
+  medicare: { group: 'B27006', match: /!!With Medicare coverage$/ },
+  medicaid: { group: 'B27007', match: /!!With Medicaid\/means-tested public coverage$/ }
+};
+export const INSURANCE_UNIVERSE = 'B27001_001E';
+
+// labels: { variableId: 'Estimate!!Total:!!Male:!!Under 6 years:!!With Medicare coverage', ... }
+// Returns { uninsured: [ids], medicare: [ids], medicaid: [ids] } or null if any is empty.
+export function pickInsuranceVars(labels) {
+  const out = {};
+  for (const [k, rule] of Object.entries(INS_RULES)) {
+    out[k] = Object.keys(labels).filter(id => id.startsWith(rule.group + '_') && id.endsWith('E') && rule.match.test(labels[id])).sort();
+    if (!out[k].length) return null;
+  }
+  return out;
+}
+export function insuranceVarIds(picks) {
+  return picks ? [INSURANCE_UNIVERSE].concat(picks.uninsured, picks.medicare, picks.medicaid) : [];
+}
+function insuranceFields(r, picks) {
+  const none = { ins_universe: null, ins_uninsured: null, ins_medicare: null, ins_medicaid: null };
+  if (!picks) return none;
+  const total = ids => sum(ids.map(k => num(r[k])));
+  const f = { ins_universe: num(r[INSURANCE_UNIVERSE]), ins_uninsured: total(picks.uninsured), ins_medicare: total(picks.medicare), ins_medicaid: total(picks.medicaid) };
+  // A count above the people it is a count of means the wrong cells were picked.
+  if (f.ins_universe !== null && [f.ins_uninsured, f.ins_medicare, f.ins_medicaid].some(v => v !== null && v > f.ins_universe)) return none;
+  return f;
 }

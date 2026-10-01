@@ -18,7 +18,7 @@
 // (otherwise the newest year the Census serves).
 // Run: node scripts/import-census-acs.mjs [--dry-run]
 
-import { VARIABLES, EXPECTED_LABELS, toRow, rowProblems } from './lib/acs.mjs';
+import { VARIABLES, EXPECTED_LABELS, toRow, rowProblems, INSURANCE_GROUPS, pickInsuranceVars, insuranceVarIds } from './lib/acs.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CENSUS_API_KEY, ACS_YEAR } = process.env;
@@ -62,11 +62,29 @@ async function checkLabels(year) {
   console.log(`  ${Object.keys(EXPECTED_LABELS).length} variable labels verified`);
 }
 
-async function fetchAll(year) {
+// Insurance cells are discovered from the Census labels. Best effort: if the
+// tables or labels are not what we expect, the rest of the import still runs and
+// the insurance columns are left null (unknown), with the reason in the log.
+async function insurancePicks(year) {
+  try {
+    const labels = {};
+    for (const g of INSURANCE_GROUPS) {
+      const d = await getJson(`https://api.census.gov/data/${year}/acs/acs5/groups/${g}.json`, `${g} metadata`);
+      Object.entries(d.variables || {}).forEach(([k, v]) => { labels[k] = String(v.label || ''); });
+    }
+    const picks = pickInsuranceVars(labels);
+    if (!picks) { console.log('  insurance: no cells matched the expected labels; insurance columns will be empty'); return null; }
+    console.log(`  insurance cells: ${picks.uninsured.length} uninsured, ${picks.medicare.length} Medicare, ${picks.medicaid.length} Medicaid (e.g. ${labels[picks.medicare[0]]})`);
+    return picks;
+  } catch (e) { console.log('  insurance: skipped (' + e.message.slice(0, 160) + ')'); return null; }
+}
+
+async function fetchAll(year, extraVars) {
   const byZip = new Map();
   const CHUNK = 45;                                              // the API allows 50 per call
-  for (let i = 0; i < VARIABLES.length; i += CHUNK) {
-    const vars = VARIABLES.slice(i, i + CHUNK);
+  const ALL = VARIABLES.concat(extraVars || []);
+  for (let i = 0; i < ALL.length; i += CHUNK) {
+    const vars = ALL.slice(i, i + CHUNK);
     const call = () => getJson(`https://api.census.gov/data/${year}/acs/acs5?get=${vars.join(',')}&for=zip%20code%20tabulation%20area:*${keyParam}`, 'ACS data');
     let data;
     try { data = await call(); }
@@ -108,14 +126,15 @@ async function main() {
   const year = await pickYear();
   console.log(`ACS ${year} 5-year, by ZCTA`);
   await checkLabels(year);
-  const raw = await fetchAll(year);
+  const picks = await insurancePicks(year);
+  const raw = await fetchAll(year, insuranceVarIds(picks));
   if (raw.size < MIN_ZCTAS) throw new Error(`only ${raw.size} ZCTAs returned (floor ${MIN_ZCTAS}); refusing to write`);
 
   const states = dryRun && !SUPABASE_URL ? new Map() : await zipStates();
   const rows = [];
   let unsound = 0, noState = 0;
   for (const [zip, rec] of raw) {
-    const row = toRow(zip, rec, year, states.get(String(zip).padStart(5, '0')));
+    const row = toRow(zip, rec, year, states.get(String(zip).padStart(5, '0')), picks);
     if (!row.state) noState++;
     if (rowProblems(row).length) unsound++;
     rows.push(row);
@@ -123,7 +142,8 @@ async function main() {
   console.log(`${rows.length} rows; ${noState} without a state (no demographics_raw row); ${unsound} whose bands do not add up`);
   if (unsound > rows.length * 0.01) throw new Error(`${unsound} rows fail the band-total check; the Census layout may have changed`);
   const sample = rows.find(r => r.zip === '38017');
-  if (sample) console.log('38017:', JSON.stringify({ households: sample.households, median: sample.median_hh_income, income: sample.income_bands }));
+  if (sample) console.log('38017:', JSON.stringify({ households: sample.households, median: sample.median_hh_income, income: sample.income_bands,
+    insurance: { universe: sample.ins_universe, uninsured: sample.ins_uninsured, medicare: sample.ins_medicare, medicaid: sample.ins_medicaid } }));
 
   if (dryRun) { console.log('dry run, nothing written'); return; }
   for (let i = 0; i < rows.length; i += 500) {
