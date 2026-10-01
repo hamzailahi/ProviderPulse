@@ -455,7 +455,7 @@ hand, in the Supabase SQL editor. The latest is
 | `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, and `report-generate`, which now only renders audits) |
 | `PATIENT_SIGNUP_ENABLED` | opens patient registration. **Closed unless set to exactly `true`**, since patient PHI storage isn't live until a Supabase BAA is in place. Existing patients can still sign in |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
-| `CENSUS_API_KEY` | `import-census-acs.yml` only; optional free Census API key stored as a GitHub secret. The import works without it at its low volume |
+| `CENSUS_API_KEY` | `import-census-acs.yml` only; a free Census API key (https://api.census.gov/data/key_signup.html, activate it from the email) stored as a GitHub secret. Required: the Census answers data requests without one with "Missing Key" |
 | `HUD_API_TOKEN` | `zip-county-crosswalk-import.yml` only; a free HUD USER token stored as a GitHub secret, not a Netlify variable |
 
 The MapTiler key is public by design and restricted to the site's domain
@@ -548,6 +548,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-01
+- **The Census import needs a free API key.** The first runs failed because
+  the Census refuses data requests without one ("Missing Key"). The workflow
+  now checks for the `CENSUS_API_KEY` secret up front and says how to get one.
 - **The Census import now explains and survives a bad API key.** The Census
   answers an invalid or not-yet-activated key with a web page rather than data,
   which made the first import run crash with a confusing error. It now prints

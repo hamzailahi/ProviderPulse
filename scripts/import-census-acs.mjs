@@ -13,8 +13,8 @@
 // EXPECTED_LABELS; the ZCTA count must clear a floor; and income and age bands
 // must add up to their totals on at least 99% of rows.
 //
-// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY; optional CENSUS_API_KEY (the
-// API works without one at low volume; this makes ~3 data calls), ACS_YEAR
+// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CENSUS_API_KEY (the
+// Census data API requires one: free, https://api.census.gov/data/key_signup.html), ACS_YEAR
 // (otherwise the newest year the Census serves).
 // Run: node scripts/import-census-acs.mjs [--dry-run]
 
@@ -71,6 +71,9 @@ async function fetchAll(year) {
     let data;
     try { data = await call(); }
     catch (e) {
+      if (e.notJson && /missing key/i.test(e.message)) {
+        throw new Error('The Census API now requires a key for data requests. Get a free one at https://api.census.gov/data/key_signup.html, click the activation link it emails you, then add it as the GitHub Actions secret CENSUS_API_KEY and run this again.');
+      }
       if (!e.notJson || !keyParam) throw e;
       console.log(`  ${e.message}\n  CENSUS_API_KEY looks invalid or not yet activated; retrying without it`);
       keyParam = ''; data = await call();

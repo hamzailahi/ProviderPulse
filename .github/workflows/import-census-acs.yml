@@ -4,7 +4,7 @@ name: Import Census ACS detail
 # income, poverty, age by sex, race and ethnicity, education, by ZIP. The ACS
 # 5-year release lands each December, so this runs every January and whenever
 # triggered by hand (run it once right after applying migration 023).
-# CENSUS_API_KEY is optional; the job makes only a handful of calls.
+# CENSUS_API_KEY is required (free: https://api.census.gov/data/key_signup.html).
 on:
   schedule:
     - cron: '0 10 15 1 *'
@@ -33,6 +33,10 @@ jobs:
         run: |
           if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
             echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"
+            exit 1
+          fi
+          if [ -z "${{ secrets.CENSUS_API_KEY }}" ]; then
+            echo "::error::CENSUS_API_KEY repository secret is required. Free key: https://api.census.gov/data/key_signup.html (click the activation link in the email)"
             exit 1
           fi
 

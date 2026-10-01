@@ -850,7 +850,7 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   ACS 5-year by ZCTA into `census_acs_zcta`. The script resolves the year at
   run time, checks every variable's Census label against `EXPECTED_LABELS`
   (`scripts/lib/acs.mjs`) and refuses to write if one moved, requires 30,000
-  ZCTAs and bands that add up on 99% of rows. `CENSUS_API_KEY` is optional.
+  ZCTAs and bands that add up on 99% of rows. `CENSUS_API_KEY` is **required** (free; the data API answers "Missing Key" without it, while the metadata calls work without one).
 - **Market benchmarks** (`build-market-benchmarks.mjs`, quarterly 27th):
   measure percentiles, per-specialty national rates, and per-state density
   (`state_density`). Run it by hand after changing what it computes.
