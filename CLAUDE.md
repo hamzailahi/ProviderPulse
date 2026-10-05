@@ -581,8 +581,10 @@ Tables:
   beside `demographics_raw`, which is untouched (its income stops at "$100,000
   and over", and its insurance-by-income cut cannot be made finer: ACS does not
   publish it). Migration 024 adds `ins_universe`, `ins_uninsured`, `ins_medicare`,
-  `ins_medicaid` (ACS B27001, B27006, B27007: civilian noninstitutionalized
-  population; Medicare and Medicaid overlap, never add them). The import finds
+  `ins_medicaid` (ACS B27001, and the collapsed C27006 / C27007 since the 2024
+  5-year ZCTA release has no B27006 / B27007: civilian noninstitutionalized
+  population; first loaded 2026-10-05, 38017: 56,456 covered, 3,490 uninsured,
+  9,331 Medicare, 2,489 Medicaid; Medicare and Medicaid overlap, never add them). The import finds
   those cells by Census label at run time (`pickInsuranceVars`), trying the
   detailed B table then the collapsed C table for each figure (the 2024 5-year
   ZCTA release returned 404 for `B27006`), and leaves a figure null, with a log
