@@ -876,7 +876,10 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   patients per 1,000 **original-Medicare** enrollees from county aggregates of
   `census_acs_zcta` and `cdc_places`. Writes `market_benchmarks` kind
   `demand_model` (migration 025). Catalog lookup shared with the activity import
-  via `scripts/lib/cms-catalog.mjs`. Floor: 500k clinicians.
+  via `scripts/lib/cms-catalog.mjs`, which matches titles **without** the
+  trailing " : YYYY-MM-DD" release stamp data.cms.gov began appending by
+  2026-10 (it broke every `$`-anchored pattern). The workflow takes an optional
+  `puf_url` input to bypass the catalog. Floor: 500k clinicians.
 - **Census ACS detail** (`import-census-acs.mjs`, yearly Jan 15): the newest
   ACS 5-year by ZCTA into `census_acs_zcta`. The script resolves the year at
   run time, checks every variable's Census label against `EXPECTED_LABELS`
@@ -992,7 +995,7 @@ node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) 
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
-node scripts/test-demand-model.mjs        # 32: the learned demand model, trainer end to end, and scoring
+node scripts/test-demand-model.mjs        # 36: the learned demand model, trainer end to end, and scoring
 node scripts/test-acs.mjs                 # 41: the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 14: the what-if re-score changes supply only
 node scripts/test-market-assistant.mjs    # 58: the assistant, figure repair, tracing (needs npm ci in v2/)

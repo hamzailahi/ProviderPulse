@@ -62,19 +62,30 @@ function dateOf(s) {
 }
 
 /**
+ * A catalog title without a trailing release stamp. data.cms.gov began
+ * suffixing titles with " : YYYY-MM-DD" (seen 2026-10), which broke every
+ * pattern anchored with $. Patterns are matched against the bare title.
+ */
+export function baseTitle(t) {
+  return String(t || '').trim().replace(/\s*:\s*(19|20)\d{2}(-\d{2}(-\d{2})?)?\s*$/, '').trim();
+}
+
+/**
  * Find one dataset by title and return its newest CSV distribution.
  * Prints every candidate, so a failed match is diagnosable from the log alone
  * rather than requiring another round trip.
  */
 export async function resolve(titleRe, label) {
   const sets = await catalog();
-  const hits = sets.filter(d => titleRe.test(String(d.title || '').trim()));
+  const hits = sets.filter(d => titleRe.test(baseTitle(d.title)));
 
   if (!hits.length) {
-    // Widen to a substring of the pattern so the log can show near-misses.
-    const loose = titleRe.source.replace(/[\\^$.*+?()[\]{}|]/g, ' ').split(/\s+/).filter(w => w.length > 4)[0] || '';
+    // Near-misses: titles sharing the pattern's two most specific words, so the
+    // log names the dataset we meant rather than the first word that matched.
+    const words = titleRe.source.replace(/[\\^$.*+?()[\]{}|]/g, ' ').split(/\s+/).filter(w => w.length > 4)
+      .sort((x, y) => y.length - x.length).slice(0, 2).map(w => w.toLowerCase());
     const near = sets
-      .filter(d => loose && String(d.title || '').toLowerCase().includes(loose.toLowerCase()))
+      .filter(d => words.length && words.every(w => String(d.title || '').toLowerCase().includes(w.slice(0, -1))))
       .slice(0, 15)
       .map(d => `      - ${d.title}`);
     throw new Error(
@@ -97,6 +108,9 @@ export async function resolve(titleRe, label) {
         year: yearOf(d.title) || yearOf(d.url) || yearOf(ds.modified),
         // Full date where one exists, for weekly-republished datasets.
         date: dateOf(d.title) || dateOf(d.url) || null,
+        // The dataset's own release stamp (" : YYYY-MM-DD" in its title), a
+        // tiebreak when several releases of the same dataset match.
+        released: dateOf(ds.title) || null,
         ...d
       });
     }
@@ -115,6 +129,7 @@ export async function resolve(titleRe, label) {
   options.sort((a, b) =>
     (b.year || 0) - (a.year || 0) ||
     (b.date || 0) - (a.date || 0) ||
+    (b.released || 0) - (a.released || 0) ||
     String(b.modified).localeCompare(String(a.modified))
   );
   for (const o of options.slice(0, 8)) {

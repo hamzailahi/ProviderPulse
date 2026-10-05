@@ -14,6 +14,10 @@ on:
         description: 'Train and print the held-out scores without writing to Supabase'
         type: boolean
         default: false
+      puf_url:
+        description: 'Optional: direct CSV link to the CMS Physician & Other Practitioners by-Provider file (skips the catalog lookup)'
+        type: string
+        default: ''
 
 concurrency: train-demand-model
 
@@ -41,10 +45,10 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           IN_DRY_RUN: ${{ inputs.dry_run }}
+          IN_PUF_URL: ${{ inputs.puf_url }}
         run: |
           set -euo pipefail
-          if [ "${IN_DRY_RUN:-}" = "true" ]; then
-            node scripts/train-demand-model.mjs --dry-run
-          else
-            node scripts/train-demand-model.mjs
-          fi
+          ARGS=()
+          [ "${IN_DRY_RUN:-}" = "true" ] && ARGS+=(--dry-run) || true
+          [ -n "${IN_PUF_URL:-}" ] && ARGS+=(--puf-url "$IN_PUF_URL") || true
+          node scripts/train-demand-model.mjs "${ARGS[@]}"

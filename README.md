@@ -550,6 +550,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-05
+- **CMS file lookup fixed for both Medicare jobs.** The CMS data catalog now
+  adds a release date to the end of dataset titles, so the lookup for the
+  Medicare claims file found nothing and the first demand-model training run
+  stopped. Titles are now matched without that date, which also keeps the
+  monthly Medicare activity import working. "Train demand model" also accepts
+  a direct link to the file as a fallback.
 - **A learned demand model.** For each specialty, a model now learns how many
   Medicare patients its doctors actually see per 1,000 Medicare enrollees in a
   county, from real CMS claims, and what about the local population predicts

@@ -155,5 +155,26 @@ acsOn = true; models = [];
 card = await specOf('Heart / cardiology');
 check('with no trained models the score works as before', card && (!card.evidence.need || card.evidence.need.basis !== 'learned'));
 
+console.log('\n8. The CMS catalog lookup copes with dated titles');
+const CAT = { dataset: [
+  { title: 'Medicare Physician & Other Practitioners - by Provider and Service : 2026-05-01', modified: '2026-05-01', distribution: [{ title: '2024', downloadURL: 'https://x/svc.csv' }] },
+  { title: 'Medicare Physician & Other Practitioners - by Geography and Service : 2026-05-01', modified: '2026-05-01', distribution: [{ title: '2024', downloadURL: 'https://x/geo.csv' }] },
+  { title: 'Medicare Physician & Other Practitioners - by Provider : 2025-05-01', modified: '2025-05-01', distribution: [{ title: 'Medicare Physician & Other Practitioners - by Provider : 2023', downloadURL: 'https://x/p23.csv' }] },
+  { title: 'Medicare Physician & Other Practitioners - by Provider : 2026-05-01', modified: '2026-05-01', distribution: [{ title: 'Medicare Physician & Other Practitioners - by Provider : 2024', downloadURL: 'https://x/2026-05/p24.csv' }] },
+  { title: 'CMS Program Statistics - Medicare Advantage - Physician, Non-Physician Practitioner & Supplier : 2022-01-15', modified: '2022-01-15', distribution: [] }
+] };
+globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => CAT });
+const cat = await import('./lib/cms-catalog.mjs');
+check('a trailing release date is ignored when matching', cat.baseTitle('Order and Referring : 2026-07-31') === 'Order and Referring' && cat.baseTitle('X - by Provider') === 'X - by Provider');
+const quiet = console.log; console.log = () => {};
+let pick = null, err = null;
+try { pick = await cat.resolve(/medicare physician .* practitioners\s*[-–]\s*by provider$/i, 'PUF'); } catch (e) { err = e; }
+let miss = null;
+try { await cat.resolve(/medicare physician .* surgeons\s*[-–]\s*by provider$/i, 'PUF'); } catch (e) { miss = e; }
+console.log = quiet;
+check('the by-Provider file matches despite the dated title, and the newest data year wins', pick && pick.url === 'https://x/2026-05/p24.csv' && pick.year === 2024, err ? err.message : JSON.stringify(pick));
+check('"by Provider and Service" and "by Geography" are never picked', pick && !/svc|geo/.test(pick.url));
+check('a miss lists near titles by the specific words, not the first long word', miss && /Practitioners - by Provider/.test(miss.message), miss && miss.message);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
