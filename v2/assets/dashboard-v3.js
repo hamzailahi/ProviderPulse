@@ -445,6 +445,11 @@ function ordinal(v) {
 }
 function evidenceLine(k, e) {
   if (!e) return 'No data for this area';
+  if (k === 'need' && e.basis === 'learned') {
+    return 'Learned from Medicare use: about ' + e.per_1k + ' patients per 1,000 enrollees expected' +
+      ((e.drivers || []).length ? ' · ' + e.drivers.map(function (d) { return d.label + (d.direction === 'up' ? ' ↑' : ' ↓'); }).join(', ') : '') +
+      ' · held-out R² ' + e.r2_cv;
+  }
   if (k === 'need') {
     return (e.parts || []).slice().sort(function (a, b) { return b.percentile - a.percentile; }).slice(0, 3)
       .map(function (x) { return (x.inverted ? 'low ' : '') + (x.label || x.measure) + ' ' + ordinal(x.percentile); }).join(' · ');

@@ -184,7 +184,7 @@ Each specialty is scored 0 to 100 from five factors:
 
 | Factor | Weight | What it measures |
 |---|---|---|
-| Health need | 30% | How common the conditions this specialty treats are locally (CDC PLACES measures chosen per specialty, e.g. heart disease, blood pressure and stroke for cardiology), plus the age mix it serves, against national percentiles |
+| Health need | 30% | Where a trained demand model exists for the specialty: expected Medicare patients per 1,000 enrollees, learned from real claims (see below), as a percentile of US counties. Otherwise: how common the conditions this specialty treats are locally (CDC PLACES measures chosen per specialty, e.g. heart disease, blood pressure and stroke for cardiology), plus the age mix it serves, against national percentiles |
 | Access gap | 30% | Clinicians per 1,000 adults in the catchment vs the national rate for that specialty |
 | Ability to pay | 20% | Insured rate (70%) and household income (30%), ranked within the state. Income is median household income, the share of households at $100k+ and low poverty when the Census detail is loaded, else the share at $75k+ |
 | Federal shortage | 10% | HRSA shortage-area (HPSA) score for the matching discipline, using the ZIP's own county when it can be matched |
@@ -441,7 +441,7 @@ netlify dev
 Schema changes live in `supabase/migrations/` but aren't applied
 automatically. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`024_census_acs_insurance.sql`.
+`025_demand_model.sql`.
 
 ## Environment variables
 
@@ -473,6 +473,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `medicare-enrollment-import.yml` | monthly, the 18th | CMS Medicare Monthly Enrollment, newest month only, overwriting the table rather than accumulating history |
 | `medicare-advantage-payers-import.yml` | monthly, the 22nd | CMS MA enrollment by state joined to the MA Contract Directory, so plans show the brand name patients recognize rather than the legal entity |
 | `zip-county-crosswalk-import.yml` | quarterly, the 25th of Jan/Apr/Jul/Oct | HUD USPS ZIP Code Crosswalk API: which county each ZIP falls in, weighted by residential addresses |
+| `train-demand-model.yml` | quarterly, the 28th of Jan/Apr/Jul/Oct | trains the learned demand model from the CMS Medicare claims-by-provider file, the Census detail and CDC PLACES, and stores one model per specialty |
 | `import-census-acs.yml` | yearly, January 15 (the ACS 5-year release lands each December) | ACS 5-year detail by ZIP into `census_acs_zcta`: household income in 16 bands, median income, poverty, age by sex, race and ethnicity, education |
 | `market-benchmarks.yml` | quarterly, the 27th of Jan/Apr/Jul/Oct | builds the market model's benchmarks from CDC PLACES and the provider tables: national health-measure percentiles, national listings per specialty, and each state's listings per 1,000 residents |
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
@@ -490,6 +491,7 @@ node scripts/test-accuracy-signals.mjs    # the directory-accuracy scoring engin
 node scripts/test-query-plan.mjs          # the query-plan allowlist behind the assistant's database tool
 node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings
 node scripts/test-market-model.mjs        # the market opportunity model
+node scripts/test-demand-model.mjs        # the learned demand model, its trainer, and how scoring uses it
 node scripts/test-acs.mjs                 # the Census detail import, and the richer income ranking
 node scripts/test-scenario.mjs            # the what-if re-score changes supply only
 node scripts/test-answer-check.mjs        # assistant figures must trace to tool results
@@ -548,6 +550,17 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-05
+- **A learned demand model.** For each specialty, a model now learns how many
+  Medicare patients its doctors actually see per 1,000 Medicare enrollees in a
+  county, from real CMS claims, and what about the local population predicts
+  that: age, income, poverty, insurance, education and the CDC health measures
+  for that specialty. It is tested on whole states it never saw, and only
+  specialties that pass replace the hand-weighted "health need" factor. Where
+  it is used, Insights says "learned from Medicare use", shows the expected
+  patients per 1,000 enrollees and the three inputs that drove it, and notes
+  that it only sees traditional Medicare. Children's care, OB-GYN and dental
+  are never trained this way. To switch it on, apply migration 025, then run
+  "Train demand model" (use the dry run first to read each specialty's score).
 - **Census insurance import fixed.** The first run skipped Medicare and
   Medicaid because the Census does not publish the detailed Medicare table for
   ZIPs in the 2024 release. The import now falls back to the Census's collapsed

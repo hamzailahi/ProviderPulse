@@ -80,6 +80,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `taxonomy-groups.js` | six specialty groups and their colors; the dashboard map colors by it, `market-score.js` counts supply with it |
 | `health-demand.js` | CDC PLACES need model per group; browser + `require` |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
+| `demand-model.js` | the learned demand model (ridge regression per specialty, state-held-out validation, `addAcs`/`addPlaces` area builders shared by trainer and scorer); browser + `require` |
 
 Shared modules are **dual-exported**: `window.X` in the browser and
 `module.exports` under Node. Keep both when editing.
@@ -518,7 +519,7 @@ Base tables were created in the dashboard; everything since is in
 `supabase/migrations/`, applied **by hand in the SQL editor**. There is no
 migration runner, so a file in that folder is not necessarily applied.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns).
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). **`025` (allows `demand_model` in `market_benchmarks`) is written but not applied.**
 `016` (clinics NPI uniqueness) is not confirmed applied. Held back: `002`
 (patient documents) pending a Supabase BAA, so briefings are profile-only.
 Migrations use `drop policy if exists` before `create policy` so a re-run is
@@ -792,7 +793,7 @@ within 25 miles (by centroid). For each of the 33 specialties:
 
 | Factor | Weight | Input |
 |---|---|---|
-| need | .30 | PLACES measures per specialty (`PROFILES`) as national percentiles, plus age-mix percentiles within the state |
+| need | .30 | **learned** where a usable demand model exists (see below), else PLACES measures per specialty (`PROFILES`) as national percentiles, plus age-mix percentiles within the state |
 | access | .30 | `100 - per1k / nationalRate * 50`; **zero clinicians = 100** |
 | pay | .20 | insured rate (70%) and income (30%) percentiles within the state. Income is ACS median household income (50%), share of households at $100k+ (25%) and low poverty (25%) when `census_acs_zcta` has this ZIP and at least 30 in its state; else the `demographics_raw` share at $75k+. `evidence.pay.income_basis` says which (`acs` or `census75`) |
 | shortage | .10 | HPSA score / 25 for the matching discipline (behavioral → mental, dental → dental, else primary) |
@@ -827,7 +828,21 @@ in 20 NPI-prefix slices and tallying per distinct taxonomy. First full run
 running total; the per-taxonomy tallies were unaffected, and the total is now
 computed correctly with a 5M sanity floor.
 
-Tests: `scripts/test-market-model.mjs`.
+**Learned need (`assets/demand-model.js`).** Per specialty, ridge regression of
+log(1 + Medicare patients per 1,000 FFS enrollees) on standardized county
+inputs: share 65+, share under 18, log median income, poverty, uninsured,
+Medicaid, bachelor's-plus, and that specialty's `PROFILES` PLACES measures.
+**Supply is never an input** (access already measures it, and counties with no
+clinicians of a specialty are excluded from training, since zero patients there
+means no one local, not no need). Validation holds out whole states; a model is
+`usable` only with held-out R² >= 0.15 and >= 150 counties. Pediatrics, OB-GYN
+and dental are never trained (not Medicare business). In `market-score`, the
+catchment is built with the same `addAcs`/`addPlaces` helpers; any unknown input
+means no learned value, and the hand-weighted need stays (`evidence.need.basis`
+is `learned` only when the model applied). Learned need does not take the
+group-basis confidence penalty and adds a Medicare-FFS-only caveat.
+
+Tests: `scripts/test-market-model.mjs`, `scripts/test-demand-model.mjs`.
 
 ## Scheduled imports
 
@@ -854,6 +869,14 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
 - **ZIP-county crosswalk** (`import-zip-county-crosswalk.mjs`, quarterly 25th):
   HUD API, 51 state-level calls; `year`/`quarter` are siblings of `results[]`,
   not per-row fields. Needs `HUD_API_TOKEN`.
+- **Demand model** (`train-demand-model.mjs`, quarterly 28th): streams the CMS
+  by-Provider PUF (`Rndrng_NPI`, `Rndrng_Prvdr_Zip5`, `Tot_Benes`), takes each
+  clinician's specialty from `provider_individuals` by NPI (word-start match on
+  `mapTerms`), places ZIPs in their majority county (HUD crosswalk), and learns
+  patients per 1,000 **original-Medicare** enrollees from county aggregates of
+  `census_acs_zcta` and `cdc_places`. Writes `market_benchmarks` kind
+  `demand_model` (migration 025). Catalog lookup shared with the activity import
+  via `scripts/lib/cms-catalog.mjs`. Floor: 500k clinicians.
 - **Census ACS detail** (`import-census-acs.mjs`, yearly Jan 15): the newest
   ACS 5-year by ZCTA into `census_acs_zcta`. The script resolves the year at
   run time, checks every variable's Census label against `EXPECTED_LABELS`
@@ -969,7 +992,8 @@ node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) 
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
-node scripts/test-acs.mjs                 # 28: the ACS import and the richer income ranking
+node scripts/test-demand-model.mjs        # 32: the learned demand model, trainer end to end, and scoring
+node scripts/test-acs.mjs                 # 41: the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 14: the what-if re-score changes supply only
 node scripts/test-market-assistant.mjs    # 58: the assistant, figure repair, tracing (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced

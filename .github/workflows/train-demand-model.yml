@@ -1,0 +1,50 @@
+name: Train demand model
+
+# Fits the learned demand model (v2/assets/demand-model.js) from the CMS
+# Physician & Other Practitioners by-Provider file, the Census ACS and CDC PLACES
+# tables, and writes one market_benchmarks row per specialty (kind
+# 'demand_model', migration 025). Runs after the quarterly benchmark build and
+# whenever triggered by hand. Use the dry run first to read the held-out scores.
+on:
+  schedule:
+    - cron: '0 11 28 1,4,7,10 *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Train and print the held-out scores without writing to Supabase'
+        type: boolean
+        default: false
+
+concurrency: train-demand-model
+
+jobs:
+  build:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"
+            exit 1
+          fi
+
+      - name: Train
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "${IN_DRY_RUN:-}" = "true" ]; then
+            node scripts/train-demand-model.mjs --dry-run
+          else
+            node scripts/train-demand-model.mjs
+          fi

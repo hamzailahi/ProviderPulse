@@ -57,6 +57,7 @@ const HealthDemand = require('../../assets/health-demand.js');
 // The explainable per-specialty opportunity model (archetype, score,
 // confidence, reasons). See that file's header for the five factors.
 const MarketModel = require('../../assets/market-model.js');
+const DemandModel = require('../../assets/demand-model.js');
 const SPECIALTIES = require('../../assets/specialties.js');
 
 // Census columns the model reads for age mix and income (demographics_raw).
@@ -519,14 +520,19 @@ exports.handler = async (event) => {
         // query above already asks for both forms. Same problem across a list.
         const zipVariants = [...new Set(memberZips.flatMap(z => [z, String(parseInt(z, 10))]))];
 
-        const [clinicPage, individualPage, placesPage] = await Promise.all([
+        const [clinicPage, individualPage, placesPage, catchAcsPage] = await Promise.all([
           pagedGet(`clinics?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,latitude,longitude`,
             'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
           pagedGet(`provider_individuals?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,latitude,longitude`,
             'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
           pagedGet(`cdc_places?zip=in.(${memberZips.join(',')})` +
             `&measureid=in.(${[...new Set(HealthDemand.measureIds().concat(MarketModel.measureIds()))].join(',')})` +
-            `&select=zip,measureid,value,pop_18plus,data_year`, 'zip', { cap: 4000, ms: 7000 })
+            `&select=zip,measureid,value,pop_18plus,data_year`, 'zip', { cap: 4000, ms: 7000 }),
+          // Census detail for the learned demand model. Optional: a missing table
+          // or failed read means no learned value, and the hand-weighted need stays.
+          pagedGet(`census_acs_zcta?zip=in.(${memberZips.join(',')})` +
+            '&select=zip,pop_total,households,median_hh_income,poverty_universe,poverty_below,age_male,age_female,ins_universe,ins_uninsured,ins_medicaid,education',
+            'zip', { cap: 400, ms: 6000 }).catch(() => ({ rows: [] }))
         ]);
 
         // Supply: count listings per group across the catchment, organisations
@@ -711,11 +717,31 @@ exports.handler = async (event) => {
           // National benchmarks (scripts/build-market-benchmarks.mjs). Absent
           // until that job has run; the model then falls back and says so.
           const bmRows = await get('market_benchmarks?select=kind,key,data&limit=500', 4000);
-          const benchmarks = { measures: {}, specialties: {} };
+          const benchmarks = { measures: {}, specialties: {} }, demandModels = {};
           (Array.isArray(bmRows) ? bmRows : []).forEach(r => {
             if (r.kind === 'measure') benchmarks.measures[r.key] = r.data;
             if (r.kind === 'specialty') benchmarks.specialties[r.key] = r.data;
+            if (r.kind === 'demand_model') demandModels[r.key] = r.data;
           });
+
+          // Learned demand (assets/demand-model.js, trained by
+          // scripts/train-demand-model.mjs): the catchment is built from the same
+          // Census and PLACES inputs, the same way, as the counties it learned from.
+          const learnedNeed = {};
+          const catchAcs = (catchAcsPage && catchAcsPage.rows) || [];
+          if (catchAcs.length && Object.keys(demandModels).length) {
+            const area = {};
+            catchAcs.forEach(r => DemandModel.addAcs(area, r, 1));
+            area.places = places;
+            const nameOf = m => (MarketModel.MEASURE_NAME || {})[m] || m;
+            Object.keys(demandModels).forEach(label => {
+              const dm = demandModels[label];
+              if (!dm || !dm.usable || !Array.isArray(dm.features)) return;
+              const ms = dm.features.filter(n => n.indexOf('m_') === 0).map(n => n.slice(2));
+              const got = DemandModel.apply(dm, DemandModel.features(area, ms), nameOf);
+              if (got) learnedNeed[label] = got;
+            });
+          }
 
           const selfNpi = /^\d{10}$/.test(String((event.queryStringParameters || {}).npi || '')) ? String(event.queryStringParameters.npi) : '';
           const baseInput = {
@@ -727,7 +753,8 @@ exports.handler = async (event) => {
             milesBetween, center: { lat: oLat, lng: oLon }, adults: catchmentAdults,
             places, demo, pay, shortage, groupNeedPct, groupAccess,
             benchmarks: Object.keys(benchmarks.measures).length || Object.keys(benchmarks.specialties).length ? benchmarks : null,
-            catchmentTruncated: catchment.truncated, radiusMiles: CATCHMENT_MAX_MILES
+            catchmentTruncated: catchment.truncated, radiusMiles: CATCHMENT_MAX_MILES,
+            learnedNeed
           };
           const scored = MarketModel.score(baseInput);
           const want = String((event.queryStringParameters || {}).specialty || '');

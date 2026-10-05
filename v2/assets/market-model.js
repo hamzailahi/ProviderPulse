@@ -196,7 +196,15 @@
         parts.push({ demo: d[0], label: DEMO_LABEL[d[0]], percentile: Math.round(p) });
         basis = basis || 'demographic';
       });
-      if (wsum) { f.need = clamp(acc / wsum); ev.need = { basis: basis, parts: parts }; }
+      var learned = input.learnedNeed ? input.learnedNeed[label] : null;
+      if (learned && learned.percentile != null) {
+        // A trained model (assets/demand-model.js) that predicted held-out
+        // states well replaces the hand-weighted blend above for this specialty.
+        f.need = clamp(learned.percentile);
+        ev.need = { basis: 'learned', percentile: learned.percentile, per_1k: learned.per_1k, r2_cv: learned.r2_cv,
+          drivers: learned.drivers, parts: (learned.drivers || []).map(function (d) { return { label: d.label, direction: d.direction }; }) };
+        caveats.push('Need is learned from Medicare fee-for-service use (held-out R\u00b2 ' + learned.r2_cv + '), so it does not see Medicare Advantage, commercial or Medicaid patients.');
+      } else if (wsum) { f.need = clamp(acc / wsum); ev.need = { basis: basis, parts: parts }; }
       else caveats.push('No defensible health-need measure exists for this specialty; scored on supply and payers only.');
 
       /* ---- access ---- */
@@ -259,7 +267,7 @@
 
       /* ---- confidence ---- */
       var conf = tw;                                    // share of model weight backed by data
-      if (ev.need && ev.need.basis !== 'specialty') conf -= 0.15;
+      if (ev.need && ev.need.basis !== 'specialty' && ev.need.basis !== 'learned') conf -= 0.15;
       if (ev.access && ev.access.basis === 'group') conf -= 0.15;
       if (input.catchmentTruncated) { conf -= 0.1; caveats.push('This area has more listings than one request returns, so supply counts are a floor.'); }
       if (input.adults != null && input.adults < 5000) { conf -= 0.15; caveats.push('Fewer than 5,000 adults in the catchment: small numbers swing the result.'); }
@@ -311,6 +319,10 @@
 
   function explain(k, v, e, label) {
     var hi = v >= 60, lo = v < 40;
+    if (k === 'need' && e.basis === 'learned') {
+      var why = (e.drivers || []).slice(0, 2).map(function (d) { return d.label; }).join(' and ');
+      return (hi ? 'Higher' : lo ? 'Lower' : 'Average') + ' expected demand than most US counties (' + ord(v) + ' pct), learned from Medicare use' + (why ? ', driven by ' + why : '') + '.';
+    }
     if (k === 'need') {
       var top = (e.parts || []).slice().sort(function (a, b) { return b.percentile - a.percentile; })[0];
       var what = top ? (top.measure && top.measure.indexOf('group:') !== 0 ? MEASURE_NAME[top.measure] || top.measure : top.label || 'health measures') : 'health measures';
@@ -347,7 +359,7 @@
 
   var API = {
     VERSION: VERSION, WEIGHTS: WEIGHTS, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES,
-    score: score, classify: classify, pct: pct, rankIn: rankIn, measureIds: measureIds
+    score: score, classify: classify, pct: pct, rankIn: rankIn, measureIds: measureIds, MEASURE_NAME: MEASURE_NAME
   };
   if (global) global.MarketModel = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
