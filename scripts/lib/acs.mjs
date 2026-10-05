@@ -104,33 +104,48 @@ export function rowProblems(row) {
 // metadata when this was written. Universe: the civilian noninstitutionalized
 // population. Medicare and Medicaid overlap (dual eligibles), so they must never be
 // added together.
-export const INSURANCE_GROUPS = ['B27001', 'B27006', 'B27007'];
-const INS_RULES = {
-  uninsured: { group: 'B27001', match: /!!No health insurance coverage$/ },
-  medicare: { group: 'B27006', match: /!!With Medicare coverage$/ },
-  medicaid: { group: 'B27007', match: /!!With Medicaid\/means-tested public coverage$/ }
+// Each figure lives in a detailed "B" table, or only in a collapsed "C" table in
+// some releases (the 2024 5-year ZCTA release returned 404 for B27006). The
+// importer tries the names in order and uses the first that exists.
+export const INSURANCE_TABLES = {
+  uninsured: ['B27001', 'C27001'],
+  medicare: ['B27006', 'C27006'],
+  medicaid: ['B27007', 'C27007']
 };
-export const INSURANCE_UNIVERSE = 'B27001_001E';
+const INS_MATCH = {
+  uninsured: /!!No health insurance coverage$/,
+  medicare: /!!With Medicare coverage$/,
+  medicaid: /!!With Medicaid\/means-tested public coverage$/
+};
 
 // labels: { variableId: 'Estimate!!Total:!!Male:!!Under 6 years:!!With Medicare coverage', ... }
-// Returns { uninsured: [ids], medicare: [ids], medicaid: [ids] } or null if any is empty.
-export function pickInsuranceVars(labels) {
-  const out = {};
-  for (const [k, rule] of Object.entries(INS_RULES)) {
-    out[k] = Object.keys(labels).filter(id => id.startsWith(rule.group + '_') && id.endsWith('E') && rule.match.test(labels[id])).sort();
-    if (!out[k].length) return null;
+// found:  { uninsured: 'B27001', medicare: 'C27006', ... } the table each figure was read from.
+// Returns { universe, uninsured: [ids], medicare: [ids], medicaid: [ids] }; a figure
+// with no matching cells gets an empty list (stored as unknown). null if none matched.
+export function pickInsuranceVars(labels, found) {
+  const out = { universe: null };
+  let any = false;
+  for (const k of Object.keys(INS_MATCH)) {
+    const groups = found ? (found[k] ? [found[k]] : []) : INSURANCE_TABLES[k];
+    out[k] = Object.keys(labels).filter(id => groups.some(g => id.startsWith(g + '_')) && id.endsWith('E') && INS_MATCH[k].test(labels[id])).sort();
+    if (out[k].length) any = true;
   }
+  if (!any) return null;
+  // The universe (civilian noninstitutionalized population) is the _001 total of
+  // whichever table the uninsured, else Medicare, else Medicaid came from.
+  const base = ['uninsured', 'medicare', 'medicaid'].find(k => out[k].length);
+  out.universe = out[base][0].split('_')[0] + '_001E';
   return out;
 }
 export function insuranceVarIds(picks) {
-  return picks ? [INSURANCE_UNIVERSE].concat(picks.uninsured, picks.medicare, picks.medicaid) : [];
+  return picks ? [picks.universe].concat(picks.uninsured, picks.medicare, picks.medicaid) : [];
 }
 function insuranceFields(r, picks) {
   const none = { ins_universe: null, ins_uninsured: null, ins_medicare: null, ins_medicaid: null };
   if (!picks) return none;
-  const total = ids => sum(ids.map(k => num(r[k])));
-  const f = { ins_universe: num(r[INSURANCE_UNIVERSE]), ins_uninsured: total(picks.uninsured), ins_medicare: total(picks.medicare), ins_medicaid: total(picks.medicaid) };
+  const total = ids => (ids.length ? sum(ids.map(k => num(r[k]))) : null);
+  const f = { ins_universe: num(r[picks.universe]), ins_uninsured: total(picks.uninsured), ins_medicare: total(picks.medicare), ins_medicaid: total(picks.medicaid) };
   // A count above the people it is a count of means the wrong cells were picked.
-  if (f.ins_universe !== null && [f.ins_uninsured, f.ins_medicare, f.ins_medicaid].some(v => v !== null && v > f.ins_universe)) return none;
+  for (const k of ['ins_uninsured', 'ins_medicare', 'ins_medicaid']) if (f.ins_universe !== null && f[k] !== null && f[k] > f.ins_universe) f[k] = null;
   return f;
 }

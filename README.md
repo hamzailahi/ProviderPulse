@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-01. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-05. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -546,6 +546,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 Newest first. Every change pushed to `main` gets an entry here.
+
+### 2026-10-05
+- **Census insurance import fixed.** The first run skipped Medicare and
+  Medicaid because the Census does not publish the detailed Medicare table for
+  ZIPs in the 2024 release. The import now falls back to the Census's collapsed
+  tables and keeps whichever figures it finds instead of dropping all three.
 
 ### 2026-10-01
 - **Insurance from the Census, including Medicare and Medicaid.** The Census
