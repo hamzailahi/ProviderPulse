@@ -460,7 +460,7 @@ hand, in the Supabase SQL editor. The latest is
 | `PATIENT_SIGNUP_ENABLED` | opens patient registration. **Closed unless set to exactly `true`**, since patient PHI storage isn't live until a Supabase BAA is in place. Existing patients can still sign in |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
 | `CENSUS_API_KEY` | `import-census-acs.yml` and `import-sahie.yml`; a free Census API key (https://api.census.gov/data/key_signup.html, activate it from the email) stored as a GitHub secret. Required: the Census answers data requests without one with "Missing Key" |
-| `SUPABASE_DB_URL` | `schema-snapshot.yml` only; the Session pooler connection string from Supabase's Connect button (port 5432, with the database password), stored as a GitHub secret. The direct connection string won't work from GitHub's runners |
+| `SUPABASE_DB_URL` | `schema-snapshot.yml` and `taxonomy-inventory.yml` only; the Session pooler connection string from Supabase's Connect button (port 5432, with the database password), stored as a GitHub secret. The direct connection string won't work from GitHub's runners |
 | `HUD_API_TOKEN` | `zip-county-crosswalk-import.yml` only; a free HUD USER token stored as a GitHub secret, not a Netlify variable |
 
 The MapTiler key is public by design and restricted to the site's domain
@@ -484,6 +484,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `market-benchmarks.yml` | quarterly, the 27th of Jan/Apr/Jul/Oct | builds the market model's benchmarks from CDC PLACES and the provider tables: national health-measure percentiles, national listings per specialty, and each state's listings per 1,000 residents |
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched |
+| `taxonomy-inventory.yml` | manual only | lists every taxonomy name stored in the directory tables with row counts, plus the newest official NUCC code set, in `supabase/reference/`; read only against the database |
 | `schema-snapshot.yml` | weekly, Mondays | dumps the live database's structure (tables, indexes, policies, grants; no data) to `supabase/schema/public.sql` and commits it only when it changed, so every such commit records a schema change |
 | `tests.yml` | every pull request and push to main | syntax check, loading every function, and the test scripts below |
 
@@ -558,6 +559,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-06
+- **Taxonomy inventory.** A new manual job records every taxonomy name the
+  directory stores, how many listings carry it, and the official NUCC code
+  list, so naming and grouping can be reviewed against the real data. The
+  directory itself stores names only, not NUCC codes.
 - **Security fix applied: migration 028.** The first schema snapshot showed
   that two tables left over from the retired v1 site, `access_requests`
   (names, emails, organizations) and `access_codes` (emails and access

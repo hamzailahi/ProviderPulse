@@ -1,0 +1,56 @@
+name: Taxonomy inventory
+
+# Manual only. Records every distinct taxonomy name stored in the directory
+# tables, with row counts, plus the official NUCC code set, in
+# supabase/reference/. Used to review how taxonomies are named and grouped.
+# Read only against the database. Needs the SUPABASE_DB_URL secret (the same
+# one the schema snapshot uses).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Add the repository secret SUPABASE_DB_URL (Supabase, Connect, Session pooler string)."
+            exit 1
+          fi
+
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Build the inventory
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/taxonomy-inventory.sh
+
+      - name: Commit if it changed
+        run: |
+          git add supabase/reference
+          if git diff --cached --quiet; then
+            echo "No change since the last inventory." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Taxonomy inventory $(date -u +%F) [skip netlify]"
+          git push origin HEAD:main

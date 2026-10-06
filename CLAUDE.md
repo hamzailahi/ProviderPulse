@@ -960,6 +960,13 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
 - **Schema snapshot** (`schema-snapshot.yml`, weekly Mondays): see Supabase
   schema. It commits to `main` itself (`[skip netlify]`); those bot commits
   are the one exception to the README-per-push rule.
+- **Taxonomy inventory** (`taxonomy-inventory.yml`, manual only,
+  `scripts/taxonomy-inventory.sh`): one read-only GROUP BY over `clinics`,
+  `provider_individuals` and `clinic_secondary_locations` (session forced
+  `default_transaction_read_only`), written with the newest NUCC CSV (link
+  scraped from nucc.org, highest version) to `supabase/reference/`. Commits to
+  `main` like the snapshot. The directory tables store taxonomy **names only**;
+  NUCC codes exist only in `provider_profiles.taxonomy_code`.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is
