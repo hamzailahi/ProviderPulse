@@ -552,6 +552,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-06
+- **Census signals and SAHIE are live.** Migrations 026 and 027 are applied
+  and both imports ran. ZIP 38017 now shows growth since 2019 (+3.2%),
+  disability (9.4%), coverage by type (employer 72.3%, individual 16.1%,
+  TRICARE 2.8%, VA 1.8%) and seniors living alone (22.5% of people 65+).
+  Its county, Shelby, reads 12.6% uninsured under 65 (SAHIE 2024, plus or
+  minus 0.8). That is higher than the ZIP's own 6.2% because it covers a
+  whole county and only people under 65.
 - **County uninsured rate from Census SAHIE.** Insights now shows the
   uninsured rate for people under 65 in the county where most of the ZIP's
   homes are, with its margin of error and year. SAHIE is the Census Bureau's
