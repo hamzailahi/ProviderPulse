@@ -3,11 +3,11 @@ name: Train demand model
 # Fits the learned demand model (v2/assets/demand-model.js) from the CMS
 # Physician & Other Practitioners by-Provider file, the Census ACS and CDC PLACES
 # tables, and writes one market_benchmarks row per specialty (kind
-# 'demand_model', migration 025). Runs after the quarterly benchmark build and
-# whenever triggered by hand. Use the dry run first to read the held-out scores.
+# 'demand_model', migration 025). MANUAL ONLY since 2026-10-06: the second
+# dry run found 0 of 33 specialties usable (supply explains 0.40-0.78 of the
+# variance and population inputs add under 0.03), so the quarterly schedule
+# was removed. Run it by hand, dry run first, if the label or inputs change.
 on:
-  schedule:
-    - cron: '0 11 28 1,4,7,10 *'
   workflow_dispatch:
     inputs:
       dry_run:

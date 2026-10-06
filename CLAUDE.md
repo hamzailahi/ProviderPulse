@@ -519,7 +519,7 @@ Base tables were created in the dashboard; everything since is in
 `supabase/migrations/`, applied **by hand in the SQL editor**. There is no
 migration runner, so a file in that folder is not necessarily applied.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). **`025` (allows `demand_model` in `market_benchmarks`) is written but not applied.**
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked.
 `016` (clinics NPI uniqueness) is not confirmed applied. Held back: `002`
 (patient documents) pending a Supabase BAA, so briefings are profile-only.
 Migrations use `drop policy if exists` before `create policy` so a re-run is
@@ -793,7 +793,7 @@ within 25 miles (by centroid). For each of the 33 specialties:
 
 | Factor | Weight | Input |
 |---|---|---|
-| need | .30 | **learned** where a usable demand model exists (see below), else PLACES measures per specialty (`PROFILES`) as national percentiles, plus age-mix percentiles within the state |
+| need | .30 | PLACES measures per specialty (`PROFILES`) as national percentiles, plus age-mix percentiles within the state. (A learned replacement exists but is **parked**: no usable models, see below.) |
 | access | .30 | `100 - per1k / nationalRate * 50`; **zero clinicians = 100** |
 | pay | .20 | insured rate (70%) and income (30%) percentiles within the state. Income is ACS median household income (50%), share of households at $100k+ (25%) and low poverty (25%) when `census_acs_zcta` has this ZIP and at least 30 in its state; else the `demographics_raw` share at $75k+. `evidence.pay.income_basis` says which (`acs` or `census75`) |
 | shortage | .10 | HPSA score / 25 for the matching discipline (behavioral → mental, dental → dental, else primary) |
@@ -844,7 +844,20 @@ fitted then held at their training mean in `apply`, never shown as drivers;
 controls-only model (`r2_gain`) **and** every profile measure's coefficient on
 the expected side (inverted measures negative). Areas with no clinicians of the
 specialty are excluded. Validation holds out whole states (pooled areas can
-cross state lines, a small leak). Pediatrics, OB-GYN
+cross state lines, a small leak).
+
+**Status: parked (2026-10-06).** The second dry run, with all fixes, found **0 of
+33 usable**: held-out R² 0.37 to 0.79 overall, but supply and urbanity alone
+scored 0.38 to 0.78 and population inputs added -0.014 to +0.033 (eye care, the
+only one above 0.02, failed the direction gate on DIABETES). Medicare FFS use
+follows supply (the Dartmouth Atlas finding), so claims cannot label need. The
+code paths stay (market-score applies a model only if one is stored and
+usable; none is), `train-demand-model.yml` is manual only, and 025 is unneeded.
+Do not lower `MIN_GAIN` or drop the direction gate to make models pass: that
+reintroduces the geography-as-need bug. A future attempt needs a different
+label (e.g. use by patient residence), not looser gates. The strong
+supply-to-volume relationship could instead power an expected-patient-volume
+estimate for the What if? panel (not built). Pediatrics, OB-GYN
 and dental are never trained (not Medicare business). In `market-score`, the
 catchment is built with the same `addAcs`/`addPlaces` helpers; any unknown input
 means no learned value, and the hand-weighted need stays (`evidence.need.basis`
@@ -878,7 +891,7 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
 - **ZIP-county crosswalk** (`import-zip-county-crosswalk.mjs`, quarterly 25th):
   HUD API, 51 state-level calls; `year`/`quarter` are siblings of `results[]`,
   not per-row fields. Needs `HUD_API_TOKEN`.
-- **Demand model** (`train-demand-model.mjs`, quarterly 28th): streams the CMS
+- **Demand model** (`train-demand-model.mjs`, **manual only, parked**): streams the CMS
   by-Provider PUF (`Rndrng_NPI`, `Rndrng_Prvdr_Zip5`, `Tot_Benes`), takes each
   clinician's specialty from `provider_individuals` by NPI (word-start match on
   `mapTerms`), places ZIPs in their majority county (HUD crosswalk), and learns

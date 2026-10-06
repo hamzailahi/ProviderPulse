@@ -184,7 +184,7 @@ Each specialty is scored 0 to 100 from five factors:
 
 | Factor | Weight | What it measures |
 |---|---|---|
-| Health need | 30% | Where a trained demand model exists for the specialty: expected Medicare patients per 1,000 enrollees, learned from real claims (see below), as a percentile of US counties. Otherwise: how common the conditions this specialty treats are locally (CDC PLACES measures chosen per specialty, e.g. heart disease, blood pressure and stroke for cardiology), plus the age mix it serves, against national percentiles |
+| Health need | 30% | How common the conditions this specialty treats are locally (CDC PLACES measures chosen per specialty, e.g. heart disease, blood pressure and stroke for cardiology), plus the age mix it serves, against national percentiles |
 | Access gap | 30% | Clinicians per 1,000 adults in the catchment vs the national rate for that specialty |
 | Ability to pay | 20% | Insured rate (70%) and household income (30%), ranked within the state. Income is median household income, the share of households at $100k+ and low poverty when the Census detail is loaded, else the share at $75k+ |
 | Federal shortage | 10% | HRSA shortage-area (HPSA) score for the matching discipline, using the ZIP's own county when it can be matched |
@@ -473,7 +473,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `medicare-enrollment-import.yml` | monthly, the 18th | CMS Medicare Monthly Enrollment, newest month only, overwriting the table rather than accumulating history |
 | `medicare-advantage-payers-import.yml` | monthly, the 22nd | CMS MA enrollment by state joined to the MA Contract Directory, so plans show the brand name patients recognize rather than the legal entity |
 | `zip-county-crosswalk-import.yml` | quarterly, the 25th of Jan/Apr/Jul/Oct | HUD USPS ZIP Code Crosswalk API: which county each ZIP falls in, weighted by residential addresses |
-| `train-demand-model.yml` | quarterly, the 28th of Jan/Apr/Jul/Oct | trains the learned demand model from the CMS Medicare claims-by-provider file, the Census detail and CDC PLACES, and stores one model per specialty |
+| `train-demand-model.yml` | manual only (parked 2026-10-06, see the changelog) | trains the learned demand model from the CMS Medicare claims-by-provider file, the Census detail and CDC PLACES; dry run first |
 | `import-census-acs.yml` | yearly, January 15 (the ACS 5-year release lands each December) | ACS 5-year detail by ZIP into `census_acs_zcta`: household income in 16 bands, median income, poverty, age by sex, race and ethnicity, education |
 | `market-benchmarks.yml` | quarterly, the 27th of Jan/Apr/Jul/Oct | builds the market model's benchmarks from CDC PLACES and the provider tables: national health-measure percentiles, national listings per specialty, and each state's listings per 1,000 residents |
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
@@ -550,6 +550,15 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-06
+- **Learned demand model parked; health need stays hand-weighted.** The
+  reworked model's dry run found no specialty where population (age, income,
+  insurance, education, CDC health measures) predicts Medicare use beyond what
+  local supply already explains. Supply and urbanity alone explained 40 to 78
+  percent of the variation; population added under 3 points, and the one
+  near-pass (eye care) had diabetes pointing the wrong way. This is the
+  well-known pattern that Medicare use follows where doctors are. Health need
+  keeps its CDC-and-age score, the training workflow is now manual only, and
+  migration 025 does not need to be applied.
 - **Demand model reworked before switching it on.** The first training run
   showed the model mostly learning where doctors cluster, not where patients
   need care: older and sicker areas came out as low demand, because Medicare
