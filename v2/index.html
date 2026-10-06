@@ -2560,6 +2560,28 @@
                 .catch(() => { if (mine === acsReq) { card.hidden = true; } });
         }
 
+        /* Market signals (migration 026). Each needs every row in view to carry
+           it; a partial sum would read as a smaller area, so it is left out. */
+        const SIGNAL_BOXES = [['disability', 'With a disability'], ['employer', 'Employer insurance'], ['direct', 'Individual-purchase insurance'],
+            ['tricare', 'TRICARE (military)'], ['va', 'VA health care'], ['seniors_alone', 'Seniors living alone (of 65+)']];
+        function signalBoxes(rows, asked) {
+            const N = v => Number(v) || 0, out = [];
+            if (rows.length !== asked) return out;
+            // Growth: only when every ZIP has both counts, and never on a swing big
+            // enough to be a ZIP boundary change rather than people moving.
+            const now = rows.reduce((a, r) => a + N(r.pop_total), 0), then = rows.reduce((a, r) => a + N(r.pop_prior), 0);
+            if (rows.every(r => r.pop_prior != null && r.pop_total != null) && then > 0) {
+                const ch = (now - then) / then * 100;
+                if (Math.abs(ch) <= 50) out.push(['Population change since ' + rows[0].pop_prior_year, (ch >= 0 ? '+' : '') + ch.toFixed(1) + '%']);
+            }
+            SIGNAL_BOXES.forEach(([k, label]) => {
+                if (!rows.every(r => r.signals && r.signals[k] && r.signals[k].n != null && r.signals[k].of > 0)) return;
+                const n = rows.reduce((a, r) => a + N(r.signals[k].n), 0), of = rows.reduce((a, r) => a + N(r.signals[k].of), 0);
+                out.push([label, (of ? (n / of * 100).toFixed(1) : '--') + '%']);
+            });
+            return out;
+        }
+
         function paintAcs(card, rows, asked) {
             const N = v => Number(v) || 0;
             const sumArr = (key, len) => { const a = new Array(len).fill(0); rows.forEach(r => (r[key] || []).forEach((v, i) => { a[i] += N(v); })); return a; };
@@ -2608,6 +2630,7 @@
              ...(hasIns ? [['Uninsured', Math.round(insNo).toLocaleString() + ' · ' + fmtPct(pct(insNo, insU))]] : []),
              ...(insMc != null && insU ? [['On Medicare', Math.round(insMc).toLocaleString() + ' · ' + fmtPct(pct(insMc, insU))]] : []),
              ...(insMd != null && insU ? [['On Medicaid', Math.round(insMd).toLocaleString() + ' · ' + fmtPct(pct(insMd, insU))]] : []),
+             ...signalBoxes(rows, asked),
              ['Median age band', (() => { const t = male.map((v, i) => v + female[i]), tot = t.reduce((a, b) => a + b, 0); let c = 0; for (let i = 0; i < t.length; i++) { c += t[i]; if (c >= tot / 2) return tot ? ACS_AGE[i] : '--'; } return '--'; })()]]
                 .forEach(([label, val]) => {
                     const b = document.createElement('div'); b.className = 'kpi-box';
@@ -2618,6 +2641,7 @@
             document.getElementById('acs-note').textContent =
                 'American Community Survey 5-year estimates. The Census does not publish ZIP-level household income above $200,000.' +
                 (asked > rows.length ? ' ' + (asked - rows.length) + ' of ' + asked + ' ZIPs in view have no ACS row yet and are left out.' : '') +
+                (rows.some(r => r.signals) ? ' Insurance types overlap (people can have more than one), so the shares do not add up to 100%.' : '') +
                 (hasIns ? ' Insurance counts cover the civilian non-institutionalized population. Medicare and Medicaid overlap (people with both are in each), so do not add them. The Uninsured and Insured Rate boxes above use these Census counts.' : '') +
                 (single ? '' : ' Area medians are household-weighted averages of ZIP medians, not true medians.');
 

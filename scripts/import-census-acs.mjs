@@ -18,7 +18,8 @@
 // (otherwise the newest year the Census serves).
 // Run: node scripts/import-census-acs.mjs [--dry-run]
 
-import { VARIABLES, EXPECTED_LABELS, toRow, rowProblems, INSURANCE_TABLES, pickInsuranceVars, insuranceVarIds } from './lib/acs.mjs';
+import { VARIABLES, EXPECTED_LABELS, toRow, rowProblems, INSURANCE_TABLES, pickInsuranceVars, insuranceVarIds,
+  SIGNAL_RULES, pickSignalVars, signalVarIds } from './lib/acs.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CENSUS_API_KEY, ACS_YEAR } = process.env;
@@ -85,6 +86,47 @@ async function insurancePicks(year) {
   return picks;
 }
 
+// Market signals: same discovery, one figure at a time, each optional.
+async function signalPicks(year) {
+  const labels = {}, found = {};
+  for (const [k, rule] of Object.entries(SIGNAL_RULES)) {
+    for (const g of rule.tables) {
+      if (Object.values(found).includes(g)) { found[k] = g; break; }
+      try {
+        const d = await getJson(`https://api.census.gov/data/${year}/acs/acs5/groups/${g}.json`, `${g} metadata`);
+        Object.entries(d.variables || {}).forEach(([id, v]) => { labels[id] = String(v.label || ''); });
+        found[k] = g;
+        break;
+      } catch (e) { console.log(`  signals: ${g} not available (${e.status || e.message.slice(0, 80)})`); }
+    }
+  }
+  const sig = pickSignalVars(labels, found);
+  for (const k of Object.keys(SIGNAL_RULES)) {
+    const s = sig && sig[k];
+    console.log(`  signal cells: ${k} ${s ? s.cells.length : 0} from ${found[k] || 'none'}${s ? ' (e.g. ' + labels[s.cells[0]] + ')' : ''}`);
+  }
+  return sig;
+}
+
+// Total population from the release five years earlier, for growth. Optional:
+// any failure leaves growth unknown and the rest of the import untouched.
+async function priorPopulation(year) {
+  for (const y of [year - 5, year - 6]) {
+    try {
+      const data = await getJson(`https://api.census.gov/data/${y}/acs/acs5?get=B01003_001E&for=zip%20code%20tabulation%20area:*${keyParam}`, `ACS ${y} population`);
+      const head = data[0], zi = head.indexOf('zip code tabulation area'), vi = head.indexOf('B01003_001E');
+      const out = new Map();
+      for (const row of data.slice(1)) {
+        const v = Number(row[vi]);
+        if (Number.isFinite(v) && v >= 0) out.set(String(row[zi]).padStart(5, '0'), v);
+      }
+      console.log(`  growth baseline: ACS ${y} population for ${out.size.toLocaleString()} ZCTAs`);
+      return { year: y, values: out };
+    } catch (e) { console.log(`  growth baseline: ACS ${y} not available (${e.status || e.message.slice(0, 80)})`); }
+  }
+  return null;
+}
+
 async function fetchAll(year, extraVars) {
   const byZip = new Map();
   const CHUNK = 45;                                              // the API allows 50 per call
@@ -133,14 +175,17 @@ async function main() {
   console.log(`ACS ${year} 5-year, by ZCTA`);
   await checkLabels(year);
   const picks = await insurancePicks(year);
-  const raw = await fetchAll(year, insuranceVarIds(picks));
+  const sig = await signalPicks(year);
+  const prior = await priorPopulation(year);
+  const raw = await fetchAll(year, [...new Set(insuranceVarIds(picks).concat(signalVarIds(sig)))]);
   if (raw.size < MIN_ZCTAS) throw new Error(`only ${raw.size} ZCTAs returned (floor ${MIN_ZCTAS}); refusing to write`);
 
   const states = dryRun && !SUPABASE_URL ? new Map() : await zipStates();
   const rows = [];
   let unsound = 0, noState = 0;
   for (const [zip, rec] of raw) {
-    const row = toRow(zip, rec, year, states.get(String(zip).padStart(5, '0')), picks);
+    const row = toRow(zip, rec, year, states.get(String(zip).padStart(5, '0')), picks, sig,
+      prior ? { year: prior.year, value: prior.values.has(String(zip).padStart(5, '0')) ? prior.values.get(String(zip).padStart(5, '0')) : null } : null);
     if (!row.state) noState++;
     if (rowProblems(row).length) unsound++;
     rows.push(row);
@@ -149,7 +194,8 @@ async function main() {
   if (unsound > rows.length * 0.01) throw new Error(`${unsound} rows fail the band-total check; the Census layout may have changed`);
   const sample = rows.find(r => r.zip === '38017');
   if (sample) console.log('38017:', JSON.stringify({ households: sample.households, median: sample.median_hh_income, income: sample.income_bands,
-    insurance: { universe: sample.ins_universe, uninsured: sample.ins_uninsured, medicare: sample.ins_medicare, medicaid: sample.ins_medicaid } }));
+    insurance: { universe: sample.ins_universe, uninsured: sample.ins_uninsured, medicare: sample.ins_medicare, medicaid: sample.ins_medicaid },
+    pop: sample.pop_total, pop_prior: sample.pop_prior, pop_prior_year: sample.pop_prior_year, signals: sample.signals }));
 
   if (dryRun) { console.log('dry run, nothing written'); return; }
   for (let i = 0; i < rows.length; i += 500) {

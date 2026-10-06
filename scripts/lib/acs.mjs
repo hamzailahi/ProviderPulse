@@ -51,7 +51,7 @@ export function num(v) {
 const sum = arr => (arr.some(x => x === null) ? null : arr.reduce((s, x) => s + x, 0));
 
 // `r` maps variable id -> raw value (string or number) for one ZCTA.
-export function toRow(zip, r, year, state, picks) {
+export function toRow(zip, r, year, state, picks, sig, prior) {
   const n = k => num(r[k]);
   const income = Array.from({ length: 16 }, (_, i) => n(`B19001_${pad(i + 2)}E`));
   const male = AGE_GROUPS.map(g => sum(g.map(i => n(`B01001_${pad(i)}E`))));
@@ -79,6 +79,11 @@ export function toRow(zip, r, year, state, picks) {
       associate: edu(21), bachelor: edu(22), graduate: sum([edu(23), edu(24), edu(25)])
     },
     ...insuranceFields(r, picks),
+    signals: signalFields(r, sig),
+    // Population five years earlier, for growth. ACS releases before 2021 use
+    // 2010 ZCTAs, so a few ZIPs changed shape; consumers ignore extreme swings.
+    pop_prior: prior && prior.value != null ? prior.value : null,
+    pop_prior_year: prior && prior.value != null ? prior.year : null,
     refreshed_at: new Date().toISOString()
   };
 }
@@ -148,4 +153,57 @@ function insuranceFields(r, picks) {
   // A count above the people it is a count of means the wrong cells were picked.
   for (const k of ['ins_uninsured', 'ins_medicare', 'ins_medicaid']) if (f.ins_universe !== null && f[k] !== null && f[k] > f.ins_universe) f[k] = null;
   return f;
+}
+
+// ---- Market signals --------------------------------------------------------------
+// More ACS counts per ZCTA, each found by label at run time (same reason as the
+// insurance cells: the detailed B table is missing for some figures at ZCTA level,
+// and the collapsed C table may be all there is). A figure whose cells are not
+// found is left unknown, never 0.
+//   disability     people with a disability (civilian noninstitutionalized)
+//   employer       people with employer-based health insurance
+//   direct         people with direct-purchase (individual) health insurance
+//   tricare        people with TRICARE / military coverage
+//   va             people with VA health care
+//   seniors_alone  people 65+ living alone (universe: people 65+ in households)
+// Coverage types overlap (people can hold several), so they are never added.
+export const SIGNAL_RULES = {
+  disability: { tables: ['B18101', 'C18101'], match: /!!With a disability$/ },
+  employer: { tables: ['B27004', 'C27004'], match: /!!With employer-based health insurance$/ },
+  direct: { tables: ['B27005', 'C27005'], match: /!!With direct-purchase health insurance$/ },
+  tricare: { tables: ['B27008', 'C27008'], match: /!!With TRICARE\/military health coverage$/ },
+  va: { tables: ['B27009', 'C27009'], match: /!!With VA Health Care$/i },
+  seniors_alone: { tables: ['B09021'], match: /65 years and over:!!Lives alone$/, universe: /!!65 years and over:$/ }
+};
+
+// labels: { id: label } for every table fetched; found: { key: table actually used }.
+// Returns { key: { cells: [ids], universe: id } } for the keys that matched, or null.
+export function pickSignalVars(labels, found) {
+  const out = {};
+  for (const [k, rule] of Object.entries(SIGNAL_RULES)) {
+    const g = found && found[k];
+    if (!g) continue;
+    const ids = Object.keys(labels).filter(id => id.startsWith(g + '_') && id.endsWith('E'));
+    const cells = ids.filter(id => rule.match.test(labels[id])).sort();
+    if (!cells.length) continue;
+    const universe = rule.universe ? ids.filter(id => rule.universe.test(labels[id])).sort() : [g + '_001E'];
+    if (!universe.length) continue;
+    out[k] = { cells, universe };
+  }
+  return Object.keys(out).length ? out : null;
+}
+export function signalVarIds(sig) {
+  if (!sig) return [];
+  return [...new Set(Object.values(sig).flatMap(s => s.cells.concat(s.universe)))];
+}
+// { key: { n, of } } with nulls for unknown; a count above its universe is dropped.
+export function signalFields(r, sig) {
+  const out = {};
+  for (const k of Object.keys(SIGNAL_RULES)) {
+    const s = sig && sig[k];
+    if (!s) { out[k] = { n: null, of: null }; continue; }
+    const n = sum(s.cells.map(id => num(r[id]))), of = sum(s.universe.map(id => num(r[id])));
+    out[k] = n !== null && of !== null && n > of ? { n: null, of } : { n, of };
+  }
+  return out;
 }

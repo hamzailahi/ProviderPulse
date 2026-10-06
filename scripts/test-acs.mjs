@@ -84,7 +84,8 @@ import { writeFileSync } from 'node:fs';
 const labels = ${JSON.stringify(EXPECTED_LABELS)};
 const vars = ${JSON.stringify(VARIABLES)};
 const zips = ${JSON.stringify(fakeZips)};
-const rec = Object.assign(${JSON.stringify(fakeRecord('x'))}, { B27001_001E: 1000, B27001_005E: 30, C27006_004E: 100, B27007_004E: 200 });
+const rec = Object.assign(${JSON.stringify(fakeRecord('x'))}, { B27001_001E: 1000, B27001_005E: 30, C27006_004E: 100, B27007_004E: 200,
+  B18101_001E: 900, B18101_004E: 90, B27004_001E: 900, B27004_004E: 500, C27005_001E: 900, C27005_004E: 80, B27008_001E: 900, B27008_004E: 20, B09021_022E: 120, B09021_023E: 30 });
 const J = (b, ok = true, status = 200) => ({ ok, status, json: async () => b, text: async () => JSON.stringify(b) });
 globalThis.fetch = async (url, init) => {
   const u = String(url);
@@ -94,6 +95,13 @@ globalThis.fetch = async (url, init) => {
     Object.entries(labels).filter(([k]) => k.startsWith(g)).forEach(([k, f]) => { v[k] = { label: process.env.BAD_LABEL === k ? 'Estimate!!Total:!!Something else' : 'Estimate!!Total:!!' + f }; });
     if (g === 'B27001') Object.assign(v, { B27001_001E: { label: 'Estimate!!Total:' }, B27001_005E: { label: 'Estimate!!Total:!!Male:!!Under 6 years:!!No health insurance coverage' } });
     if (g === 'B27006') return J({}, false, 404);
+    if (g === 'B18101') Object.assign(v, { B18101_001E: { label: 'Estimate!!Total:' }, B18101_004E: { label: 'Estimate!!Total:!!Male:!!Under 5 years:!!With a disability' }, B18101_005E: { label: 'Estimate!!Total:!!Male:!!Under 5 years:!!No disability' } });
+    if (g === 'B27004') Object.assign(v, { B27004_001E: { label: 'Estimate!!Total:' }, B27004_004E: { label: 'Estimate!!Total:!!Male:!!Under 19 years:!!With employer-based health insurance' } });
+    if (g === 'B27005') return J({}, false, 404);
+    if (g === 'C27005') Object.assign(v, { C27005_001E: { label: 'Estimate!!Total:' }, C27005_004E: { label: 'Estimate!!Total:!!Male:!!Under 19 years:!!With direct-purchase health insurance' } });
+    if (g === 'B27008') Object.assign(v, { B27008_001E: { label: 'Estimate!!Total:' }, B27008_004E: { label: 'Estimate!!Total:!!Male:!!Under 19 years:!!With TRICARE/military health coverage' } });
+    if (g === 'B27009' || g === 'C27009') return J({}, false, 404);
+    if (g === 'B09021') Object.assign(v, { B09021_001E: { label: 'Estimate!!Total:' }, B09021_022E: { label: 'Estimate!!Total:!!65 years and over:' }, B09021_023E: { label: 'Estimate!!Total:!!65 years and over:!!Lives alone' } });
     if (g === 'C27006') v.C27006_004E = { label: 'Estimate!!Total:!!Male:!!Under 19 years:!!With Medicare coverage' };
     if (g === 'B27007') v.B27007_004E = { label: process.env.NO_INS ? 'Something else' : 'Estimate!!Total:!!Male:!!Under 19 years:!!With Medicaid/means-tested public coverage' };
     return J({ variables: v });
@@ -101,6 +109,7 @@ globalThis.fetch = async (url, init) => {
   if (u.includes('api.census.gov') && u.includes('?get=')) {
     if (u.includes('key=') && process.env.BAD_KEY) return { ok: true, status: 200, text: async () => '<html><body>Invalid Key</body></html>' };
     const want = decodeURIComponent(u.split('get=')[1].split('&')[0]).split(',');
+    if (want.length === 1 && want[0] === 'B01003_001E') return u.includes('/2019/') ? J([['B01003_001E', 'zip code tabulation area'], ['50', '38017'], ['-666666666', '38138']]) : J({}, false, 404);
     return J([want.concat(['zip code tabulation area'])].concat(zips.map(z => want.map(k => String(rec[k])).concat([z]))));
   }
   if (u.includes('demographics_raw')) return J(u.includes('zip=gt.') ? [] : [{ zip: '38017', state: 'TN' }, { zip: '38138', state: 'tn' }]);
@@ -116,6 +125,12 @@ const written = (() => { try { return JSON.parse(readFileSync(out, 'utf8')); } c
 check('a clean run succeeds and writes', p.status === 0 && /written/.test(p.stdout) && Array.isArray(written), p.stdout + p.stderr);
 check('a 404 on B27006 falls back to C27006', /B27006 not available/.test(p.stdout) && /medicare 1 from C27006/.test(p.stdout), p.stdout);
 check('insurance counts are written', written && written[0].ins_universe === 1000 && written[0].ins_uninsured === 30 && written[0].ins_medicare === 100 && written[0].ins_medicaid === 200, JSON.stringify(written && written[0].ins_uninsured));
+const w0 = written && written.find(r => r.zip === '38017'), w1 = written && written.find(r => r.zip === '38138');
+check('signals are written with their universes', w0 && w0.signals.disability.n === 90 && w0.signals.disability.of === 900 && w0.signals.employer.n === 500 && w0.signals.tricare.n === 20, JSON.stringify(w0 && w0.signals));
+check('a 404 on B27005 falls back to C27005 for individual-purchase cover', w0 && w0.signals.direct.n === 80 && /signals: B27005 not available/.test(p.stdout));
+check('seniors living alone use people 65+ in households as the universe', w0 && w0.signals.seniors_alone.n === 30 && w0.signals.seniors_alone.of === 120);
+check('a figure with no table is unknown, not zero', w0 && w0.signals.va.n === null && w0.signals.va.of === null);
+check('growth baseline comes from five years earlier; a suppressed one is unknown', w0 && w0.pop_prior === 50 && w0.pop_prior_year === 2019 && w1 && w1.pop_prior === null && w1.pop_prior_year === null);
 check('every ZCTA is written once', written && written.length === 3 && new Set(written.map(r => r.zip)).size === 3);
 check('state comes from demographics_raw, upper-cased; unmatched ZIPs have none', written && written.find(r => r.zip === '38138').state === 'TN' && written.find(r => r.zip === '00501').state === null);
 check('the Census label check ran', /variable labels verified/.test(p.stdout));
