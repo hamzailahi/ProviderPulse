@@ -519,7 +519,7 @@ Base tables were created in the dashboard; everything since is in
 `supabase/migrations/`, applied **by hand in the SQL editor**. There is no
 migration runner, so a file in that folder is not necessarily applied.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. **`026` (market signals on `census_acs_zcta`) is written but not applied.**
 `016` (clinics NPI uniqueness) is not confirmed applied. Held back: `002`
 (patient documents) pending a Supabase BAA, so briefings are profile-only.
 Migrations use `drop policy if exists` before `create policy` so a re-run is
@@ -589,7 +589,14 @@ Tables:
   those cells by Census label at run time (`pickInsuranceVars`), trying the
   detailed B table then the collapsed C table for each figure (the 2024 5-year
   ZCTA release returned 404 for `B27006`), and leaves a figure null, with a log
-  line, when neither has it.
+  line, when neither has it. Migration 026 adds `pop_prior`/`pop_prior_year`
+  (B01003 from the release five years earlier, for growth; pre-2021 releases
+  use 2010 ZCTAs, so the dashboard hides swings above 50%) and `signals` jsonb
+  `{key: {n, of}}` for `disability`, `employer`, `direct`, `tricare`, `va`,
+  `seniors_alone` (`SIGNAL_RULES` in `scripts/lib/acs.mjs`, found by label with
+  the same B-then-C fallback; seniors' universe is people 65+ in households).
+  Coverage types overlap: never add them. The dashboard shows a signal only when
+  every ZIP in view has it.
 - `market_benchmarks`: benchmarks for the market model (021), keyed
   `(kind, key)`: `measure`, `specialty`, and `state_density` (the last needs 022's widened check constraint; first written 2026-09-30, 114 rows). Public read,
   service-role write.
@@ -1018,7 +1025,7 @@ node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
 node scripts/test-demand-model.mjs        # 45: the learned demand model, trainer end to end, and scoring
-node scripts/test-acs.mjs                 # 41: the ACS import and the richer income ranking
+node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 14: the what-if re-score changes supply only
 node scripts/test-market-assistant.mjs    # 58: the assistant, figure repair, tracing (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced

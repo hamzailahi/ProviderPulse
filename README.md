@@ -441,7 +441,7 @@ netlify dev
 Schema changes live in `supabase/migrations/` but aren't applied
 automatically. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`025_demand_model.sql`.
+`026_census_acs_signals.sql`.
 
 ## Environment variables
 
@@ -550,6 +550,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-06
+- **More Census signals by ZIP.** The Census detail block on the Demographics
+  tab now also shows population change over five years, the share of people
+  with a disability, employer, individual-purchase, TRICARE and VA insurance,
+  and the share of people 65 and over who live alone. Insurance types overlap,
+  so those shares are not meant to add up. A signal is only shown when every
+  ZIP in view has it, and a five-year change above 50% is hidden because it
+  usually means the ZIP's boundary changed in 2020. To switch it on, apply
+  migration 026 and run "Import Census ACS detail" again.
 - **Learned demand model parked; health need stays hand-weighted.** The
   reworked model's dry run found no specialty where population (age, income,
   insurance, education, CDC health measures) predicts Medicare use beyond what
