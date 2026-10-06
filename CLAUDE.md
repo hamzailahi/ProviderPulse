@@ -519,7 +519,7 @@ Base tables were created in the dashboard; everything since is in
 `supabase/migrations/`, applied **by hand in the SQL editor**. There is no
 migration runner, so a file in that folder is not necessarily applied.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. **`026` (market signals on `census_acs_zcta`) and `027` (`sahie_county`) are written but not applied.**
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06.
 `016` (clinics NPI uniqueness) is not confirmed applied. Held back: `002`
 (patient documents) pending a Supabase BAA, so briefings are profile-only.
 Migrations use `drop policy if exists` before `create policy` so a re-run is
@@ -596,12 +596,21 @@ Tables:
   `seniors_alone` (`SIGNAL_RULES` in `scripts/lib/acs.mjs`, found by label with
   the same B-then-C fallback; seniors' universe is people 65+ in households).
   Coverage types overlap: never add them. The dashboard shows a signal only when
-  every ZIP in view has it.
+  every ZIP in view has it. First load 2026-10-06: every B27004/5/8/9 table
+  404'd at ZCTA and the C tables were used (6 cells each); disability from
+  B18101 (12 cells); growth baseline ACS 2019 for 33,120 ZCTAs. 38017: population
+  55,073 to 56,826 (+3.2%), disability 9.4%, employer 72.3%, direct-purchase
+  16.1% (includes Medigap, so it runs high), TRICARE 2.8%, VA 1.8%, seniors
+  living alone 22.5% of 65+.
 - `sahie_county`: Census SAHIE county uninsured estimates (027), **under 65
   only** (the default slice; 65+ is nearly all Medicare), with margin of error
   and year. `market-score` returns `sahie` for the county holding most of the
   ZIP's homes (largest `res_ratio`) and `available:false` when there is no row
-  or rate; Insights labels it "under 65" with its source. Public read.
+  or rate; Insights labels it "under 65" with its source. Public read. First
+  load 2026-10-06: SAHIE 2024 (2025 not yet published), 3,144 counties, one
+  without a rate; Shelby County TN 12.6% +/-0.8 of 732,633 under 65. Note it
+  differs from the ZIP's ACS uninsured share (38017: 6.2%, all ages): different
+  area and different ages, both correct.
 - `market_benchmarks`: benchmarks for the market model (021), keyed
   `(kind, key)`: `measure`, `specialty`, and `state_density` (the last needs 022's widened check constraint; first written 2026-09-30, 114 rows). Public read,
   service-role write.
