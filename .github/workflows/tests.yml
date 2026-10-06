@@ -51,6 +51,9 @@ jobs:
       - name: Learned demand model and its trainer
         run: node scripts/test-demand-model.mjs
 
+      - name: Census SAHIE county uninsured estimates
+        run: node scripts/test-sahie.mjs
+
       - name: Census ACS detail import and income ranking
         run: node scripts/test-acs.mjs
 

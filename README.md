@@ -441,7 +441,7 @@ netlify dev
 Schema changes live in `supabase/migrations/` but aren't applied
 automatically. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`026_census_acs_signals.sql`.
+`027_sahie_county.sql`.
 
 ## Environment variables
 
@@ -455,7 +455,7 @@ hand, in the Supabase SQL editor. The latest is
 | `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, and `report-generate`, which now only renders audits) |
 | `PATIENT_SIGNUP_ENABLED` | opens patient registration. **Closed unless set to exactly `true`**, since patient PHI storage isn't live until a Supabase BAA is in place. Existing patients can still sign in |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
-| `CENSUS_API_KEY` | `import-census-acs.yml` only; a free Census API key (https://api.census.gov/data/key_signup.html, activate it from the email) stored as a GitHub secret. Required: the Census answers data requests without one with "Missing Key" |
+| `CENSUS_API_KEY` | `import-census-acs.yml` and `import-sahie.yml`; a free Census API key (https://api.census.gov/data/key_signup.html, activate it from the email) stored as a GitHub secret. Required: the Census answers data requests without one with "Missing Key" |
 | `HUD_API_TOKEN` | `zip-county-crosswalk-import.yml` only; a free HUD USER token stored as a GitHub secret, not a Netlify variable |
 
 The MapTiler key is public by design and restricted to the site's domain
@@ -474,6 +474,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `medicare-advantage-payers-import.yml` | monthly, the 22nd | CMS MA enrollment by state joined to the MA Contract Directory, so plans show the brand name patients recognize rather than the legal entity |
 | `zip-county-crosswalk-import.yml` | quarterly, the 25th of Jan/Apr/Jul/Oct | HUD USPS ZIP Code Crosswalk API: which county each ZIP falls in, weighted by residential addresses |
 | `train-demand-model.yml` | manual only (parked 2026-10-06, see the changelog) | trains the learned demand model from the CMS Medicare claims-by-provider file, the Census detail and CDC PLACES; dry run first |
+| `import-sahie.yml` | yearly, September 10 (SAHIE trails by about two years) | Census SAHIE county uninsured estimates for people under 65 into `sahie_county` |
 | `import-census-acs.yml` | yearly, January 15 (the ACS 5-year release lands each December) | ACS 5-year detail by ZIP into `census_acs_zcta`: household income in 16 bands, median income, poverty, age by sex, race and ethnicity, education |
 | `market-benchmarks.yml` | quarterly, the 27th of Jan/Apr/Jul/Oct | builds the market model's benchmarks from CDC PLACES and the provider tables: national health-measure percentiles, national listings per specialty, and each state's listings per 1,000 residents |
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
@@ -492,6 +493,7 @@ node scripts/test-query-plan.mjs          # the query-plan allowlist behind the 
 node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings
 node scripts/test-market-model.mjs        # the market opportunity model
 node scripts/test-demand-model.mjs        # the learned demand model, its trainer, and how scoring uses it
+node scripts/test-sahie.mjs               # Census county uninsured estimates and how Insights reports them
 node scripts/test-acs.mjs                 # the Census detail import, and the richer income ranking
 node scripts/test-scenario.mjs            # the what-if re-score changes supply only
 node scripts/test-answer-check.mjs        # assistant figures must trace to tool results
@@ -550,6 +552,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-06
+- **County uninsured rate from Census SAHIE.** Insights now shows the
+  uninsured rate for people under 65 in the county where most of the ZIP's
+  homes are, with its margin of error and year. SAHIE is the Census Bureau's
+  model-based estimate, which blends survey and administrative records and is
+  steadier than survey data alone for small counties. To switch it on, apply
+  migration 027 and run "Import Census SAHIE" once.
 - **More Census signals by ZIP.** The Census detail block on the Demographics
   tab now also shows population change over five years, the share of people
   with a disability, employer, individual-purchase, TRICARE and VA insurance,

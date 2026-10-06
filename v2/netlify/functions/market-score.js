@@ -425,6 +425,21 @@ exports.handler = async (event) => {
         as_of: `${first.data_month} ${first.data_year}`
       } : { available: false, reason: 'Medicare enrollment data for this state has no usable counts' };
     }
+    // Census SAHIE (migration 027): the county holding most of this ZIP's
+    // residents, under-65 uninsured rate. Optional: missing table or row means
+    // no figure, never a guessed one.
+    let sahie = { available: false };
+    if (crosswalkPage.rows.length) {
+      const main = crosswalkPage.rows.slice().sort((a, b) => (Number(b.res_ratio) || 0) - (Number(a.res_ratio) || 0))[0];
+      const sr = await get(`sahie_county?fips=eq.${encodeURIComponent(main.fips)}&select=fips,county,year,uninsured_pct,uninsured_pct_moe,uninsured,under65&limit=1`, 4000).catch(() => []);
+      const r = Array.isArray(sr) && sr[0];
+      if (r && r.uninsured_pct != null) {
+        sahie = { available: true, fips: r.fips, county: r.county, year: r.year, uninsured_pct: Number(r.uninsured_pct),
+          moe: r.uninsured_pct_moe == null ? null : Number(r.uninsured_pct_moe), uninsured: r.uninsured, under65: r.under65,
+          share_of_zip: Math.round((Number(main.res_ratio) || 0) * 100) };
+      }
+    }
+
     const hpsaRows = hpsaPage.rows;
     const primary = hpsaRows.filter(h => /primary/i.test(h.discipline || ''));
     const hpsaScore = median((primary.length ? primary : hpsaRows).map(h => Number(h.hpsa_score)).filter(n => isFinite(n)));
@@ -849,6 +864,7 @@ exports.handler = async (event) => {
         // table has usable rows for this ZIP/state, which is expected until
         // the importers have run.
         medicare: medicareMix,
+        sahie,
         // Per-specialty verdict. NOTE: these describe the CATCHMENT named in
         // `catchment`, not this ZIP. Do not render a group score under a
         // ZIP-only heading.

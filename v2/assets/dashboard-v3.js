@@ -381,6 +381,13 @@ function paintInsights() {
       fmtN(d.medicare.total_beneficiaries) + ' beneficiaries ' + (d.medicare.level === 'zip' ? 'in this ZIP' : 'statewide') + ', ' +
       d.medicare.medicare_advantage_pct + '% on Medicare Advantage (' + d.medicare.as_of + '). A high MA share means network contracts matter.']);
   }
+  if (d.sahie && d.sahie.available) {
+    var s = d.sahie;
+    F.push(['neutral', 'County uninsured rate (under 65)',
+      s.uninsured_pct.toFixed(1) + '%' + (s.moe != null ? ' (\u00b1' + s.moe.toFixed(1) + ')' : '') + ' in ' + (s.county || 'this county') +
+      (s.uninsured != null ? ', about ' + fmtN(s.uninsured) + ' people' : '') + '. Census SAHIE ' + s.year +
+      ', a model-based estimate steadier than survey data for small areas' + (s.share_of_zip && s.share_of_zip < 100 ? '; ' + s.share_of_zip + '% of this ZIP\u2019s homes are in this county' : '') + '.']);
+  }
   if (m.providers_per_1k != null && !m.benchmark_per_1k) {
     F.push(['neutral', 'Provider supply',
       m.providers_per_1k.toFixed(1) + ' listings per 1,000 residents. ' + fmtN(m.organizations) + ' organizations and ' + fmtN(m.individual_physicians) +

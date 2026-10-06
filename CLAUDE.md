@@ -519,7 +519,7 @@ Base tables were created in the dashboard; everything since is in
 `supabase/migrations/`, applied **by hand in the SQL editor**. There is no
 migration runner, so a file in that folder is not necessarily applied.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. **`026` (market signals on `census_acs_zcta`) is written but not applied.**
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. **`026` (market signals on `census_acs_zcta`) and `027` (`sahie_county`) are written but not applied.**
 `016` (clinics NPI uniqueness) is not confirmed applied. Held back: `002`
 (patient documents) pending a Supabase BAA, so briefings are profile-only.
 Migrations use `drop policy if exists` before `create policy` so a re-run is
@@ -597,6 +597,11 @@ Tables:
   the same B-then-C fallback; seniors' universe is people 65+ in households).
   Coverage types overlap: never add them. The dashboard shows a signal only when
   every ZIP in view has it.
+- `sahie_county`: Census SAHIE county uninsured estimates (027), **under 65
+  only** (the default slice; 65+ is nearly all Medicare), with margin of error
+  and year. `market-score` returns `sahie` for the county holding most of the
+  ZIP's homes (largest `res_ratio`) and `available:false` when there is no row
+  or rate; Insights labels it "under 65" with its source. Public read.
 - `market_benchmarks`: benchmarks for the market model (021), keyed
   `(kind, key)`: `measure`, `specialty`, and `state_density` (the last needs 022's widened check constraint; first written 2026-09-30, 114 rows). Public read,
   service-role write.
@@ -914,6 +919,9 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   run time, checks every variable's Census label against `EXPECTED_LABELS`
   (`scripts/lib/acs.mjs`) and refuses to write if one moved, requires 30,000
   ZCTAs and bands that add up on 99% of rows. `CENSUS_API_KEY` is **required** (free; the data API answers "Missing Key" without it, while the metadata calls work without one).
+- **Census SAHIE** (`import-sahie.mjs`, yearly Sept 10): newest year found by
+  trying back from last year, county slice `AGECAT=0&RACECAT=0&SEXCAT=0&IPRCAT=0`,
+  column check before parsing, floor 3,000 counties. Needs `CENSUS_API_KEY`.
 - **Market benchmarks** (`build-market-benchmarks.mjs`, quarterly 27th):
   measure percentiles, per-specialty national rates, and per-state density
   (`state_density`). Run it by hand after changing what it computes.
@@ -1025,6 +1033,7 @@ node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
 node scripts/test-demand-model.mjs        # 45: the learned demand model, trainer end to end, and scoring
+node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick
 node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 14: the what-if re-score changes supply only
 node scripts/test-market-assistant.mjs    # 58: the assistant, figure repair, tracing (needs npm ci in v2/)
