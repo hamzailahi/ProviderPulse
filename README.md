@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-05. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-06. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 

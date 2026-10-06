@@ -14,7 +14,12 @@
 //
 // INPUTS. County aggregates of census_acs_zcta and cdc_places, built with the
 // same helpers market-score.js uses for a catchment (DemandModel.addAcs /
-// addPlaces), weighted by the crosswalk's residential ratio.
+// addPlaces), weighted by the crosswalk's residential ratio. Each training row
+// is a county POOLED with every county within 25 miles (label and inputs
+// alike), because claims are counted where the doctor practises and patients
+// travel to hubs. Supply (clinicians per enrollee) and urbanity (people within
+// reach) are fitted as controls and held at average when scoring; see
+// assets/demand-model.js for why the first, unpooled run was not usable.
 //
 // HONESTY CHECKS. Cross-validation holds out whole states. A specialty whose
 // held-out R^2 is below DemandModel.MIN_R2 is stored as unusable, with the
@@ -38,7 +43,14 @@ const pufUrlArg = opt('--puf-url'), pufFile = opt('--puf-file');
 
 const PUF_TITLE = /medicare physician .* practitioners\s*[-–]\s*by provider$/i;
 const MIN_PUF_NPIS = Number(process.env.MIN_PUF_NPIS) || 500000;
-const MIN_ENROLLEES = 500;            // smaller counties are too noisy to learn from
+const MIN_ENROLLEES = 500;            // smaller areas are too noisy to learn from
+const RADIUS = 25;                    // miles; the same reach market-score scores a catchment over
+const GEO_MEASURE = 'DENTAL';         // the PLACES measure whose rows carry ZIP centroids
+const miles = (lat1, lon1, lat2, lon2) => {
+  const R = 3958.8, r = Math.PI / 180;
+  const a = Math.sin((lat2 - lat1) * r / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin((lon2 - lon1) * r / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+};
 
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
@@ -132,22 +144,50 @@ async function main() {
   const enroll = new Map();
   for (const r of await pageAll('medicare_county_enrollment', 'fips,state,original_medicare_benes', 'fips')) {
     const v = Number(r.original_medicare_benes);
-    if (v >= MIN_ENROLLEES) enroll.set(r.fips, v);
+    if (v > 0) enroll.set(r.fips, v);
     if (!stateOf.has(r.fips)) stateOf.set(r.fips, r.state);
   }
-  console.log(`geography: ${zipCounties.size.toLocaleString()} ZIPs in the crosswalk, ${enroll.size.toLocaleString()} counties with at least ${MIN_ENROLLEES} FFS enrollees`);
+  console.log(`geography: ${zipCounties.size.toLocaleString()} ZIPs in the crosswalk, ${enroll.size.toLocaleString()} counties with FFS enrollees`);
 
   // ---- 4. county areas from ACS and PLACES --------------------------------------
   const areas = new Map();
   const area = f => { if (!areas.has(f)) areas.set(f, {}); return areas.get(f); };
   const acs = await pageAll('census_acs_zcta', 'zip,pop_total,households,median_hh_income,poverty_universe,poverty_below,age_male,age_female,ins_universe,ins_uninsured,ins_medicaid,education', 'zip');
   for (const r of acs) for (const c of zipCounties.get(String(r.zip).padStart(5, '0')) || []) DemandModel.addAcs(area(c.fips), r, c.ratio);
-  const measures = MarketModel.measureIds();
-  for (const m of measures) {
-    const rows = await pageAll('cdc_places', 'zip,value,pop_18plus', 'zip', `&measureid=eq.${m}`);
-    for (const r of rows) for (const c of zipCounties.get(String(r.zip).padStart(5, '0')) || []) DemandModel.addPlaces(area(c.fips), m, r.value, r.pop_18plus, c.ratio);
+  // Only measures with data: the PLACES import has no KIDNEY rows, and a
+  // measure with no data used to drop every county of the specialties using it.
+  const measures = [], centroid = new Map();
+  for (const m of MarketModel.measureIds()) {
+    const rows = await pageAll('cdc_places', m === GEO_MEASURE ? 'zip,value,pop_18plus,lat,lon' : 'zip,value,pop_18plus', 'zip', `&measureid=eq.${m}`);
+    if (rows.length) measures.push(m);
+    for (const r of rows) for (const c of zipCounties.get(String(r.zip).padStart(5, '0')) || []) {
+      DemandModel.addPlaces(area(c.fips), m, r.value, r.pop_18plus, c.ratio);
+      // County centre: adult-weighted mean of its ZIP centroids.
+      const w = (Number(r.pop_18plus) || 0) * c.ratio;
+      if (m === GEO_MEASURE && w > 0 && r.lat != null && r.lon != null) {
+        const k = centroid.get(c.fips) || { w: 0, lat: 0, lon: 0 };
+        k.w += w; k.lat += Number(r.lat) * w; k.lon += Number(r.lon) * w; centroid.set(c.fips, k);
+      }
+    }
   }
-  console.log(`inputs: ${acs.length.toLocaleString()} ACS ZIPs and ${measures.length} PLACES measures folded into ${areas.size.toLocaleString()} counties`);
+  const skipped = MarketModel.measureIds().filter(m => !measures.includes(m));
+  console.log(`inputs: ${acs.length.toLocaleString()} ACS ZIPs and ${measures.length} PLACES measures folded into ${areas.size.toLocaleString()} counties` +
+    (skipped.length ? ` (no data for ${skipped.join(', ')}, left out)` : ''));
+
+  // Training areas: each county plus every county whose centre is within
+  // RADIUS miles, so patients travelling to a nearby hub mostly stay inside.
+  const centres = [...centroid.entries()].map(([f, k]) => ({ fips: f, lat: k.lat / k.w, lon: k.lon / k.w }));
+  const near = new Map();
+  for (const a of centres) near.set(a.fips, centres.filter(b => miles(a.lat, a.lon, b.lat, b.lon) <= RADIUS).map(b => b.fips));
+  const avg = [...near.values()].reduce((t, v) => t + v.length, 0) / Math.max(1, near.size);
+  console.log(`areas: ${near.size.toLocaleString()} counties with a centre, ${avg.toFixed(1)} counties within ${RADIUS} miles on average`);
+  const pooledArea = new Map(), pooledEnroll = new Map();
+  for (const [fips, members] of near) {
+    const pooled = {};
+    let e = 0;
+    for (const f of members) { DemandModel.mergeArea(pooled, areas.get(f)); e += enroll.get(f) || 0; }
+    pooledArea.set(fips, pooled); pooledEnroll.set(fips, e);
+  }
 
   // ---- 5. labels per specialty per county ----------------------------------------
   const patients = new Map(), clinicians = new Map();     // label -> fips -> n
@@ -171,14 +211,27 @@ async function main() {
   for (const [label] of SPECIALTIES) {
     const prof = MarketModel.PROFILES[label] || { m: [] };
     const ms = prof.m.map(x => x[0]).filter(m => measures.includes(m));
+    // A specialty's own condition measures must push demand the way the
+    // profile says (inverted measures, like missed checkups, the other way).
+    const expect = {};
+    prof.m.forEach(x => { if (ms.includes(x[0])) expect['m_' + x[0]] = x[2] ? -1 : 1; });
+    const pts = patients.get(label) || new Map(), cls = clinicians.get(label) || new Map();
     const rows = [];
-    for (const [fips, n] of (patients.get(label) || new Map())) {
-      if (!enroll.has(fips) || !areas.has(fips)) continue;
-      rows.push({ group: stateOf.get(fips) || '??', x: DemandModel.features(areas.get(fips), ms), y: (n / enroll.get(fips)) * 1000 });
+    for (const [fips, members] of near) {
+      let p = 0, c = 0;
+      for (const f of members) { p += pts.get(f) || 0; c += cls.get(f) || 0; }
+      const pooled = pooledArea.get(fips), e = pooledEnroll.get(fips);
+      if (e < MIN_ENROLLEES || c === 0) continue;     // nobody to see patients is supply, not need
+      const x = DemandModel.features(pooled, ms);
+      x.c_supply = Math.log1p((c / e) * 1000);         // clinicians per 1,000 enrollees within reach
+      x.c_logpop = pooled.pop > 0 ? Math.log(pooled.pop) : null;   // urbanity: people within reach
+      rows.push({ group: stateOf.get(fips) || '??', x, y: (p / e) * 1000 });
     }
-    const m = DemandModel.train(label, rows, ms);
-    const top = m.coef ? m.features.map((f, j) => [f, m.coef[j]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3).map(([f, c]) => `${f} ${c >= 0 ? '+' : ''}${c.toFixed(2)}`).join(', ') : '';
-    console.log(`  ${m.usable ? 'USE ' : 'skip'} ${label}: n ${m.n}${m.r2_cv != null ? `, held-out R2 ${m.r2_cv}` : ''}${m.reason ? ` (${m.reason})` : ''}${top ? `; strongest: ${top}` : ''}`);
+    const m = DemandModel.train(label, rows, ms, { controls: ['c_supply', 'c_logpop'], expect });
+    const top = m.coef ? m.features.map((f, j) => [f, m.coef[j]]).filter(([f]) => !f.startsWith('c_'))
+      .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3).map(([f, c]) => `${f} ${c >= 0 ? '+' : ''}${c.toFixed(2)}`).join(', ') : '';
+    const scores = m.r2_cv != null ? `, held-out R2 ${m.r2_cv} (supply and urbanity alone ${m.r2_controls_only}, demand adds ${m.r2_gain})` : '';
+    console.log(`  ${m.usable ? 'USE ' : 'skip'} ${label}: n ${m.n}${scores}${m.reason ? ` [${m.reason}]` : ''}${top ? `; strongest demand inputs: ${top}` : ''}`);
     out.push({ kind: 'demand_model', key: label, data: m });
   }
   const usable = out.filter(r => r.data.usable).length;

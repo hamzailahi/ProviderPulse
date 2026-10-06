@@ -12,10 +12,15 @@
    (Tot_Benes per clinician), summed by county.
 
    WHAT IT DOES NOT LEARN
-   Supply. Clinician counts are deliberately not an input: the access factor
-   already measures supply, and putting it here too would count it twice. Rows
-   with no clinicians of a specialty are left out of training, because zero
-   patients there means nobody local to see, not no need.
+   Supply. Patients are counted where the doctor practises, so a raw model
+   learns where doctors cluster (the first run's strongest input everywhere was
+   college education, a metro proxy, and older or sicker areas read as LOW
+   demand). Two defences: each training area is a county plus every county
+   within 25 miles, so most travel to a nearby hub stays inside it; and supply
+   and urbanity are fitted as controls, then held at their average when
+   scoring, so the answer is "demand if supply were typical". The access factor
+   judges actual supply. A model must also add held-out accuracy beyond the
+   controls alone, and its own condition measures must point the right way.
 
    LIMITS (said on screen wherever the result is shown)
    Medicare fee-for-service only: Medicare Advantage patients are not in the
@@ -42,6 +47,9 @@
   var NOT_MEDICARE = ['Pediatrics (children)', "Women's health / OB-GYN", 'Dental'];
 
   var MIN_R2 = 0.15, MIN_ROWS = 150;
+  // Held-out R^2 the demand inputs must add over supply and urbanity alone, and
+  // how far (standardized) a condition measure may lean the wrong way.
+  var MIN_GAIN = 0.02, SIGN_TOLERANCE = 0.02;
 
   /* area = {
        pop, age65, under18, households, median_income (household-weighted),
@@ -155,37 +163,66 @@
   /* rows: [{ group: state, x: {name: value}, y: patients per 1,000 enrollees }]
      Returns the stored model, or { usable:false, reason } when it should not be
      used. y is modelled as log1p so a few huge counties do not dominate. */
-  function train(label, rows, measures) {
-    var names = featureNames(measures);
+  /* rows: [{ group: state, x: {name: value}, y: patients per 1,000 enrollees }]
+     opts.controls: names of supply/urbanity inputs (prefixed c_) that are fitted
+       so the demand inputs are estimated with supply held fixed, then held at
+       their average when scoring. They never reach a user as a "driver".
+     opts.expect: { feature: +1 | -1 } the direction a specialty's own condition
+       measures must take. A model that says more heart disease means less
+       cardiology is learning geography, not need, and is not used.
+     Returns the stored model, or { usable:false, reason } when it should not be
+     used. y is modelled as log1p so a few huge areas do not dominate. */
+  function train(label, rows, measures, opts) {
+    opts = opts || {};
+    var controls = opts.controls || [], expect = opts.expect || {};
+    var names = featureNames(measures).concat(controls);
     var clean = (rows || []).filter(function (r) {
       return r.y != null && isFinite(r.y) && r.y >= 0 && names.every(function (n) { return r.x[n] != null && isFinite(r.x[n]); });
     });
     if (NOT_MEDICARE.indexOf(label) !== -1) return { specialty: label, usable: false, reason: 'not a Medicare specialty', n: clean.length };
-    if (clean.length < MIN_ROWS) return { specialty: label, usable: false, reason: 'too few counties (' + clean.length + ')', n: clean.length };
+    if (clean.length < MIN_ROWS) return { specialty: label, usable: false, reason: 'too few areas (' + clean.length + ')', n: clean.length };
     var X = clean.map(function (r) { return names.map(function (n) { return r.x[n]; }); });
     var y = clean.map(function (r) { return Math.log1p(r.y); });
     var g = clean.map(function (r) { return r.group; });
-    var best = null;
-    [0.3, 3, 30].forEach(function (lam) {
-      var s = groupedCv(X, y, g, lam);
-      if (s != null && (!best || s > best.r2)) best = { lambda: lam, r2: s };
-    });
+    var bestOf = function (cols) {
+      var Xs = cols ? X.map(function (x) { return cols.map(function (j) { return x[j]; }); }) : X, best = null;
+      [0.3, 3, 30].forEach(function (lam) {
+        var s = groupedCv(Xs, y, g, lam);
+        if (s != null && (!best || s > best.r2)) best = { lambda: lam, r2: s };
+      });
+      return best;
+    };
+    var best = bestOf(null);
     if (!best) return { specialty: label, usable: false, reason: 'could not fit', n: clean.length };
+    // How much the demand inputs add beyond supply and urbanity alone, on held-out states.
+    var ctrlCols = controls.map(function (c) { return names.indexOf(c); });
+    var base = ctrlCols.length ? bestOf(ctrlCols) : null;
+    var gain = base ? best.r2 - base.r2 : best.r2;
     var m = fitRidge(X, y, best.lambda);
-    var preds = X.map(function (x) { return predictRaw(m, x); }).sort(function (a, b) { return a - b; });
-    var ys = clean.map(function (r) { return r.y; }).sort(function (a, b) { return a - b; });
     var round = function (v, k) { var p = Math.pow(10, k); return Math.round(v * p) / p; };
-    var model = {
-      specialty: label, usable: best.r2 >= MIN_R2, reason: best.r2 >= MIN_R2 ? null : 'held-out R^2 ' + round(best.r2, 3) + ' below ' + MIN_R2,
-      n: clean.length, r2_cv: round(best.r2, 4), lambda: best.lambda, features: names,
+    var wrong = Object.keys(expect).filter(function (f) {
+      var j = names.indexOf(f);
+      return j !== -1 && m.coef[j] * expect[f] < -SIGN_TOLERANCE;
+    });
+    var reason = best.r2 < MIN_R2 ? 'held-out R^2 ' + round(best.r2, 3) + ' below ' + MIN_R2
+      : gain < MIN_GAIN ? 'demand inputs add only ' + round(gain, 3) + ' R^2 beyond supply and urbanity (need ' + MIN_GAIN + ')'
+      : wrong.length ? 'wrong direction for ' + wrong.join(', ')
+      : null;
+    // Fitted values with the controls held at their average: what scoring will see.
+    var neutral = function (x) { return x.map(function (v, j) { return ctrlCols.indexOf(j) !== -1 ? m.mean[j] : v; }); };
+    var preds = X.map(function (x) { return predictRaw(m, neutral(x)); }).sort(function (a, b) { return a - b; });
+    var ys = clean.map(function (r) { return r.y; }).sort(function (a, b) { return a - b; });
+    return {
+      specialty: label, usable: !reason, reason: reason,
+      n: clean.length, r2_cv: round(best.r2, 4), r2_controls_only: base ? round(base.r2, 4) : null, r2_gain: round(gain, 4),
+      lambda: best.lambda, features: names, controls: controls,
       intercept: round(m.intercept, 6), coef: m.coef.map(function (v) { return round(v, 6); }),
       mean: m.mean.map(function (v) { return round(v, 6); }), sd: m.sd.map(function (v) { return round(v, 6); }),
-      // Percentile anchors of the fitted values, so a catchment reads as "Nth
-      // percentile of US counties"; and the observed median for context.
+      // Percentile anchors of the (supply-neutral) fitted values, so an area
+      // reads as "Nth percentile of US areas"; and the observed median.
       anchors: { p05: round(quantile(preds, 0.05), 5), p25: round(quantile(preds, 0.25), 5), p50: round(quantile(preds, 0.5), 5), p75: round(quantile(preds, 0.75), 5), p95: round(quantile(preds, 0.95), 5) },
       observed_median_per_1k: round(quantile(ys, 0.5), 1)
     };
-    return model;
   }
 
   function pctFrom(anchors, v) {
@@ -240,6 +277,26 @@
     return area;
   }
 
+  /* Add area `src` into `dst` (both built with addAcs/addPlaces): used to pool
+     the counties within reach of a county into one training area. */
+  function mergeArea(dst, src) {
+    if (!src) return dst;
+    Object.keys(src).forEach(function (k) {
+      if (k === 'places' || k === '_pw' || k === '_pv' || k === 'median_income') return;
+      if (typeof src[k] === 'number') dst[k] = (dst[k] || 0) + src[k];
+    });
+    if (src._pw) {
+      dst._pw = dst._pw || {}; dst._pv = dst._pv || {}; dst.places = dst.places || {};
+      Object.keys(src._pw).forEach(function (m) {
+        dst._pw[m] = (dst._pw[m] || 0) + src._pw[m];
+        dst._pv[m] = (dst._pv[m] || 0) + src._pv[m];
+        dst.places[m] = dst._pv[m] / dst._pw[m];
+      });
+    }
+    dst.median_income = dst.households ? dst.income_x_hh / dst.households : null;
+    return dst;
+  }
+
   var LABELS = {};
   BASE.forEach(function (b) { LABELS[b[0]] = b[1]; });
 
@@ -249,12 +306,16 @@
      that moved it most (direction relative to an average county). */
   function apply(model, feats, measureName) {
     if (!model || !model.usable) return null;
-    var x = model.features.map(function (n) { return feats ? feats[n] : null; });
+    var controls = model.controls || [];
+    // Controls (supply, urbanity) are held at their training average: the
+    // answer is "demand here if supply were typical", which access then judges.
+    var x = model.features.map(function (n, j) { return controls.indexOf(n) !== -1 ? model.mean[j] : (feats ? feats[n] : null); });
     var raw = predictRaw(model, x);
     if (raw == null) return null;
     var pull = model.features.map(function (n, j) {
       return { name: n, z: model.coef[j] * (x[j] - model.mean[j]) / model.sd[j] };
-    }).sort(function (a, b) { return Math.abs(b.z) - Math.abs(a.z); }).slice(0, 3).map(function (p) {
+    }).filter(function (p) { return controls.indexOf(p.name) === -1; })
+      .sort(function (a, b) { return Math.abs(b.z) - Math.abs(a.z); }).slice(0, 3).map(function (p) {
       var label = LABELS[p.name] || (p.name.indexOf('m_') === 0 ? (measureName ? measureName(p.name.slice(2)) : p.name.slice(2)) : p.name);
       return { feature: p.name, label: label, direction: p.z >= 0 ? 'up' : 'down' };
     });
@@ -266,7 +327,7 @@
   }
 
   var API = { addAcs: addAcs, addPlaces: addPlaces, features: features, featureNames: featureNames, fitRidge: fitRidge, predictRaw: predictRaw, groupedCv: groupedCv,
-    train: train, apply: apply, r2: r2, NOT_MEDICARE: NOT_MEDICARE, MIN_R2: MIN_R2, MIN_ROWS: MIN_ROWS, BASE: BASE };
+    train: train, apply: apply, r2: r2, mergeArea: mergeArea, NOT_MEDICARE: NOT_MEDICARE, MIN_R2: MIN_R2, MIN_ROWS: MIN_ROWS, MIN_GAIN: MIN_GAIN, BASE: BASE };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.DemandModel = API;
 })(typeof window !== 'undefined' ? window : this);

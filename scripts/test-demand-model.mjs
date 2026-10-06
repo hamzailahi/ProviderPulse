@@ -52,8 +52,37 @@ check('older population and heart disease are the strongest drivers', ['share_65
 const junk = D.train('Heart / cardiology', rows.map(r => ({ ...r, y: rnd() * 100 })), meas);
 check('noise is stored as unusable, with the reason', !junk.usable && /below/.test(junk.reason));
 check('paediatrics is never trained on Medicare', !D.train('Pediatrics (children)', rows, []).usable);
-check('too few counties is unusable', /too few/.test(D.train('Heart / cardiology', rows.slice(0, 40), meas).reason));
+check('too few areas is unusable', /too few/.test(D.train('Heart / cardiology', rows.slice(0, 40), meas).reason));
 check('rows with a missing input are dropped, not filled', D.train('Heart / cardiology', rows.map((r, i) => i % 2 ? { ...r, x: { ...r.x, m_CHD: null } } : r), meas).n === 150);
+
+console.log('\n3b. Supply is held apart from demand');
+// A world where patients per enrollee follow supply only: more clinicians
+// nearby, more patients seen. Demand inputs are noise. The raw first model
+// would have scored this well; it must not be usable now.
+const conf = [];
+for (let i = 0; i < 300; i++) {
+  const sup = rnd() * 3;
+  conf.push({ group: 'S' + (i % 12), x: { ...rows[i].x, c_supply: sup, c_logpop: 10 + rnd() }, y: Math.expm1(1 + 1.5 * sup + (rnd() - 0.5) * 0.1) });
+}
+const cm = D.train('Heart / cardiology', conf, meas, { controls: ['c_supply', 'c_logpop'] });
+check('supply alone explains it: high R2 but demand adds nothing, so unusable', !cm.usable && cm.r2_cv > 0.8 && /add only/.test(cm.reason), JSON.stringify({ r2: cm.r2_cv, base: cm.r2_controls_only, reason: cm.reason }));
+// Demand AND supply both matter: usable, and the demand effect survives.
+const both = rows.map((r, i) => { const sup = rnd() * 3; return { ...r, x: { ...r.x, c_supply: sup, c_logpop: 10 + rnd() }, y: Math.expm1(Math.log1p(r.y) + 0.8 * sup) }; });
+const bm = D.train('Heart / cardiology', both, meas, { controls: ['c_supply', 'c_logpop'], expect: { m_CHD: 1 } });
+check('with real demand on top of supply, it is usable and says how much demand adds', bm.usable && bm.r2_gain > 0.1, JSON.stringify({ r2: bm.r2_cv, gain: bm.r2_gain, reason: bm.reason }));
+const hi = D.apply(bm, { ...rows[0].x, c_supply: 0 }), lo = D.apply(bm, { ...rows[0].x, c_supply: 3 });
+check('scoring holds supply at average: local supply never moves learned need', hi.per_1k === lo.per_1k && hi.percentile === lo.percentile);
+check('controls are never shown as drivers', hi.drivers.every(d => !d.feature.startsWith('c_')));
+const flip = rows.map(r => ({ ...r, y: Math.expm1(Math.log1p(r.y) + 3 - 0.6 * r.x.m_CHD) }));
+const fm = D.train('Heart / cardiology', flip, meas, { expect: { m_CHD: 1 } });
+check('more heart disease meaning less cardiology demand is refused', !fm.usable && /wrong direction for m_CHD/.test(fm.reason), fm.reason);
+
+console.log('\n3c. Pooling areas');
+const p1 = D.addPlaces(D.addAcs({}, { pop_total: 100, households: 40, median_hh_income: 50000, poverty_universe: 90, poverty_below: 9 }, 1), 'CHD', 10, 100, 1);
+const p2 = D.addPlaces(D.addAcs({}, { pop_total: 300, households: 120, median_hh_income: 90000, poverty_universe: 270, poverty_below: 54 }, 1), 'CHD', 6, 300, 1);
+const pooled = D.mergeArea(D.mergeArea({}, p1), p2);
+check('pooled counts add, shares are recomputed, income is household-weighted', pooled.pop === 400 && Math.abs(D.features(pooled, []).poverty_rate - 63 / 360) < 1e-9 && Math.abs(pooled.median_income - 80000) < 1e-6);
+check('pooled health measures are adult-weighted', Math.abs(pooled.places.CHD - 7) < 1e-9);
 
 console.log('\n4. Applying a model');
 const rich = { ...rows[0].x, share_65plus: 0.34, m_CHD: 9.8 }, young = { ...rows[0].x, share_65plus: 0.11, m_CHD: 4.2 };
@@ -83,7 +112,7 @@ const puf = join(dir, 'puf.csv');
 // patients follow age and heart disease.
 const counties = Array.from({ length: 200 }, (_, i) => {
   const old = 0.1 + rnd() * 0.25, chd = 4 + rnd() * 6;
-  return { fips: String(47000 + i), zip: String(37000 + i), state: 'S' + (i % 10), old, chd, enroll: 10000,
+  return { i, fips: String(47000 + i), zip: String(37000 + i), state: 'S' + (i % 10), old, chd, enroll: 10000,
     benes: Math.round(Math.expm1(1 + 6 * old + 0.2 * chd + (rnd() - 0.5) * 0.2) * 10) };
 });
 writeFileSync(puf, 'Rndrng_NPI,Rndrng_Prvdr_Zip5,Tot_Benes,Other\n' + counties.map((c, i) => `${1000000000 + i},${c.zip},${c.benes},x`).join('\n') + '\n');
@@ -102,7 +131,7 @@ globalThis.fetch = async (url, init) => {
     ins_universe: 950, ins_uninsured: 60 + (Number(c.zip) % 3) * 5, ins_medicaid: 150 + (Number(c.zip) % 4) * 10,
     age_male: Array.from({ length: 18 }, (_, b) => b >= 13 ? Math.round(c.old * 100) : 30), age_female: Array.from({ length: 18 }, (_, b) => b >= 13 ? Math.round(c.old * 100) : 30),
     education: { universe: 600, bachelor: 100 + (Number(c.zip) % 6) * 10, graduate: 50 } })), 'zip'));
-  if (u.includes('cdc_places')) { const m = u.match(/measureid=eq\\.(\\w+)/)[1]; return J(page(u, C.map(c => ({ zip: c.zip, value: m === 'CHD' ? c.chd : 5 + (Number(c.zip) % 9) * 0.3, pop_18plus: 800 })), 'zip')); }
+  if (u.includes('cdc_places')) { const m = u.match(/measureid=eq\\.(\\w+)/)[1]; return J(page(u, C.map(c => ({ zip: c.zip, value: m === 'CHD' ? c.chd : 5 + (Number(c.zip) % 9) * 0.3, pop_18plus: 800, lat: 25 + Math.floor(c.i / 20) * 1.0, lon: -120 + (c.i % 20) * 1.2 })).filter(() => m !== 'KIDNEY'), 'zip')); }
   if (u.includes('market_benchmarks')) { writeFileSync(${JSON.stringify(out)}, init.body); return J([]); }
   throw new Error('unexpected fetch ' + u);
 };
@@ -115,7 +144,9 @@ const hm = written && written.find(r => r.key === 'Heart / cardiology');
 check('the trainer runs and writes one row per specialty', p.status === 0 && written && written.length === 33 && written.every(r => r.kind === 'demand_model'), (p.stdout + p.stderr).slice(-600));
 check('cardiology is learned from the claims and usable', hm && hm.data.usable && hm.data.r2_cv > 0.5, hm && JSON.stringify({ r2: hm.data.r2_cv, reason: hm.data.reason }));
 check('specialties with no clinicians in the file are stored as unusable', written && !written.find(r => r.key === 'Skin / dermatology').data.usable);
-check('the log names held-out scores', /held-out R2/.test(p.stdout));
+check('the log names held-out scores and what demand adds beyond supply', /held-out R2/.test(p.stdout) && /demand adds/.test(p.stdout), p.stdout.slice(-800));
+check('a measure with no data is left out, not allowed to drop every area', /no data for KIDNEY/.test(p.stdout));
+check('areas are pooled within 25 miles (here the counties are far apart, so one each)', /1\.0 counties within 25 miles/.test(p.stdout), (p.stdout.match(/areas:.*/) || [''])[0]);
 p = run({ MIN_PUF_NPIS: '100000' });
 check('a short claims file stops training', p.status !== 0 && /refusing to train/.test(p.stderr));
 
