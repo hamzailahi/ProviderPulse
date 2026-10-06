@@ -531,9 +531,9 @@ from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
 Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06.
-`016` is applied (the first snapshot shows `clinics_npi_unique`). **`028` (closes
-public reads of v1's `access_requests` / `access_codes`) is written, not yet
-applied.** Held back: `002`
+`016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
+public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
+confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
 (patient documents) pending a Supabase BAA, so briefings are profile-only.
 Migrations use `drop policy if exists` before `create policy` so a re-run is
 safe.

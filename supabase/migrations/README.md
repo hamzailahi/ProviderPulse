@@ -65,7 +65,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 025 | `025_demand_model.sql` | allows the `demand_model` kind | not applied, not needed while the demand model is parked |
 | 026 | `026_census_acs_signals.sql` | growth and market signals on `census_acs_zcta` | applied 2026-10-06 |
 | 027 | `027_sahie_county.sql` | Census SAHIE county uninsured estimates | applied 2026-10-06 |
-| 028 | `028_lock_v1_access_tables.sql` | **security fix**: closes public reads of v1's `access_requests` and `access_codes` (names, emails, access codes) | **written, run it now** |
+| 028 | `028_lock_v1_access_tables.sql` | **security fix**: closes public reads of v1's `access_requests` and `access_codes` (names, emails, access codes) | applied 2026-10-06, confirmed by the snapshot |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

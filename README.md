@@ -558,12 +558,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-06
-- **Security fix to apply: migration 028.** The first schema snapshot showed
+- **Security fix applied: migration 028.** The first schema snapshot showed
   that two tables left over from the retired v1 site, `access_requests`
   (names, emails, organizations) and `access_codes` (emails and access
   codes), could be read by anyone with the site's public key. Nothing uses
   them any more. 028 removes the public rules and privileges and keeps the
-  rows. The snapshot also confirmed migration 016 is applied and found three
+  rows. It is applied, and the next snapshot confirmed the public access is
+  gone. The snapshot also confirmed migration 016 is applied and found three
   CMS tables made in the dashboard that are now documented.
 - **The database structure is now kept in git.** Supabase doesn't save SQL
   run in its editor, and the core tables were made by clicking in the
