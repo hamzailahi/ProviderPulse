@@ -1,0 +1,73 @@
+name: Schema snapshot
+
+# Keeps a record of the live Supabase schema in git, because Supabase keeps
+# no history of SQL run in its editor and the core tables were made by hand.
+# Weekly, and on demand. Commits supabase/schema/public.sql to main only when
+# the schema changed, so every commit from this job is a dated record of drift.
+#
+# Needs the repository secret SUPABASE_DB_URL: the Session pooler connection
+# string from Supabase (Connect button, "Session pooler", port 5432).
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'   # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: schema-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Add the repository secret SUPABASE_DB_URL (Supabase, Connect, Session pooler string)."
+            exit 1
+          fi
+
+      # pg_dump must be at least as new as the server. Supabase runs 15 or 17.
+      - name: Install pg_dump 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Dump the schema
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dump-schema.sh supabase/schema/public.sql
+
+      - name: Commit if it changed
+        run: |
+          git add supabase/schema/public.sql
+          if git diff --cached --quiet; then
+            echo "No schema change since the last snapshot." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### Schema changed"
+            echo '```diff'
+            git diff --cached --stat
+            git diff --cached | head -300
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Schema snapshot $(date -u +%F): live database changed [skip netlify]"
+          git push origin HEAD:main
+          echo "::notice::The live schema changed. If that was not from a migration file, write one."

@@ -518,6 +518,17 @@ blast radius. Every decision writes to `audit_log`.
 Base tables were created in the dashboard; everything since is in
 `supabase/migrations/`, applied **by hand in the SQL editor**. There is no
 migration runner, so a file in that folder is not necessarily applied.
+**Supabase keeps no history of editor SQL**: any SQL the user is asked to run
+must first exist as a numbered migration file in git. The live structure is
+recorded in `supabase/schema/public.sql`, dumped weekly by
+`schema-snapshot.yml` (`scripts/dump-schema.sh`, needs the `SUPABASE_DB_URL`
+secret, Session pooler string; it strips pg_dump's per-run `\restrict` token
+so the file only changes with the schema, and refuses dumps that are short,
+lack `clinics`, or contain a credential). A snapshot commit no migration
+explains is hand-made drift: write the migration. `supabase/schema-snapshot.sql`
+is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
+from its output snapshots identically). Status per file is in
+`supabase/migrations/README.md`; keep it current.
 
 Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06.
 `016` (clinics NPI uniqueness) is not confirmed applied. Held back: `002`
@@ -936,6 +947,9 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   (`state_density`). Run it by hand after changing what it computes.
 - **CDC PLACES** (`import-cdc-places.mjs`, yearly Sept 20).
 - **NPI ZIP enrichment** (`enrich-npi-zips.mjs`, hourly): see below.
+- **Schema snapshot** (`schema-snapshot.yml`, weekly Mondays): see Supabase
+  schema. It commits to `main` itself (`[skip netlify]`); those bot commits
+  are the one exception to the README-per-push rule.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is

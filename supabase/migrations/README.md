@@ -1,62 +1,90 @@
 # Supabase migrations
 
+Supabase keeps no history of SQL run in its editor. **This folder, plus the
+schema snapshot, is the only record of the database's structure.** If SQL
+is run anywhere else, save it here as the next numbered file first.
+
+## Two records, and why both exist
+
+| Record | What it is | How it's kept |
+|---|---|---|
+| `supabase/migrations/NNN_*.sql` | every change since the start, in order, with the reasoning in comments | written with each change, by hand |
+| `supabase/schema/public.sql` | what the live database actually is today, including the core tables made by clicking in the dashboard | the **Schema snapshot** GitHub Action dumps it weekly (Mondays) and commits it only when something changed |
+
 The core tables (`clinics`, `demographics_raw`, `hpsa_designations`,
-`provider_profiles`, `provider_insurance`, `patient_profiles`, `audit_log`) were
-created by hand in the Supabase dashboard and are **not** represented here.
-Everything added since is, so it can be reviewed and re-run.
+`provider_profiles`, `provider_insurance`, `patient_profiles`, `audit_log`,
+`access_requests`) were created in the dashboard and have no migration file.
+The snapshot is their record. A snapshot commit that no migration explains
+means someone changed the database by hand: write the matching migration.
 
-## How to run one
+Setting the snapshot up needs one GitHub secret, `SUPABASE_DB_URL`: in
+Supabase, click **Connect**, choose **Session pooler**, copy the string, put
+the database password in it, and save it under GitHub, Settings, Secrets and
+variables, Actions. (The "Direct connection" string will not work: GitHub's
+runners have no IPv6.) Without the secret, `supabase/schema-snapshot.sql` is
+a read-only query that produces the same record from the SQL editor.
 
-Supabase dashboard → **SQL Editor** → **New query** → paste the file → **Run**.
+## How to run a migration
 
-Every file is idempotent (`if not exists` / `on conflict do nothing`), so
-re-running one is safe.
+Supabase dashboard, **SQL Editor**, **New query**, paste the whole file,
+**Run**. Files are written to be re-runnable (`if not exists`,
+`drop policy if exists` before `create policy`). Some wrap their work in
+`begin` / `commit`: run those as one execution.
 
 ## Order and status
 
-| # | File | What it enables | Safe to run now? |
-|---|---|---|---|
-| 001 | `001_leie_exclusions.sql` | OIG exclusion screening at provider registration | **Yes** — you reported this one already applied |
-| 003 | `003_insurance_payers.sql` | State-specific insurance lists on both signup forms | **Yes** — do this one next |
-| 004 | `004_provider_review_status.sql` | Name-based exclusion screening (flag for review) | **Yes** |
-| 002 | `002_patient_documents.sql` | Patient document upload + extraction | **NOT YET** — see below |
-| 013 | `013_npi_zip_enrichment.sql` | `provider_individuals` (NPI-1) + `zip_enrichment_queue` | **Applied** (2026-08-10, confirmed via anon-key curl) — required before 014 |
-| 014 | `014_clinic_secondary_locations.sql` | `clinic_secondary_locations` — pl_pfile secondary practice locations for both clinics and physicians | **Applied** (2026-08-10, confirmed via anon-key curl) — depends on 013 (physician secondary locations reference `provider_individuals`) |
-| 015 | `015_provider_individuals_affiliation.sql` | `provider_individuals.affiliated_clinic_npi` — coordinate-matched heuristic link to a parent clinic | Applied alongside 013/014 as part of the same bulk-load prep |
-| 016 | `016_clinics_npi_unique.sql` | `unique(npi)` on `clinics`, after deduping pre-existing duplicate/blank-NPI rows | **NOT YET applied** — blocks the NPPES bulk-load pipeline's upsert (`on_conflict=npi`) until run; see the file for what was found/removed |
+Status as of 2026-10-06.
 
-They are independent, EXCEPT 014 (depends on 013 — physician secondary locations reference `provider_individuals`) and 016 (should run before any further bulk-load upload, though it doesn't technically depend on 013/014/015) — everything else is creation order, not a dependency chain.
+| # | File | What it adds | Status |
+|---|---|---|---|
+| 001 | `001_leie_exclusions.sql` | OIG exclusion list for registration screening | applied |
+| 002 | `002_patient_documents.sql` | patient document upload and extracted facts (PHI) | **held back** until BAAs are in place, see below |
+| 003 | `003_insurance_payers.sql` | insurance plans by state | applied |
+| 004 | `004_provider_review_status.sql` | review flag for name-based exclusion matches | applied |
+| 005 | `005_provider_availability.sql` | opening hours and appointment settings | applied |
+| 006 | `006_provider_locations.sql` | one account, many practice sites | applied |
+| 007 | `007_fix_location_verified.sql` | corrects 006's `verified` backfill | applied |
+| 008 | `008_directory_audits.sql` | Medicare activity, audit runs, findings, demand log (RLS on, no policies, on purpose) | applied |
+| 009 | `009_cdc_places.sql` | CDC PLACES health measures by ZIP | applied |
+| 010 | `010_cdc_places_centroids.sql` | ZIP centroids on `cdc_places` | applied |
+| 011 | `011_lock_provider_profiles_select.sql` | security fix: closes anon reads of provider profiles | applied |
+| 012 | `012_fix_011_cmd_filter.sql` | makes 011's cleanup actually match | applied |
+| 013 | `013_npi_zip_enrichment.sql` | `provider_individuals` and the enrichment queue | applied 2026-08-10 |
+| 014 | `014_clinic_secondary_locations.sql` | secondary practice addresses (needs 013) | applied 2026-08-10 |
+| 015 | `015_provider_individuals_affiliation.sql` | `affiliated_clinic_npi` | applied |
+| 016 | `016_clinics_npi_unique.sql` | `unique(npi)` on `clinics` after a dedupe | **not confirmed**; the first snapshot will show whether the constraint exists |
+| 017 | `017_cms_provider_cache.sql` | 90-day cache of CMS lookups | applied |
+| 018 | `018_appointments.sql` | appointment requests and briefings | applied |
+| 019 | `019_medicare_county_enrollment.sql` | Medicare enrollment by county | applied |
+| 020 | `020_zip_county_crosswalk.sql` | HUD ZIP to county crosswalk | applied |
+| 021 | `021_market_benchmarks.sql` | market model benchmarks | applied |
+| 022 | `022_market_benchmarks_state_density.sql` | allows the `state_density` kind | applied |
+| 023 | `023_census_acs_zcta.sql` | ACS 5-year detail by ZIP | applied |
+| 024 | `024_census_acs_insurance.sql` | insurance columns on `census_acs_zcta` | applied |
+| 025 | `025_demand_model.sql` | allows the `demand_model` kind | not applied, not needed while the demand model is parked |
+| 026 | `026_census_acs_signals.sql` | growth and market signals on `census_acs_zcta` | applied 2026-10-06 |
+| 027 | `027_sahie_county.sql` | Census SAHIE county uninsured estimates | applied 2026-10-06 |
+
+Only 014 depends on another file (013). Everything else is creation order.
 
 ## Why 002 is held back
 
-`002` creates storage for uploaded medical records — the most sensitive PHI this
-system will hold. Do not run it in production until BAAs are in place with
-**both**:
+`002` creates storage for uploaded medical records, the most sensitive PHI
+this system would hold. Do not run it in production until BAAs are in place
+with **both** Supabase (Team plan or above) and Anthropic, on the API account
+`doc-extract.js` uses, since document contents leave our infrastructure when
+they are read. The code is gated behind `DOCUMENT_UPLOAD_ENABLED`, so the
+feature stays dark either way. Running `002` in a dev project is fine.
 
-1. **Supabase** (Team plan or above)
-2. **Anthropic**, on the API account `doc-extract.js` uses — document contents
-   leave our infrastructure when they are read
+## Adding an insurance plan
 
-The application code is gated behind `DOCUMENT_UPLOAD_ENABLED=false`, so the
-feature stays dark regardless. Running `002` in a dev project is fine.
-
-## After running 003
-
-230 plans are seeded: 13 national carriers plus 217 rows covering **all 50
-states, DC and Puerto Rico** — each state's Blue Cross licensee (they are
-independent companies, not one national insurer), its Medicaid program under its
-own brand (TennCare, Medi-Cal, MassHealth, SoonerCare, Apple Health …), and
-notable regional plans in the larger markets.
-
-**Review the names before launch.** Plan names, Medicaid brands and Blue Cross
-licensees all change, and this is a strong starting set rather than a verified
-market census. A missing plan degrades gracefully — both forms offer "Other" as
-free text — but a *wrong* name looks worse than a missing one. Adding a plan
-needs no code change:
+No code change needed. `state = null` means national, shown in every state.
 
 ```sql
 insert into public.insurance_payers (name, state, category, sort_order)
 values ('Some Regional Plan', 'TN', 'commercial', 60);
 ```
 
-`state = null` means national, shown in every state.
+Plan names, Medicaid brands and Blue Cross licensees change. A missing plan
+degrades gracefully (both forms offer "Other"), but a wrong name looks worse
+than a missing one, so review the list before launch.
