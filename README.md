@@ -549,6 +549,19 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 Newest first. Every change pushed to `main` gets an entry here.
 
+### 2026-10-06
+- **Demand model reworked before switching it on.** The first training run
+  showed the model mostly learning where doctors cluster, not where patients
+  need care: older and sicker areas came out as low demand, because Medicare
+  counts patients where the doctor practises and people travel to hubs. Each
+  training area is now a county plus everything within 25 miles; local supply
+  and urbanity are accounted for during training and held at average when
+  scoring; a model must add accuracy beyond supply alone; and a specialty's
+  own conditions must push demand the right way (more heart disease cannot
+  mean less cardiology). The kidney measure, which has no data, no longer
+  knocks out Kidney and Urology. Nothing is live yet: run "Train demand
+  model" as a dry run again first.
+
 ### 2026-10-05
 - **CMS file lookup fixed for both Medicare jobs.** The CMS data catalog now
   adds a release date to the end of dataset titles, so the lookup for the

@@ -829,13 +829,22 @@ running total; the per-taxonomy tallies were unaffected, and the total is now
 computed correctly with a 5M sanity floor.
 
 **Learned need (`assets/demand-model.js`).** Per specialty, ridge regression of
-log(1 + Medicare patients per 1,000 FFS enrollees) on standardized county
-inputs: share 65+, share under 18, log median income, poverty, uninsured,
-Medicaid, bachelor's-plus, and that specialty's `PROFILES` PLACES measures.
-**Supply is never an input** (access already measures it, and counties with no
-clinicians of a specialty are excluded from training, since zero patients there
-means no one local, not no need). Validation holds out whole states; a model is
-`usable` only with held-out R² >= 0.15 and >= 150 counties. Pediatrics, OB-GYN
+log(1 + Medicare patients per 1,000 FFS enrollees) on standardized inputs:
+share 65+, share under 18, log median income, poverty, uninsured, Medicaid,
+bachelor's-plus, and that specialty's `PROFILES` PLACES measures **that have
+data** (no `KIDNEY` rows, which once zeroed Kidney and Urology). **Claims are
+counted where the doctor practises**, so the first run (2026-10-05, dry) learned
+geography: bachelor's-plus led almost everywhere, primary care had share 65+ at
+-0.55, cardiology CHD -0.30, oncology CANCER -0.20. Fixes, all required: each
+training row is a county **pooled with every county within 25 miles** (label
+and inputs, `mergeArea`); **supply and urbanity are controls**
+(`c_supply` = log1p clinicians per 1,000 enrollees within reach, `c_logpop`),
+fitted then held at their training mean in `apply`, never shown as drivers;
+`usable` needs held-out R² >= 0.15 **and** at least 0.02 more than a
+controls-only model (`r2_gain`) **and** every profile measure's coefficient on
+the expected side (inverted measures negative). Areas with no clinicians of the
+specialty are excluded. Validation holds out whole states (pooled areas can
+cross state lines, a small leak). Pediatrics, OB-GYN
 and dental are never trained (not Medicare business). In `market-score`, the
 catchment is built with the same `addAcs`/`addPlaces` helpers; any unknown input
 means no learned value, and the hand-weighted need stays (`evidence.need.basis`
@@ -995,7 +1004,7 @@ node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) 
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
 node scripts/test-market-model.mjs        # 30: the market opportunity model
-node scripts/test-demand-model.mjs        # 36: the learned demand model, trainer end to end, and scoring
+node scripts/test-demand-model.mjs        # 45: the learned demand model, trainer end to end, and scoring
 node scripts/test-acs.mjs                 # 41: the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 14: the what-if re-score changes supply only
 node scripts/test-market-assistant.mjs    # 58: the assistant, figure repair, tracing (needs npm ci in v2/)
