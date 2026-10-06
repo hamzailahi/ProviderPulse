@@ -1716,20 +1716,6 @@ ALTER TABLE ONLY public.provider_profiles
 
 
 --
--- Name: access_codes Allow public read codes; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "Allow public read codes" ON public.access_codes FOR SELECT USING (true);
-
-
---
--- Name: access_requests Allow public read requests; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "Allow public read requests" ON public.access_requests FOR SELECT USING (true);
-
-
---
 -- Name: clinics Allow public select on clinics; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -1741,13 +1727,6 @@ CREATE POLICY "Allow public select on clinics" ON public.clinics FOR SELECT USIN
 --
 
 CREATE POLICY "Allow public select on demographics_raw" ON public.demographics_raw FOR SELECT USING (true);
-
-
---
--- Name: access_requests Public can submit requests; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "Public can submit requests" ON public.access_requests FOR INSERT TO anon WITH CHECK (true);
 
 
 --
@@ -1783,13 +1762,6 @@ CREATE POLICY "Public read access" ON public.hpsa_designations FOR SELECT TO aut
 --
 
 CREATE POLICY "Public read clinics" ON public.clinics FOR SELECT USING (true);
-
-
---
--- Name: access_codes Public read codes; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "Public read codes" ON public.access_codes FOR SELECT USING (true);
 
 
 --
@@ -2185,8 +2157,6 @@ GRANT ALL ON FUNCTION public.touch_updated_at() TO service_role;
 -- Name: TABLE access_codes; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.access_codes TO anon;
-GRANT ALL ON TABLE public.access_codes TO authenticated;
 GRANT ALL ON TABLE public.access_codes TO service_role;
 
 
@@ -2203,8 +2173,6 @@ GRANT ALL ON SEQUENCE public.access_codes_id_seq TO service_role;
 -- Name: TABLE access_requests; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.access_requests TO anon;
-GRANT ALL ON TABLE public.access_requests TO authenticated;
 GRANT ALL ON TABLE public.access_requests TO service_role;
 
 
