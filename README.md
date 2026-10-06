@@ -559,7 +559,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-06
-- **Taxonomy inventory.** A new manual job records every taxonomy name the
+- **Taxonomy inventory.** First run: 909 distinct taxonomy names over
+  about 10.2 million listings, 893 of them official NUCC names. A new manual job records every taxonomy name the
   directory stores, how many listings carry it, and the official NUCC code
   list, so naming and grouping can be reviewed against the real data. The
   directory itself stores names only, not NUCC codes.

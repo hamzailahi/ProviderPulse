@@ -361,6 +361,18 @@ category-form values (54,987 rows) were left alone on purpose**; nothing in
 NUCC fits a bucket like `Facility / Clinic`, and guessing was rejected. The
 three-way rule still has to exist.
 
+**Live inventory, 2026-10-06** (`supabase/reference/taxonomy-inventory.csv`,
+NUCC 26.1): 909 distinct names over 10,175,703 rows (1.90M `clinics`, 7.15M
+`provider_individuals`, 1.13M secondary). 893 match an official NUCC name
+(871 exactly by display name); only **16 names on 133 rows** match nothing
+(`Facility / Clinic`, `Therapy & Rehabilitation`, a raw code `246ZS0400X`, a
+typo `Biostatiscian`, ...), so the category form is now nearly gone. 347
+clinician names (2.42M rows) fall under no patient specialty, led by
+`Behavior Technician` (562,631 rows), which `taxonomy-groups.js` also files
+under Specialty Medicine rather than Behavioral Health. Three `mapTerms`
+match nothing stored: `Podiatry`, `Speech & Hearing`, `Alternative Medicine`.
+Not yet acted on: awaiting the taxonomy review.
+
 ## Insurance payers are state-specific
 
 `insurance_payers` (migration 003) holds national carriers (`state is null`)
