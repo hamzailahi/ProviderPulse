@@ -445,7 +445,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`027_sahie_county.sql`.
+`028_lock_v1_access_tables.sql`.
 
 ## Environment variables
 
@@ -558,6 +558,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 Newest first. Every change pushed to `main` gets an entry here.
 
 ### 2026-10-06
+- **Security fix to apply: migration 028.** The first schema snapshot showed
+  that two tables left over from the retired v1 site, `access_requests`
+  (names, emails, organizations) and `access_codes` (emails and access
+  codes), could be read by anyone with the site's public key. Nothing uses
+  them any more. 028 removes the public rules and privileges and keeps the
+  rows. The snapshot also confirmed migration 016 is applied and found three
+  CMS tables made in the dashboard that are now documented.
 - **The database structure is now kept in git.** Supabase doesn't save SQL
   run in its editor, and the core tables were made by clicking in the
   dashboard, so nothing recorded them. A new weekly job dumps the live

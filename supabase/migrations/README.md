@@ -13,7 +13,8 @@ is run anywhere else, save it here as the next numbered file first.
 
 The core tables (`clinics`, `demographics_raw`, `hpsa_designations`,
 `provider_profiles`, `provider_insurance`, `patient_profiles`, `audit_log`,
-`access_requests`) were created in the dashboard and have no migration file.
+`access_requests`, `access_codes`, and the CMS tables `cms_county_utilization`,
+`cms_procedures_full`, `cms_zip_procedures`) were created in the dashboard and have no migration file.
 The snapshot is their record. A snapshot commit that no migration explains
 means someone changed the database by hand: write the matching migration.
 
@@ -33,7 +34,7 @@ Supabase dashboard, **SQL Editor**, **New query**, paste the whole file,
 
 ## Order and status
 
-Status as of 2026-10-06.
+Status as of 2026-10-06, checked against the first schema snapshot.
 
 | # | File | What it adds | Status |
 |---|---|---|---|
@@ -52,7 +53,7 @@ Status as of 2026-10-06.
 | 013 | `013_npi_zip_enrichment.sql` | `provider_individuals` and the enrichment queue | applied 2026-08-10 |
 | 014 | `014_clinic_secondary_locations.sql` | secondary practice addresses (needs 013) | applied 2026-08-10 |
 | 015 | `015_provider_individuals_affiliation.sql` | `affiliated_clinic_npi` | applied |
-| 016 | `016_clinics_npi_unique.sql` | `unique(npi)` on `clinics` after a dedupe | **not confirmed**; the first snapshot will show whether the constraint exists |
+| 016 | `016_clinics_npi_unique.sql` | `unique(npi)` on `clinics` after a dedupe | applied (the snapshot shows `clinics_npi_unique`) |
 | 017 | `017_cms_provider_cache.sql` | 90-day cache of CMS lookups | applied |
 | 018 | `018_appointments.sql` | appointment requests and briefings | applied |
 | 019 | `019_medicare_county_enrollment.sql` | Medicare enrollment by county | applied |
@@ -64,6 +65,7 @@ Status as of 2026-10-06.
 | 025 | `025_demand_model.sql` | allows the `demand_model` kind | not applied, not needed while the demand model is parked |
 | 026 | `026_census_acs_signals.sql` | growth and market signals on `census_acs_zcta` | applied 2026-10-06 |
 | 027 | `027_sahie_county.sql` | Census SAHIE county uninsured estimates | applied 2026-10-06 |
+| 028 | `028_lock_v1_access_tables.sql` | **security fix**: closes public reads of v1's `access_requests` and `access_codes` (names, emails, access codes) | **written, run it now** |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

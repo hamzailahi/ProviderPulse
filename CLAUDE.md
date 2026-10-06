@@ -531,7 +531,9 @@ from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
 Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06.
-`016` (clinics NPI uniqueness) is not confirmed applied. Held back: `002`
+`016` is applied (the first snapshot shows `clinics_npi_unique`). **`028` (closes
+public reads of v1's `access_requests` / `access_codes`) is written, not yet
+applied.** Held back: `002`
 (patient documents) pending a Supabase BAA, so briefings are profile-only.
 Migrations use `drop policy if exists` before `create policy` so a re-run is
 safe.
@@ -563,6 +565,14 @@ Tables:
 - `patient_documents` / `patient_document_facts`: **PHI**, migration 002, not
   applied.
 - `audit_log`: service role only.
+- `access_requests`, `access_codes`: v1 leftovers (names, emails, one-time
+  codes). Unused by any code. Until 028 they had `USING (true)` select
+  policies, readable with the publishable key; 028 drops them and revokes
+  anon/authenticated privileges.
+- `cms_county_utilization` (ER visits, stays, readmissions by county FIPS) and
+  `cms_procedures_full` (CMS by-provider-and-service rows by ZIP): made in the
+  dashboard, public read, read directly by `index.html`. `cms_zip_procedures`
+  is public read and unused by any code.
 - `insurance_payers`: national + per-state plans, public read.
 - `leie_exclusions`: `id` primary key (**not** NPI: most rows have none, and
   177 NPIs repeat). Service role only.
