@@ -24,18 +24,19 @@ psqlq() { psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X "$@"; }
 # ---- 1. Size check (read only) -------------------------------------------
 # An UPDATE writes a new version of each row and, for indexed tables, new index
 # entries; the old versions are only reclaimed by vacuum. Worst case the three
-# tables need their current total size again, plus the staging table.
+# tables need their current total size again, plus the staging table, plus a
+# burst of write-ahead log (WAL) before checkpoints recycle it.
 echo "== Size check"
 psqlq -At -F $'\t' -c "begin transaction read only;
   select c.relname, pg_total_relation_size(c.oid) from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public' and c.relname in ('clinics','provider_individuals','clinic_secondary_locations');
   commit;" > "$WORK/sizes.tsv" 2> "$WORK/err" || fail "Size check failed: $(tr '\n' ' ' < "$WORK/err" | cut -c1-300)"
 total_bytes=$(awk -F'\t' '{s+=$2} END {print s+0}' "$WORK/sizes.tsv")
-need_gb=$(awk -v b="$total_bytes" 'BEGIN { printf "%.1f", (b * 1.1 + 1.5e9) / 1e9 }')
+need_gb=$(awk -v b="$total_bytes" 'BEGIN { printf "%.1f", (b * 1.1 + 1.5e9 + 2e9) / 1e9 }')
 {
   echo "## Size check"; echo
   awk -F'\t' '{ printf "- %s: %.2f GB\n", $1, $2/1e9 }' "$WORK/sizes.tsv"
-  echo "- Estimated extra disk needed for the backfill: **${need_gb} GB** (all three tables rewritten once, plus about 1.5 GB of staging)"
+  echo "- Estimated extra disk needed for the backfill: **${need_gb} GB** (all three tables rewritten once, about 1.5 GB of staging and 2 GB of WAL)"
   echo "- Free disk entered: ${DISK_FREE_GB:-not given}"
 } > "$WORK/size.md"
 cat "$WORK/size.md"

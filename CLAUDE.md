@@ -392,8 +392,9 @@ keyword matching and no default bucket**. Three phases, each gated:
    with a reason. Secondary rows take their parent NPI's code. Decisions live
    in one tested place (`scripts/lib/taxonomy-map.mjs`, `taxonomy-assign.mjs`);
    dry run and apply share them. Apply refuses unless the `disk_free_gb` input
-   covers ~1.1x the three tables' size plus 1.5 GB staging (an UPDATE writes a
-   new row version). Updates run per 4-digit NPI prefix, each its own
+   covers ~1.1x the three tables' size plus 1.5 GB staging and 2 GB of WAL
+   (an UPDATE writes a new row version; the first dry run, 2026-10-08, measured
+   the tables at 3.1 GB, so about 6.9 GB, against 2.9 GB free on a 12 GB disk). Updates run per 4-digit NPI prefix, each its own
    transaction, VACUUM every 250, skipping rows already right, so a rerun
    resumes. Then migration 030 (indexes, concurrently). The hourly enrichment
    writes `taxonomy_code` (`nppes_api`) once the column exists.

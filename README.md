@@ -567,7 +567,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   classification and specialization, the matching Medicare specialty, and
   whether it shows on the map (students are hidden). Every listing gets a
   `taxonomy_code` taken from NPPES by NPI, through a new manual job that
-  first checks there is enough database disk for the rewrite. Anything it
+  first checks there is enough database disk for the rewrite (tables,
+  staging and write-ahead log). Anything it
   cannot place goes to an exceptions file with a reason, never into a
   default group. New hourly backfill rows get their code too. Next:
   phase 2 colors the map by the official groupings, and phase 3 rebuilds
