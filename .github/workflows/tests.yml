@@ -72,5 +72,10 @@ jobs:
       - name: Market opportunity model
         run: node scripts/test-market-model.mjs
 
+      - name: NUCC taxonomy map (and the generated file is in sync)
+        run: |
+          node scripts/build-taxonomy-map.mjs --check
+          node scripts/test-taxonomy-map.mjs
+
       - name: Market assistant (stepped agent, tools, history rules)
         run: node scripts/test-market-assistant.mjs

@@ -66,6 +66,8 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 026 | `026_census_acs_signals.sql` | growth and market signals on `census_acs_zcta` | applied 2026-10-06 |
 | 027 | `027_sahie_county.sql` | Census SAHIE county uninsured estimates | applied 2026-10-06 |
 | 028 | `028_lock_v1_access_tables.sql` | **security fix**: closes public reads of v1's `access_requests` and `access_codes` (names, emails, access codes) | applied 2026-10-06, confirmed by the snapshot |
+| 029 | `029_taxonomy_codes.sql` | `taxonomy_map` table, and `taxonomy_code` / `taxonomy_code_source` on the three directory tables (nullable, no rewrite) | written, **run before the taxonomy backfill** |
+| 030 | `030_taxonomy_code_indexes.sql` | indexes on `taxonomy_code`, built concurrently (no begin/commit) | written, **run only after the backfill finishes in apply mode** |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

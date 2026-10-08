@@ -43,9 +43,23 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: bash scripts/taxonomy-inventory.sh
 
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      # The CMS Medicare specialty crosswalk feeds taxonomy_map's cms_* columns.
+      # A failure here is a warning: the last committed copy (if any) is kept.
+      - name: Fetch the CMS taxonomy crosswalk
+        run: node scripts/fetch-cms-taxonomy-crosswalk.mjs || echo "::warning::CMS crosswalk not refreshed; keeping the last copy"
+
+      # Rebuild the taxonomy map from whatever NUCC release and crosswalk are now
+      # in supabase/reference, so a new NUCC version flows through on its own.
+      - name: Rebuild the taxonomy map
+        run: node scripts/build-taxonomy-map.mjs
+
       - name: Commit if it changed
         run: |
-          git add supabase/reference
+          git add supabase/reference v2/assets/taxonomy-map.js
           if git diff --cached --quiet; then
             echo "No change since the last inventory." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0

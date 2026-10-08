@@ -77,7 +77,8 @@ second copy. The `access_requests` table still holds v1's data.
 | `forms.css` | `register-provider.html`, `auth.html`, `admin-review.html`, `404.html` |
 | `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, paged `tableQuery`/`providerRowsQuery`, `milesBetween`, MapTiler key, ZIP centroid lookup |
 | `specialties.js` | the 33 patient-facing specialties (see taxonomy section); also `require`d by `market-score.js` and the benchmark builder |
-| `taxonomy-groups.js` | six specialty groups and their colors; the dashboard map colors by it, `market-score.js` counts supply with it |
+| `taxonomy-groups.js` | six specialty groups and their colors; the dashboard map colors by it, `market-score.js` counts supply with it. **Being replaced** by `taxonomy-map.js` (see NUCC codes) |
+| `taxonomy-map.js` | **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `health-demand.js` | CDC PLACES need model per group; browser + `require` |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
 | `demand-model.js` | the learned demand model (ridge regression per specialty, state-held-out validation, `addAcs`/`addPlaces` area builders shared by trainer and scorer); browser + `require` |
@@ -371,7 +372,53 @@ clinician names (2.42M rows) fall under no patient specialty, led by
 `Behavior Technician` (562,631 rows), which `taxonomy-groups.js` also files
 under Specialty Medicine rather than Behavioral Health. Three `mapTerms`
 match nothing stored: `Podiatry`, `Speech & Hearing`, `Alternative Medicine`.
-Not yet acted on: awaiting the taxonomy review.
+Being acted on: see NUCC codes below.
+
+### NUCC codes (replacing keyword groups; phase 1 shipped 2026-10-08)
+
+The spec: classify every listing by its own NUCC code and the official
+hierarchy (Grouping, then Classification, then Specialization), with **no
+keyword matching and no default bucket**. Three phases, each gated:
+
+1. **Data (shipped, not yet run).** Migration 029 adds `taxonomy_map` and
+   `taxonomy_code` / `taxonomy_code_source` on `clinics`,
+   `provider_individuals`, `clinic_secondary_locations`. The
+   `taxonomy-backfill.yml` job (`scripts/taxonomy-backfill.sh`) takes each
+   NPI's code from the NPPES monthly file: the slot flagged primary, else the
+   first listed (`nppes_first`, counted), else, for an NPI NPPES lacks or a
+   code missing from the NUCC release, an **exact** display-name match
+   (`display_name`; names shared by two codes such as `Pharmacist` never
+   resolve). Everything else goes to `supabase/reference/taxonomy-exceptions.csv`
+   with a reason. Secondary rows take their parent NPI's code. Decisions live
+   in one tested place (`scripts/lib/taxonomy-map.mjs`, `taxonomy-assign.mjs`);
+   dry run and apply share them. Apply refuses unless the `disk_free_gb` input
+   covers ~1.1x the three tables' size plus 1.5 GB staging (an UPDATE writes a
+   new row version). Updates run per 4-digit NPI prefix, each its own
+   transaction, VACUUM every 250, skipping rows already right, so a rerun
+   resumes. Then migration 030 (indexes, concurrently). The hourly enrichment
+   writes `taxonomy_code` (`nppes_api`) once the column exists.
+2. **Map (next).** Map groups become the NUCC `Grouping` strings verbatim (29
+   names; `Other Service Providers` exists in both sections, so 30
+   section/grouping pairs), individual groupings in one color family and
+   organizational ones in a muted second family, legend and filter with counts,
+   tooltip Grouping > Classification > Specialization + code. A listing whose
+   code is unknown is **hidden and reported** (console error naming the code,
+   status line count), never reassigned.
+3. **Patient specialties (after review).** The 33 specialties re-keyed on
+   codes; every visible Individual code (698 in v26.1) must belong to at least
+   one, explicitly, in `supabase/reference/taxonomy-overrides.csv`
+   (`patient_specialties`, `;`-separated). Hospital-only NPs (Acute Care,
+   Critical Care, Neonatal) go to a new **Hospital-based clinicians**
+   specialty (the user's choice). The full table goes to the user as a
+   spreadsheet for approval before search switches; benchmarks are rebuilt
+   after.
+
+Until phase 2 ships, `taxonomy-groups.js` remains the live classifier.
+`show_on_map` and patient specialties are data in the overrides CSV, never
+code; today the only override hides `390200000X` (Student, Health Care).
+`taxonomy-map.js` and `supabase/reference/taxonomy_map.csv` are generated
+from `nucc_taxonomy.csv` + `cms_taxonomy_crosswalk.csv` + the overrides; CI
+runs `build-taxonomy-map.mjs --check`, so a hand edit or stale file fails.
 
 ## Insurance payers are state-specific
 
@@ -542,7 +589,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. **`029` (taxonomy codes) written, not applied; `030` (its indexes) only after the backfill.**
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
@@ -644,6 +691,12 @@ Tables:
   without a rate; Shelby County TN 12.6% +/-0.8 of 732,633 under 65. Note it
   differs from the ZIP's ACS uninsured share (38017: 6.2%, all ages): different
   area and different ages, both correct.
+- `taxonomy_map` (029): one row per NUCC code, loaded from
+  `supabase/reference/taxonomy_map.csv` by the backfill job (never by a
+  migration, so a NUCC release needs none): official `grouping`,
+  `classification`, `specialization`, `display_name`, `section`, CMS
+  `cms_specialty_code` / `cms_specialty_name` (several joined with `; `),
+  `patient_specialties text[]`, `show_on_map`, `nucc_version`. Public read.
 - `market_benchmarks`: benchmarks for the market model (021), keyed
   `(kind, key)`: `measure`, `specialty`, and `state_density` (the last needs 022's widened check constraint; first written 2026-09-30, 114 rows). Public read,
   service-role write.
@@ -977,8 +1030,15 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   `provider_individuals` and `clinic_secondary_locations` (session forced
   `default_transaction_read_only`), written with the newest NUCC CSV (link
   scraped from nucc.org, highest version) to `supabase/reference/`. Commits to
-  `main` like the snapshot. The directory tables store taxonomy **names only**;
-  NUCC codes exist only in `provider_profiles.taxonomy_code`.
+  `main` like the snapshot. It also fetches the CMS taxonomy crosswalk (a
+  warning, not a failure, if CMS is down) and rebuilds `taxonomy-map.js`, so a
+  new NUCC release flows through. Until the backfill runs, the directory tables
+  store taxonomy **names only**.
+- **Taxonomy backfill** (`taxonomy-backfill.yml`, manual only): see NUCC
+  codes. Inputs `mode` (`dry_run` / `apply`), `disk_free_gb`, `nppes_url`.
+  Commits `taxonomy-backfill-summary.md` and `taxonomy-exceptions.csv` (capped
+  at 200,000 rows). The NPPES file is about 1 GB zipped, 9M rows; NPPES_MIN_ROWS
+  exists only for tests.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is
@@ -1092,6 +1152,7 @@ node scripts/test-market-assistant.mjs    # 58: the assistant, figure repair, tr
 node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
+node scripts/test-taxonomy-map.mjs        # 47: NUCC map, no default bucket, primary-code choice, exact-name fallback
 ```
 
 Frontends are verified in headless Chromium (Playwright) against mocked

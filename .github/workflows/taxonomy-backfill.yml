@@ -1,0 +1,87 @@
+name: Taxonomy backfill
+
+# Manual only. Fills taxonomy_code on clinics, provider_individuals and
+# clinic_secondary_locations from the NPPES monthly full file, and loads the
+# taxonomy_map table. Needs migration 029. See scripts/taxonomy-backfill.sh.
+#
+# Run dry_run first: it writes nothing to the database and commits a summary
+# and an exceptions file to supabase/reference/. Then run apply with the free
+# disk shown in Supabase (Settings, Compute and Disk); it refuses if that is
+# less than the size check says the rewrite needs. Re-running resumes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: dry_run writes nothing; apply writes codes
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+      disk_free_gb:
+        description: Free database disk in GB, from Supabase (needed for apply)
+        required: false
+      nppes_url:
+        description: Optional direct link to the NPPES monthly zip (skips the download page)
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: taxonomy-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Add the repository secret SUPABASE_DB_URL (Supabase, Connect, Session pooler string)."
+            exit 1
+          fi
+
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Backfill
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          MODE: ${{ inputs.mode }}
+          DISK_FREE_GB: ${{ inputs.disk_free_gb }}
+          NPPES_URL: ${{ inputs.nppes_url }}
+          WORK: ${{ runner.temp }}/taxbf
+        run: bash scripts/taxonomy-backfill.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          [ -f supabase/reference/taxonomy-backfill-summary.md ] && cat supabase/reference/taxonomy-backfill-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Commit the summary and exceptions
+        if: always()
+        run: |
+          git add supabase/reference/taxonomy-backfill-summary.md supabase/reference/taxonomy-exceptions.csv 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Taxonomy backfill (${{ inputs.mode }}) $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

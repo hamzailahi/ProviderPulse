@@ -97,10 +97,21 @@ async function fetchNppesZip(zip, enumerationType) {
   return out;
 }
 
-function primaryTaxonomyDesc(rec) {
+function primaryTaxonomy(rec) {
   const taxes = rec.taxonomies || [];
-  const primary = taxes.find(t => t.primary) || taxes[0] || {};
-  return primary.desc || null;
+  return taxes.find(t => t.primary) || taxes[0] || {};
+}
+function primaryTaxonomyDesc(rec) {
+  return primaryTaxonomy(rec).desc || null;
+}
+
+// The NUCC code for the same taxonomy (migration 029). Sent only when the
+// column exists, so this job keeps working if it deploys before 029 is applied.
+let hasTaxonomyCode = false;
+function withCode(row, rec) {
+  if (!hasTaxonomyCode) return row;
+  const code = String(primaryTaxonomy(rec).code || '').trim().toUpperCase();
+  return { ...row, taxonomy_code: code || null, taxonomy_code_source: code ? 'nppes_api' : null };
 }
 
 function locationAddress(rec) {
@@ -155,8 +166,8 @@ async function enrichOneZip(zip) {
     fetchNppesZip(zip, 'NPI-1')
   ]);
 
-  const orgRows = orgRecords.map(compactOrg).filter(r => r.npi);
-  const individualRows = individualRecords.map(compactIndividual).filter(r => r.npi);
+  const orgRows = orgRecords.map(r => withCode(compactOrg(r), r)).filter(r => r.npi);
+  const individualRows = individualRecords.map(r => withCode(compactIndividual(r), r)).filter(r => r.npi);
 
   const existingOrgNpis = await existingNpis('clinics', orgRows.map(r => r.npi));
   const existingIndividualNpis = await existingNpis('provider_individuals', individualRows.map(r => r.npi));
@@ -183,6 +194,8 @@ async function enrichOneZip(zip) {
 }
 
 async function main() {
+  try { await sbGet('clinics?select=taxonomy_code&limit=1'); hasTaxonomyCode = true; }
+  catch (e) { console.log('taxonomy_code column not present (migration 029 not applied); inserting without codes'); }
   let queueRows;
   if (singleZip) {
     if (!/^\d{5}$/.test(singleZip)) { console.error('--zip must be 5 digits'); process.exit(1); }
