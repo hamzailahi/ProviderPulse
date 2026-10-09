@@ -603,7 +603,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; **`030` (its indexes) to run now.** `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`

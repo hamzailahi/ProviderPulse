@@ -565,8 +565,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 - **Every listing now carries its official taxonomy code.** The backfill
   gave 10,175,696 of 10,175,703 listings their NUCC code from the September
   NPPES file (7 remain, all old labels with no exact NUCC match, listed for
-  review). Nothing on the map or in search changes yet; the next step colors
-  the map by the official NUCC groupings.
+  review), and the code columns are indexed. Nothing on the map or in search
+  changes yet; the next step colors the map by the official NUCC groupings.
 - **Procedures summary tried and dropped.** Shrinking the 4 GB Medicare
   procedures table into a ZIP-level summary turned out too slow and too heavy
   for the database's disk, and briefly broke the Procedures panel while it
