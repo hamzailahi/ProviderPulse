@@ -8,13 +8,23 @@
 set -euo pipefail
 : "${SUPABASE_DB_URL:?Set SUPABASE_DB_URL}"
 OUT=supabase/reference/procedures-summary-check.md
-q() { psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -At -F '|' -c "begin transaction read only; set local statement_timeout = '20min'; set local lock_timeout = '10s'; $1; commit;"; }
+# Every query's error is raised as an annotation, so a failure is readable
+# from the check run without the full log.
+q() {
+  local out
+  if ! out=$(psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -At -F '|' -c "begin transaction read only; set local statement_timeout = '20min'; set local lock_timeout = '10s'; $1; commit;" 2>/tmp/q.err); then
+    echo "::error::Query failed: $(tr '\n' ' ' < /tmp/q.err | cut -c1-400)" >&2
+    echo "::error::Query failed: $(tr '\n' ' ' < /tmp/q.err | cut -c1-400)"
+    return 1
+  fi
+  printf '%s\n' "$out"
+}
 
 # Before comparing, say plainly whether 031 has finished: the summary must
 # exist (committed), and no session may still be building it. Building holds
 # a lock, so a lookup that cannot get one in 10s means it is still running.
-running=$(q "select count(*) from pg_stat_activity where state <> 'idle' and pid <> pg_backend_pid() and query ilike '%cms_procedures_by_zip%'" 2>/dev/null || echo "?")
-exists=$(q "select to_regclass('public.cms_procedures_by_zip') is not null")
+running=$(q "select count(*) from pg_stat_activity where state <> 'idle' and pid <> pg_backend_pid() and query ilike '%cms_procedures_by_zip%'") || exit 1
+exists=$(q "select to_regclass('public.cms_procedures_by_zip') is not null") || exit 1
 if [ "$exists" != "t" ]; then
   msg="cms_procedures_by_zip does not exist yet: migration 031 has not committed (sessions still working on it: $running). If none, run 031 again."
   echo "::error::$msg"; echo "$msg" >&2
