@@ -445,7 +445,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`033_abandon_procedures_summary.sql`; 031 and 032 are marked do-not-run.
+`033_abandon_procedures_summary.sql`; 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
 
 ## Environment variables
 
@@ -561,6 +561,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-09
 
+- **Every listing now carries its official taxonomy code.** The backfill
+  gave 10,175,696 of 10,175,703 listings their NUCC code from the September
+  NPPES file (7 remain, all old labels with no exact NUCC match, listed for
+  review). Nothing on the map or in search changes yet; the next step colors
+  the map by the official NUCC groupings.
 - **Procedures summary tried and dropped.** Shrinking the 4 GB Medicare
   procedures table into a ZIP-level summary turned out too slow and too heavy
   for the database's disk, and briefly broke the Procedures panel while it

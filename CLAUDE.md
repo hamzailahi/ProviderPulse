@@ -380,7 +380,7 @@ The spec: classify every listing by its own NUCC code and the official
 hierarchy (Grouping, then Classification, then Specialization), with **no
 keyword matching and no default bucket**. Three phases, each gated:
 
-1. **Data (shipped, not yet run).** Migration 029 adds `taxonomy_map` and
+1. **Data (done 2026-10-09).** Migration 029 adds `taxonomy_map` and
    `taxonomy_code` / `taxonomy_code_source` on `clinics`,
    `provider_individuals`, `clinic_secondary_locations`. The
    `taxonomy-backfill.yml` job (`scripts/taxonomy-backfill.sh`) takes each
@@ -402,6 +402,15 @@ keyword matching and no default bucket**. Three phases, each gated:
    transaction, VACUUM every 250, skipping rows already right, so a rerun
    resumes. Then migration 030 (indexes, concurrently). The hourly enrichment
    writes `taxonomy_code` (`nppes_api`) once the column exists.
+   **Applied 2026-10-09** (NPPES September 2026 file, 3h01m on an 18 GB disk):
+   10,175,696 of 10,175,703 rows coded; 9,443,429 NPPES NPIs carried a
+   taxonomy and every one was flagged primary (`nppes_first` 0); 18,622 rows
+   by exact display name, 873 by the reviewed name list; **7 exceptions**
+   (reversed legacy labels such as `Counselor, Professional`, and the retired
+   code `246ZS0400X`) in `supabase/reference/taxonomy-exceptions.csv`. The
+   stored name agreed with the NPPES code on 98.5 to 99.6% of rows; the rest
+   changed taxonomy between the March load and September, and the code is the
+   newer fact.
 2. **Map (next).** Map groups become the NUCC `Grouping` strings verbatim (29
    names; `Other Service Providers` exists in both sections, so 30
    section/grouping pairs), individual groupings in one color family and
@@ -594,7 +603,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08; `030` (its indexes) only after the backfill. `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; **`030` (its indexes) to run now.** `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
