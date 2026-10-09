@@ -1065,6 +1065,12 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   Commits `taxonomy-backfill-summary.md` and `taxonomy-exceptions.csv` (capped
   at 200,000 rows). The NPPES file is about 1 GB zipped, 9M rows; NPPES_MIN_ROWS
   exists only for tests.
+- **Taxonomy code indexes** (`taxonomy-indexes.yml`, manual,
+  `scripts/taxonomy-indexes.sh`): applies 030 through psql, because the SQL
+  editor wraps a pasted script in one transaction and `CREATE INDEX
+  CONCURRENTLY` refuses that (error 25001, 2026-10-09). Drops invalid leftovers
+  first; fails unless all three indexes are valid. Use the same pattern for any
+  future concurrent index migration.
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
   read-only sizes of every table and index, dead rows, index use, WAL, to
   `supabase/reference/db-size-report.md`. Run it before any disk decision.

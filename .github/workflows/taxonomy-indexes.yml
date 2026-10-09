@@ -1,0 +1,30 @@
+name: Taxonomy code indexes
+
+# Manual only. Applies migration 030 (three CREATE INDEX CONCURRENTLY
+# statements) through psql, because the Supabase SQL editor wraps a pasted
+# script in a transaction and concurrent index builds refuse to run in one.
+# Drops any invalid leftover from a failed build first, and fails unless all
+# three indexes end up valid. Needs the SUPABASE_DB_URL secret.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  indexes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Build the indexes
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/taxonomy-indexes.sh
