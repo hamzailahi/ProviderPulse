@@ -258,15 +258,50 @@ export function displayNameIndex(nucc) {
 }
 
 /**
+ * Reviewed choices for display names NUCC gives to two codes
+ * (supabase/reference/taxonomy-name-overrides.csv: display_name, nucc_code,
+ * note). Each row must name a display name that really is ambiguous, and a
+ * code that really carries that name, so the file cannot quietly map one name
+ * to an unrelated code. Returns Map(lower-case name -> code).
+ */
+export function parseNameOverrides(text, nucc) {
+  const rows = parseCsv(text);
+  const ix = headerIndex(rows[0], { name: ['display_name'], code: ['nucc_code'] }, 'taxonomy name overrides');
+  const byName = new Map();
+  for (const n of nucc) {
+    const k = n.display_name.trim().toLowerCase();
+    if (k) byName.set(k, (byName.get(k) || []).concat(n.code));
+  }
+  const out = new Map();
+  for (const r of rows.slice(1)) {
+    const name = (r[ix.name] || '').trim(), code = (r[ix.code] || '').trim();
+    if (!name && !code) continue;
+    const k = name.toLowerCase(), codes = byName.get(k) || [];
+    if (!codes.length) throw new Error(`taxonomy name overrides: "${name}" is not a NUCC display name`);
+    if (codes.length < 2) throw new Error(`taxonomy name overrides: "${name}" is not ambiguous (only ${codes[0]}); no override needed`);
+    if (!codes.includes(code)) throw new Error(`taxonomy name overrides: ${code} does not carry the name "${name}" (it is one of ${codes.join(', ')})`);
+    if (out.has(k)) throw new Error(`taxonomy name overrides: "${name}" is listed twice`);
+    out.set(k, code);
+  }
+  return out;
+}
+
+/**
  * The fallback for an NPI NPPES does not have (deactivated, or missing from the
- * file): an exact display-name match only. Never fuzzy, never keywords.
+ * file): an exact display-name match only. Never fuzzy, never keywords. A name
+ * NUCC uses for two codes resolves only through a reviewed name override
+ * (source 'display_name_reviewed'); otherwise it is an exception.
  * Returns {code, source} or {code: null, reason}.
  */
-export function resolveByName(name, index) {
+export function resolveByName(name, index, nameOverrides) {
   const k = String(name || '').trim().toLowerCase();
   if (!k) return { code: null, reason: 'not in NPPES; no stored taxonomy name' };
   if (!index.has(k)) return { code: null, reason: 'not in NPPES; stored name is not a NUCC display name' };
   const code = index.get(k);
-  if (!code) return { code: null, reason: 'not in NPPES; stored name matches more than one NUCC code' };
+  if (!code) {
+    const reviewed = nameOverrides && nameOverrides.get(k);
+    if (reviewed) return { code: reviewed, source: 'display_name_reviewed' };
+    return { code: null, reason: 'not in NPPES; stored name matches more than one NUCC code' };
+  }
   return { code, source: 'display_name' };
 }

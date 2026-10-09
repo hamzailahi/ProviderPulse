@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseCsv, parseNucc, parseCmsCrosswalk, parseOverrides, buildMap, groupingsOf, renderMapCsv,
-  renderMapJs, pickNppesTaxonomy, displayNameIndex, resolveByName } from './lib/taxonomy-map.mjs';
+  renderMapJs, pickNppesTaxonomy, displayNameIndex, resolveByName, parseNameOverrides } from './lib/taxonomy-map.mjs';
 
 let pass = 0, fail = 0;
 const ok = (cond, name) => { if (cond) pass++; else { fail++; console.log('FAIL', name); } };
@@ -100,6 +100,23 @@ ok(resolveByName('Internal Medicine Physicians', idx).code === null, 'no fuzzy m
 ok(/more than one/.test(resolveByName('Pharmacist', idx).reason), 'ambiguous display name is an exception');
 ok(/not a NUCC display name/.test(resolveByName('Facility / Clinic', idx).reason), 'legacy label is an exception');
 ok(/no stored taxonomy/.test(resolveByName('', idx).reason), 'blank name is an exception');
+
+// --- reviewed rule for names NUCC gives two codes ------------------------------
+const nameOv = parseNameOverrides(readFileSync('supabase/reference/taxonomy-name-overrides.csv', 'utf8'), nucc);
+ok(nameOv.size === 5, `five reviewed ambiguous names (${nameOv.size})`);
+for (const [n, code] of [['Pharmacist', '183500000X'], ['Psychologist', '103T00000X'], ['Podiatrist', '213E00000X'],
+  ['Clinical Neuropsychologist', '103G00000X'], ['Military Hospital', '286500000X']]) {
+  const r = resolveByName(n, idx, nameOv);
+  ok(r.code === code && r.source === 'display_name_reviewed', `${n} -> general code ${code} via the reviewed file`);
+  ok(byCode.get(code).specialization === '', `${code} is the general code (no specialization)`);
+}
+ok(resolveByName('Internal Medicine Physician', idx, nameOv).source === 'display_name', 'unambiguous names are untouched by the file');
+ok(resolveByName('Facility / Clinic', idx, nameOv).code === null, 'the file cannot rescue a non-NUCC label');
+const H = 'display_name,nucc_code\n';
+throws(() => parseNameOverrides(H + 'Pharmacist,207Q00000X\n', nucc), /does not carry the name/, 'override to an unrelated code is refused');
+throws(() => parseNameOverrides(H + 'Internal Medicine Physician,207R00000X\n', nucc), /not ambiguous/, 'override for an unambiguous name is refused');
+throws(() => parseNameOverrides(H + 'Facility / Clinic,261Q00000X\n', nucc), /not a NUCC display name/, 'override for a legacy label is refused');
+throws(() => parseNameOverrides(H + 'Pharmacist,183500000X\npharmacist,1835G0000X\n', nucc), /twice/, 'duplicate name refused');
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

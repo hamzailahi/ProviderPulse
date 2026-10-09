@@ -42,6 +42,8 @@ create policy "taxonomy_map public read" on public.taxonomy_map for select using
 --   nppes_primary  the NPPES taxonomy flagged primary
 --   nppes_first    NPPES flagged none; the first one listed was used
 --   display_name   the NPI is not in NPPES; exact NUCC display-name match
+--   display_name_reviewed  as above, for a name NUCC gives two codes, resolved by
+--                  supabase/reference/taxonomy-name-overrides.csv
 --   nppes_api      written by the hourly ZIP enrichment from the NPI Registry
 alter table public.clinics                    add column if not exists taxonomy_code text;
 alter table public.clinics                    add column if not exists taxonomy_code_source text;

@@ -17,7 +17,7 @@
 //          --assign assign.csv --exceptions exceptions.csv --summary summary.md
 import { createReadStream, readFileSync, writeFileSync, createWriteStream } from 'node:fs';
 import { streamCsvRows } from './lib/bulk.mjs';
-import { parseNucc, displayNameIndex, resolveByName } from './lib/taxonomy-map.mjs';
+import { parseNucc, displayNameIndex, resolveByName, parseNameOverrides } from './lib/taxonomy-map.mjs';
 
 const arg = k => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : null; };
 for (const k of ['nppes', 'rows', 'assign', 'exceptions', 'summary']) if (!arg(k)) throw new Error(`missing --${k}`);
@@ -26,6 +26,7 @@ const nucc = parseNucc(readFileSync(arg('nucc') || 'supabase/reference/nucc_taxo
 const known = new Set(nucc.map(n => n.code));
 const display = new Map(nucc.map(n => [n.code, n.display_name.toLowerCase()]));
 const byName = displayNameIndex(nucc);
+const nameOverrides = parseNameOverrides(readFileSync(arg('name-overrides') || 'supabase/reference/taxonomy-name-overrides.csv', 'utf8'), nucc);
 
 // npi (as a number) -> index into codeList * 2 + (first ? 1 : 0). Numbers keep
 // ~9M entries to a few hundred MB.
@@ -61,12 +62,12 @@ for await (const r of streamCsvRows(createReadStream(arg('rows')))) {
     if (known.has(c)) { code = c; src = hit & 1 ? 'nppes_first' : 'nppes_primary'; }
     else {
       unknownNppes.set(c, (unknownNppes.get(c) || 0) + 1);
-      const f = resolveByName(name, byName);
+      const f = resolveByName(name, byName, nameOverrides);
       if (f.code) { code = f.code; src = f.source; }
       else reason = `NPPES code ${c} is not in this NUCC release; ` + f.reason.replace(/^not in NPPES; /, '');
     }
   } else {
-    const f = resolveByName(name, byName);
+    const f = resolveByName(name, byName, nameOverrides);
     if (f.code) { code = f.code; src = f.source; } else reason = f.reason;
   }
   if (code) {
@@ -91,9 +92,9 @@ const pct = (a, b) => (b ? (100 * a / b).toFixed(2) + '%' : '-');
 const lines = [
   `# Taxonomy backfill summary`, '',
   `NPPES NPIs with a taxonomy: ${nppes.size.toLocaleString()}. NUCC codes known: ${known.size}.`, '',
-  `| Table | Rows | NPPES primary | NPPES first (no flag) | Display name | Exceptions | Stored name agrees with code | Rows to write |`,
-  `|---|---|---|---|---|---|---|---|`,
-  ...Object.entries(stats).map(([t, s]) => `| ${t} | ${s.rows.toLocaleString()} | ${(s.nppes_primary || 0).toLocaleString()} | ${(s.nppes_first || 0).toLocaleString()} | ${(s.display_name || 0).toLocaleString()} | ${(s.exception || 0).toLocaleString()} | ${pct(s.name_agrees || 0, s.rows - (s.exception || 0))} | ${(s.to_write || 0).toLocaleString()} |`),
+  `| Table | Rows | NPPES primary | NPPES first (no flag) | Display name | Reviewed name rule | Exceptions | Stored name agrees with code | Rows to write |`,
+  `|---|---|---|---|---|---|---|---|---|`,
+  ...Object.entries(stats).map(([t, s]) => `| ${t} | ${s.rows.toLocaleString()} | ${(s.nppes_primary || 0).toLocaleString()} | ${(s.nppes_first || 0).toLocaleString()} | ${(s.display_name || 0).toLocaleString()} | ${(s.display_name_reviewed || 0).toLocaleString()} | ${(s.exception || 0).toLocaleString()} | ${pct(s.name_agrees || 0, s.rows - (s.exception || 0))} | ${(s.to_write || 0).toLocaleString()} |`),
   '', `Coverage: ${pct(total - exceptions, total)} of ${total.toLocaleString()} rows have a code; ${exceptions.toLocaleString()} are exceptions.`, '',
 ];
 if (unknownNppes.size) {
