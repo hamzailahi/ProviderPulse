@@ -647,7 +647,13 @@ Tables:
   cells); it pages ordered by the unique key and falls back to the old table
   only on 404/400. `scripts/check-procedures-summary.sh` compares totals and
   every panel cell for 38017 plus the ten busiest ZIPs; 032 drops the old
-  table behind a guard that compares row count and totals.
+  table behind a guard that compares row count and totals. The first 031 (one
+  GROUP BY over 9.8M rows) died with `No space left on device` on 2026-10-09:
+  a big aggregation writes **temporary sort files and WAL** on top of its
+  output, and only 2.9 GB was free; it rolled back cleanly. 031 now runs 100
+  batches by two-digit ZIP prefix (contiguous ranges, so every row lands once;
+  tested identical to a single pass). **Budget scratch space for any large
+  rewrite or aggregate, not just the size of the result.**
 - `insurance_payers`: national + per-state plans, public read.
 - `leie_exclusions`: `id` primary key (**not** NPI: most rows have none, and
   177 NPIs repeat). Service role only.
