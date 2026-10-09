@@ -1,3 +1,7 @@
+-- ABANDONED 2026-10-09: do not run. The build was too slow on this database's
+-- disk and the user chose to keep cms_procedures_full. Migration 033 ends any
+-- build still running and drops the summary. Kept as a record.
+--
 -- ZIP-level summary of cms_procedures_full, for the dashboard's Procedures
 -- panel (v2/index.html, fetchProceduresData).
 --

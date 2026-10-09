@@ -594,7 +594,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08; `030` (its indexes) only after the backfill. **`031` (procedures summary) written, not applied; `032` (drops `cms_procedures_full`) only after `procedures-summary-check.yml` reports MATCH.**
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08; `030` (its indexes) only after the backfill. `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
@@ -638,22 +638,17 @@ Tables:
   `cms_zip_procedures` is public read and unused by any code.
 - `cms_procedures_full`: CMS by-provider-and-service rows (9.8M rows, 28
   columns, **4.0 GB, half the database** on 2026-10-09), made in the dashboard
-  by hand; no import script exists. Being replaced by `cms_procedures_by_zip`
-  (031): one row per `(zip, specialty, hcpcs_cd)` (unique, `nulls not
-  distinct`) with `tot_benes` / `tot_srvcs` sums, `sum_avg_*` (sum of each
-  provider's average) and `providers` (row count). The Procedures panel
-  (`fetchProceduresData` in `index.html`) shows each average as sum / count,
-  so the summary reproduces it exactly (proved on a local sample: 0 differing
-  cells); it pages ordered by the unique key and falls back to the old table
-  only on 404/400. `scripts/check-procedures-summary.sh` compares totals and
-  every panel cell for 38017 plus the ten busiest ZIPs; 032 drops the old
-  table behind a guard that compares row count and totals. The first 031 (one
-  GROUP BY over 9.8M rows) died with `No space left on device` on 2026-10-09:
-  a big aggregation writes **temporary sort files and WAL** on top of its
-  output, and only 2.9 GB was free; it rolled back cleanly. 031 now runs 100
-  batches by two-digit ZIP prefix (contiguous ranges, so every row lands once;
-  tested identical to a single pass). **Budget scratch space for any large
-  rewrite or aggregate, not just the size of the result.**
+  by hand; no import script exists. Read directly by `index.html`'s Procedures
+  panel, which adds rows up by specialty and code. **A ZIP-level summary was
+  tried and abandoned (2026-10-09, migrations 031/032 marked do-not-run, 033
+  cleans up):** one GROUP BY over 9.8M rows ran out of disk (temporary sort
+  files and WAL, 2.9 GB free); batching by ZIP prefix then crawled, because
+  each batch reads a scattered 1% of the table from a small gp3 disk, and the
+  build's exclusive lock broke the panel while it ran. The user chose to keep
+  the table. If this is revisited: build it outside the live table's path
+  (e.g. stream the CMS source file in GitHub Actions and load the summary),
+  and **budget scratch space and I/O for any large rewrite, not just the size
+  of the result.**
 - `insurance_payers`: national + per-state plans, public read.
 - `leie_exclusions`: `id` primary key (**not** NPI: most rows have none, and
   177 NPIs repeat). Service role only.
@@ -1061,8 +1056,6 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   Commits `taxonomy-backfill-summary.md` and `taxonomy-exceptions.csv` (capped
   at 200,000 rows). The NPPES file is about 1 GB zipped, 9M rows; NPPES_MIN_ROWS
   exists only for tests.
-- **Procedures summary check** (`procedures-summary-check.yml`, manual): see
-  `cms_procedures_full`; read-only, exits 1 on any mismatch.
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
   read-only sizes of every table and index, dead rows, index use, WAL, to
   `supabase/reference/db-size-report.md`. Run it before any disk decision.

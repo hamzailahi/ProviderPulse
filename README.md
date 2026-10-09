@@ -445,7 +445,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`032_drop_cms_procedures_full.sql` (run it only after the procedures summary check reports a match).
+`033_abandon_procedures_summary.sql`; 031 and 032 are marked do-not-run.
 
 ## Environment variables
 
@@ -460,7 +460,7 @@ hand, in the Supabase SQL editor. The latest is
 | `PATIENT_SIGNUP_ENABLED` | opens patient registration. **Closed unless set to exactly `true`**, since patient PHI storage isn't live until a Supabase BAA is in place. Existing patients can still sign in |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
 | `CENSUS_API_KEY` | `import-census-acs.yml` and `import-sahie.yml`; a free Census API key (https://api.census.gov/data/key_signup.html, activate it from the email) stored as a GitHub secret. Required: the Census answers data requests without one with "Missing Key" |
-| `SUPABASE_DB_URL` | `schema-snapshot.yml`, `taxonomy-inventory.yml`, `taxonomy-backfill.yml`, `db-size-report.yml` and `procedures-summary-check.yml` only; the Session pooler connection string from Supabase's Connect button (port 5432, with the database password), stored as a GitHub secret. The direct connection string won't work from GitHub's runners |
+| `SUPABASE_DB_URL` | `schema-snapshot.yml`, `taxonomy-inventory.yml`, `taxonomy-backfill.yml` and `db-size-report.yml` only; the Session pooler connection string from Supabase's Connect button (port 5432, with the database password), stored as a GitHub secret. The direct connection string won't work from GitHub's runners |
 | `HUD_API_TOKEN` | `zip-county-crosswalk-import.yml` only; a free HUD USER token stored as a GitHub secret, not a Netlify variable |
 
 The MapTiler key is public by design and restricted to the site's domain
@@ -485,7 +485,6 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched |
 | `taxonomy-inventory.yml` | manual only | lists every taxonomy name stored in the directory tables with row counts, plus the newest official NUCC code set and the CMS Medicare specialty crosswalk, in `supabase/reference/`, and rebuilds the taxonomy map from them; read only against the database |
-| `procedures-summary-check.yml` | manual only | read-only comparison of the per-provider Medicare procedures table with its ZIP-level summary; must report a match before migration 032 drops the old table |
 | `db-size-report.yml` | manual only | read-only report of table, index and write-ahead-log sizes and dead rows, written to `supabase/reference/db-size-report.md` |
 | `taxonomy-backfill.yml` | manual only | gives every listing its official NUCC taxonomy code from the NPPES monthly file and loads the `taxonomy_map` table. `dry_run` writes nothing and reports coverage and exceptions; `apply` refuses unless the free disk entered covers the rewrite |
 | `schema-snapshot.yml` | weekly, Mondays | dumps the live database's structure (tables, indexes, policies, grants; no data) to `supabase/schema/public.sql` and commits it only when it changed, so every such commit records a schema change |
@@ -562,21 +561,16 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-09
 
-- **Procedures panel reads a ZIP-level summary.** The Medicare procedures
-  table held one row per provider per procedure code (9.8 million rows,
-  4 GB, half the database), but the dashboard's Procedures panel only ever
-  added those rows up by specialty and code. A new summary table stores those
-  totals per ZIP, so the panel shows the same numbers while downloading far
-  fewer rows. A read-only check compares the two before the old table is
-  dropped; dropping it frees about 3 GB for the taxonomy backfill. The first
-  attempt to build the summary ran out of disk (the database's temporary
-  working space, not the summary itself) and rolled back without changing
-  anything; it now builds in 100 small batches. The check says plainly whether the
-  summary is still being built, so a dropped browser connection during the
-  build is not mistaken for a failure. Listings
-  whose name NUCC uses for two codes (Pharmacist, Psychologist, Podiatrist,
-  Clinical Neuropsychologist, Military Hospital) now get the general code,
-  from a short reviewed list rather than being left without one.
+- **Procedures summary tried and dropped.** Shrinking the 4 GB Medicare
+  procedures table into a ZIP-level summary turned out too slow and too heavy
+  for the database's disk, and briefly broke the Procedures panel while it
+  ran. It is cancelled and cleaned up (migration 033); the panel reads the
+  original table again, exactly as before. The disk was grown to 18 GB, which
+  makes room for the taxonomy backfill instead.
+- **Ambiguous taxonomy names get their general code.** Listings whose name
+  NUCC uses for two codes (Pharmacist, Psychologist, Podiatrist, Clinical
+  Neuropsychologist, Military Hospital) get the general code from a short
+  reviewed list, rather than being left without one.
 - **Database size report.** A new manual, read-only job lists where the
   database's disk goes (each table's data and indexes, dead rows left by
   updates, unused indexes, write-ahead log), so decisions about compacting

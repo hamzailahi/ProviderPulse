@@ -1,3 +1,7 @@
+-- ABANDONED 2026-10-09: do not run. cms_procedures_full stays (see 033).
+-- Its guard would refuse anyway once 033 has dropped the summary. Kept as a
+-- record.
+--
 -- Drops the per-provider Medicare procedures table (4.0 GB, half the
 -- database) and one unused index, now that the dashboard reads the ZIP-level
 -- summary from migration 031.

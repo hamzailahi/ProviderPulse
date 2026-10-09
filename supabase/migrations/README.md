@@ -68,8 +68,9 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 028 | `028_lock_v1_access_tables.sql` | **security fix**: closes public reads of v1's `access_requests` and `access_codes` (names, emails, access codes) | applied 2026-10-06, confirmed by the snapshot |
 | 029 | `029_taxonomy_codes.sql` | `taxonomy_map` table, and `taxonomy_code` / `taxonomy_code_source` on the three directory tables (nullable, no rewrite) | written, **run before the taxonomy backfill** |
 | 030 | `030_taxonomy_code_indexes.sql` | indexes on `taxonomy_code`, built concurrently (no begin/commit) | written, **run only after the backfill finishes in apply mode** |
-| 031 | `031_cms_procedures_by_zip.sql` | ZIP-level summary of `cms_procedures_full` for the Procedures panel (same figures, far fewer rows) | written, **run now** (creates a table, drops nothing) |
-| 032 | `032_drop_cms_procedures_full.sql` | drops the 4 GB per-provider procedures table and an unused 44 MB index; guarded | written, **run only after the Procedures summary check reports MATCH**; not reversible except by re-importing from CMS |
+| 031 | `031_cms_procedures_by_zip.sql` | ZIP-level procedures summary | **abandoned, do not run** (too slow on this disk; see 033) |
+| 032 | `032_drop_cms_procedures_full.sql` | would drop the per-provider procedures table | **abandoned, do not run**; the table stays |
+| 033 | `033_abandon_procedures_summary.sql` | ends a stuck 031 build and drops `cms_procedures_by_zip`; `cms_procedures_full` untouched | written, **run now** |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

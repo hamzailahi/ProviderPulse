@@ -3449,41 +3449,18 @@
             try {
                 const zipList = zips.map(z => String(z).padStart(5,'0')).join(',');
 
-                // Reads the ZIP-level summary (migration 031): one row per ZIP,
-                // specialty and code, carrying the sums and the provider count this
-                // panel used to compute from one row per provider. Falls back to the
-                // per-provider table while 031 is not applied. Paging is ordered by
-                // the summary's unique key, so offset paging cannot skip rows.
-                async function pageAll(table, select, order) {
-                    let rows = [], offset = 0;
-                    while (true) {
-                        const res = await fetch(
-                            `${SUPABASE_URL}/rest/v1/${table}?zip=in.(${zipList})&select=${select}&order=${order}&limit=1000&offset=${offset}`,
-                            { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
-                        );
-                        if (!res.ok) { const err = new Error(`HTTP ${res.status}`); err.status = res.status; throw err; }
-                        const batch = await res.json();
-                        if (!batch || batch.length === 0) break;
-                        rows = rows.concat(batch);
-                        if (batch.length < 1000) break;
-                        offset += 1000;
-                    }
-                    return rows;
-                }
-                let allRows;
-                try {
-                    allRows = (await pageAll('cms_procedures_by_zip',
-                        'specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,sum_avg_sbmtd_chrg,sum_avg_mdcr_alowd_amt,sum_avg_mdcr_pymt_amt,providers',
-                        'zip,specialty,hcpcs_cd'))
-                        .map(r => ({ specialty: r.specialty, hcpcs_cd: r.hcpcs_cd, hcpcs_desc: r.hcpcs_desc,
-                            tot_benes: r.tot_benes, tot_srvcs: r.tot_srvcs, avg_sbmtd_chrg: r.sum_avg_sbmtd_chrg,
-                            avg_mdcr_alowd_amt: r.sum_avg_mdcr_alowd_amt, avg_mdcr_pymt_amt: r.sum_avg_mdcr_pymt_amt,
-                            n: r.providers }));
-                } catch (e) {
-                    if (e.status !== 404 && e.status !== 400) throw e;
-                    allRows = (await pageAll('cms_procedures_full',
-                        'specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_sbmtd_chrg,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt',
-                        'specialty,tot_benes.desc')).map(r => ({ ...r, n: 1 }));
+                let allRows = [];
+                let offset = 0;
+                while (true) {
+                    const res = await fetch(
+                        `${SUPABASE_URL}/rest/v1/cms_procedures_full?zip=in.(${zipList})&select=specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_sbmtd_chrg,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt&order=specialty,tot_benes.desc&limit=1000&offset=${offset}`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
+                    );
+                    const batch = await res.json();
+                    if (!batch || batch.length === 0) break;
+                    allRows = allRows.concat(batch);
+                    if (batch.length < 1000) break;
+                    offset += 1000;
                 }
 
                 if (!allRows.length) {
@@ -3510,7 +3487,7 @@
                     p.avg_sbmtd_chrg     += parseFloat(row.avg_sbmtd_chrg || 0);
                     p.avg_mdcr_alowd_amt += parseFloat(row.avg_mdcr_alowd_amt || 0);
                     p.avg_mdcr_pymt_amt  += parseFloat(row.avg_mdcr_pymt_amt || 0);
-                    p.count += Number(row.n) || 0;
+                    p.count += 1;
                 });
 
                 proceduresRawData = bySpec;
