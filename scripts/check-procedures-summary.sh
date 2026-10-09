@@ -8,7 +8,23 @@
 set -euo pipefail
 : "${SUPABASE_DB_URL:?Set SUPABASE_DB_URL}"
 OUT=supabase/reference/procedures-summary-check.md
-q() { psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -At -F '|' -c "begin transaction read only; set local statement_timeout = '20min'; $1; commit;"; }
+q() { psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -At -F '|' -c "begin transaction read only; set local statement_timeout = '20min'; set local lock_timeout = '10s'; $1; commit;"; }
+
+# Before comparing, say plainly whether 031 has finished: the summary must
+# exist (committed), and no session may still be building it. Building holds
+# a lock, so a lookup that cannot get one in 10s means it is still running.
+running=$(q "select count(*) from pg_stat_activity where state <> 'idle' and pid <> pg_backend_pid() and query ilike '%cms_procedures_by_zip%'" 2>/dev/null || echo "?")
+exists=$(q "select to_regclass('public.cms_procedures_by_zip') is not null")
+if [ "$exists" != "t" ]; then
+  msg="cms_procedures_by_zip does not exist yet: migration 031 has not committed (sessions still working on it: $running). If none, run 031 again."
+  echo "::error::$msg"; echo "$msg" >&2
+  printf '# Procedures summary check\n\n%s\n' "$msg" > "$OUT"; exit 1
+fi
+if [ "$running" != "0" ]; then
+  msg="Migration 031 still appears to be running ($running session(s)). Wait for it to finish, then run this check again."
+  echo "::error::$msg"; echo "$msg" >&2
+  printf '# Procedures summary check\n\n%s\n' "$msg" > "$OUT"; exit 1
+fi
 
 totals=$(q "select
   (select count(*) from public.cms_procedures_full where zip is not null),
