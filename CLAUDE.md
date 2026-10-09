@@ -1040,6 +1040,9 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   Commits `taxonomy-backfill-summary.md` and `taxonomy-exceptions.csv` (capped
   at 200,000 rows). The NPPES file is about 1 GB zipped, 9M rows; NPPES_MIN_ROWS
   exists only for tests.
+- **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
+  read-only sizes of every table and index, dead rows, index use, WAL, to
+  `supabase/reference/db-size-report.md`. Run it before any disk decision.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is

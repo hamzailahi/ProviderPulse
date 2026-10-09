@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-08. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-09. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -460,7 +460,7 @@ hand, in the Supabase SQL editor. The latest is
 | `PATIENT_SIGNUP_ENABLED` | opens patient registration. **Closed unless set to exactly `true`**, since patient PHI storage isn't live until a Supabase BAA is in place. Existing patients can still sign in |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
 | `CENSUS_API_KEY` | `import-census-acs.yml` and `import-sahie.yml`; a free Census API key (https://api.census.gov/data/key_signup.html, activate it from the email) stored as a GitHub secret. Required: the Census answers data requests without one with "Missing Key" |
-| `SUPABASE_DB_URL` | `schema-snapshot.yml`, `taxonomy-inventory.yml` and `taxonomy-backfill.yml` only; the Session pooler connection string from Supabase's Connect button (port 5432, with the database password), stored as a GitHub secret. The direct connection string won't work from GitHub's runners |
+| `SUPABASE_DB_URL` | `schema-snapshot.yml`, `taxonomy-inventory.yml`, `taxonomy-backfill.yml` and `db-size-report.yml` only; the Session pooler connection string from Supabase's Connect button (port 5432, with the database password), stored as a GitHub secret. The direct connection string won't work from GitHub's runners |
 | `HUD_API_TOKEN` | `zip-county-crosswalk-import.yml` only; a free HUD USER token stored as a GitHub secret, not a Netlify variable |
 
 The MapTiler key is public by design and restricted to the site's domain
@@ -485,6 +485,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched |
 | `taxonomy-inventory.yml` | manual only | lists every taxonomy name stored in the directory tables with row counts, plus the newest official NUCC code set and the CMS Medicare specialty crosswalk, in `supabase/reference/`, and rebuilds the taxonomy map from them; read only against the database |
+| `db-size-report.yml` | manual only | read-only report of table, index and write-ahead-log sizes and dead rows, written to `supabase/reference/db-size-report.md` |
 | `taxonomy-backfill.yml` | manual only | gives every listing its official NUCC taxonomy code from the NPPES monthly file and loads the `taxonomy_map` table. `dry_run` writes nothing and reports coverage and exceptions; `apply` refuses unless the free disk entered covers the rewrite |
 | `schema-snapshot.yml` | weekly, Mondays | dumps the live database's structure (tables, indexes, policies, grants; no data) to `supabase/schema/public.sql` and commits it only when it changed, so every such commit records a schema change |
 | `tests.yml` | every pull request and push to main | syntax check, loading every function, and the test scripts below |
@@ -558,6 +559,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
 
+### 2026-10-09
+
+- **Database size report.** A new manual, read-only job lists where the
+  database's disk goes (each table's data and indexes, dead rows left by
+  updates, unused indexes, write-ahead log), so decisions about compacting
+  or growing the disk start from numbers.
 ### 2026-10-08
 
 - **Official taxonomy codes, phase 1 of 3.** Listings are moving from

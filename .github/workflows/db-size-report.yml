@@ -1,0 +1,41 @@
+name: Database size report
+
+# Manual only. Read-only: reports where the database's disk goes (tables,
+# indexes, dead rows, WAL) to supabase/reference/db-size-report.md, so space
+# decisions are made from numbers. Needs the SUPABASE_DB_URL secret.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Report
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          bash scripts/db-size-report.sh
+          cat supabase/reference/db-size-report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Commit
+        run: |
+          git add supabase/reference/db-size-report.md
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Database size report $(date -u +%F) [skip netlify]"
+          git push origin HEAD:main
