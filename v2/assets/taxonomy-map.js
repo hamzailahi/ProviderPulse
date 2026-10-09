@@ -31,8 +31,22 @@
       if (!e) throw new Error('Unknown NUCC taxonomy code: ' + code);
       return e.grouping;
     },
-    codes: function () { return Object.keys(DATA.codes); }
+    codes: function () { return Object.keys(DATA.codes); },
+    // Patient specialty label -> the codes the reviewed table puts in it (only
+    // codes shown on the map). An unknown label is an empty list, never "all".
+    codesFor: function (label) {
+      if (!bySpec) {
+        bySpec = {};
+        Object.keys(DATA.codes).forEach(function (code) {
+          var c = DATA.codes[code];
+          if (c[4] !== 1) return;
+          c[5].forEach(function (l) { (bySpec[l] = bySpec[l] || []).push(code); });
+        });
+      }
+      return (bySpec[label] || []).slice();
+    }
   };
+  var bySpec = null;
   if (global) global.TaxonomyMap = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : null);

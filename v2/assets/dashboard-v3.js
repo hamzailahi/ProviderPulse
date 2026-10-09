@@ -148,6 +148,7 @@ function applySpecialty(label) {
   if (count) { count.hidden = !label; count.textContent = label ? '1' : ''; }
   if (typeof taxonomies === 'undefined' || !taxonomies.size) return;     // nothing loaded yet
   if (!label) {
+    specialtyCodeSet = null;
     selectedTaxonomies = new Set(taxonomies);
     document.querySelectorAll('.tax-chk').forEach(function (c) { c.checked = true; });
     var all = $('chk-all'); if (all) all.checked = true;
@@ -161,7 +162,8 @@ function applySpecialty(label) {
   var s = null;
   for (var i = 0; i < SPECIALTIES.length; i++) if (SPECIALTIES[i][0] === label) s = SPECIALTIES[i];
   var terms = s ? s[1].split(',') : [label];
-  applyNavigatorTaxonomyFilter(terms);
+  // By NUCC code (the reviewed table); a label that is not a specialty matches by name.
+  applyNavigatorTaxonomyFilter(terms, window.TaxonomyMap ? TaxonomyMap.codesFor(label) : []);
   paintInsights();
 }
 
@@ -889,6 +891,8 @@ if (mode === 'mine') {
       if (a.type !== 'update_map') return;
       var terms = null;
       if (a.specialty) {
+        // The assistant speaks the market list; map an old label to today's.
+        for (var k in (window.MARKET_LABEL_ALIASES || {})) if (window.MARKET_LABEL_ALIASES[k] === a.specialty) a.specialty = k;
         var s = SPECIALTIES.filter(function (x) { return x[0] === a.specialty; })[0];
         if (s) terms = s[1].split(',');
       }
@@ -994,8 +998,9 @@ if (mode === 'mine') {
         el('b', {}, t[1]), el('span', {}, t[2])));
     });
   }
+  // Reports are written by the market assistant, which knows the market list.
   var spec = el('select', { class: 'rp-input', 'aria-label': 'Specialty' },
-    SPECIALTIES.map(function (s) { return el('option', { value: s[0] }, s[0]); }));
+    (window.MARKET_SPECIALTIES || SPECIALTIES).map(function (s) { return el('option', { value: s[0] }, s[0]); }));
   var compare = el('input', { class: 'rp-input', placeholder: 'e.g. 38138, 38139', 'aria-label': 'ZIPs to compare with' });
   var who = el('input', { class: 'rp-input', placeholder: 'e.g. Dr. Rivera, Midsouth Dermatology', 'aria-label': 'Prepared for' });
   var forWho = el('label', { class: 'rp-field', hidden: true }, el('span', {}, 'Prepared for'), who);

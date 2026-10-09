@@ -5,7 +5,7 @@
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const M = require('../v2/assets/market-model.js');
-const SPECIALTIES = require('../v2/assets/specialties.js');
+const SPECIALTIES = require('../v2/assets/specialties.js').MARKET;   // the market side's frozen list until phase 3b
 
 let pass = 0, fail = 0;
 const check = (l, c, d) => { if (c) { pass++; console.log(`  PASS  ${l}`); } else { fail++; console.log(`  FAIL  ${l}${d ? '\n        ' + d : ''}`); } };

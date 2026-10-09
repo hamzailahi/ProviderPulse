@@ -80,7 +80,7 @@ function tableQuery(table, select, filter) {
   return page(0, []);
 }
 
-var PROVIDER_ROW_SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude';
+var PROVIDER_ROW_SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude';
 function clinicsQuery(filter) {
   return tableQuery('clinics', PROVIDER_ROW_SELECT, filter);
 }
@@ -101,7 +101,7 @@ function providerRowsQuery(filter) {
   return Promise.all([
     clinicsQuery(filter),
     tableQuery('provider_individuals', PROVIDER_ROW_SELECT, filter),
-    tableQuery('clinic_secondary_locations', 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude', filter)
+    tableQuery('clinic_secondary_locations', 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude', filter)
   ]).then(function (results) {
     var all = tagSrc(results[0], 'clinic').concat(tagSrc(results[1], 'individual'), tagSrc(results[2], 'secondary'));
     // Any table that hit the page cap means the answer is a sample, and the
@@ -195,6 +195,18 @@ function taxonomyPrefilter(terms) {
   var keys = Object.keys(words);
   if (!keys.length) return '';
   return '&or=(' + keys.map(function (w) { return 'primary_taxonomy.ilike.*' + w + '*'; }).join(',') + ')';
+}
+
+// Patient specialties are keyed on NUCC codes (taxonomy codes phase 3): the
+// reviewed table in supabase/reference/taxonomy-overrides.csv, read through
+// TaxonomyMap.codesFor (assets/taxonomy-map.js, loaded before this file). An
+// unknown label is an empty list; callers then fall back to name terms.
+// taxonomy_code is indexed (migration 030), so in.() is cheap.
+function specialtyCodes(label) {
+  return (typeof TaxonomyMap !== 'undefined' && label) ? TaxonomyMap.codesFor(label) : [];
+}
+function codeFilter(codes) {
+  return '&taxonomy_code=in.(' + codes.join(',') + ')';
 }
 
 function initials(name) {

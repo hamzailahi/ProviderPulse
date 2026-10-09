@@ -369,6 +369,12 @@
         let zipsWithClinics = new Set(); // Tracks which ZIPs have at least one clinic (for boundary styling only — NOT demographic data)
         let lockedZip = null, lockedLayer = null;
         let selectedTaxonomies = new Set();
+        // Set when the specialty picker is in use: the NUCC codes the reviewed
+        // table puts in that specialty (TaxonomyMap.codesFor). renderMap then
+        // also requires a listing's code to be in it, so a listing whose stored
+        // name looks right but whose code says otherwise is not shown. null for
+        // name-based filters (#tax= deep links, the Exact taxonomies list).
+        let specialtyCodeSet = null;
         // Which row sources renderMap draws. All on by default; the individual-physician
         // source is by far the noisiest (often 5-10x the clinic count in a populated ZIP),
         // so this is the main declutter lever short of turning off a whole layer.
@@ -1507,6 +1513,7 @@
                     if (!(passSearch && passSource && (selectedTaxonomies.size === 0 || selectedTaxonomies.has(p['Primary Taxonomy'])))) return false;
                     // Rows with no _src (navigator injections) are never hidden by grouping.
                     if (!p._src) return true;
+                    if (specialtyCodeSet && !specialtyCodeSet.has(p['Taxonomy Code'])) return false;
                     const e = taxEntry(p);
                     if (!e) { hiddenUnknown++; return false; }
                     if (!e.showOnMap) return false;
@@ -2100,7 +2107,9 @@
                 } else {
                     const terms = activeSpecialtyTerms();
                     const next = new Set([...selectedTaxonomies].filter(t => t !== '\u0000no-match'));
-                    taxArray.forEach(t => { if (!taxBefore.has(t) && terms.length && taxonomyMatchesAny(t, terms)) next.add(t); });
+                    // With the specialty picker, a new name joins when a listing carrying it has one of the specialty's codes.
+                    const byCode = specialtyCodeSet ? namesWithCodes(specialtyCodeSet) : null;
+                    taxArray.forEach(t => { if (!taxBefore.has(t) && (byCode ? byCode.has(t) : terms.length && taxonomyMatchesAny(t, terms))) next.add(t); });
                     selectedTaxonomies = next.size ? next : new Set(['\u0000no-match']);
                 }
                 // New taxonomies need checkboxes too, ticked to match the filter.
@@ -3190,9 +3199,21 @@
         // value. The leading space anchors it to a word boundary, without which
         // "Urology Physician" would match "NeUROLOGY PHYSICIAN"; the absent trailing
         // space still lets "Dentist" match "General Practice Dentistry".
-        function applyNavigatorTaxonomyFilter(wantTax) {
+        // Stored names carried by at least one loaded listing whose code is in the set.
+        function namesWithCodes(codeSet) {
+            const out = new Set();
+            for (const addr in groupedData) {
+                groupedData[addr].practices.forEach(p => { if (p['Primary Taxonomy'] && codeSet.has(p['Taxonomy Code'])) out.add(p['Primary Taxonomy']); });
+            }
+            return out;
+        }
+
+        // codes (optional): the specialty picker's NUCC codes. Without them the
+        // terms match stored names, as #tax= deep links always have.
+        function applyNavigatorTaxonomyFilter(wantTax, codes) {
             const norm = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
             const wanted = wantTax.map(norm).filter(Boolean);
+            specialtyCodeSet = codes && codes.length ? new Set(codes) : null;
 
             // No terms asked for means "show me this whole market" — a link like
             // #zip=38017 with no tax=. Without this guard the no-match branch
@@ -3204,10 +3225,12 @@
                 if (el) el.textContent = '✅ ' + Object.keys(groupedData).length + ' locations loaded';
                 return;
             }
-            const matched = new Set();
-            for (const t of taxonomies) {
-                const nt = ' ' + norm(t);
-                if (wanted.some(w => nt.includes(' ' + w))) matched.add(t);
+            const matched = specialtyCodeSet ? namesWithCodes(specialtyCodeSet) : new Set();
+            if (!specialtyCodeSet) {
+                for (const t of taxonomies) {
+                    const nt = ' ' + norm(t);
+                    if (wanted.some(w => nt.includes(' ' + w))) matched.add(t);
+                }
             }
 
             const statusEl = document.getElementById('dbStatus');

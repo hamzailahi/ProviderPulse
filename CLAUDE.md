@@ -75,10 +75,10 @@ second copy. The `access_requests` table still holds v1's data.
 | `portal.css`, `portal.js` | `portal.html` |
 | `dashboard.css`, `dashboard-v3.css`, `dashboard-v3.js` | `index.html` (v3 files layer the redesign over the original dashboard) |
 | `forms.css` | `register-provider.html`, `auth.html`, `admin-review.html`, `404.html` |
-| `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, paged `tableQuery`/`providerRowsQuery`, `milesBetween`, MapTiler key, ZIP centroid lookup |
-| `specialties.js` | the 33 patient-facing specialties (see taxonomy section); also `require`d by `market-score.js` and the benchmark builder |
+| `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code`), `milesBetween`, MapTiler key, ZIP centroid lookup |
+| `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.MARKET` is the market side's frozen 33-label list, `require`d by `market-score.js`, the assistant, the benchmark builder and the demand trainer until phase 3b |
 | `taxonomy-groups.js` | six specialty groups; `market-score.js` counts supply with it and the dashboard's Insights tab names them. The map no longer uses it (NUCC phase 2). **Being replaced** by `taxonomy-map.js` |
-| `taxonomy-map.js` | the dashboard map's classifier since 2026-10-09; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
+| `taxonomy-map.js` | the dashboard map's classifier since 2026-10-09, and `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `health-demand.js` | CDC PLACES need model per group; browser + `require` |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
 | `demand-model.js` | the learned demand model (ridge regression per specialty, state-held-out validation, `addAcs`/`addPlaces` area builders shared by trainer and scorer); browser + `require` |
@@ -327,8 +327,11 @@ The tables that bridge the vocabularies:
 
 - `MAP_TAXONOMY` in `patient-match.js`, exposed as `map_taxonomies`. **A map
   link must use `map_taxonomies`, not `taxonomies`.**
-- `SPECIALTIES` in `assets/specialties.js`: 33 entries of
-  `[label, mapTerms, nppesTerm]`. `mapTerms` match `clinics.primary_taxonomy`;
+- `SPECIALTIES` in `assets/specialties.js`: 44 entries of
+  `[label, mapTerms, nppesTerm]` (33 until 2026-10-09; see NUCC codes phase
+  3). Patient-facing search finds a label's listings by **code**
+  (`TaxonomyMap.codesFor`); `mapTerms` still serve claimed listings'
+  self-reported specialty, `#tax=` deep links and the market side. `mapTerms` match `clinics.primary_taxonomy`;
   `nppesTerm` goes to the NPPES API. Every `nppesTerm` was verified live
   (NPPES says `Dietitian`, not `Registered Dietitian`). Frozen, hand-verified
   data. Note that "Orthopedics & sports injury" includes the bare term
@@ -448,21 +451,38 @@ keyword matching and no default bucket**. Three phases, each gated:
    `supabase/reference/patient-specialties-proposal.csv` and
    `patient-specialties-list.json`. It proposes 45 specialties: the 33
    labels kept (benchmarks and My market are keyed by label), "Speech &
-   hearing" renamed "Speech & language therapy", and 12 new (Hearing &
+   hearing" renamed "Speech & language therapy", and 11 new (Hearing &
    audiology, Behavior therapy (ABA), Nursing (RN, LPN), Physician assistant,
    Care coordination & community health, Hospital-based clinicians, General
    surgery, Infectious disease, Genetics & genetic counseling, Hospice &
-   palliative care, Other health services). 45 codes are flagged for a
-   decision. The rules are a drafting aid: the overrides CSV is now the
+   palliative care, Other health services): 44 in all. 45 codes were
+   flagged for a decision. The rules are a drafting aid: the overrides CSV is now the
    source of truth, edited per code; do not regenerate it from the script.
-   **Before search switches:** `resolveQuery` in `patient.js` matches label
-   words by plain substring, so "hearing" already resolves to Ear, nose &
-   throat (it contains "ear"), and adding the new labels would send
-   "physician" to Physician assistant and "hospital" to Hospital-based
-   clinicians. Fix with word-boundary matching and plain-language hints for
-   the new categories in the same change.
+   **3a, patient-facing, shipped 2026-10-09** (the user's choice of order):
+   patient search (`runProviderSearch` / `buildResults`), portal Competition
+   and the dashboard specialty select query `taxonomy_code=in.(...)` and
+   keep a row only if its code is in the set; a label that is not a
+   specialty (a navigator suggestion, a description with no match) falls
+   back to name terms. The dashboard keeps `specialtyCodeSet` beside the
+   name-keyed `selectedTaxonomies`; `#tax=` deep links stay name-based.
+   `resolveQuery` matches label words as **whole words** (a substring test
+   sent "hearing" to ENT), lets a partial word match the start of a label
+   word only when it is 4+ letters and not generic (`GENERIC_QUERY`:
+   physician, hospital, doctor, ...), and matches the registry term only
+   from its start ("Surgery" as a whole word took "knee surgery"). Hints
+   for the new categories sit in `CONDITION_HINTS` (hearing, speech and ABA
+   first, before ENT and mental health); hints read the raw lowercased text.
+   Covered by `scripts/test-patient-query.mjs` (it lifts the code out of
+   `patient.js`). The 11 new labels' `nppesTerm`s are NUCC classification
+   names **not verified live** (NPPES was unreachable): check them before
+   relying on the navigator for those categories.
+   **3b, market side (next):** `market-score`, the assistant, the benchmark
+   builder and the demand trainer use `SPECIALTIES.MARKET` (the 33 old
+   labels, "Speech & hearing" under its old name and terms;
+   `MARKET_LABEL_ALIASES` maps the new name back). Re-key them on codes,
+   rebuild `market_benchmarks`, then delete the frozen list.
 
-Until phase 3 ships, `taxonomy-groups.js` remains the classifier for supply counts and Insights.
+Until phase 3b ships, `taxonomy-groups.js` remains the classifier for supply counts and Insights.
 `show_on_map` and patient specialties are data in the overrides CSV, never
 code; the only hidden code is `390200000X` (Student, Health Care).
 `taxonomy-map.js` and `supabase/reference/taxonomy_map.csv` are generated
@@ -502,7 +522,8 @@ call `invalidateSize()` and refit.
 ### Patient map (`patient.js`)
 
 Search-first: what (specialty or plain-language condition), where (ZIP), how
-far (**5, 10, 25 or 50 miles**, default 10) and insurance. Results come
+far (**5, 10, 25 or 50 miles**, default 10) and insurance. A specialty's
+listings are found by NUCC code (see NUCC codes phase 3). Results come
 straight from the directory tables through the publishable key, so search
 never waits on the AI and still works if functions are down. Claimed listings
 are overlaid from `providers-public`. One circle marker per listed result
@@ -1223,6 +1244,7 @@ node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
 node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
+node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 ```
 
 Frontends are verified in headless Chromium (Playwright) against mocked

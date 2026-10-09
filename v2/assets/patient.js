@@ -269,6 +269,10 @@ var RESULTS_PAGE = 25;
 // Plain-language words a patient types, mapped onto a SPECIALTIES label. Word
 // boundaries throughout: "ear" must not fire on "near", "ent" on "patient".
 var CONDITION_HINTS = [
+  // Before Ear, nose & throat and Mental health, which would otherwise catch these.
+  [/\b(hearing|audiolog|deaf|tinnitus)/, 'Hearing & audiology'],
+  [/\b(speech|stutter|language delay|swallow)/, 'Speech & language therapy'],
+  [/\b(autism|autistic|aba\b|applied behavior|behaviou?r(al)? (therap|analy|technician))/, 'Behavior therapy (ABA)'],
   [/\b(diabet|thyroid|hormon|endocrin)/, 'Diabetes & hormones'],
   [/\b(heart|cardi|chest pain|blood pressure|hypertens|palpitat)/, 'Heart / cardiology'],
   [/\b(skin|rash|acne|eczema|psoria|mole|derma)/, 'Skin / dermatology'],
@@ -294,6 +298,18 @@ var CONDITION_HINTS = [
   [/\b(urgent|emergency)\b/, 'Urgent care & emergency'],
   [/\b(diet|nutrition|weight loss)/, 'Nutrition & dietitian'],
   [/\b(x-?ray|mri|ct scan|imaging|blood test|lab work)/, 'Imaging & lab'],
+  [/\b(nurse practitioner|np)\b/, 'Primary care / family doctor'],
+  [/\b(nursing home|assisted living|memory care|skilled nursing|long.term care)/, 'Nursing & assisted living'],
+  [/\b(home health|in.home care|home care|caregiver)/, 'Home health & in-home care'],
+  [/\b(nurse|rn|lpn|lvn)\b/, 'Nursing (RN, LPN)'],
+  [/\b(physician'?s? assistant|pa|pa-c)\b/, 'Physician assistant'],
+  [/\b(case manag|care coordinat|care manag|community health worker|health coach)/, 'Care coordination & community health'],
+  [/\b(hospice|palliative|end.of.life)/, 'Hospice & palliative care'],
+  [/\b(genetic|dna test|brca)/, 'Genetics & genetic counseling'],
+  [/\b(infectious|infection|hiv|lyme)/, 'Infectious disease'],
+  [/\b(surgeon|surgery|hernia|gallbladder|appendi|varicose)/, 'General surgery'],
+  [/\b(hospitalist|anesthes)/, 'Hospital-based clinicians'],
+  [/\b(pharmac|prescription refill)/, 'Pharmacy'],
   [/\b(check ?up|physical|primary care|family doctor|general doctor|flu|cold|fever|annual)/, 'Primary care / family doctor']
 ];
 
@@ -304,22 +320,36 @@ function specialtyByLabel(label) {
 
 // Free text -> {label, terms}. Specialty names first, then condition words.
 // null means "we could not tell", which hands the text to the AI helper.
+//
+// Label words must match whole words. A plain substring test sent "hearing"
+// to Ear, nose & throat (it contains "ear"). A partial word may still match the
+// start of a label word ("derm" -> dermatology), but never a generic word:
+// "physician" must not land on Physician assistant, nor "hospital" on
+// Hospital-based clinicians. The registry term only matches from its start
+// (as before): as a whole word, "Surgery" sent "knee surgery" to General surgery.
+var GENERIC_QUERY = /^(doctors?|physicians?|hospitals?|clinics?|health|care|medical|services?|other|general|specialists?|providers?)$/;
+function qNorm(v) { return String(v || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
+function hasWords(text, phrase) { return phrase && (' ' + text + ' ').indexOf(' ' + phrase + ' ') !== -1; }
+function startsName(text, name) { return text.length >= 4 && !GENERIC_QUERY.test(text) && name.indexOf(text) === 0; }
 function resolveQuery(text) {
-  var t = String(text || '').trim().toLowerCase();
+  var t = qNorm(text);
   if (!t) return null;
   var i, s;
   for (i = 0; i < SPECIALTIES.length; i++) {
     s = SPECIALTIES[i];
-    if (s[0].toLowerCase() === t || s[2].toLowerCase() === t) return { label: s[0], terms: s[1].split(',') };
+    if (qNorm(s[0]) === t || qNorm(s[2]) === t) return { label: s[0], terms: s[1].split(',') };
   }
   for (i = 0; i < SPECIALTIES.length; i++) {
     s = SPECIALTIES[i];
-    var names = s[0].toLowerCase().split(/[\/&,()]+/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 2; });
-    if (names.some(function (n) { return t.indexOf(n) !== -1 || n.indexOf(t) === 0; }) ||
-        s[2].toLowerCase().indexOf(t) === 0) return { label: s[0], terms: s[1].split(',') };
+    var names = s[0].split(/[\/&,()]+/).map(qNorm).filter(function (x) { return x.length > 2; });
+    var nppes = qNorm(s[2]);
+    if (names.some(function (n) { return hasWords(t, n) || startsName(t, n); }) ||
+        startsName(t, nppes)) return { label: s[0], terms: s[1].split(',') };
   }
+  // Hints read the raw lowercased text: they spell out their own punctuation (x-ray, ob-gyn).
+  var raw = String(text).trim().toLowerCase();
   for (i = 0; i < CONDITION_HINTS.length; i++) {
-    if (CONDITION_HINTS[i][0].test(t)) {
+    if (CONDITION_HINTS[i][0].test(raw)) {
       s = specialtyByLabel(CONDITION_HINTS[i][1]);
       if (s) return { label: s[0], terms: s[1].split(',') };
     }
@@ -357,7 +387,11 @@ function runProviderSearch() {
     var dLat = s.miles / 69, dLng = s.miles / (69 * Math.max(0.2, Math.cos(c.lat * Math.PI / 180)));
     var box = 'latitude=gte.' + (c.lat - dLat).toFixed(5) + '&latitude=lte.' + (c.lat + dLat).toFixed(5) +
               '&longitude=gte.' + (c.lng - dLng).toFixed(5) + '&longitude=lte.' + (c.lng + dLng).toFixed(5);
-    return providerRowsQuery(box + taxonomyPrefilter(s.terms)).then(function (rows) {
+    // A specialty finds its listings by NUCC code (the reviewed table). Terms
+    // that are not a specialty (a navigator suggestion) still match by name.
+    var codes = specialtyCodes(s.label);
+    s.codeSet = codes.length ? codes.reduce(function (m, c) { m[c] = true; return m; }, {}) : null;
+    return providerRowsQuery(box + (s.codeSet ? codeFilter(codes) : taxonomyPrefilter(s.terms))).then(function (rows) {
       if (seq !== s.seq) return;
       s.truncated = !!rows.truncated;
       s.all = buildResults(rows, s);
@@ -384,7 +418,7 @@ function buildResults(rows, s) {
     if (r.miles < cur.miles) { r.sites = cur.sites; byNpi[r.npi] = r; }
   }
   (rows || []).forEach(function (row) {
-    if (!row.npi || !taxMatches(row.primary_taxonomy, s.terms)) return;
+    if (!row.npi || !(s.codeSet ? s.codeSet[row.taxonomy_code] : taxMatches(row.primary_taxonomy, s.terms))) return;
     consider({
       npi: String(row.npi), name: titleCase(row.name), specialty: row.primary_taxonomy || '',
       address: titleCase(row.address), city: titleCase(row.city), state: row.state, zip: row.zip,
@@ -833,11 +867,9 @@ function reviewEl() {
         // Offering to find it is carrying out that instruction, not advising.
         if (data.referrals && data.referrals.length) {
           var term = data.referrals[0];
-          var match = null;
-          for (var i = 0; i < SPECIALTIES.length; i++) {
-            if (SPECIALTIES[i][0].toLowerCase().indexOf(term.toLowerCase()) !== -1 ||
-                SPECIALTIES[i][2].toLowerCase().indexOf(term.toLowerCase()) !== -1) { match = i; break; }
-          }
+          // Same whole-word matching as the search box.
+          var hit = resolveQuery(term), match = null;
+          for (var i = 0; hit && i < SPECIALTIES.length; i++) if (SPECIALTIES[i][0] === hit.label) { match = i; break; }
           // Straight into the search the referral names.
           if (match !== null) pickSpecialty(match);
           else { state.askDraft = 'My doctor referred me to ' + term + '.'; location.hash = '#/ask'; }

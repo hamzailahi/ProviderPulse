@@ -42,7 +42,7 @@
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const MarketModel = require('../v2/assets/market-model.js');
-const SPECIALTIES = require('../v2/assets/specialties.js');
+const SPECIALTIES = require('../v2/assets/specialties.js').MARKET;   // the market side's frozen list until phase 3b
 
 const TABLE = 'market_benchmarks';
 const GEO_MEASURE = 'DENTAL';   // same measure market-score.js reads pop_18plus from

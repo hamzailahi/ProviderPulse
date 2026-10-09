@@ -407,7 +407,7 @@ v2/assets/                   shared browser modules, several also loaded by func
                                directory.js       map, search and taxonomy helpers
                                taxonomy-map.js    NUCC code to official grouping (generated)
                                taxonomy-groups.js six specialty groups, used for supply counts
-                               specialties.js     the 33 patient-facing specialties
+                               specialties.js     the 44 patient-facing specialties (33 for the market model)
                                health-demand.js   CDC PLACES need model by group
                                market-model.js    the market opportunity model
 v2/netlify/functions/        backend: auth, matching, scoring, screening, audits, appointments
@@ -513,7 +513,8 @@ node scripts/test-answer-check.mjs        # assistant figures must trace to tool
 node scripts/test-density-benchmark.mjs   # the state comparison is like for like, and honest when unavailable
 node scripts/test-signup-gate.mjs         # patient sign-up is closed unless explicitly opened
 node scripts/test-market-assistant.mjs    # the assistant: steps, tools, history rules (needs npm ci in v2/)
-node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list
+node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list, specialty coverage
+node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 ```
 
 The frontends are checked by driving them in a headless browser against
@@ -565,6 +566,19 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-09
 
+- **Patient search finds providers by their official code.** Picking or
+  typing a specialty now finds every listing whose NUCC code belongs to it,
+  per the approved table, instead of matching words in the taxonomy name.
+  Eleven new categories are searchable (among them Hearing & audiology,
+  Behavior therapy (ABA), Nursing, Physician assistant and General surgery),
+  and "Speech & hearing" is now "Speech & language therapy". The same
+  change covers the provider portal's Competition tab and the dashboard's
+  specialty filter. Typed searches match whole words: "primary care doctor"
+  works as before, "hearing" now finds audiologists instead of ear, nose
+  and throat doctors, "knee surgery" stays with orthopedics, and generic
+  words such as "physician" or "hospital" go to the AI helper rather than a
+  wrong category. Market scores still use the previous 33 categories until
+  their benchmarks are rebuilt on codes.
 - **Patient specialties by official code approved.** The reviewed table
   is now the record of which search category each code belongs to, and a
   test fails if any visible clinician code is left without one. Patient
@@ -575,7 +589,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   categories, so that every visible individual clinician can be found
   (today about 3.3 million listings belong to no category). It keeps the
   existing categories, splits hearing out of speech therapy, and adds
-  twelve, including Behavior therapy (ABA), Nursing, Physician assistant,
+  eleven, including Behavior therapy (ABA), Nursing, Physician assistant,
   Care coordination, Hospital-based clinicians and General surgery. 45
   codes are flagged for a decision. Patient search does not change until
   the proposal is approved.

@@ -36,7 +36,7 @@ const Anthropic = AnthropicModule.default || AnthropicModule;
 const { getUser, isProvider } = require('./lib/auth.js');
 const { validatePlan, buildPath, summarise, TABLES, OPS } = require('./lib/query-plan.js');
 const { verifyText } = require('./lib/answer-check.js');
-const SPECIALTIES = require('../../assets/specialties.js');
+const SPECIALTIES = require('../../assets/specialties.js').MARKET;   // the market side's frozen list until phase 3b
 const marketScore = require('./market-score.js');
 
 const MODEL = 'claude-opus-5-5';

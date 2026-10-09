@@ -34,7 +34,7 @@ import { resolve } from './lib/cms-catalog.mjs';
 const require = createRequire(import.meta.url);
 const DemandModel = require('../v2/assets/demand-model.js');
 const MarketModel = require('../v2/assets/market-model.js');
-const SPECIALTIES = require('../v2/assets/specialties.js');
+const SPECIALTIES = require('../v2/assets/specialties.js').MARKET;   // the market side's frozen list until phase 3b
 
 const args = process.argv.slice(2);
 const opt = (n, d = null) => (args.indexOf(n) !== -1 ? args[args.indexOf(n) + 1] : d);

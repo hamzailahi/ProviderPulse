@@ -58,7 +58,7 @@ const HealthDemand = require('../../assets/health-demand.js');
 // confidence, reasons). See that file's header for the five factors.
 const MarketModel = require('../../assets/market-model.js');
 const DemandModel = require('../../assets/demand-model.js');
-const SPECIALTIES = require('../../assets/specialties.js');
+const SPECIALTIES = require('../../assets/specialties.js').MARKET;   // the market side's frozen list until phase 3b
 
 // Census columns the model reads for age mix and income (demographics_raw).
 const AGE_INCOME_COLS = [
@@ -772,7 +772,8 @@ exports.handler = async (event) => {
             learnedNeed
           };
           const scored = MarketModel.score(baseInput);
-          const want = String((event.queryStringParameters || {}).specialty || '');
+          const wantRaw = String((event.queryStringParameters || {}).specialty || '');
+          const want = require('../../assets/specialties.js').MARKET_LABEL_ALIASES[wantRaw] || wantRaw;
           model = {
             version: scored.version, weights: scored.weights,
             benchmarks: scored.specialties.some(x => x.evidence.access && x.evidence.access.basis === 'specialty') ? 'specialty' : 'group',

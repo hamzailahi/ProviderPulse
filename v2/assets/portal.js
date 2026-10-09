@@ -747,11 +747,16 @@ function loadCompetition(miles, specOverride) {
     var dLat = miles / 69, dLng = miles / (69 * Math.max(0.2, Math.cos(c.lat * Math.PI / 180)));
     var box = 'latitude=gte.' + (c.lat - dLat).toFixed(5) + '&latitude=lte.' + (c.lat + dLat).toFixed(5) +
               '&longitude=gte.' + (c.lng - dLng).toFixed(5) + '&longitude=lte.' + (c.lng + dLng).toFixed(5);
-    return Promise.all([providerRowsQuery(box + taxonomyPrefilter(spec.terms)), loadRegistered()]).then(function (res) {
+    // Competitors are found by NUCC code, like the patient search; a
+    // description that is not one of the specialties still matches by name.
+    var codes = specialtyCodes(spec.label), codeSet = null;
+    if (codes.length) { codeSet = {}; codes.forEach(function (x) { codeSet[x] = true; }); }
+    return Promise.all([providerRowsQuery(box + (codeSet ? codeFilter(codes) : taxonomyPrefilter(spec.terms))), loadRegistered()]).then(function (res) {
       var mine = String((S.profile || {}).npi || '');
       var byNpi = {};
       res[0].forEach(function (r) {
-        if (!r.npi || String(r.npi) === mine || !r.latitude || !taxMatches(r.primary_taxonomy, spec.terms)) return;
+        if (!r.npi || String(r.npi) === mine || !r.latitude) return;
+        if (!(codeSet ? codeSet[r.taxonomy_code] : taxMatches(r.primary_taxonomy, spec.terms))) return;
         var d = milesBetween(c.lat, c.lng, +r.latitude, +r.longitude);
         if (d > miles) return;
         var cur = byNpi[r.npi];

@@ -39,7 +39,7 @@ const SPECIALTIES = [
   ['Foot & ankle / podiatry', 'Podiatrist,Podiatric Clinic/Center,Podiatry', 'Podiatrist'],
   ['Pain management', 'Pain Medicine Physician,Pain Medicine (Anesthesiology) Physician,Pain Medicine', 'Pain Medicine'],
   ['Plastic & reconstructive surgery', 'Plastic Surgery Physician,Plastic and Reconstructive Surgery Physician,Plastic Surgery', 'Plastic Surgery'],
-  ['Speech & hearing', 'Speech-Language Pathologist,Audiologist,Hearing Instrument Specialist,Hearing and Speech Clinic/Center,Speech & Hearing', 'Speech-Language Pathologist'],
+  ['Speech & language therapy', 'Speech-Language Pathologist,Speech-Language Assistant,Hearing and Speech Clinic/Center,Speech & Hearing', 'Speech-Language Pathologist'],
   ['Nutrition & dietitian', 'Registered Dietitian,Nutritionist,Nutrition', 'Dietitian'],
   ['Acupuncture, massage & naturopathy', 'Acupuncturist,Massage Therapist,Naturopath,Music Therapist,Alternative Medicine', 'Acupuncturist'],
   ['Urgent care & emergency', 'Urgent Care Clinic/Center,Emergency Care Clinic/Center,Emergency Medicine Physician,General Acute Care Hospital,Critical Access Hospital,Ambulatory Surgical Clinic/Center,Emergency Services', 'Emergency Medicine'],
@@ -47,9 +47,45 @@ const SPECIALTIES = [
   ['Pharmacy', 'Pharmacy,Pharmacist', 'Pharmacy'],
   ['Home health & in-home care', 'Home Health Agency,Home Health Aide,Home Health Registered Nurse,In Home Supportive Care Agency,Nursing Care Agency,Community Based Hospice Care Agency,Nursing', 'Home Health'],
   ['Nursing & assisted living', 'Skilled Nursing Facility,Assisted Living Facility,Adult Care Home Facility,Nursing', 'Skilled Nursing Facility'],
-  ['Medical equipment & supplies', 'Durable Medical Equipment,Prosthetic/Orthotic Supplier,Customized Equipment,Hearing  Aid Equipment,Medical Equipment & Supplies', 'Durable Medical Equipment & Medical Supplies']
+  ['Medical equipment & supplies', 'Durable Medical Equipment,Prosthetic/Orthotic Supplier,Customized Equipment,Hearing  Aid Equipment,Medical Equipment & Supplies', 'Durable Medical Equipment & Medical Supplies'],
+  // Added 2026-10-09 with the NUCC code table (taxonomy codes phase 3). Their
+  // nppesTerms are official NUCC classification names, NOT yet verified live
+  // against the registry (it was unreachable when they were added).
+  ['Hearing & audiology', 'Audiologist,Hearing Instrument Specialist,Audiology Assistant,Hearing Aid Equipment', 'Audiologist'],
+  ['Behavior therapy (ABA)', 'Behavior Technician,Behavior Analyst,Assistant Behavior Analyst', 'Behavior Analyst'],
+  ['Nursing (RN, LPN)', 'Registered Nurse,Licensed Practical Nurse,Licensed Vocational Nurse,Clinical Nurse Specialist', 'Registered Nurse'],
+  ['Physician assistant', 'Physician Assistant', 'Physician Assistant'],
+  ['Care coordination & community health', 'Case Manager/Care Coordinator,Community Health Worker,Health Educator,Prevention Professional', 'Case Manager/Care Coordinator'],
+  ['Hospital-based clinicians', 'Hospitalist,Anesthesiology Physician,Certified Registered Nurse Anesthetist,Acute Care Nurse Practitioner,Critical Care Medicine', 'Hospitalist'],
+  ['General surgery', 'Surgery Physician,Vascular Surgery Physician,Colon & Rectal Surgery Physician,Transplant Surgery Physician', 'Surgery'],
+  ['Infectious disease', 'Infectious Disease Physician', 'Infectious Disease'],
+  ['Genetics & genetic counseling', 'Genetic Counselor,Medical Genetics', 'Medical Genetics'],
+  ['Hospice & palliative care', 'Hospice and Palliative Medicine,Community Based Hospice Care Agency,Hospice Care', 'Hospice and Palliative Medicine'],
+  ['Other health services', 'Specialist,Technician,Interpreter,Driver', 'Specialist']
 ];
 
-// Also loaded by Netlify Functions (market-score via lib/market-model), so the
-// scoring model scores exactly the specialties patients search for.
-if (typeof module !== 'undefined' && module.exports) module.exports = SPECIALTIES;
+// Patient search, the portal and the dashboard filter find a specialty's
+// listings by NUCC code (TaxonomyMap.codesFor(label), from the reviewed table
+// in supabase/reference/taxonomy-overrides.csv). mapTerms remain for what
+// still matches by name: claimed listings' self-reported specialty, the
+// dashboard's #tax= deep links and the market side below.
+//
+// MARKET_SPECIALTIES is the market model's list (market-score, the assistant,
+// the benchmark builder, the demand trainer): the 33 labels as they were
+// before the code table, with "Speech & hearing" under its old name and terms,
+// because market_benchmarks rows are keyed by those labels. It goes away when
+// the market side moves to codes and the benchmarks are rebuilt (phase 3b).
+var MARKET_SPECIALTIES = SPECIALTIES.slice(0, 33).map(function (s) {
+  return s[0] === 'Speech & language therapy'
+    ? ['Speech & hearing', 'Speech-Language Pathologist,Audiologist,Hearing Instrument Specialist,Hearing and Speech Clinic/Center,Speech & Hearing', 'Speech-Language Pathologist']
+    : s;
+});
+// The dashboard sends the patient-facing label; the market side knows it by the old one.
+var MARKET_LABEL_ALIASES = { 'Speech & language therapy': 'Speech & hearing' };
+
+if (typeof window !== 'undefined') { window.MARKET_SPECIALTIES = MARKET_SPECIALTIES; window.MARKET_LABEL_ALIASES = MARKET_LABEL_ALIASES; }
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = SPECIALTIES;
+  module.exports.MARKET = MARKET_SPECIALTIES;
+  module.exports.MARKET_LABEL_ALIASES = MARKET_LABEL_ALIASES;
+}
