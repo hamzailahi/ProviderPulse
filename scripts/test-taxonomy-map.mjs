@@ -118,5 +118,25 @@ throws(() => parseNameOverrides(H + 'Internal Medicine Physician,207R00000X\n', 
 throws(() => parseNameOverrides(H + 'Facility / Clinic,261Q00000X\n', nucc), /not a NUCC display name/, 'override for a legacy label is refused');
 throws(() => parseNameOverrides(H + 'Pharmacist,183500000X\npharmacist,1835G0000X\n', nucc), /twice/, 'duplicate name refused');
 
+// --- patient specialties (phase 3; approved 2026-10-09) ---------------------
+// Acceptance 5: every visible Individual code belongs to at least one patient
+// specialty, set explicitly in the overrides file, and every label used there
+// is on the approved list.
+{
+  const approved = new Set(JSON.parse(readFileSync('supabase/reference/patient-specialties-list.json', 'utf8')).map(s => s.label));
+  const ovAll = parseOverrides(ovText, known);
+  const uncovered = nucc.filter(n => n.section === 'Individual' && !(ovAll.get(n.code) && ovAll.get(n.code).show === false)
+    && !(ovAll.get(n.code) && ovAll.get(n.code).specialties.length));
+  ok(uncovered.length === 0, `every visible individual code has a patient specialty (${uncovered.slice(0, 5).map(n => n.code).join(', ')})`);
+  const unknownLabels = [...new Set([...ovAll.values()].flatMap(o => o.specialties).filter(l => !approved.has(l)))];
+  ok(unknownLabels.length === 0, `overrides use only approved specialty labels (${unknownLabels.join(' | ')})`);
+  const spec = code => ovAll.get(code).specialties;
+  ok(spec('106S00000X').includes('Behavior therapy (ABA)'), 'Behavior Technician found under ABA');
+  ok(spec('363LF0000X').includes('Primary care / family doctor'), 'Family NP found under Primary care');
+  ok(spec('363LA2100X').includes('Hospital-based clinicians'), 'Acute Care NP under Hospital-based clinicians (the user\'s choice)');
+  ok(spec('183500000X').join() === 'Pharmacy', 'Pharmacist under Pharmacy');
+  ok(!ovAll.get('390200000X').specialties.length, 'Student is in no specialty');
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -437,7 +437,11 @@ keyword matching and no default bucket**. Three phases, each gated:
    Critical Care, Neonatal) go to a new **Hospital-based clinicians**
    specialty (the user's choice). The full table goes to the user as a
    spreadsheet for approval before search switches; benchmarks are rebuilt
-   after. **Proposal drafted 2026-10-09, awaiting the user's review:**
+   after. **Approved by the user 2026-10-09 as proposed** and written into
+   `taxonomy-overrides.csv` (790 codes with specialties, plus Student
+   hidden); `test-taxonomy-map.mjs` enforces the coverage rule and that every
+   label is on `patient-specialties-list.json`. Search does not read it yet.
+   The proposal was drafted 2026-10-09:
    `scripts/propose-patient-specialties.mjs` (rules keyed on NUCC
    Classification, then Specialization; exits non-zero if a visible
    Individual code gets no specialty) writes
@@ -449,12 +453,18 @@ keyword matching and no default bucket**. Three phases, each gated:
    Care coordination & community health, Hospital-based clinicians, General
    surgery, Infectious disease, Genetics & genetic counseling, Hospice &
    palliative care, Other health services). 45 codes are flagged for a
-   decision. The rules are a drafting aid: once approved, the assignments go
-   into `taxonomy-overrides.csv` as one explicit row per code.
+   decision. The rules are a drafting aid: the overrides CSV is now the
+   source of truth, edited per code; do not regenerate it from the script.
+   **Before search switches:** `resolveQuery` in `patient.js` matches label
+   words by plain substring, so "hearing" already resolves to Ear, nose &
+   throat (it contains "ear"), and adding the new labels would send
+   "physician" to Physician assistant and "hospital" to Hospital-based
+   clinicians. Fix with word-boundary matching and plain-language hints for
+   the new categories in the same change.
 
 Until phase 3 ships, `taxonomy-groups.js` remains the classifier for supply counts and Insights.
 `show_on_map` and patient specialties are data in the overrides CSV, never
-code; today the only override hides `390200000X` (Student, Health Care).
+code; the only hidden code is `390200000X` (Student, Health Care).
 `taxonomy-map.js` and `supabase/reference/taxonomy_map.csv` are generated
 from `nucc_taxonomy.csv` + `cms_taxonomy_crosswalk.csv` + the overrides; CI
 runs `build-taxonomy-map.mjs --check`, so a hand edit or stale file fails.
@@ -1212,7 +1222,7 @@ node scripts/test-market-assistant.mjs    # 58: the assistant, figure repair, tr
 node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
-node scripts/test-taxonomy-map.mjs        # 64: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names
+node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
 ```
 
 Frontends are verified in headless Chromium (Playwright) against mocked

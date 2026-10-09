@@ -565,6 +565,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-09
 
+- **Patient specialties by official code approved.** The reviewed table
+  is now the record of which search category each code belongs to, and a
+  test fails if any visible clinician code is left without one. Patient
+  search switches over in the next step, together with a fix so that
+  typing "hearing" no longer lands on Ear, nose & throat.
 - **Patient specialties by official code: proposal ready for review.** A
   draft assigns every one of the 883 NUCC codes to patient search
   categories, so that every visible individual clinician can be found
