@@ -14,26 +14,25 @@ q() {
   local out
   if ! out=$(psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -At -F '|' -c "begin transaction read only; set local statement_timeout = '20min'; set local lock_timeout = '10s'; $1; commit;" 2>/tmp/q.err); then
     echo "::error::Query failed: $(tr '\n' ' ' < /tmp/q.err | cut -c1-400)" >&2
-    echo "::error::Query failed: $(tr '\n' ' ' < /tmp/q.err | cut -c1-400)"
     return 1
   fi
   printf '%s\n' "$out"
 }
 
-# Before comparing, say plainly whether 031 has finished: the summary must
-# exist (committed), and no session may still be building it. Building holds
-# a lock, so a lookup that cannot get one in 10s means it is still running.
-running=$(q "select count(*) from pg_stat_activity where state <> 'idle' and pid <> pg_backend_pid() and query ilike '%cms_procedures_by_zip%'") || exit 1
-exists=$(q "select to_regclass('public.cms_procedures_by_zip') is not null") || exit 1
+# Before comparing, say plainly whether 031 has finished. The summary must
+# exist, and no other session may hold a lock on it: 031 drops and recreates
+# the table in one transaction, so while it runs it holds an exclusive lock.
+# (pg_stat_activity hides other roles' query text, so locks are the reliable
+# signal.)
+exists=$(q "select to_regclass('public.cms_procedures_by_zip') is not null") || { echo "::error::Could not query the database: $(tr '\n' ' ' < /tmp/q.err | cut -c1-300)"; exit 1; }
 if [ "$exists" != "t" ]; then
-  msg="cms_procedures_by_zip does not exist yet: migration 031 has not committed (sessions still working on it: $running). If none, run 031 again."
-  echo "::error::$msg"; echo "$msg" >&2
-  printf '# Procedures summary check\n\n%s\n' "$msg" > "$OUT"; exit 1
+  msg="cms_procedures_by_zip does not exist: migration 031 has not committed. If it is not still running, run 031 again."
+  echo "::error::$msg"; printf '# Procedures summary check\n\n%s\n' "$msg" > "$OUT"; exit 1
 fi
-if [ "$running" != "0" ]; then
-  msg="Migration 031 still appears to be running ($running session(s)). Wait for it to finish, then run this check again."
-  echo "::error::$msg"; echo "$msg" >&2
-  printf '# Procedures summary check\n\n%s\n' "$msg" > "$OUT"; exit 1
+held=$(q "select count(*) || ' lock(s), oldest ' || coalesce(to_char(now() - min(a.xact_start), 'HH24:MI:SS'), '?') from pg_locks l left join pg_stat_activity a on a.pid = l.pid where l.relation = 'public.cms_procedures_by_zip'::regclass and l.pid <> pg_backend_pid() and l.mode = 'AccessExclusiveLock'") || exit 1
+if [ "${held%% *}" != "0" ]; then
+  msg="Migration 031 is still running: $held on cms_procedures_by_zip (age of the transaction holding it). Wait for it to finish (it gives up after 30 minutes), then run this check again."
+  echo "::error::$msg"; printf '# Procedures summary check\n\n%s\n' "$msg" > "$OUT"; exit 1
 fi
 
 totals=$(q "select

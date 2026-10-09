@@ -571,7 +571,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   dropped; dropping it frees about 3 GB for the taxonomy backfill. The first
   attempt to build the summary ran out of disk (the database's temporary
   working space, not the summary itself) and rolled back without changing
-  anything; it now builds in 100 small batches. Listings
+  anything; it now builds in 100 small batches. The check says plainly whether the
+  summary is still being built, so a dropped browser connection during the
+  build is not mistaken for a failure. Listings
   whose name NUCC uses for two codes (Pharmacist, Psychologist, Podiatrist,
   Clinical Neuropsychologist, Military Hospital) now get the general code,
   from a short reviewed list rather than being left without one.
