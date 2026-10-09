@@ -50,6 +50,7 @@
     <link rel="stylesheet" href="assets/dashboard.css">
     <link rel="stylesheet" href="assets/dashboard-v3.css">
     <script src="assets/taxonomy-groups.js"></script>
+    <script src="assets/taxonomy-map.js"></script>
     <script src="assets/specialties.js"></script>
 </head>
 <body>
@@ -744,6 +745,7 @@
                         'Name': c.name || '',
                         'Primary Practice Address': c.address || '',
                         'Primary Taxonomy': c.primary_taxonomy || '',
+                        'Taxonomy Code': c.taxonomy_code || '',
                         'ZIP Code': c.zip || '',
                         'State': c.state || '',
                         'Latitude': c.latitude || '',
@@ -791,11 +793,11 @@
         // location groups under the org/physician it belongs to. Rendering, popups and the
         // legend need no changes: a physician or secondary address is just another row with
         // an npi/name/address/primary_taxonomy/zip/state/latitude/longitude.
-        const PROVIDER_ROW_SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude';
+        const PROVIDER_ROW_SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude';
         const PROVIDER_SOURCES = [
             { table: 'clinics', select: PROVIDER_ROW_SELECT, src: 'clinic' },
             { table: 'provider_individuals', select: PROVIDER_ROW_SELECT, src: 'individual' },
-            { table: 'clinic_secondary_locations', select: 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,latitude,longitude', src: 'secondary' }
+            { table: 'clinic_secondary_locations', select: 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude', src: 'secondary' }
         ];
 
         async function fetchProviderRows(filterFn, onProgress) {
@@ -873,6 +875,7 @@
                     'NPI': c.npi || '', 'Name': c.name || '',
                     'Primary Practice Address': c.address || '',
                     'Primary Taxonomy': c.primary_taxonomy || '',
+                    'Taxonomy Code': c.taxonomy_code || '',
                     'ZIP Code': c.zip || '', 'State': c.state || '',
                     'Latitude': c.latitude || '', 'Longitude': c.longitude || '', '_src': c._src,
                     ...Object.fromEntries(Object.entries(demByZip[c.zip] || {}).filter(([k]) =>
@@ -930,6 +933,7 @@
                     'NPI': c.npi || '', 'Name': c.name || '',
                     'Primary Practice Address': c.address || '',
                     'Primary Taxonomy': c.primary_taxonomy || '',
+                    'Taxonomy Code': c.taxonomy_code || '',
                     'ZIP Code': c.zip || '', 'State': c.state || '',
                     'Latitude': c.latitude || '', 'Longitude': c.longitude || '', '_src': c._src,
                     ...Object.fromEntries(Object.entries(demByZip[c.zip] || {}).filter(([k]) =>
@@ -996,7 +1000,7 @@
             });
 
             const taxArray = Array.from(taxonomies).sort();
-            taxArray.forEach(t => taxonomyColors[t] = TaxonomyGroups.colorFor(t));   // 6 specialty groups (assets/taxonomy-groups.js), not a hue per raw taxonomy
+            colorTaxonomyNames();   // dropdown dots: the NUCC grouping colour of the listings carrying each name
             selectedTaxonomies = new Set(taxArray);
 
             buildTaxDropdown(taxArray); updateLegend();
@@ -1191,7 +1195,7 @@
             taxArray.forEach(t => {
                 const label = document.createElement('label'); label.className = 'tax-option';
                 const dot = `<span style="width:10px;height:10px;border-radius:50%;background:${taxonomyColors[t]};display:inline-block;flex-shrink:0;"></span>`;
-                label.innerHTML = `<input type="checkbox" class="tax-chk" value="${t}" checked /> ${dot} <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${t}">${t}</span>`;
+                label.innerHTML = `<input type="checkbox" class="tax-chk" value="${escHtml(t)}" checked /> ${dot} <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escHtml(t)}">${escHtml(t)}</span>`;
                 container.appendChild(label);
             });
             document.getElementById('chk-all').checked = true;
@@ -1391,6 +1395,74 @@
         }
 
         // --- MAP RENDER & MULTI-TAXONOMY PINS ---
+        // --- NUCC groupings (taxonomy codes phase 2) ---
+        // Every listing is classified by its own NUCC code (taxonomy_code, migration
+        // 029) through the generated assets/taxonomy-map.js: the official Grouping,
+        // verbatim, with no keyword matching and no default bucket. Individual
+        // groupings take a vivid colour family and organizational ones a muted one,
+        // assigned by position in TaxonomyMap.groupings, so a new NUCC release needs
+        // no code change. A code the map hides (show_on_map=false, e.g. Student) is
+        // left off the map on purpose. A missing or unknown code is hidden and
+        // reported (console error naming it, a count under the map key), never
+        // reassigned to a guessed group.
+        const GROUPING_PALETTE = {
+            individual: ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0891b2', '#db2777', '#ca8a04', '#4f46e5',
+                         '#059669', '#e11d48', '#7c3aed', '#0d9488', '#65a30d', '#c026d3', '#b45309', '#1e40af', '#be123c'],
+            organization: ['#78716c', '#64748b', '#a1887f', '#8091ab', '#9ca3af', '#a8a29e', '#7c8b7a', '#94a3b8',
+                           '#8b7d9b', '#a3937a', '#6b7f8e', '#9e8a8a']
+        };
+        const GROUPINGS = (window.TaxonomyMap ? TaxonomyMap.groupings : []).map((g, i, all) => {
+            const family = g.individual ? 'individual' : 'organization';
+            const idx = all.slice(0, i).filter(x => x.individual === g.individual).length;
+            const pal = GROUPING_PALETTE[family];
+            return { key: (g.individual ? 'I|' : 'O|') + g.grouping, grouping: g.grouping, individual: g.individual,
+                     color: pal[idx % pal.length] };
+        });
+        const GROUPING_BY_KEY = Object.fromEntries(GROUPINGS.map(g => [g.key, g]));
+        window.MAP_GROUPINGS = GROUPINGS;
+        let hiddenGroupings = new Set();       // grouping keys the map key has unchecked
+        const _reportedMissingCode = new Set();
+
+        // The NUCC entry for a row, or null when its code is missing or unknown.
+        // TaxonomyMap.get logs an unknown code once; a missing code is logged here.
+        function taxEntry(p) {
+            if (p._tx !== undefined) return p._tx;
+            const code = String(p['Taxonomy Code'] || '').trim();
+            let e = null;
+            if (!code) {
+                const npi = String(p['NPI'] || '');
+                if (!_reportedMissingCode.has(npi)) {
+                    _reportedMissingCode.add(npi);
+                    console.error('[taxonomy-map] listing has no taxonomy code: NPI ' + npi + ' (' + (p['Primary Taxonomy'] || 'no name') + ')');
+                }
+            } else if (window.TaxonomyMap) {
+                e = TaxonomyMap.get(code);
+            }
+            p._tx = e;
+            return e;
+        }
+        function groupingKeyOf(p) { const e = taxEntry(p); return e ? (e.individual ? 'I|' : 'O|') + e.grouping : null; }
+        function practiceColor(p) { const g = GROUPING_BY_KEY[groupingKeyOf(p)]; return g ? g.color : '#3b82f6'; }
+        function hierarchyText(e) {
+            return [e.grouping, e.classification, e.specialization].filter(Boolean).join(' › ');
+        }
+        window.setGroupingVisible = function (key, visible) {
+            if (visible) hiddenGroupings.delete(key); else hiddenGroupings.add(key);
+            renderMap();
+        };
+        // The taxonomy dropdown is still keyed by stored name (specialty filters and
+        // deep links match names until phase 3); its dot shows the grouping colour of
+        // the first listing carrying that name.
+        function colorTaxonomyNames() {
+            for (const addr in groupedData) {
+                groupedData[addr].practices.forEach(p => {
+                    const t = p['Primary Taxonomy'];
+                    if (t && !taxonomyColors[t] && groupingKeyOf(p)) taxonomyColors[t] = practiceColor(p);
+                });
+            }
+            taxonomies.forEach(t => { if (!taxonomyColors[t]) taxonomyColors[t] = '#9ca3af'; });
+        }
+
         function renderMap() {
             // Markers live in a cluster layer when markercluster is available.
             // 1,500 individually-placed pins stacked into an unreadable column;
@@ -1414,6 +1486,9 @@
             }
 
             let coordGroups = {};
+            // Per-grouping counts of what passes every other filter, for the map key.
+            const groupingCounts = {};
+            let hiddenUnknown = 0;
 
             for (let addr in groupedData) {
                 const node = groupedData[addr]; 
@@ -1429,7 +1504,15 @@
                     // Rows with no _src tag predate the source split (e.g. recommended-pin
                     // injections) and should never be hidden by a source toggle.
                     const passSource = !p._src || selectedSources.has(p._src);
-                    return passSearch && passSource && (selectedTaxonomies.size === 0 || selectedTaxonomies.has(p['Primary Taxonomy']));
+                    if (!(passSearch && passSource && (selectedTaxonomies.size === 0 || selectedTaxonomies.has(p['Primary Taxonomy'])))) return false;
+                    // Rows with no _src (navigator injections) are never hidden by grouping.
+                    if (!p._src) return true;
+                    const e = taxEntry(p);
+                    if (!e) { hiddenUnknown++; return false; }
+                    if (!e.showOnMap) return false;
+                    const gk = (e.individual ? 'I|' : 'O|') + e.grouping;
+                    groupingCounts[gk] = (groupingCounts[gk] || 0) + 1;
+                    return !hiddenGroupings.has(gk);
                 });
                 if (filtered.length === 0) continue;
                 
@@ -1488,7 +1571,9 @@
                     <div style="margin-bottom:10px;" id="clinic-${npi}">
                         ${recBadge}${secondaryBadge}
                         <strong style="font-size:12px;">${escHtml(item.practice['Name'] || '—')}</strong><br/>
-                        <span style="color:var(--text-secondary);font-size:11px;">${escHtml(item.practice['Primary Taxonomy'] || '—')}</span><br/>
+                        ${(() => { const e = taxEntry(item.practice); return e
+                            ? `<span style="color:var(--text-secondary);font-size:11px;">${escHtml(hierarchyText(e))}</span><br/><span style="color:var(--text-muted);font-size:10px;">NUCC ${escHtml(e.code)}</span><br/>`
+                            : `<span style="color:var(--text-secondary);font-size:11px;">${escHtml(item.practice['Primary Taxonomy'] || '—')}</span><br/>`; })()}
                         ${items.length > 1 ? `<span style="color:var(--text-muted);font-size:10px;">${escHtml(item.address)}</span><br/>` : ''}
                         ${affiliationNote}
                         <span style="color:var(--text-muted);font-size:10px;">NPI: ${npi}</span><br/>
@@ -1505,11 +1590,11 @@
                     return popupHtml;
                 }
 
-                let uniqueTaxs = [...new Set(items.map(i => i.practice['Primary Taxonomy']))];
-                const colorMap = window._displayColors || taxonomyColors;
-                let gradientStr = uniqueTaxs.length === 1
-                    ? (colorMap[uniqueTaxs[0]] || '#3b82f6')
-                    : `conic-gradient(${uniqueTaxs.map((t, idx) => `${colorMap[t] || '#3b82f6'} ${idx * (100/uniqueTaxs.length)}% ${(idx + 1) * (100/uniqueTaxs.length)}%`).join(', ')})`;
+                // One colour per NUCC grouping present at this spot (not per raw name).
+                const uniqueColors = [...new Set(items.map(i => practiceColor(i.practice)))];
+                let gradientStr = uniqueColors.length === 1
+                    ? uniqueColors[0]
+                    : `conic-gradient(${uniqueColors.map((c, idx) => `${c} ${idx * (100/uniqueColors.length)}% ${(idx + 1) * (100/uniqueColors.length)}%`).join(', ')})`;
                 // Rings, in priority order: amber = recommended to this patient,
                 // teal = a claimed and NPI-verified listing. Both keep the taxonomy fill.
                 // A secondary-location row is aliased to its parent's NPI (migration 014),
@@ -1530,7 +1615,10 @@
                 const marker = L.marker([group.lat, group.lng], {
                     icon: L.divIcon({ className: 'multi-tax-icon', html: iconHtml, iconSize: [dotSize, dotSize], iconAnchor: [dotSize / 2, dotSize / 2] })
                 })
-                .bindTooltip(items.length === 1 ? items[0].practice['Name'] : `${items.length} Providers Here`, { direction: 'top', offset: [0, -8], opacity: 0.9 })
+                .bindTooltip(items.length === 1
+                    ? (() => { const e = taxEntry(items[0].practice);
+                        return escHtml(items[0].practice['Name'] || '') + (e ? `<br/><span style="font-size:10px;">${escHtml(hierarchyText(e))} · ${escHtml(e.code)}</span>` : ''); })()
+                    : `${items.length} Providers Here`, { direction: 'top', offset: [0, -8], opacity: 0.9 })
                 // maxHeight makes Leaflet add its own .leaflet-popup-scrolled class (overflow-y:auto)
                 // once content exceeds it -- without it a same-coordinate group of 200 individuals
                 // (now routine with provider_individuals merged in) renders a popup taller than the
@@ -1563,6 +1651,9 @@
             if (countyGeoJSONLayer && showCounties && map.hasLayer(countyGeoJSONLayer)) countyGeoJSONLayer.bringToFront();
             markers.forEach(m => { if (m && typeof m.bringToFront === 'function') m.bringToFront(); });
             updateDemographics();
+            // The map key (dashboard-v3.js) lists each grouping with its count and
+            // reports listings hidden for a missing or unknown code.
+            if (typeof window.onGroupingCounts === 'function') window.onGroupingCounts(groupingCounts, hiddenUnknown, hiddenGroupings);
         }
 
         // --- DASHBOARD ROUTING LOGIC ---
@@ -1983,6 +2074,7 @@
                             'NPI': c.npi, 'Name': c.name,
                             'Primary Practice Address': c.address,
                             'Primary Taxonomy': c.primary_taxonomy,
+                            'Taxonomy Code': c.taxonomy_code || '',
                             'ZIP Code': c.zip, 'State': c.state,
                             'Latitude': c.latitude, 'Longitude': c.longitude,
                             '_src': c._src
@@ -1996,7 +2088,7 @@
 
                 // Rebuild taxonomy colors to include any new taxonomies from neighbors
                 const taxArray = Array.from(taxonomies).sort();
-                taxArray.forEach(t => taxonomyColors[t] = TaxonomyGroups.colorFor(t));   // 6 specialty groups (assets/taxonomy-groups.js), not a hue per raw taxonomy
+                colorTaxonomyNames();   // dropdown dots: the NUCC grouping colour of the listings carrying each name
 
                 // Keep the user's filter. This used to reset to every taxonomy,
                 // so a filtered map showed everything once neighbors loaded.

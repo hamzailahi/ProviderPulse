@@ -147,8 +147,10 @@ modes:
 
 Filters stay off the map until asked for, and a specialty picker replaces
 hundreds of raw taxonomy codes (the codes are still there under "Exact
-taxonomies"). Dots are colored by six specialty groups with a matching
-key. The **Insights** tab comes first and carries the market opportunity
+taxonomies"). Dots are colored by the official NUCC groupings (vivid
+colors for individual clinicians, muted ones for organizations), and the
+map key doubles as a filter: each grouping in view has a checkbox and a
+count. A provider's popup shows its full classification and code. The **Insights** tab comes first and carries the market opportunity
 model described next. Demographics, health data and procedures are all
 still there as tabs. **Reports** is a builder on top of the assistant
 below: pick a market memo, expansion one-pager or client pitch, the
@@ -403,7 +405,8 @@ v2/register-*.html           registration flows
 v2/admin-review.html         OIG review queue
 v2/assets/                   shared browser modules, several also loaded by functions:
                                directory.js       map, search and taxonomy helpers
-                               taxonomy-groups.js the six specialty groups and their colors
+                               taxonomy-map.js    NUCC code to official grouping (generated)
+                               taxonomy-groups.js six specialty groups, used for supply counts
                                specialties.js     the 33 patient-facing specialties
                                health-demand.js   CDC PLACES need model by group
                                market-model.js    the market opportunity model
@@ -562,6 +565,17 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-09
 
+- **The map now groups providers by their official classification.** Dots
+  are colored by the NUCC grouping of each listing's own taxonomy code,
+  read from the code rather than guessed from the name: vivid colors for
+  individual clinicians, muted ones for organizations. The map key lists
+  every grouping in view with a count and a checkbox to hide or show it.
+  Popups and tooltips show the full path (for example Ambulatory Health
+  Care Facilities › Clinic/Center › Primary Care) and the code. Students
+  are left off the map. A listing with a missing or unrecognized code is
+  hidden and counted in the key rather than dropped into a catch-all
+  group. Search by specialty and the market scores are unchanged for now;
+  they move to codes in phase 3, after review.
 - **Every listing now carries its official taxonomy code.** The backfill
   gave 10,175,696 of 10,175,703 listings their NUCC code from the September
   NPPES file (7 remain, all old labels with no exact NUCC match, listed for

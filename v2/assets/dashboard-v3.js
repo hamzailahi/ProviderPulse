@@ -166,13 +166,16 @@ function applySpecialty(label) {
 }
 
 /* ---------- 3. legend ----------------------------------------------------- */
+// The map key lists the official NUCC Groupings (window.MAP_GROUPINGS, built in
+// index.html from assets/taxonomy-map.js), individuals first, each with a
+// checkbox and the number of listings in view. index.html calls
+// onGroupingCounts after every render; unchecking calls setGroupingVisible.
 (function legend() {
   var mapBox = $('map-container');
-  if (!mapBox || !window.TaxonomyGroups) return;
+  if (!mapBox) return;
+  var groups = el('div', { class: 'lg-groups' });
   var body = el('div', { class: 'lg-body' },
-    TaxonomyGroups.list.map(function (g) {
-      return el('div', { class: 'lg-row' }, el('i', { class: 'lg-dot', style: 'background:' + g.color }), g.name);
-    }),
+    groups,
     el('div', { class: 'lg-sep' }),
     el('div', { class: 'lg-row' }, el('i', { class: 'lg-cluster' }, '12'), 'Cluster: number of providers, zoom in to split'),
     el('div', { class: 'lg-row' }, el('i', { class: 'lg-dot ring' }), 'Verified on ProviderPulse'),
@@ -185,6 +188,41 @@ function applySpecialty(label) {
     } }, 'Map key', el('span', { class: 'lg-caret', 'aria-hidden': 'true' }, '▾')),
     body);
   mapBox.appendChild(box);
+
+  function section(title, list, counts, hidden) {
+    var shown = list.filter(function (g) { return counts[g.key] || hidden.has(g.key); });
+    if (!shown.length) return null;
+    return el('div', { class: 'lg-sec' },
+      el('div', { class: 'lg-sub' }, title),
+      shown.map(function (g) {
+        var id = 'lg-g-' + GROUPING_IDS(g.key);
+        return el('label', { class: 'lg-row lg-check', for: id },
+          el('input', { type: 'checkbox', id: id, checked: !hidden.has(g.key), onchange: function () {
+            if (typeof window.setGroupingVisible === 'function') window.setGroupingVisible(g.key, this.checked);
+          } }),
+          el('i', { class: 'lg-dot' + (g.individual ? '' : ' org'), style: 'background:' + g.color }),
+          el('span', { class: 'lg-name', title: g.grouping }, g.grouping),
+          el('span', { class: 'lg-count' }, (counts[g.key] || 0).toLocaleString()));
+      }));
+  }
+  var ids = {}, nextId = 0;
+  function GROUPING_IDS(key) { if (!(key in ids)) ids[key] = String(nextId++); return ids[key]; }
+
+  window.onGroupingCounts = function (counts, unknown, hidden) {
+    var all = window.MAP_GROUPINGS || [];
+    while (groups.firstChild) groups.removeChild(groups.firstChild);
+    var ind = section('Individuals', all.filter(function (g) { return g.individual; }), counts, hidden);
+    var org = section('Organizations', all.filter(function (g) { return !g.individual; }), counts, hidden);
+    if (ind) groups.appendChild(ind);
+    if (org) groups.appendChild(org);
+    if (!ind && !org) groups.appendChild(el('div', { class: 'lg-row lg-muted' }, 'Search an area to see its provider groups'));
+    if (unknown > 0) {
+      groups.appendChild(el('div', { class: 'lg-warn', role: 'status' },
+        unknown.toLocaleString() + (unknown === 1 ? ' listing' : ' listings') + ' hidden: unknown taxonomy code'));
+    }
+    groups.appendChild(el('div', { class: 'lg-src' }, 'Groups are the official NUCC groupings'));
+  };
+  window.onGroupingCounts({}, 0, new Set());
 })();
 
 /* ---------- 4. welcome ---------------------------------------------------- */

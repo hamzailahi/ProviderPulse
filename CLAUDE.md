@@ -77,8 +77,8 @@ second copy. The `access_requests` table still holds v1's data.
 | `forms.css` | `register-provider.html`, `auth.html`, `admin-review.html`, `404.html` |
 | `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, paged `tableQuery`/`providerRowsQuery`, `milesBetween`, MapTiler key, ZIP centroid lookup |
 | `specialties.js` | the 33 patient-facing specialties (see taxonomy section); also `require`d by `market-score.js` and the benchmark builder |
-| `taxonomy-groups.js` | six specialty groups and their colors; the dashboard map colors by it, `market-score.js` counts supply with it. **Being replaced** by `taxonomy-map.js` (see NUCC codes) |
-| `taxonomy-map.js` | **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
+| `taxonomy-groups.js` | six specialty groups; `market-score.js` counts supply with it and the dashboard's Insights tab names them. The map no longer uses it (NUCC phase 2). **Being replaced** by `taxonomy-map.js` |
+| `taxonomy-map.js` | the dashboard map's classifier since 2026-10-09; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `health-demand.js` | CDC PLACES need model per group; browser + `require` |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
 | `demand-model.js` | the learned demand model (ridge regression per specialty, state-held-out validation, `addAcs`/`addPlaces` area builders shared by trainer and scorer); browser + `require` |
@@ -338,9 +338,9 @@ The tables that bridge the vocabularies:
   `primary`, `specialty`, `surgical`, `dental`, `behavioral`, `facility`.
   Rules are **ordered, and discipline wins over venue**: a `Dental
   Clinic/Center` is dental. `facility` is only for entities with **no**
-  clinical discipline, so no clinician is ever classified as a facility. The
-  dashboard map colors by these groups again (as of 2026-09-29, with a legend),
-  and `market-score.js` uses it for supply counts. Do not add a second
+  clinical discipline, so no clinician is ever classified as a facility.
+  `market-score.js` uses it for supply counts and Insights for its group
+  names; the map moved to NUCC groupings on 2026-10-09. Do not add a second
   clinician/facility split anywhere.
 
 **Matching rule.** Normalize both sides (lowercase, `&`→`and`, punctuation to
@@ -411,13 +411,25 @@ keyword matching and no default bucket**. Three phases, each gated:
    stored name agreed with the NPPES code on 98.5 to 99.6% of rows; the rest
    changed taxonomy between the March load and September, and the code is the
    newer fact.
-2. **Map (next).** Map groups become the NUCC `Grouping` strings verbatim (29
-   names; `Other Service Providers` exists in both sections, so 30
-   section/grouping pairs), individual groupings in one color family and
-   organizational ones in a muted second family, legend and filter with counts,
-   tooltip Grouping > Classification > Specialization + code. A listing whose
-   code is unknown is **hidden and reported** (console error naming the code,
-   status line count), never reassigned.
+2. **Map (done 2026-10-09).** The dashboard selects `taxonomy_code` with
+   every row and classifies it through `TaxonomyMap.get`: map groups are the
+   NUCC `Grouping` strings verbatim (29 names; `Other Service Providers`
+   exists in both sections, so groups are keyed `I|name` / `O|name`, 30
+   pairs). Individual groupings take a vivid palette and organizational ones
+   a muted palette (square dots in the key), assigned by position in
+   `TaxonomyMap.groupings`, so a new NUCC release needs no code change. The
+   map key (`dashboard-v3.js`, fed by `window.onGroupingCounts` after each
+   `renderMap`) lists groupings present with a checkbox and a count of what
+   passes every other filter; unchecking calls `setGroupingVisible`. Popups
+   and single-pin tooltips show Grouping › Classification › Specialization
+   plus the code. `show_on_map=false` codes are left off silently. A missing
+   or unknown code is **hidden and reported**: `console.error` once per code
+   (or per NPI when the code is missing) and "N listings hidden: unknown
+   taxonomy code" in the key. Never reassigned. Rows with no `_src`
+   (navigator injections) are never hidden by grouping. The **Exact
+   taxonomies** dropdown and the specialty filter still match stored
+   **names** until phase 3; their dots borrow the grouping colour.
+   `market-score.js` and Insights still use the six groups.
 3. **Patient specialties (after review).** The 33 specialties re-keyed on
    codes; every visible Individual code (698 in v26.1) must belong to at least
    one, explicitly, in `supabase/reference/taxonomy-overrides.csv`
@@ -427,7 +439,7 @@ keyword matching and no default bucket**. Three phases, each gated:
    spreadsheet for approval before search switches; benchmarks are rebuilt
    after.
 
-Until phase 2 ships, `taxonomy-groups.js` remains the live classifier.
+Until phase 3 ships, `taxonomy-groups.js` remains the classifier for supply counts and Insights.
 `show_on_map` and patient specialties are data in the overrides CSV, never
 code; today the only override hides `390200000X` (Student, Health Care).
 `taxonomy-map.js` and `supabase/reference/taxonomy_map.csv` are generated
