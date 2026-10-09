@@ -31,7 +31,14 @@ if [ "$exists" != "t" ]; then
 fi
 held=$(q "select count(*) || ' lock(s), oldest ' || coalesce(to_char(now() - min(a.xact_start), 'HH24:MI:SS'), '?') from pg_locks l left join pg_stat_activity a on a.pid = l.pid where l.relation = 'public.cms_procedures_by_zip'::regclass and l.pid <> pg_backend_pid() and l.mode = 'AccessExclusiveLock'") || exit 1
 if [ "${held%% *}" != "0" ]; then
-  msg="Migration 031 is still running: $held on cms_procedures_by_zip (age of the transaction holding it). Wait for it to finish (it gives up after 30 minutes), then run this check again."
+  # What the holding session is doing, and whether the database is growing
+  # (an insert in progress writes pages as it goes; a stuck session does not).
+  state=$(q "select a.state || ', waiting on ' || coalesce(a.wait_event_type || '/' || a.wait_event, 'nothing') || ', current statement running ' || to_char(now() - a.query_start, 'HH24:MI:SS') from pg_locks l join pg_stat_activity a on a.pid = l.pid where l.relation = 'public.cms_procedures_by_zip'::regclass and l.pid <> pg_backend_pid() and l.mode = 'AccessExclusiveLock' limit 1") || state="unknown"
+  s1=$(q "select pg_database_size(current_database())") || s1=0
+  sleep 60
+  s2=$(q "select pg_database_size(current_database())") || s2=0
+  grew=$(( (s2 - s1) / 1048576 ))
+  msg="Migration 031 is still running: $held on cms_procedures_by_zip. Session: $state. Database grew ${grew} MB in the last minute. Wait for it to finish, then run this check again."
   echo "::error::$msg"; printf '# Procedures summary check\n\n%s\n' "$msg" > "$OUT"; exit 1
 fi
 
