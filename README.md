@@ -565,6 +565,15 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-09
 
+- **Patient specialties by official code: proposal ready for review.** A
+  draft assigns every one of the 883 NUCC codes to patient search
+  categories, so that every visible individual clinician can be found
+  (today about 3.3 million listings belong to no category). It keeps the
+  existing categories, splits hearing out of speech therapy, and adds
+  twelve, including Behavior therapy (ABA), Nursing, Physician assistant,
+  Care coordination, Hospital-based clinicians and General surgery. 45
+  codes are flagged for a decision. Patient search does not change until
+  the proposal is approved.
 - **The map now groups providers by their official classification.** Dots
   are colored by the NUCC grouping of each listing's own taxonomy code,
   read from the code rather than guessed from the name: vivid colors for

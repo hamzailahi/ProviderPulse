@@ -437,7 +437,20 @@ keyword matching and no default bucket**. Three phases, each gated:
    Critical Care, Neonatal) go to a new **Hospital-based clinicians**
    specialty (the user's choice). The full table goes to the user as a
    spreadsheet for approval before search switches; benchmarks are rebuilt
-   after.
+   after. **Proposal drafted 2026-10-09, awaiting the user's review:**
+   `scripts/propose-patient-specialties.mjs` (rules keyed on NUCC
+   Classification, then Specialization; exits non-zero if a visible
+   Individual code gets no specialty) writes
+   `supabase/reference/patient-specialties-proposal.csv` and
+   `patient-specialties-list.json`. It proposes 45 specialties: the 33
+   labels kept (benchmarks and My market are keyed by label), "Speech &
+   hearing" renamed "Speech & language therapy", and 12 new (Hearing &
+   audiology, Behavior therapy (ABA), Nursing (RN, LPN), Physician assistant,
+   Care coordination & community health, Hospital-based clinicians, General
+   surgery, Infectious disease, Genetics & genetic counseling, Hospice &
+   palliative care, Other health services). 45 codes are flagged for a
+   decision. The rules are a drafting aid: once approved, the assignments go
+   into `taxonomy-overrides.csv` as one explicit row per code.
 
 Until phase 3 ships, `taxonomy-groups.js` remains the classifier for supply counts and Insights.
 `show_on_map` and patient specialties are data in the overrides CSV, never

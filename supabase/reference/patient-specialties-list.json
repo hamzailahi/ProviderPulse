@@ -1,0 +1,266 @@
+[
+  {
+    "key": "PC",
+    "label": "Primary care / family doctor",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "PED",
+    "label": "Pediatrics (children)",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "WH",
+    "label": "Women's health / OB-GYN",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "MH",
+    "label": "Mental health & counseling",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "DEN",
+    "label": "Dental",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "EYE",
+    "label": "Eye care",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "CHI",
+    "label": "Chiropractic",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "PT",
+    "label": "Physical & occupational therapy",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "ORTHO",
+    "label": "Orthopedics & sports injury",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "CARD",
+    "label": "Heart / cardiology",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "DERM",
+    "label": "Skin / dermatology",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "ALLR",
+    "label": "Allergy & immunology",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "LUNG",
+    "label": "Lung, breathing & sleep",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "GI",
+    "label": "Digestive / gastroenterology",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "KID",
+    "label": "Kidney / nephrology",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "ENDO",
+    "label": "Diabetes & hormones",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "ONC",
+    "label": "Cancer care / oncology",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "RHEUM",
+    "label": "Arthritis / rheumatology",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "NEURO",
+    "label": "Brain & nerves / neurology",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "ENT",
+    "label": "Ear, nose & throat",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "URO",
+    "label": "Urology",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "POD",
+    "label": "Foot & ankle / podiatry",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "PAIN",
+    "label": "Pain management",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "PLAS",
+    "label": "Plastic & reconstructive surgery",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "SPEECH",
+    "label": "Speech & language therapy",
+    "status": "renamed",
+    "why": "was \"Speech & hearing\""
+  },
+  {
+    "key": "NUTR",
+    "label": "Nutrition & dietitian",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "ALT",
+    "label": "Acupuncture, massage & naturopathy",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "URG",
+    "label": "Urgent care & emergency",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "IMG",
+    "label": "Imaging & lab",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "PHARM",
+    "label": "Pharmacy",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "HOME",
+    "label": "Home health & in-home care",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "SNF",
+    "label": "Nursing & assisted living",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "DME",
+    "label": "Medical equipment & supplies",
+    "status": "existing",
+    "why": ""
+  },
+  {
+    "key": "HEAR",
+    "label": "Hearing & audiology",
+    "status": "new",
+    "why": "split out of \"Speech & hearing\" (spec)"
+  },
+  {
+    "key": "ABA",
+    "label": "Behavior therapy (ABA)",
+    "status": "new",
+    "why": "spec: Behavior Technicians and Behavior Analysts"
+  },
+  {
+    "key": "RN",
+    "label": "Nursing (RN, LPN)",
+    "status": "new",
+    "why": "spec: Nursing (RN, LPN)"
+  },
+  {
+    "key": "PA",
+    "label": "Physician assistant",
+    "status": "new",
+    "why": "spec: Physician assistant"
+  },
+  {
+    "key": "CARE",
+    "label": "Care coordination & community health",
+    "status": "new",
+    "why": "spec: Care coordination (Case Managers), plus community health workers"
+  },
+  {
+    "key": "HOSP",
+    "label": "Hospital-based clinicians",
+    "status": "new",
+    "why": "your choice for hospital-only NPs; also hospitalists, anesthesia, critical care"
+  },
+  {
+    "key": "SURG",
+    "label": "General surgery",
+    "status": "new",
+    "why": "general surgeons were only reachable through the bare term \"Surgery\" under Orthopedics"
+  },
+  {
+    "key": "ID",
+    "label": "Infectious disease",
+    "status": "new",
+    "why": "infectious disease physicians had no specialty"
+  },
+  {
+    "key": "GEN",
+    "label": "Genetics & genetic counseling",
+    "status": "new",
+    "why": "medical geneticists and genetic counselors had no specialty"
+  },
+  {
+    "key": "PALL",
+    "label": "Hospice & palliative care",
+    "status": "new",
+    "why": "hospice and palliative physicians had no specialty"
+  },
+  {
+    "key": "OTHER",
+    "label": "Other health services",
+    "status": "new",
+    "why": "explicit home for visible non-clinical individual codes (technicians, interpreters, drivers, research staff); see Decisions"
+  }
+]
