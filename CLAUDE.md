@@ -1242,6 +1242,12 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   what 003 lists, `on conflict do nothing`; applied 2026-10-11); regenerate
   rather than edit. A later refresh: rerun the job, then generate the next
   numbered migration (the conflict rule makes it add only new plans).
+  Applied: 325 rows went in; 65 names already existed in that state (the
+  Medicare Advantage import uses sort order 70 too, and upserts its
+  category to `medicare` monthly), listed by the read-only
+  `supabase/queries/034_overlaps.sql`. Pickers ignore category, so nothing
+  is missing; grouping pickers by type would need several categories per
+  name.
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
   read-only sizes of every table and index, dead rows, index use, WAL, to
   `supabase/reference/db-size-report.md`. Run it before any disk decision.

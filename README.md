@@ -571,6 +571,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-11
 
+- **Which new insurance plans were already listed.** A read-only query,
+  `supabase/queries/034_overlaps.sql`, lists the plans from the October
+  insurance load whose name was already in that state's list under another
+  type (mostly Medicare Advantage brands), so the load left them as they
+  were.
 - **Mental health searches no longer suggest neurologists.** The national
   registry files psychiatrists and neurologists under one board, "Psychiatry
   & Neurology", so the care navigator's search for a psychiatrist also
