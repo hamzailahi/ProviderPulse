@@ -571,6 +571,15 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-11
 
+- **Insurance plan list approved.** The review removed carriers that are
+  not medical plans (Reliance Standard Life, Nippon Life, State Farm, and
+  TennCare's dental and pharmacy managers) and merged duplicate names, so
+  each plan appears once per state under the name on the member card: state
+  suffixes are gone ("Molina Healthcare of Texas" is "Molina Healthcare"),
+  Medicaid plans read UnitedHealthcare Community Plan, Aetna Better Health,
+  Humana Healthy Horizons and so on, and regional variants fold together
+  (Partnership HealthPlan, WellSense, Kaiser Permanente). A migration
+  generated from the approved list adds the new plans to the pickers.
 - **More insurance plans, step one.** A new manual, read-only job finds
   the official CMS files listing every company selling private, employer
   and marketplace health insurance in each state, and every Medicaid
