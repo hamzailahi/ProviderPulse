@@ -1206,7 +1206,8 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   such as HCSC, dba, group, plan, parent; brand `-` leaves a non-medical
   carrier out); the draft (84 entries) is pending the user's review;
   numbers may carry thousands separators; "X dba Y" takes Y and a
-  "(formerly ...)" note is dropped; one row per state and brand across
+  "(formerly ...)" note is dropped; a Medi-Cal "Plan/County" suffix is
+  dropped only when it is that row's own Geographic Region; one row per state and brand across
   markets (the table is unique on name and state), primary category
   commercial, then marketplace, then medicaid; one row per state, category and brand,
   at least 1,000 members. Output `payer-proposal.csv` and
@@ -1329,7 +1330,7 @@ node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless 
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
 node scripts/test-market-benchmarks.mjs   # 7: the benchmark builder end to end, specialty rates by code
 node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
-node scripts/test-payers.mjs              # 34: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
+node scripts/test-payers.mjs              # 37: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 ```
 

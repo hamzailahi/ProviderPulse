@@ -97,5 +97,14 @@ const both = rollUp([{ state: 'AZ', brand: 'UnitedHealthcare', members: 5000, ca
   { state: 'AZ', brand: 'UnitedHealthcare', members: 9000, category: 'commercial', source: 'mlr', legal_name: 'b', group: '', brand_basis: 'x' }], 1000).kept;
 ok(both.length === 1 && both[0].members === 14000 && both[0].category === 'commercial' && both[0].categories.join() === 'commercial,medicaid', 'one entry per state and brand across markets');
 
+const ca = medicaidPlans([
+  { State: 'California', 'Program Name': 'Two-Plan Model (Comprehensive MCO)', 'Plan Name': 'Inland Empire Health Plan/Riverside', 'Geographic Region': 'Riverside', 'Total Enrollment': '700,000', Year: '2024' },
+  { State: 'California', 'Program Name': 'Two-Plan Model (Comprehensive MCO)', 'Plan Name': 'Inland Empire Health Plan/San Bernardino', 'Geographic Region': 'San Bernardino', 'Total Enrollment': '650,000', Year: '2024' },
+  { State: 'California', 'Program Name': 'X (Comprehensive MCO)', 'Plan Name': 'Partnership HealthPlan of CA/Southwest', 'Geographic Region': 'Humboldt, Lake', 'Total Enrollment': '1000', Year: '2024' }
+], new Map());
+ok(ca[0].brand === 'Inland Empire Health Plan' && ca[1].brand === 'Inland Empire Health Plan', 'a "/County" label matching the row\'s region is dropped');
+ok(ca[2].brand === 'Partnership HealthPlan of CA/Southwest', 'a slash that is not the row\'s region is left for review');
+ok(rollUp(ca, 1000).kept.find(x => x.brand === 'Inland Empire Health Plan').members === 1350000, 'county rows merge into one plan');
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -134,7 +134,16 @@ export function medicaidPlans(rows, brandMap) {
     const st = stateCode(r.State);
     if (!st) continue;
     const members = Math.round(num(r['Total Enrollment']) || 0);
-    const plan = cleanName(r['Plan Name']), parent = (r['Parent Organization'] || '').trim();
+    // California files one row per plan per county ("Inland Empire Health
+    // Plan/Riverside"). The part after "/" is dropped only when it is that
+    // row's own Geographic Region, so it is a county label, not a name.
+    let rawPlan = String(r['Plan Name'] || '');
+    const slash = rawPlan.lastIndexOf('/');
+    if (slash > 0) {
+      const tail = rawPlan.slice(slash + 1).trim().toLowerCase(), region = String(r['Geographic Region'] || '').toLowerCase();
+      if (tail && region.includes(tail)) rawPlan = rawPlan.slice(0, slash);
+    }
+    const plan = cleanName(rawPlan), parent = (r['Parent Organization'] || '').trim();
     const mapped = lookup(brandMap, 'plan', r['Plan Name']) || lookup(brandMap, 'parent', parent);
     out.push({
       source: 'medicaid', state: st, legal_name: plan, dba: '', group: parent, program: (r['Program Name'] || '').trim(),
