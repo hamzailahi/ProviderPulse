@@ -1188,7 +1188,22 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   members in the state; a spreadsheet review before anything loads). The
   parser is written against what discovery records. cms.gov and
   data.medicaid.gov are unreachable from the cloud dev container, so this
-  runs in Actions.
+  runs in Actions. Discovery (2026-10-11) found the 2024 MLR zip
+  (`MR_Submission_Template_Header.csv`: `business_state` incl. a
+  "Grand Total" row per company, `company_name`, `dba_marketing_name`,
+  `group_affiliation`; `Part1_2_Summary_Data_Premium_Claims.csv`:
+  `row_lookup_code` with `cmm_{individual,small_group,large_group}_{yearly,total}`)
+  and the Medicaid table (`State` full name, `Program Name`, `Plan Name`,
+  `Total Enrollment`, `Year` 2016 to 2024, `Parent Organization`). The same
+  job then runs `scripts/build-payer-proposal.mjs` (logic in
+  `scripts/lib/payers.mjs`, tests in `scripts/test-payers.mjs`): covered
+  lives found by the row lookup's label, summed over the three markets per
+  state filing; Medicaid newest year, comprehensive MCO programs only;
+  names are the DBA or plan name minus corporate suffixes unless the
+  reviewed exact-match `supabase/reference/payer-brand-map.csv` says
+  otherwise (no pattern matching); one row per state, category and brand,
+  at least 1,000 members. Output `payer-proposal.csv` and
+  `payer-proposal-summary.md`, for the user's review. Nothing loads yet.
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
   read-only sizes of every table and index, dead rows, index use, WAL, to
   `supabase/reference/db-size-report.md`. Run it before any disk decision.
@@ -1307,6 +1322,7 @@ node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless 
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
 node scripts/test-market-benchmarks.mjs   # 7: the benchmark builder end to end, specialty rates by code
 node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
+node scripts/test-payers.mjs              # 23: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 ```
 

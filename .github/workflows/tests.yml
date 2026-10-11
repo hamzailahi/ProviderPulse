@@ -80,5 +80,8 @@ jobs:
           node scripts/test-taxonomy-map.mjs
           node scripts/test-patient-query.mjs
 
+      - name: Insurance plan proposal logic
+        run: node scripts/test-payers.mjs
+
       - name: Market assistant (stepped agent, tools, history rules)
         run: node scripts/test-market-assistant.mjs

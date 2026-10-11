@@ -517,6 +517,7 @@ node scripts/test-density-benchmark.mjs   # the state comparison is like for lik
 node scripts/test-market-benchmarks.mjs   # the benchmark builder counts each specialty's listings by code
 node scripts/test-signup-gate.mjs         # patient sign-up is closed unless explicitly opened
 node scripts/test-market-assistant.mjs    # the assistant: steps, tools, history rules (needs npm ci in v2/)
+node scripts/test-payers.mjs              # the insurance plan proposal: names, members, Medicaid plans, the cutoff
 node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list, specialty coverage
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 ```

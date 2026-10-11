@@ -2,8 +2,9 @@ name: Payer sources
 
 # Manual only, read only. Finds and describes the official CMS files the
 # insurance plan list is built from (insurer MLR filings and Medicaid managed
-# care enrollment) and commits what it found to
-# supabase/reference/payer-sources/. Touches no database and needs no secret.
+# care enrollment), builds the proposed plan list from them, and commits both
+# to supabase/reference/payer-sources/ for review. Touches no database and
+# needs no secret.
 
 on:
   workflow_dispatch:
@@ -26,6 +27,11 @@ jobs:
 
       - name: Discover the source files
         run: node scripts/payer-sources-discover.mjs supabase/reference/payer-sources
+
+      # The proposal for review: insurers and Medicaid plans per state, with
+      # at least 1,000 members. Nothing is loaded into the database.
+      - name: Build the plan proposal
+        run: node scripts/build-payer-proposal.mjs --out supabase/reference/payer-sources
 
       - name: Commit what was found
         if: always()
