@@ -62,8 +62,8 @@ ok(mcd.find(x => x.state === 'NM').brand === 'Molina Healthcare of New Mexico' &
 
 // roll-up and cutoff
 const { kept, dropped } = rollUp(mlr.concat(mcd), 1000);
-const aetnaTx = kept.find(x => x.state === 'TX' && x.brand === 'Aetna' && x.category === 'medicaid');
-ok(aetnaTx && aetnaTx.members === 77966, 'one row per state, brand and category; members summed across programs');
+const aetnaTx = kept.find(x => x.state === 'TX' && x.brand === 'Aetna' && x.categories.includes('medicaid'));
+ok(aetnaTx && aetnaTx.members === 77966, 'one row per state and brand; members summed across programs');
 ok(kept.find(x => x.state === 'TX' && x.brand === 'UnitedHealthcare').members === 980000, 'two legal entities of one brand become one row');
 ok(dropped.some(x => x.brand === 'Tiny Mutual') && dropped.some(x => x.brand === 'Small Plan') && !kept.some(x => x.brand === 'Tiny Mutual'), 'under 1,000 members left out');
 
@@ -89,6 +89,13 @@ ok(r2[2].brand === 'Cigna', 'an N/A marketing name falls through to the group ma
 const ru = rollUp(r2, 1000);
 ok(ru.excluded.length === 1 && !ru.kept.some(x => x.brand === EXCLUDE), 'excluded entries never reach the list');
 throws(() => parseBrandMap('match_type,match,brand\ncompany_state,Acme,X\n'), /\|ST/, 'company_state needs a state');
+
+ok(cleanName('UnitedHealthcare Insurance Company, dba UnitedHealthcare Community Plan') === 'UnitedHealthcare Community Plan', '"dba" names the brand');
+ok(cleanName('El Paso Health Plans, Inc., dba El Paso Health') === 'El Paso Health', 'dba after a suffix');
+ok(cleanName('Wellpoint of Iowa, Inc. (formerly Amerigroup of Iowa, Inc.)') === 'Wellpoint of Iowa', '"(formerly ...)" dropped');
+const both = rollUp([{ state: 'AZ', brand: 'UnitedHealthcare', members: 5000, category: 'medicaid', source: 'medicaid', legal_name: 'a', group: '', brand_basis: 'x' },
+  { state: 'AZ', brand: 'UnitedHealthcare', members: 9000, category: 'commercial', source: 'mlr', legal_name: 'b', group: '', brand_basis: 'x' }], 1000).kept;
+ok(both.length === 1 && both[0].members === 14000 && both[0].category === 'commercial' && both[0].categories.join() === 'commercial,medicaid', 'one entry per state and brand across markets');
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

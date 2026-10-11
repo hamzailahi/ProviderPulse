@@ -44,8 +44,13 @@ export function objects(text) {
 // A name a patient would recognise: drop corporate suffixes only. Never guess
 // a brand from words in the name; the reviewed brand map does that.
 const SUFFIX = /[,\s]+(inc\.?|incorporated|l\.?l\.?c\.?|corp\.?|corporation|co\.?|company|ltd\.?|limited|l\.?p\.?)$/i;
+// Two mechanical rules, not guesses: "X dba Y" means the brand IS Y, and a
+// "(formerly ...)" note is history, not the name.
 export function cleanName(s) {
   let t = String(s || '').replace(/\s+/g, ' ').trim();
+  const dba = t.match(/,?\s+d\/?b\/?a\.?\s+(.+)$/i);
+  if (dba) t = dba[1].trim();
+  t = t.replace(/\s*\(formerly[^)]*\)\s*/i, ' ').trim();
   for (let i = 0; i < 3; i++) t = t.replace(SUFFIX, '').trim();
   return t.replace(/[,\s]+$/, '');
 }
@@ -139,18 +144,24 @@ export function medicaidPlans(rows, brandMap) {
   return out;
 }
 
-// One row per (state, brand, category): members summed, every source name kept.
+// One row per (state, brand): members summed, every source name kept. A brand
+// sold in several markets in one state (UnitedHealthcare commercial and
+// Medicaid) is ONE pick-list entry, because the table is unique on (name,
+// state) and acceptance is matched by name; its categories are all kept and
+// the primary one is commercial, then marketplace, then medicaid.
 // Entries the reviewed map excludes ("-") come back separately.
 export function rollUp(items, minMembers) {
   const by = new Map(), excluded = [];
   for (const it of items) {
     if (it.brand === EXCLUDE) { excluded.push(it); continue; }
-    const k = [it.state, it.category, it.brand.toLowerCase()].join('\u0000');
-    const cur = by.get(k) || { state: it.state, category: it.category, brand: it.brand, members: 0, sources: new Set(), names: new Set(), groups: new Set(), bases: new Set() };
-    cur.members += it.members;
+    const k = [it.state, it.brand.toLowerCase()].join('\u0000');
+    const cur = by.get(k) || { state: it.state, brand: it.brand, members: 0, categories: new Set(), sources: new Set(), names: new Set(), groups: new Set(), bases: new Set() };
+    cur.members += it.members; cur.categories.add(it.category);
     cur.sources.add(it.source); cur.names.add(it.legal_name); if (it.group) cur.groups.add(it.group); cur.bases.add(it.brand_basis);
     by.set(k, cur);
   }
-  const all = [...by.values()].map(x => ({ ...x, sources: [...x.sources], names: [...x.names], groups: [...x.groups], bases: [...x.bases] }));
+  const ORDER = ['commercial', 'marketplace', 'medicaid'];
+  const all = [...by.values()].map(x => ({ ...x, category: ORDER.find(c => x.categories.has(c)), categories: ORDER.filter(c => x.categories.has(c)),
+    sources: [...x.sources], names: [...x.names], groups: [...x.groups], bases: [...x.bases] }));
   return { kept: all.filter(x => x.members >= minMembers), dropped: all.filter(x => x.members < minMembers), excluded };
 }
