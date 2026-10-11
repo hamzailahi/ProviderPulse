@@ -242,14 +242,11 @@ MA,commercial,Cigna,54228,yes,reviewed map,Connecticut General Life Insurance; C
 MA,commercial,Health New England,48022,,marketing name (DBA),Health New England,Baystate Hlth Grp,mlr,commercial
 MA,commercial,Aetna,26645,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
 MA,commercial,Fallon Community Health Plan,12853,,marketing name (DBA),Fallon Community Health Plan,Fallon Grp,mlr,commercial
-MA,medicaid,WellSense Health Plan,434573,,reviewed map; plan name,WellSense Beth Israel Lahey Health (BILH) Performance Network ACO; WellSense Boston Children's ACO; WellSense Care Alliance; WellSense Community Alliance; WellSense Mercy Alliance; WellSense Signature Alliance; WellSense Southcoast Alliance; WellSense Essential MCO; WellSense Health Plan,"Boston Medical Center Health Plan, Inc.; Boston Medical Health Plan",medicaid,medicaid
+MA,medicaid,WellSense Health Plan,461000,,reviewed map; plan name,East Boston Neighborhood Health WellSense Alliance; WellSense Beth Israel Lahey Health (BILH) Performance Network ACO; WellSense Boston Children's ACO; WellSense Care Alliance; WellSense Community Alliance; WellSense Mercy Alliance; WellSense Signature Alliance; WellSense Southcoast Alliance; WellSense Essential MCO; WellSense Health Plan,"Boston Medical Center Health Plan, Inc.; Boston Medical Health Plan",medicaid,medicaid
 MA,medicaid,Tufts Health Together,106390,,reviewed map; plan name,Tufts Health Together with Cambridge Health Alliance (CHA); Tufts Health Together with UMass Memorial Health; Tufts Health Together,"Tufts Health Public Plans, Inc.",medicaid,medicaid
+MA,medicaid,Fallon Health,83892,,reviewed map,Fallon 365 Care; Berkshire Fallon Health Collaborative; Fallon Health-Atrius Health Care Collaborative,"Fallon Community Health Plan, Inc.",medicaid,medicaid
 MA,medicaid,BeHealthy Partnership Plan,45272,,plan name,BeHealthy Partnership Plan,"Health New England, Inc.",medicaid,medicaid
-MA,medicaid,Fallon Health-Atrius Health Care Collaborative,35757,,plan name,Fallon Health-Atrius Health Care Collaborative,"Fallon Community Health Plan, Inc.",medicaid,medicaid
-MA,medicaid,Fallon 365 Care,31491,,plan name,Fallon 365 Care,"Fallon Community Health Plan, Inc.",medicaid,medicaid
-MA,medicaid,East Boston Neighborhood Health WellSense Alliance,26427,,plan name,East Boston Neighborhood Health WellSense Alliance,"Boston Medical Center Health Plan, Inc.",medicaid,medicaid
 MA,medicaid,UnitedHealthcare Community Plan,23589,,reviewed map,UnitedHealthcare,UnitedHealthcare,medicaid,medicaid
-MA,medicaid,Berkshire Fallon Health Collaborative,16644,,plan name,Berkshire Fallon Health Collaborative,"Fallon Community Health Plan, Inc.",medicaid,medicaid
 MA,medicaid,Commonwealth Care Alliance,16523,,plan name,Commonwealth Care Alliance,Commonwealth Care Alliance,medicaid,medicaid
 MA,medicaid,Senior Whole Health,12464,,plan name,Senior Whole Health,Magellan Health,medicaid,medicaid
 MA,medicaid,Navicare HMO,10041,,plan name,Navicare HMO,Fallon Health Plan,medicaid,medicaid

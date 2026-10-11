@@ -1,9 +1,9 @@
 <!-- Written by scripts/build-payer-proposal.mjs. A proposal for review; nothing is loaded. -->
-# Insurance plan proposal, 2026-10-11 19:11 UTC
+# Insurance plan proposal, 2026-10-11 19:12 UTC
 
 Sources: https://www.cms.gov/files/zip/mlr-public-use-file-2024.zip and https://download.medicaid.gov/data/managed-care-enrollment-by-program-and-plan2024-table4.csv. Cutoff: at least 1,000 members in the state.
 
-Reviewed brand map entries: 238.
+Reviewed brand map entries: 242.
 
 Covered-lives rows used: `NUMBER_OF_COVERED_LIVES` (Number of covered lives).
 MLR: 2,194 filings, 1,699 state filings with covered lives, 73,297,015 covered lives in all.
@@ -27,7 +27,7 @@ Largest state filings (check these look right):
 
 Medicaid: 7,804 rows; newest year 2024; 505 comprehensive managed care plan rows, 70,563,848 enrollees.
 
-Proposed: **664** state plans (301 with Medicaid, 88 individual-market only, 347 commercial); 271 are already in the list. Below the cutoff and left out: 754. Left out by the reviewed map as not medical plans: 121 (The United States Life Ins. Co. in the City of New York, State Farm Mutual Automobile Insurance, ACN Group of California, Reliance Standard Life Insurance, Nippon Life Insurance Company of America, DentaQuest USA Insurance, OptumRx).
+Proposed: **661** state plans (298 with Medicaid, 88 individual-market only, 347 commercial); 271 are already in the list. Below the cutoff and left out: 754. Left out by the reviewed map as not medical plans: 121 (The United States Life Ins. Co. in the City of New York, State Farm Mutual Automobile Insurance, ACN Group of California, Reliance Standard Life Insurance, Nippon Life Insurance Company of America, DentaQuest USA Insurance, OptumRx).
 
 Largest parent groups (candidates for the reviewed brand map):
 
