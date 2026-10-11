@@ -575,7 +575,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   food insecurity, no reliable transport, diabetes) instead of frailty.
   Nursing and Physician assistant are no longer scored as markets, since
   nurses are employed and most PAs already count toward primary care; both
-  stay fully searchable. The model now scores 40 categories.
+  stay fully searchable. The model now scores 40 categories. The national
+  benchmarks were rebuilt so the three new measures have national
+  percentiles (food insecurity and transport are published for about
+  24,000 of 30,000 areas; elsewhere those parts are left out, never
+  guessed).
 - **The old six provider groups are retired.** The opportunity panels no
   longer score Primary care, Specialty, Surgical, Dental and Behavioral as
   broad groups (their national rates were counted from organizations only

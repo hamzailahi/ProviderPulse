@@ -497,7 +497,12 @@ keyword matching and no default bucket**. Three phases, each gated:
    (`ACCESS2`, `FOODINSECU`, `LACKTRPT`, diabetes); infectious disease and
    genetics stay with no measure; Nursing and Physician assistant left the
    scored list (nurses are employed; PA codes already count in primary
-   care). Their old benchmark rows linger unused.
+   care). Their old benchmark rows linger unused. Benchmarks rerun the same
+   day (dry run, then write, 124 rows) so the three new measures have
+   national anchors: `ACCESS2` p50 8.6 over 29,983 ZCTAs, `FOODINSECU` 13.5
+   and `LACKTRPT` 7.5 over only 24,234 (CDC publishes social-need measures
+   for fewer areas; where missing, that part drops and the rest
+   renormalizes).
    "Speech & hearing" became "Speech & language therapy"
    and hearing kept the old hearing-loss profile. **Benchmarks rebuilt by
    code 2026-10-11** (dry run then write, 123 rows, ~16 min each): 9,049,543
