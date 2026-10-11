@@ -1,0 +1,611 @@
+state,category,brand,members,already_listed,brand_basis,source_names,parent_group,sources
+AK,commercial,Premera Blue Cross,108055,,marketing name (DBA),Premera Blue Cross,Premera Blue Cross Group,mlr
+AK,commercial,Moda Health Plan,9829,,marketing name (DBA),Moda Health Plan,Oregon Dental Grp,mlr
+AK,commercial,Aetna Life Insurance,2287,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+AL,commercial,Blue Cross and Blue Shield of Alabama,917909,yes,marketing name (DBA),Blue Cross and Blue Shield of Alabama,BCBS OF AL GRP,mlr
+AL,commercial,UnitedHealthcare Insurance,204663,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+AL,commercial,VIVA Health,23817,yes,marketing name (DBA),VIVA Health,,mlr
+AL,marketplace,Celtic Insurance,57356.44,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+AR,commercial,Arkansas Blue Cross Blue Shield,350383,,marketing name (DBA),USAble Mutual Insurance,ARKANSAS BCBS GRP,mlr
+AR,commercial,QualChoice,72856,yes,marketing name (DBA),QualChoice Life and Health Insurance; QCA Health Plan,QualChoice Holdings Inc.,mlr
+AR,commercial,N/A,21971,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+AR,commercial,UnitedHealthcare Insurance,19881,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+AR,commercial,Health Advantage,18064,,marketing name (DBA),HMO Partners,ARKANSAS BCBS GRP,mlr
+AR,commercial,Aetna Life Insurance,14665,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+AR,commercial,UnitedHealthcare Insurance Company of the River Valley,7914,,marketing name (DBA),UnitedHealthcare Insurance Company of the River Valley,UNITEDHEALTH GRP,mlr
+AR,commercial,UnitedHealthcare of Arkansas,2426,,marketing name (DBA),UnitedHealthcare of Arkansas,UNITEDHEALTH GRP,mlr
+AR,marketplace,Celtic Insurance,109744.37,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+AR,marketplace,USAble HMO,30361,,marketing name (DBA),USAble HMO,ARKANSAS BCBS GRP,mlr
+AR,marketplace,Golden Rule Insurance,1314,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+AZ,commercial,Blue Cross and Blue Shield of Arizona,422828,,marketing name (DBA),Blue Cross and Blue Shield of Arizona,"Blue Cross and Blue Shield of Arizona, Inc.",mlr
+AZ,commercial,UnitedHealthcare Insurance,123024,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+AZ,commercial,Banner Health and Aetna Health Plan,121077,,marketing name (DBA),Banner Health and Aetna Health Plan,CVS Health Group,mlr
+AZ,commercial,UnitedHealthcare of Arizona,100453,,marketing name (DBA),UnitedHealthcare of Arizona,UNITEDHEALTH GRP,mlr
+AZ,commercial,N/A,51394,,marketing name (DBA),Cigna HealthCare of Arizona; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+AZ,commercial,Banner Health and Aetna Health Insurance,36069,,marketing name (DBA),Banner Health and Aetna Health Insurance,CVS Health Group,mlr
+AZ,commercial,Aetna Life Insurance,14128,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+AZ,commercial,Reliance Standard Life Insurance,3056,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr
+AZ,marketplace,Health Net of Arizona,63405,,marketing name (DBA),Arizona Complete Health,CENTENE CORP GRP,mlr
+AZ,marketplace,Oscar Health Plan,9507,,marketing name (DBA),Oscar Health Plan,,mlr
+AZ,marketplace,Golden Rule Insurance,5993,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+AZ,marketplace,Medica Community Health Plan,1534,,marketing name (DBA),Medica Community Health Plan,Medica,mlr
+CA,commercial,Kaiser Permanente,6642277,,marketing name (DBA),Kaiser Foundation Health Plan,KAISER FOUNDATION GRP,mlr
+CA,commercial,Blue Shield of California,2222289,yes,marketing name (DBA),California Physicians Service,Blue Shield of California Group,mlr
+CA,commercial,Anthem Blue Cross,1965095,yes,marketing name (DBA),Blue Cross of California,Elevance Hlth Inc Grp,mlr
+CA,commercial,Health Net of California,513971.23,,marketing name (DBA),Health Net of California,CENTENE CORP GRP,mlr
+CA,commercial,UnitedHealthcare of California,380079,,marketing name (DBA),UHC of California,UNITEDHEALTH GRP,mlr
+CA,commercial,UnitedHealthcare Benefits Plan of California,336097,,marketing name (DBA),UnitedHealthcare Benefits Plan of California,UNITEDHEALTH GRP,mlr
+CA,commercial,N/A,331673,,marketing name (DBA),Assurity Life Insurance; Cigna HealthCare of California; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+CA,commercial,Aetna Life Insurance,305310,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+CA,commercial,Local Initiative Health Authority for Los Angeles County,246195,,marketing name (DBA),Local Initiative Health Authority for Los Angeles County,L.A. Care Health Plan,mlr
+CA,commercial,Aetna Health of California,224258,,marketing name (DBA),Aetna Health of California,CVS Health Group,mlr
+CA,commercial,"U.S. Behavioral Health Plan, CA",162362,,marketing name (DBA),"U.S. Behavioral Health Plan, CA",UNITEDHEALTH GRP,mlr
+CA,commercial,ACN Group of California,138886.61,,marketing name (DBA),ACN Group of California,UNITEDHEALTH GRP,mlr
+CA,commercial,Sharp Health Plan,137718,,marketing name (DBA),Sharp Health Plan,,mlr
+CA,commercial,Sutter Health Alliance,118165,,marketing name (DBA),Sutter Health Alliance,,mlr
+CA,commercial,Western Health Advantage,117736,,marketing name (DBA),Western Health Advantage,,mlr
+CA,commercial,Anthem Blue Cross Life and Health Insurance,82133,,marketing name (DBA),Anthem Blue Cross Life and Health Insurance,Elevance Hlth Inc Grp,mlr
+CA,commercial,Valley Health Plan,56239,,marketing name (DBA),County of Santa Clara,,mlr
+CA,commercial,UnitedHealthcare Insurance,30096,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+CA,commercial,Holman Professional Counseling Centers,24320,,marketing name (DBA),Holman Professional Counseling Centers,Holman Professional Counseling Centers,mlr
+CA,commercial,Scripps Health Plan Services,17656,,marketing name (DBA),Scripps Health Plan Services,,mlr
+CA,commercial,Nippon Life Insurance Company of America,13965,,marketing name (DBA),Nippon Life Insurance Company of America,,mlr
+CA,commercial,San Francisco Health Authority,11166,,marketing name (DBA),San Francisco Health Authority,Healthy Workers,mlr
+CA,commercial,Community Care Health Plan,11105,,marketing name (DBA),Community Care Health Plan,,mlr
+CA,commercial,"County of Ventura, dba Ventura County Health Care Plan",9908,,marketing name (DBA),"County of Ventura, dba Ventura County Health Care Plan",,mlr
+CA,commercial,Chinese Community Health Plan,8321,,marketing name (DBA),Chinese Community Health Plan,,mlr
+CA,commercial,Blue Shield of California Life & Health Insurance,7523,,marketing name (DBA),Blue Shield of California Life & Health Insurance,Blue Shield of California Group,mlr
+CA,commercial,CONTRA COSTA HEALTH PLAN,6554,,marketing name (DBA),CONTRA COSTA MEDICAL SERVICES DBA CONTRA COSTA HEALTH PLAN,,mlr
+CA,commercial,Unimerica Insurance,6162,,marketing name (DBA),Unimerica Insurance,UNITEDHEALTH GRP,mlr
+CA,commercial,ALAMEDA ALLIANCE FOR HEALTH,5790,,marketing name (DBA),ALAMEDA ALLIANCE FOR HEALTH,,mlr
+CA,commercial,Kaiser Permanente Insurance,2634,,marketing name (DBA),Kaiser Permanente Insurance,KAISER FOUNDATION GRP,mlr
+CA,commercial,Health Plan of San Mateo,1296,,marketing name (DBA),San Mateo Health Commission,,mlr
+CA,marketplace,MOLINA HEALTHCARE OF CALIFORNIA,59400,,marketing name (DBA),MOLINA HEALTHCARE OF CALIFORNIA,Molina Healthcare Inc GRP,mlr
+CA,marketplace,Inland Empire Health Plan,28932,yes,marketing name (DBA),Inland Empire Health Plan,,mlr
+CA,marketplace,The United States Life Ins. Co. in the City of New York,2426,,marketing name (DBA),The United States Life Ins. Co. in the City of New York,AMERICAN INTL GRP,mlr
+CO,commercial,Kaiser Permanente,359209,,marketing name (DBA),Kaiser Foundation Health Plan of Colorado,KAISER FOUNDATION GRP,mlr
+CO,commercial,"Rocky Mountain Hospital and Medical Service, Inc., dba Anthem Blue Cross and Blue Shield",184748,,marketing name (DBA),"Rocky Mountain Hospital and Medical Service, Inc., dba Anthem Blue Cross and Blue Shield",Elevance Hlth Inc Grp,mlr
+CO,commercial,N/A,132359,,marketing name (DBA),Cigna HealthCare of Colorado; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+CO,commercial,UnitedHealthcare Insurance,128549,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+CO,commercial,HMO Colorado,101399,,marketing name (DBA),HMO Colorado,Elevance Hlth Inc Grp,mlr
+CO,commercial,UnitedHealthcare of Colorado,16261,,marketing name (DBA),UnitedHealthcare of Colorado,UNITEDHEALTH GRP,mlr
+CO,commercial,Aetna Life Insurance,15665,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+CO,commercial,Kaiser Permanente Insurance,1266,,marketing name (DBA),Kaiser Permanente Insurance,KAISER FOUNDATION GRP,mlr
+CO,marketplace,Rocky Mountain Health Plans (RMHP),54805,,marketing name (DBA),Rocky Mountain Health Maintenance Organization,UNITEDHEALTH GRP,mlr
+CO,marketplace,Denver Health Medical Plan,11834,,marketing name (DBA),Denver Health Medical Plan,,mlr
+CO,marketplace,N/A,6374,,marketing name (DBA),SelectHealth,IHC Inc Grp,mlr
+CO,marketplace,Golden Rule Insurance,1503,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+CT,commercial,Anthem Health Plans,200351,,marketing name (DBA),Anthem Health Plans,Elevance Hlth Inc Grp,mlr
+CT,commercial,N/A,75441,,marketing name (DBA),Cigna HealthCare of Connecticut; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+CT,commercial,UnitedHealthcare Insurance,59136,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+CT,commercial,Aetna Life Insurance,30786,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+CT,commercial,Oxford Health Insurance,24446,,marketing name (DBA),Oxford Health Insurance,UNITEDHEALTH GRP,mlr
+CT,commercial,ConnectiCare,21382,yes,marketing name (DBA),"ConnectiCare, Insurance; ConnectiCare",HIP INS GRP,mlr
+CT,commercial,Oxford Health Plans (CT),2303,,marketing name (DBA),Oxford Health Plans (CT),UNITEDHEALTH GRP,mlr
+CT,marketplace,ConnectiCare Benefits,71620,,marketing name (DBA),ConnectiCare Benefits,HIP INS GRP,mlr
+DC,commercial,UnitedHealthcare Insurance,134895,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+DC,commercial,Group Hospitalization and Medical Services,131738,,marketing name (DBA),Group Hospitalization and Medical Services,CAREFIRST INC GRP,mlr
+DC,commercial,Aetna Life Insurance,119478,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+DC,commercial,CareFirst BlueChoice,101691,,marketing name (DBA),CareFirst BlueChoice,CAREFIRST INC GRP,mlr
+DC,commercial,Aetna Health Inc. (a Pennsylvania corporation),79603,,marketing name (DBA),Aetna Health Inc. (a Pennsylvania corporation),CVS Health Group,mlr
+DC,commercial,N/A,71033,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+DC,commercial,Kaiser Foundation Health Plan of Mid-Atlantic States,69864,,marketing name (DBA),Kaiser Foundation Health Plan of Mid-Atlantic States,KAISER FOUNDATION GRP,mlr
+DC,commercial,MD-Individual Practice Association,12512,,marketing name (DBA),MD-Individual Practice Association,UNITEDHEALTH GRP,mlr
+DC,commercial,"AMHIC, A Reciprocal Association & Sub",3104,,marketing name (DBA),"AMHIC, A Reciprocal Association & Sub",,mlr
+DC,commercial,Optimum Choice,1207,,marketing name (DBA),Optimum Choice,UNITEDHEALTH GRP,mlr
+DE,commercial,Highmark BCBSD,102787,,marketing name (DBA),Highmark BCBSD,HIGHMARK GRP,mlr
+DE,commercial,N/A,7350,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+DE,commercial,Aetna Health Inc. (a Pennsylvania corporation),6247,,marketing name (DBA),Aetna Health Inc. (a Pennsylvania corporation),CVS Health Group,mlr
+DE,commercial,Aetna Life Insurance,4394,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+DE,commercial,UnitedHealthcare Insurance,3480,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+DE,marketplace,AmeriHealth Caritas VIP Next,6412,,marketing name (DBA),AmeriHealth Caritas VIP Next,INDEPENDENCE BLUE CROSS GRP,mlr
+DE,marketplace,Celtic Insurance,1322,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+FL,commercial,Florida Blue,1253468,yes,marketing name (DBA),Blue Cross and Blue Shield of Florida,"Blue Cross and Blue Shield of Florida, Inc.",mlr
+FL,commercial,Health Options,1156932,,marketing name (DBA),Health Options,"Blue Cross and Blue Shield of Florida, Inc.",mlr
+FL,commercial,Aetna Health Inc. (a Florida corporation),628675,,marketing name (DBA),Aetna Health Inc. (a Florida corporation),CVS Health Group,mlr
+FL,commercial,UnitedHealthcare Insurance,439768,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+FL,commercial,Aetna Life Insurance,396481,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+FL,commercial,N/A,274602,,marketing name (DBA),Cigna HealthCare of Florida; Cigna Health and Life Insurance,Connecticut General Life Insurance Co; Cigna Hlth Grp,mlr
+FL,commercial,UnitedHealthcare of Florida,192279,,marketing name (DBA),UnitedHealthcare of Florida,UNITEDHEALTH GRP,mlr
+FL,commercial,Neighborhood Health Partnership,139981,,marketing name (DBA),Neighborhood Health Partnership,UNITEDHEALTH GRP,mlr
+FL,commercial,Capital Health Plan,111730,,marketing name (DBA),Capital Health Plan,"Blue Cross and Blue Shield of Florida, Inc.",mlr
+FL,commercial,Florida Health Care Plan,85219,,marketing name (DBA),Florida Health Care Plan,"Blue Cross and Blue Shield of Florida, Inc.",mlr
+FL,commercial,Molina Healthcare of Florida,81017,,marketing name (DBA),Molina Healthcare of Florida,Molina Healthcare Inc GRP,mlr
+FL,commercial,AvMed Health Plans,38704,,marketing name (DBA),AvMed,Sentara Health Management Group,mlr
+FL,commercial,BeHealthy Florida,6340,,marketing name (DBA),BeHealthy Florida,"Blue Cross and Blue Shield of Florida, Inc.",mlr
+FL,commercial,Curative Insurance,5694,,marketing name (DBA),Curative Insurance,Curative Inc Grp,mlr
+FL,commercial,All Savers Insurance,4597,,marketing name (DBA),All Savers Insurance,UNITEDHEALTH GRP,mlr
+FL,commercial,Reliance Standard Life Insurance,2958,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr
+FL,marketplace,Celtic Insurance,992005.76999999,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+FL,marketplace,Oscar Insurance Company of Florida,871881,,marketing name (DBA),Oscar Insurance Company of Florida,,mlr
+FL,marketplace,Health First Commercial Plans,53086,,marketing name (DBA),Health First Commercial Plans,,mlr
+FL,marketplace,Sunshine State Health Plan,50087,,marketing name (DBA),Sunshine State Health Plan,CENTENE CORP GRP,mlr
+FL,marketplace,Golden Rule Insurance,12642,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+FL,marketplace,The United States Life Ins. Co. in the City of New York,6444,,marketing name (DBA),The United States Life Ins. Co. in the City of New York,AMERICAN INTL GRP,mlr
+FL,marketplace,AmeriHealth Caritas Florida,4202,,marketing name (DBA),AmeriHealth Caritas Florida,INDEPENDENCE BLUE CROSS GRP,mlr
+GA,commercial,Blue Cross Blue Shield Healthcare Plan of Georgia,422044,,marketing name (DBA),Blue Cross Blue Shield Healthcare Plan of Georgia,Elevance Hlth Inc Grp,mlr
+GA,commercial,Kaiser Foundation Health Plan of Georgia,262557,,marketing name (DBA),Kaiser Foundation Health Plan of Georgia,KAISER FOUNDATION GRP,mlr
+GA,commercial,N/A,164409,,marketing name (DBA),Cigna HealthCare of Georgia; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+GA,commercial,Aetna Health Inc. (a Georgia corporation),136650,,marketing name (DBA),Aetna Health Inc. (a Georgia corporation),CVS Health Group,mlr
+GA,commercial,UnitedHealthcare Insurance,99219,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+GA,commercial,Alliant Health Plans,82789,,marketing name (DBA),Alliant Health Plans,Health One Alliance Grp,mlr
+GA,commercial,Aetna Life Insurance,43700,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+GA,commercial,UnitedHealthcare of Georgia,11381,,marketing name (DBA),UnitedHealthcare of Georgia,UNITEDHEALTH GRP,mlr
+GA,commercial,Kaiser Permanente Insurance,3575,,marketing name (DBA),Kaiser Permanente Insurance,KAISER FOUNDATION GRP,mlr
+GA,commercial,UnitedHealthcare Insurance Company of the River Valley,2149,,marketing name (DBA),UnitedHealthcare Insurance Company of the River Valley,UNITEDHEALTH GRP,mlr
+GA,commercial,Sidecar Health Insurance,1997,,marketing name (DBA),Sidecar Health Insurance,,mlr
+GA,marketplace,Ambetter of Peach State,512704,,marketing name (DBA),Ambetter of Peach State,CENTENE CORP GRP,mlr
+GA,marketplace,Oscar Health Plan of Georgia,367102,,marketing name (DBA),Oscar Health Plan of Georgia,,mlr
+GA,marketplace,"AMGP Georgia Managed Care Company, Inc. dba Anthem Blue Cross and Blue Shield",38945,,marketing name (DBA),"AMGP Georgia Managed Care Company, Inc. dba Anthem Blue Cross and Blue Shield",Elevance Hlth Inc Grp,mlr
+GA,marketplace,CareSource Georgia,37168.71,yes,marketing name (DBA),CareSource Georgia,CareSource Management Group,mlr
+HI,commercial,HMSA,472937,,marketing name (DBA),Hawaii Medical Service Association,,mlr
+HI,commercial,Kaiser Permanente,183508,,marketing name (DBA),Kaiser Foundation Health Plan,KAISER FOUNDATION GRP,mlr
+HI,commercial,UHA,58935,,marketing name (DBA),University Health Alliance,,mlr
+HI,commercial,HMAA,36943,,marketing name (DBA),Hawaii Management Alliance Association,,mlr
+HI,commercial,UnitedHealthcare Insurance,2076,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+IA,commercial,Wellmark Blue Cross and Blue Shield of Iowa Wellmark Blue Cross and Blue Shield,266182,,marketing name (DBA),Wellmark,Wellmark Group,mlr
+IA,commercial,Wellmark Health Plan of Iowa,201834,,marketing name (DBA),Wellmark Health Plan of Iowa,Wellmark Group,mlr
+IA,commercial,UnitedHealthcare Insurance,22009,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+IA,commercial,HealthPartners UnityPoint Health,11857,,marketing name (DBA),HealthPartners UnityPoint Health,,mlr
+IA,commercial,Medica Insurance,10210,,marketing name (DBA),Medica Insurance,Medica Grp,mlr
+IA,commercial,Medical Associates Health Plan,9671,,marketing name (DBA),Medical Associates Health Plan,Medical Associates Clinic,mlr
+IA,commercial,UnitedHealthcare Plan of the River Valley,5908,,marketing name (DBA),UnitedHealthcare Plan of the River Valley,UNITEDHEALTH GRP,mlr
+IA,commercial,Aetna Life Insurance,1736,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+IA,marketplace,Oscar Insurance,26767,,marketing name (DBA),Oscar Insurance,,mlr
+IA,marketplace,Golden Rule Insurance,1049,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+ID,commercial,Regence BlueShield of Idaho,170642,yes,marketing name (DBA),Regence BlueShield of Idaho,REGENCE GRP,mlr
+ID,commercial,Blue Cross of Idaho Health Service,130638,,marketing name (DBA),Blue Cross of Idaho Health Service,"Blue Cross of Idaho Health Service, Inc.",mlr
+ID,commercial,N/A,67537,,marketing name (DBA),SelectHealth; Connecticut General Life Insurance; Cigna Health and Life Insurance,IHC Inc Grp; Cigna Hlth Grp,mlr
+ID,commercial,PacificSource Health Plans,31057,,marketing name (DBA),PacificSource Health Plans,PacificSource Hlth Plan Grp,mlr
+ID,commercial,St. Luke's Health Plan,8931,,marketing name (DBA),St. Luke's Health Plan,,mlr
+ID,commercial,Montana Health Cooperative,7924,,marketing name (DBA),Montana Health Cooperative,Montana Health Cooperative,mlr
+ID,commercial,UnitedHealthcare Insurance,4543,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+ID,commercial,Moda Health Plan,4449,,marketing name (DBA),Moda Health Plan,Oregon Dental Grp,mlr
+ID,commercial,Aetna Life Insurance,3930,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+ID,marketplace,Molina Healthcare of Utah,1052,,marketing name (DBA),Molina Healthcare of Utah,Molina Healthcare Inc GRP,mlr
+IL,commercial,"Blue Cross Blue Shield of Illinois, Montana, New Mexico, Oklahoma and Texas",1962566,,marketing name (DBA),"Health Care Service Corporation, a Mutual Legal Reserve",HCSC GRP,mlr
+IL,commercial,UnitedHealthcare Insurance Company of Illinois,161177,,marketing name (DBA),UnitedHealthcare Insurance Company of Illinois,UNITEDHEALTH GRP,mlr
+IL,commercial,Health Alliance Medical Plans,129608,,marketing name (DBA),Health Alliance Medical Plans,Carle Holding Co Grp,mlr
+IL,commercial,UnitedHealthcare Insurance,74844,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+IL,commercial,Aetna Health Inc. (a Pennsylvania corporation),57417,,marketing name (DBA),Aetna Health Inc. (a Pennsylvania corporation),CVS Health Group,mlr
+IL,commercial,UnitedHealthcare of Illinois,42137,,marketing name (DBA),UnitedHealthcare of Illinois,UNITEDHEALTH GRP,mlr
+IL,commercial,State Farm Mutual Automobile Insurance,41515,,marketing name (DBA),State Farm Mutual Automobile Insurance,State Farm Mutual Group,mlr
+IL,commercial,Aetna Life Insurance,31374,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+IL,commercial,N/A,28900,,marketing name (DBA),Cigna HealthCare of Illinois; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+IL,commercial,Unity Health Insurance,8941,,marketing name (DBA),Quartz Health Benefit Plans,University Health Care & Gundersen Lutheran Group,mlr
+IL,commercial,UnitedHealthcare Insurance Company of the River Valley,3358,,marketing name (DBA),UnitedHealthcare Insurance Company of the River Valley,UNITEDHEALTH GRP,mlr
+IL,commercial,Nippon Life Insurance Company of America,1827,,marketing name (DBA),Nippon Life Insurance Company of America,,mlr
+IL,commercial,MercyCare Health Plans,1796,,marketing name (DBA),MercyCare Insurance; MercyCare HMO,Mercy Alliance Inc Group,mlr
+IL,commercial,Reliance Standard Life Insurance,1628,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr
+IL,commercial,Medical Associates Health Plan,1466,,marketing name (DBA),Medical Associates Health Plan,Medical Associates Clinic,mlr
+IL,marketplace,Celtic Insurance,53136.77,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+IL,marketplace,Oscar Health Plan,11138,,marketing name (DBA),Oscar Health Plan,,mlr
+IL,marketplace,Molina Healthcare of Illinois,7646,,marketing name (DBA),Molina Healthcare of Illinois,,mlr
+IL,marketplace,Golden Rule Insurance,3199,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+IL,marketplace,The United States Life Ins. Co. in the City of New York,1194,,marketing name (DBA),The United States Life Ins. Co. in the City of New York,AMERICAN INTL GRP,mlr
+IN,commercial,Anthem Insurance Companies,375332,,marketing name (DBA),Anthem Insurance Companies,Elevance Hlth Inc Grp,mlr
+IN,commercial,UnitedHealthcare Insurance,59649,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+IN,commercial,PHP or Physicians Health Plan,23558,,marketing name (DBA),Physicians Health Plan of Northern Indiana,Priority Health,mlr
+IN,commercial,N/A,17309,,marketing name (DBA),Cigna HealthCare of Indiana; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+IN,commercial,Indiana University Health Plans,9637,,marketing name (DBA),Indiana University Health Plans,,mlr
+IN,commercial,Aetna Health Inc. (a Pennsylvania corporation),6660,,marketing name (DBA),Aetna Health Inc. (a Pennsylvania corporation),CVS Health Group,mlr
+IN,commercial,SIHO Insurance Services,6279,,marketing name (DBA),Southeastern Indiana Health Organization,,mlr
+IN,commercial,Aetna Life Insurance,4976,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+IN,marketplace,Celtic Insurance,114144.69,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+IN,marketplace,CareSource Indiana,82660,yes,marketing name (DBA),CareSource Indiana,CareSource Management Group,mlr
+IN,marketplace,Golden Rule Insurance,2409,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+KS,commercial,Blue Cross and Blue Shield of Kansas,265920,yes,marketing name (DBA),Blue Cross and Blue Shield of Kansas,BCBS of KS GRP,mlr
+KS,commercial,BLUE CROSS AND BLUE SHIELD OF KANSAS CITY,119266.70000000001,,marketing name (DBA),BLUE CROSS AND BLUE SHIELD OF KANSAS CITY,BCBS OF KC GRP,mlr
+KS,commercial,UnitedHealthcare Insurance,63458,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+KS,commercial,Aetna Life Insurance,40030,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+KS,commercial,N/A,10618,,marketing name (DBA),Assurity Life Insurance; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+KS,marketplace,Celtic Insurance,76039.36,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+KS,marketplace,Oscar Insurance,12497,,marketing name (DBA),Oscar Insurance,,mlr
+KS,marketplace,US Health and Life Insurance,2079,,marketing name (DBA),US Health and Life Insurance,,mlr
+KS,marketplace,Medica Insurance,1809,,marketing name (DBA),Medica Insurance,Medica Grp,mlr
+KY,commercial,Anthem Health Plans of Kentucky,295853,,marketing name (DBA),Anthem Health Plans of Kentucky,Elevance Hlth Inc Grp,mlr
+KY,commercial,UnitedHealthcare of Kentucky,21023,,marketing name (DBA),UnitedHealthcare of Kentucky,UNITEDHEALTH GRP,mlr
+KY,commercial,UnitedHealthcare Insurance,15941,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+KY,commercial,Aetna Life Insurance,6123,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+KY,commercial,N/A,3525,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+KY,marketplace,WELLCARE HEALTH PLANS OF KENTUCKY,26102,,marketing name (DBA),WELLCARE HEALTH PLANS OF KENTUCKY,WellCare Management Group,mlr
+KY,marketplace,CareSource Kentucky,19838,,marketing name (DBA),CareSource Kentucky,CareSource Management Group,mlr
+KY,marketplace,Molina Healthcare of Kentucky,1534,,marketing name (DBA),Molina Healthcare of Kentucky,,mlr
+LA,commercial,Blue Cross Blue Shield of Louisiana,334869,,marketing name (DBA),Louisiana Health Service and Indemnity,LOUISIANA HLTH SERV GRP,mlr
+LA,commercial,HMO Louisiana,171746,,marketing name (DBA),HMO Louisiana,LOUISIANA HLTH SERV GRP,mlr
+LA,commercial,UnitedHealthcare Insurance,118813,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+LA,commercial,UnitedHealthcare Insurance Company of the River Valley,12569,,marketing name (DBA),UnitedHealthcare Insurance Company of the River Valley,UNITEDHEALTH GRP,mlr
+LA,commercial,Aetna Health Inc. (a LA corp.),3642,,marketing name (DBA),Aetna Health Inc. (a LA corp.),CVS Health Group,mlr
+LA,commercial,Aetna Life Insurance,3471,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+LA,commercial,N/A,1501,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+LA,marketplace,Ambetter Health of Louisiana,76609,,marketing name (DBA),Ambetter Health of Louisiana,,mlr
+LA,marketplace,CHRISTUS Health Plan Louisiana,17306,,marketing name (DBA),CHRISTUS Health Plan Louisiana,,mlr
+MA,commercial,Blue Cross and Blue Shield of Massachusetts HMO Blue,570709,,marketing name (DBA),Blue Cross and Blue Shield of Massachusetts HMO Blue,BCBS of MA Grp,mlr
+MA,commercial,Blue Cross and Blue Shield of Massachusetts,267434,,marketing name (DBA),Blue Cross and Blue Shield of Massachusetts,BCBS of MA Grp,mlr
+MA,commercial,Harvard Pilgrim Health Care,233944,yes,marketing name (DBA),Harvard Pilgrim Health Care,HARVARD PILGRIM HTH CARE GRP,mlr
+MA,commercial,Tufts Health Public Plans,212713,,marketing name (DBA),Tufts Health Public Plans,Tufts Health Plan,mlr
+MA,commercial,Boston Medical Center Health Plan,106759,,marketing name (DBA),Boston Medical Center Health Plan,,mlr
+MA,commercial,Mass General Brigham Health Plan,86539,yes,marketing name (DBA),Mass General Brigham Health Plan,,mlr
+MA,commercial,UnitedHealthcare Insurance,76140,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+MA,commercial,N/A,54228,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+MA,commercial,Health New England,48022,,marketing name (DBA),Health New England,Baystate Hlth Grp,mlr
+MA,commercial,HPHC Insurance,47687,,marketing name (DBA),HPHC Insurance,HARVARD PILGRIM HTH CARE GRP,mlr
+MA,commercial,Aetna Life Insurance,26443,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+MA,commercial,Fallon Community Health Plan,12853,,marketing name (DBA),Fallon Community Health Plan,Fallon Grp,mlr
+MA,commercial,Mass General Brigham Health Insurance,4286,,marketing name (DBA),Mass General Brigham Health Insurance,,mlr
+MD,commercial,CareFirst BlueChoice,459767,,marketing name (DBA),CareFirst BlueChoice,CAREFIRST INC GRP,mlr
+MD,commercial,Kaiser Foundation Health Plan of Mid-Atlantic States,295898,,marketing name (DBA),Kaiser Foundation Health Plan of Mid-Atlantic States,KAISER FOUNDATION GRP,mlr
+MD,commercial,CareFirst of Maryland,262893,,marketing name (DBA),CareFirst of Maryland,CAREFIRST INC GRP,mlr
+MD,commercial,Group Hospitalization and Medical Services,179008,,marketing name (DBA),Group Hospitalization and Medical Services,CAREFIRST INC GRP,mlr
+MD,commercial,Optimum Choice,84694,,marketing name (DBA),Optimum Choice,UNITEDHEALTH GRP,mlr
+MD,commercial,N/A,82411,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+MD,commercial,UnitedHealthcare Insurance,77707,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+MD,commercial,Aetna Life Insurance,18398,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+MD,commercial,Aetna Health Inc. (a Pennsylvania corporation),9750,,marketing name (DBA),Aetna Health Inc. (a Pennsylvania corporation),CVS Health Group,mlr
+MD,commercial,MAMSI Life and Health Insurance,9203,,marketing name (DBA),MAMSI Life and Health Insurance,UNITEDHEALTH GRP,mlr
+MD,commercial,UnitedHealthcare of the Mid-Atlantic,4390,,marketing name (DBA),UnitedHealthcare of the Mid-Atlantic,UNITEDHEALTH GRP,mlr
+MD,marketplace,Golden Rule Insurance,1171,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+ME,commercial,Anthem Health Plans of Maine,159167,,marketing name (DBA),Anthem Health Plans of Maine,Elevance Hlth Inc Grp,mlr
+ME,commercial,Harvard Pilgrim Health Care,42551,,marketing name (DBA),Harvard Pilgrim Health Care,HARVARD PILGRIM HTH CARE GRP,mlr
+ME,commercial,Maine Community Health Options,30167,,marketing name (DBA),Maine Community Health Options,Maine Community Health Options,mlr
+ME,commercial,N/A,16676,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+ME,commercial,HPHC Insurance,11070,,marketing name (DBA),HPHC Insurance,HARVARD PILGRIM HTH CARE GRP,mlr
+ME,commercial,UnitedHealthcare Insurance,7104,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+ME,commercial,Aetna Life Insurance,5139,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+MI,commercial,Blue Cross Blue Shield of Michigan,882932.532726187,yes,marketing name (DBA),Blue Cross Blue Shield of Michigan Mutual Insurance,BCBS OF MI GRP,mlr
+MI,commercial,Blue Care Network,521607,,marketing name (DBA),Blue Care Network,BCBS OF MI GRP,mlr
+MI,commercial,Priority Health,517323,yes,marketing name (DBA),Priority Health,Corewell Health Group,mlr
+MI,commercial,Health Alliance Plan of Michigan,89786,,marketing name (DBA),Health Alliance Plan of Michigan,Henry Ford Health Systems Group,mlr
+MI,commercial,Priority Health Insurance,49027,,marketing name (DBA),Priority Health Insurance,Corewell Health Group,mlr
+MI,commercial,Alliance Health and Life Insurance,46686,,marketing name (DBA),Alliance Health and Life Insurance,Henry Ford Health Systems Group,mlr
+MI,commercial,UnitedHealthcare Insurance,42799,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+MI,commercial,UnitedHealthcare Community Plan,36040,,marketing name (DBA),UnitedHealthcare Community Plan,UNITEDHEALTH GRP,mlr
+MI,commercial,University of Michigan Health Plan,25676,,marketing name (DBA),University of Michigan Health Plan,PHP Insurance Company,mlr
+MI,commercial,N/A,6882,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+MI,commercial,Aetna Life Insurance,4806,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+MI,commercial,GMS Reinsurance,3833,,marketing name (DBA),GMS Reinsurance,,mlr
+MI,commercial,University of Michigan Health Insurance,2424,,marketing name (DBA),University of Michigan Health Insurance,PHP Insurance Company,mlr
+MI,commercial,Reliance Standard Life Insurance,1280,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr
+MI,marketplace,Meridian Health Plan of Michigan,115109,,marketing name (DBA),Meridian Health Plan of Michigan,"Meridian Health Plan of Michigan, Inc.",mlr
+MI,marketplace,Molina Healthcare of Michigan,35687,,marketing name (DBA),Molina Healthcare of Michigan,Molina Healthcare Inc GRP,mlr
+MI,marketplace,Golden Rule Insurance,6000,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+MI,marketplace,Oscar Insurance,2909,,marketing name (DBA),Oscar Insurance,,mlr
+MI,marketplace,McLaren Health Plan Community,2418,,marketing name (DBA),McLaren Health Plan Community,McLaren Hlth Grp,mlr
+MN,commercial,Blue Cross Blue Shield of Minnesota,317192,,marketing name (DBA),BCBSM,BCBS of MN Grp,mlr
+MN,commercial,HealthPartners Insurance,234767,,marketing name (DBA),HealthPartners Insurance,HEALTHPARTNERS GRP,mlr
+MN,commercial,Medica Insurance,180947,,marketing name (DBA),Medica Insurance,Medica Grp,mlr
+MN,commercial,Blue Plus,65593,,marketing name (DBA),HMO Minnesota,BCBS of MN Grp,mlr
+MN,commercial,UnitedHealthcare Insurance,54786,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+MN,commercial,Sanford Health Plan,4817,,marketing name (DBA),Sanford Health Plan of Minnesota,Sanford Health Plan/Sanford Health Plan of Minnesota,mlr
+MN,commercial,Allina Health and Aetna Insurance,3537,,marketing name (DBA),Allina Health and Aetna Insurance,CVS Health Group,mlr
+MN,commercial,N/A,2858,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+MN,commercial,Quartz Health Plan MN,2289,,marketing name (DBA),Quartz Health Plan MN,University Health Care & Gundersen Lutheran Group,mlr
+MN,commercial,Aetna Life Insurance,1479,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+MN,commercial,UnitedHealthcare of Illinois,1364,,marketing name (DBA),UnitedHealthcare of Illinois,UNITEDHEALTH GRP,mlr
+MN,marketplace,UCare Minnesota,49414,,marketing name (DBA),UCare Minnesota,UCare Minnesota,mlr
+MO,commercial,Healthy Alliance Life Insurance,278885,,marketing name (DBA),Healthy Alliance Life Insurance,Elevance Hlth Inc Grp,mlr
+MO,commercial,UnitedHealthcare Insurance,188938,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+MO,commercial,BLUE CROSS AND BLUE SHIELD OF KANSAS CITY,169449.3,,marketing name (DBA),BLUE CROSS AND BLUE SHIELD OF KANSAS CITY,BCBS OF KC GRP,mlr
+MO,commercial,Aetna Life Insurance,56044,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+MO,commercial,N/A,36913,,marketing name (DBA),Assurity Life Insurance; Cigna HealthCare of St Louis; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+MO,commercial,Cox Health Systems Insurance,32569,,marketing name (DBA),Cox Health Systems Insurance,COX INS GRP,mlr
+MO,commercial,BLUE CARE,11513,,marketing name (DBA),"GOOD HEALTH HMO, INC. d/b/a BLUE CARE",BCBS OF KC GRP,mlr
+MO,commercial,HMO Missouri,5227,,marketing name (DBA),HMO Missouri,Elevance Hlth Inc Grp,mlr
+MO,commercial,Reliance Standard Life Insurance,1733,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr
+MO,marketplace,Celtic Insurance,136675.03,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+MO,marketplace,Oscar Insurance,24772,,marketing name (DBA),Oscar Insurance,,mlr
+MO,marketplace,Medica Insurance,12189,,marketing name (DBA),Medica Insurance,Medica Grp,mlr
+MO,marketplace,Golden Rule Insurance,4536,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+MO,marketplace,Medica Central Insurance,1374,,marketing name (DBA),Medica Central Insurance,Medica Grp,mlr
+MS,commercial,"BLUE CROSS & BLUE SHIELD OF MISSISSIPPI, A MUTUAL INSURANCE",267094,,marketing name (DBA),"BLUE CROSS & BLUE SHIELD OF MISSISSIPPI, A MUTUAL INSURANCE",MISSISSIPPI INS GRP,mlr
+MS,commercial,N/A,63769,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+MS,commercial,UnitedHealthcare Insurance,28813,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+MS,commercial,UnitedHealthcare of Mississippi,9820,,marketing name (DBA),UnitedHealthcare of Mississippi,UNITEDHEALTH GRP,mlr
+MS,commercial,Aetna Life Insurance,1177,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+MS,marketplace,Ambetter of Magnolia,190124,,marketing name (DBA),Ambetter of Magnolia,CENTENE CORP GRP,mlr
+MS,marketplace,Molina Healthcare of Mississippi,33063,,marketing name (DBA),Molina Healthcare of Mississippi,Molina Healthcare Inc GRP,mlr
+MS,marketplace,Vantage Health Plan of Mississippi,3055,,marketing name (DBA),Vantage Health Plan of Mississippi,,mlr
+MS,marketplace,Golden Rule Insurance,2114,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+MT,commercial,"Blue Cross Blue Shield of Illinois, Montana, New Mexico, Oklahoma and Texas",134371,,marketing name (DBA),"Health Care Service Corporation, a Mutual Legal Reserve",HCSC GRP,mlr
+MT,commercial,PacificSource Health Plans,29991,,marketing name (DBA),PacificSource Health Plans,PacificSource Hlth Plan Grp,mlr
+MT,commercial,Montana Health Cooperative,29576,,marketing name (DBA),Montana Health Cooperative,Montana Health Cooperative,mlr
+MT,commercial,UnitedHealthcare Insurance,1293,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+NC,commercial,Blue Cross and Blue Shield of North Carolina,1104290,yes,marketing name (DBA),Blue Cross and Blue Shield of North Carolina,,mlr
+NC,commercial,Aetna Health Inc. (a Pennsylvania corporation),329227,,marketing name (DBA),Aetna Health Inc. (a Pennsylvania corporation),CVS Health Group,mlr
+NC,commercial,UnitedHealthcare Insurance,82144,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+NC,commercial,UnitedHealthcare of North Carolina,61152,,marketing name (DBA),UnitedHealthcare of North Carolina,UNITEDHEALTH GRP,mlr
+NC,commercial,N/A,47043,,marketing name (DBA),Cigna HealthCare of North Carolina; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+NC,commercial,Aetna Life Insurance,17726,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+NC,commercial,FirstCarolinaCare Insurance,3299,,marketing name (DBA),FirstCarolinaCare Insurance,"Health Alliance Medical Plans, Inc.",mlr
+NC,marketplace,Ambetter of North Carolina,120226,,marketing name (DBA),Ambetter of North Carolina,,mlr
+NC,marketplace,AmeriHealth Caritas North Carolina,15385,,marketing name (DBA),AmeriHealth Caritas North Carolina,INDEPENDENCE BLUE CROSS GRP,mlr
+NC,marketplace,CareSource North Carolina,8877.928,,marketing name (DBA),CareSource North Carolina,CareSource Management Group,mlr
+NC,marketplace,The United States Life Ins. Co. in the City of New York,1119,,marketing name (DBA),The United States Life Ins. Co. in the City of New York,AMERICAN INTL GRP,mlr
+ND,commercial,Blue Cross Blue Shield of North Dakota,150210,yes,marketing name (DBA),Blue Cross Blue Shield of North Dakota,,mlr
+ND,commercial,Sanford Health Plan,95445,yes,marketing name (DBA),Sanford Health Plan,Sanford Health Plan/Sanford Health Plan of Minnesota,mlr
+ND,commercial,Medica Insurance,6940,,marketing name (DBA),Medica Insurance,Medica Grp,mlr
+ND,commercial,UnitedHealthcare Insurance,1958,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+ND,commercial,HealthPartners Insurance,1798,,marketing name (DBA),HealthPartners Insurance,HEALTHPARTNERS GRP,mlr
+ND,marketplace,Medica Health Plans,1950,,marketing name (DBA),Medica Health Plans,Medica Grp,mlr
+NE,commercial,Blue Cross and Blue Shield of Nebraska,197437,yes,marketing name (DBA),Blue Cross and Blue Shield of Nebraska,Blue Cross and Blue Shield of Nebraska,mlr
+NE,commercial,Medica Insurance,55901,,marketing name (DBA),Medica Insurance,Medica Grp,mlr
+NE,commercial,UnitedHealthcare Insurance,23784,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+NE,commercial,Aetna Life Insurance,6808,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+NE,marketplace,Nebraska Total Care,70781,yes,marketing name (DBA),Nebraska Total Care,CENTENE CORP GRP,mlr
+NE,marketplace,Golden Rule Insurance,1235,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+NH,commercial,Matthew Thornton Health Plan,120480,,marketing name (DBA),Matthew Thornton Health Plan,Elevance Hlth Inc Grp,mlr
+NH,commercial,Anthem Health Plans of New Hampshire,55678,,marketing name (DBA),Anthem Health Plans of New Hampshire,Elevance Hlth Inc Grp,mlr
+NH,commercial,Harvard Pilgrim Health Care of New England,38542,,marketing name (DBA),Harvard Pilgrim Health Care of New England,HARVARD PILGRIM HTH CARE GRP,mlr
+NH,commercial,N/A,13362,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+NH,commercial,UnitedHealthcare Freedom Insurance,6989,,marketing name (DBA),UnitedHealthcare Freedom Insurance,UNITEDHEALTH GRP,mlr
+NH,commercial,HPHC Insurance,5541,,marketing name (DBA),HPHC Insurance,HARVARD PILGRIM HTH CARE GRP,mlr
+NH,commercial,Aetna Life Insurance,1687,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+NH,commercial,UnitedHealthcare Insurance,1139,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+NH,marketplace,Celtic Insurance,15495.62,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+NJ,commercial,Horizon Blue Cross Blue Shield of NJ,749491,,marketing name (DBA),Horizon Healthcare Services,BCBS OF NJ GRP,mlr
+NJ,commercial,Aetna Life Insurance,157965,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+NJ,commercial,AmeriHealth Insurance Company of New Jersey,143916,,marketing name (DBA),AmeriHealth Insurance Company of New Jersey,INDEPENDENCE BLUE CROSS GRP,mlr
+NJ,commercial,Oxford Health Insurance,127563,,marketing name (DBA),Oxford Health Insurance,UNITEDHEALTH GRP,mlr
+NJ,commercial,N/A,109346,,marketing name (DBA),Cigna HealthCare of New Jersey; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+NJ,commercial,UnitedHealthcare Insurance,42417,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+NJ,commercial,Aetna Health Inc. (a New Jersey corporation),1472,,marketing name (DBA),Aetna Health Inc. (a New Jersey corporation),CVS Health Group,mlr
+NJ,commercial,Nippon Life Insurance Company of America,1444,,marketing name (DBA),Nippon Life Insurance Company of America,,mlr
+NJ,marketplace,Oscar Garden State Insurance,256543,,marketing name (DBA),Oscar Garden State Insurance,,mlr
+NJ,marketplace,WellCare Health Insurance Company of New Jersey,5055,,marketing name (DBA),WellCare Health Insurance Company of New Jersey,,mlr
+NJ,marketplace,The United States Life Ins. Co. in the City of New York,3891,,marketing name (DBA),The United States Life Ins. Co. in the City of New York,AMERICAN INTL GRP,mlr
+NM,commercial,"Blue Cross Blue Shield of Illinois, Montana, New Mexico, Oklahoma and Texas",132417,,marketing name (DBA),"Health Care Service Corporation, a Mutual Legal Reserve",HCSC GRP,mlr
+NM,commercial,Presbyterian Health Plan,35844,yes,marketing name (DBA),Presbyterian Health Plan,Presbyterian Hlthcare Serv Grp,mlr
+NM,commercial,UnitedHealthcare Insurance,17010,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+NM,commercial,UnitedHealthcare of New Mexico,7635,,marketing name (DBA),UnitedHealthcare of New Mexico,UNITEDHEALTH GRP,mlr
+NM,commercial,Presbyterian Insurance,3495,,marketing name (DBA),Presbyterian Insurance,Presbyterian Hlthcare Serv Grp,mlr
+NM,marketplace,Molina Healthcare of New Mexico,7605,,marketing name (DBA),Molina Healthcare of New Mexico,Molina Healthcare Inc GRP,mlr
+NM,marketplace,Western Sky Community Care,5004,yes,marketing name (DBA),Western Sky Community Care,,mlr
+NV,commercial,Health Plan of Nevada,206832,,marketing name (DBA),Health Plan of Nevada,UNITEDHEALTH GRP,mlr
+NV,commercial,"Rocky Mountain Hospital and Medical Service, Inc., dba Anthem Blue Cross and Blue Shield",96179,,marketing name (DBA),"Rocky Mountain Hospital and Medical Service, Inc., dba Anthem Blue Cross and Blue Shield",Elevance Hlth Inc Grp,mlr
+NV,commercial,Sierra Health and Life Insurance,52487,,marketing name (DBA),Sierra Health and Life Insurance,UNITEDHEALTH GRP,mlr
+NV,commercial,UnitedHealthcare Insurance,34487,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+NV,commercial,HMO Colorado,29824,,marketing name (DBA),HMO Colorado,Elevance Hlth Inc Grp,mlr
+NV,commercial,N/A,17372,,marketing name (DBA),SelectHealth; Connecticut General Life Insurance; Cigna Health and Life Insurance,IHC Inc Grp; Cigna Hlth Grp,mlr
+NV,commercial,Hometown Health Providers Insurance,14621,,marketing name (DBA),Hometown Health Providers Insurance,Renown Health,mlr
+NV,commercial,Aetna Life Insurance,10914,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+NV,commercial,Hometown Health Plan,10657,,marketing name (DBA),Hometown Health Plan,Renown Health,mlr
+NV,commercial,Aetna Health Inc. (a Pennsylvania corporation),1944,,marketing name (DBA),Aetna Health Inc. (a Pennsylvania corporation),CVS Health Group,mlr
+NV,marketplace,SilverSummit Healthplan,16836,,marketing name (DBA),SilverSummit Healthplan,,mlr
+NV,marketplace,Aetna Health of Utah,7277,,marketing name (DBA),Aetna Health of Utah,CVS Health Group,mlr
+NY,commercial,Oxford Health Insurance,557531,,marketing name (DBA),Oxford Health Insurance,UNITEDHEALTH GRP,mlr
+NY,commercial,Aetna Life Insurance,417879,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+NY,commercial,Excellus Health Plan,367934,,marketing name (DBA),Excellus Health Plan,Lifetime HlthCare Grp,mlr
+NY,commercial,Anthem HealthChoice Assurance,341395,,marketing name (DBA),Anthem HealthChoice Assurance,Elevance Hlth Inc Grp,mlr
+NY,commercial,EmblemHealth,254818,yes,marketing name (DBA),EmblemHealth Insurance; Health Insurance Plan of Greater New York; EmblemHealth Plan,HIP INS GRP,mlr
+NY,commercial,N/A,244294,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+NY,commercial,"BlueCross BlueShield of Western New York, BlueShield of Northeastern New York",223760,,marketing name (DBA),Highmark Western and Northeastern New York,HIGHMARK GRP,mlr
+NY,commercial,UnitedHealthcare Insurance Company of New York,143158,,marketing name (DBA),UnitedHealthcare Insurance Company of New York,UNITEDHEALTH GRP,mlr
+NY,commercial,Independent Health,123386,,marketing name (DBA),Independent Health Association; Independent Health Benefits,,mlr
+NY,commercial,MVP Health Services,77852,,marketing name (DBA),MVP Health Services,MVP GRP,mlr
+NY,commercial,Capital District Physicians Health Plan,74355,,marketing name (DBA),Capital District Physicians Health Plan,CDPHP,mlr
+NY,commercial,CDPHP Universal Benefits,73131,,marketing name (DBA),CDPHP Universal Benefits,CDPHP,mlr
+NY,commercial,MVP Health Plan,49875,,marketing name (DBA),MVP Health Plan,MVP GRP,mlr
+NY,commercial,The United States Life Ins. Co. in the City of New York,44880,,marketing name (DBA),The United States Life Ins. Co. in the City of New York,AMERICAN INTL GRP,mlr
+NY,commercial,MetroPlus Health Plan,41206,,marketing name (DBA),MetroPlus Health Plan,,mlr
+NY,commercial,Nippon Life Insurance Company of America,7368,,marketing name (DBA),Nippon Life Insurance Company of America,,mlr
+NY,commercial,Anthem HealthChoice HMO,1035,,marketing name (DBA),Anthem HealthChoice HMO,Elevance Hlth Inc Grp,mlr
+NY,marketplace,Healthfirst PHSP,47240,,marketing name (DBA),Healthfirst PHSP,"Healthfirst PHSP, Inc.",mlr
+NY,marketplace,Anthem HP,23968,,marketing name (DBA),Anthem HP,Elevance Hlth Inc Grp,mlr
+NY,marketplace,Oscar Insurance,10291,,marketing name (DBA),Oscar Insurance,,mlr
+NY,marketplace,UnitedHealthcare of New York,5945,,marketing name (DBA),UnitedHealthcare of New York,UNITEDHEALTH GRP,mlr
+OH,commercial,Community Insurance,548497,,marketing name (DBA),Community Insurance,Elevance Hlth Inc Grp,mlr
+OH,commercial,Medical Mutual of Ohio,222469,,marketing name (DBA),Medical Mutual of Ohio,Medical Mutual of Ohio,mlr
+OH,commercial,UnitedHealthcare Insurance,92091,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+OH,commercial,Aetna Life Insurance,47970,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+OH,commercial,United Healthcare Life Insurance,45788,,marketing name (DBA),United Healthcare Life Insurance,UNITEDHEALTH GRP,mlr
+OH,commercial,N/A,34813,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+OH,commercial,UnitedHealthcare of Ohio,33058,,marketing name (DBA),UnitedHealthcare of Ohio,UNITEDHEALTH GRP,mlr
+OH,commercial,AultCare,30424,,marketing name (DBA),AultCare Insurance,,mlr
+OH,commercial,Aetna Health Inc. (a Pennsylvania corporation),24849,,marketing name (DBA),Aetna Health Inc. (a Pennsylvania corporation),CVS Health Group,mlr
+OH,commercial,SummaCare,17781,,marketing name (DBA),SummaCare; Summa Insurance,Summa Hlth Grp,mlr
+OH,commercial,Paramount Insurance,17548,,marketing name (DBA),Paramount Insurance,Medical Mutual of Ohio,mlr
+OH,commercial,Sidecar Health Insurance,7917,,marketing name (DBA),Sidecar Health Insurance,,mlr
+OH,commercial,All Savers Insurance,5356,,marketing name (DBA),All Savers Insurance,UNITEDHEALTH GRP,mlr
+OH,commercial,UnitedHealthcare Insurance Company of the River Valley,3133,,marketing name (DBA),UnitedHealthcare Insurance Company of the River Valley,UNITEDHEALTH GRP,mlr
+OH,commercial,Reliance Standard Life Insurance,1884,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr
+OH,commercial,The Health Plan of West Virginia,1320,,marketing name (DBA),The Health Plan of West Virginia,HEALTH PLAN GRP,mlr
+OH,marketplace,Buckeye Community Health Plan,86278,,marketing name (DBA),Buckeye Community Health Plan,CENTENE CORP GRP,mlr
+OH,marketplace,Molina Healthcare of Ohio,77720,,marketing name (DBA),Molina Healthcare of Ohio,Molina Healthcare Inc GRP,mlr
+OH,marketplace,Oscar Buckeye State Insurance,72324,,marketing name (DBA),Oscar Buckeye State Insurance,,mlr
+OH,marketplace,CareSource,70070,yes,marketing name (DBA),CareSource,CareSource Management Group,mlr
+OH,marketplace,Medical Health Insuring Corporation of Ohio,52894,,marketing name (DBA),Medical Health Insuring Corporation of Ohio,Medical Mutual of Ohio,mlr
+OH,marketplace,Golden Rule Insurance,2264,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+OK,commercial,"Blue Cross Blue Shield of Illinois, Montana, New Mexico, Oklahoma and Texas",604722,,marketing name (DBA),"Health Care Service Corporation, a Mutual Legal Reserve",HCSC GRP,mlr
+OK,commercial,CommunityCare HMO,63049,,marketing name (DBA),CommunityCare HMO,CommunityCare Grp,mlr
+OK,commercial,UnitedHealthcare Insurance,22937,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+OK,commercial,UnitedHealthcare of Oklahoma,19819,,marketing name (DBA),UnitedHealthcare of Oklahoma,UNITEDHEALTH GRP,mlr
+OK,commercial,Aetna Life Insurance,17083,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+OK,commercial,CommunityCare Life & Health Insurance,2294,,marketing name (DBA),CommunityCare Life & Health Insurance,CommunityCare Grp,mlr
+OK,commercial,N/A,1357,,marketing name (DBA),Assurity Life Insurance; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+OK,commercial,GlobalHealth,1210,,marketing name (DBA),GlobalHealth,GlobalHealth Holdings Grp,mlr
+OK,marketplace,Celtic Insurance,66584.5,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+OK,marketplace,Medica Insurance,12439,,marketing name (DBA),Medica Insurance,Medica Grp,mlr
+OK,marketplace,Oscar Insurance,12153,,marketing name (DBA),Oscar Insurance,,mlr
+OR,commercial,Kaiser Permanente,341192,,marketing name (DBA),Kaiser Foundation Health Plan of the Northwest,KAISER FOUNDATION GRP,mlr
+OR,commercial,Regence BlueCross BlueShield of Oregon,242510,yes,marketing name (DBA),Regence BlueCross BlueShield of Oregon,REGENCE GRP,mlr
+OR,commercial,Providence Health Plan,167631.66,yes,marketing name (DBA),Providence Health Plan,,mlr
+OR,commercial,PacificSource Health Plans,69975,,marketing name (DBA),PacificSource Health Plans,PacificSource Hlth Plan Grp,mlr
+OR,commercial,Moda Health Plan,56562,,marketing name (DBA),Moda Health Plan,Oregon Dental Grp,mlr
+OR,commercial,UnitedHealthcare Insurance,43300,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+OR,commercial,Aetna Life Insurance,11871,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+OR,commercial,N/A,9198,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+OR,commercial,Health Net Health Plan of Oregon,8073,,marketing name (DBA),Health Net Health Plan of Oregon,CENTENE CORP GRP,mlr
+OR,commercial,Samaritan Health Plans,1337,,marketing name (DBA),Samaritan Health Plans,"Samaritan Health Plans, Inc",mlr
+PA,commercial,Highmark,660645,,marketing name (DBA),Highmark,HIGHMARK GRP,mlr
+PA,commercial,UPMC Health Options,306639.6628638967,,marketing name (DBA),UPMC Health Options,UPMC HLTH SYSTEM GRP,mlr
+PA,commercial,Independence Assurance,241941,,marketing name (DBA),Independence Assurance,INDEPENDENCE BLUE CROSS GRP,mlr
+PA,commercial,Keystone Health Plan East,241338,,marketing name (DBA),Keystone Health Plan East,INDEPENDENCE BLUE CROSS GRP,mlr
+PA,commercial,Capital Advantage Assurance,108084,,marketing name (DBA),Capital Advantage Assurance,Capital Advantage Assurance Company,mlr
+PA,commercial,Capital BlueCross,76704,,marketing name (DBA),Capital BlueCross,CAPITAL BLUE CROSS GRP,mlr
+PA,commercial,Independence Blue Cross,75393,yes,marketing name (DBA),Independence Hospital Indemnity Plan,INDEPENDENCE BLUE CROSS GRP,mlr
+PA,commercial,UnitedHealthcare Insurance,65304,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+PA,commercial,Highmark Benefits Group,50563,,marketing name (DBA),Highmark Benefits Group,HIGHMARK GRP,mlr
+PA,commercial,N/A,49431,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+PA,commercial,Highmark Coverage Advantage,47632,,marketing name (DBA),Highmark Coverage Advantage,HIGHMARK GRP,mlr
+PA,commercial,Geisinger Health Plan,39442,yes,marketing name (DBA),Geisinger Health Plan,GEISINGER INS GRP,mlr
+PA,commercial,Aetna Life Insurance,34736,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+PA,commercial,Highmark Health Insurance,30906,,marketing name (DBA),Highmark Health Insurance,HIGHMARK GRP,mlr
+PA,commercial,Geisinger Quality Options,26560,,marketing name (DBA),Geisinger Quality Options,GEISINGER INS GRP,mlr
+PA,commercial,First Priority Life,23553,,marketing name (DBA),First Priority Life Insurance,HIGHMARK GRP,mlr
+PA,commercial,UPMC Health Coverage,11313.999999999998,,marketing name (DBA),UPMC Health Coverage,UPMC HLTH SYSTEM GRP,mlr
+PA,commercial,Aetna HealthAssurance Pennsylvania,7741,,marketing name (DBA),Aetna HealthAssurance Pennsylvania,CVS Health Group,mlr
+PA,commercial,UPMC Health Plan,7370,yes,marketing name (DBA),UPMC Health Plan,UPMC HLTH SYSTEM GRP,mlr
+PA,commercial,First Priority Health,3943,,marketing name (DBA),HMO Of Northeastern Pennsylvania,HIGHMARK GRP,mlr
+PA,commercial,UnitedHealthcare of Pennsylvania,2172,,marketing name (DBA),UnitedHealthcare of Pennsylvania,UNITEDHEALTH GRP,mlr
+PA,commercial,Aetna Health Inc. (a Pennsylvania corporation),1690,,marketing name (DBA),Aetna Health Inc. (a Pennsylvania corporation),CVS Health Group,mlr
+PA,commercial,Reliance Standard Life Insurance,1058,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr
+PA,marketplace,Pennsylvania Health & Wellness,35093,,marketing name (DBA),Pennsylvania Health & Wellness,,mlr
+PA,marketplace,QCC Insurance,31468,,marketing name (DBA),QCC Insurance,INDEPENDENCE BLUE CROSS GRP,mlr
+PA,marketplace,Oscar Health Plan of Pennsylvania,2591,,marketing name (DBA),Oscar Health Plan of Pennsylvania,,mlr
+PA,marketplace,The United States Life Ins. Co. in the City of New York,1468,,marketing name (DBA),The United States Life Ins. Co. in the City of New York,AMERICAN INTL GRP,mlr
+PA,marketplace,Golden Rule Insurance,1242,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+PR,commercial,Triple-S Salud,401651,yes,marketing name (DBA),Triple-S Salud,,mlr
+PR,commercial,N/A,40675,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance; MAPFRE Life Insurance,Cigna Hlth Grp; MAPFRE Insurance Group,mlr
+PR,commercial,Mennonite General Hospital,36585,,marketing name (DBA),Mennonite General Hospital,"Mennonite General Hospital, Inc",mlr
+PR,commercial,Plan Medico Servicios de Salud Bella Vista,5120,,marketing name (DBA),Plan Medico Servicios de Salud Bella Vista,,mlr
+PR,commercial,Auxilio Platino,3915,,marketing name (DBA),Auxilio Platino,,mlr
+PR,commercial,Ryder Health Plan,1041,,marketing name (DBA),Ryder Health Plan,,mlr
+RI,commercial,Blue Cross & Blue Shield of Rhode Island,139562,yes,marketing name (DBA),Blue Cross & Blue Shield of Rhode Island,,mlr
+RI,commercial,Neighborhood Health Plan of Rhode Island,40160,yes,marketing name (DBA),Neighborhood Health Plan of Rhode Island,00000,mlr
+RI,commercial,UnitedHealthcare Insurance,14808,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+RI,commercial,HPHC Insurance,3643,,marketing name (DBA),HPHC Insurance,HARVARD PILGRIM HTH CARE GRP,mlr
+RI,commercial,Harvard Pilgrim Health Care of New England,2745,,marketing name (DBA),Harvard Pilgrim Health Care of New England,HARVARD PILGRIM HTH CARE GRP,mlr
+SC,commercial,BlueCross and BlueShield of South Carolina,608763,,marketing name (DBA),BlueCross and BlueShield of South Carolina,BCBS of SC Grp,mlr
+SC,commercial,BlueChoice HealthPlan of South Carolina,55479,,marketing name (DBA),BlueChoice HealthPlan of South Carolina,BCBS of SC Grp,mlr
+SC,commercial,UnitedHealthcare of South Carolina,26140,,marketing name (DBA),UnitedHealthcare of South Carolina,UNITEDHEALTH GRP,mlr
+SC,commercial,UnitedHealthcare Insurance,18230,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+SC,commercial,N/A,15867,,marketing name (DBA),Cigna HealthCare of South Carolina; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+SC,commercial,Aetna Life Insurance,2627,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+SC,commercial,UnitedHealthcare Insurance Company of the River Valley,1215,,marketing name (DBA),UnitedHealthcare Insurance Company of the River Valley,UNITEDHEALTH GRP,mlr
+SC,marketplace,Absolute Total Care,229279,yes,marketing name (DBA),Absolute Total Care,,mlr
+SC,marketplace,MOLINA HEALTHCARE OF SOUTH CAROLINA,32805,,marketing name (DBA),MOLINA HEALTHCARE OF SOUTH CAROLINA,Molina Healthcare Inc GRP,mlr
+SC,marketplace,Select Health of South Carolina,2774,yes,marketing name (DBA),Select Health of South Carolina,,mlr
+SC,marketplace,Golden Rule Insurance,1788,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+SD,commercial,Wellmark Blue Cross and Blue Shield of South Dakota,127222,yes,marketing name (DBA),Wellmark of South Dakota,Wellmark Group,mlr
+SD,commercial,Sanford Health Plan,39374,yes,marketing name (DBA),Sanford Health Plan,Sanford Health Plan/Sanford Health Plan of Minnesota,mlr
+SD,commercial,Avera Health Plans,33616,yes,marketing name (DBA),Avera Health Plans,,mlr
+SD,commercial,HealthPartners Insurance,4399,,marketing name (DBA),HealthPartners Insurance,HEALTHPARTNERS GRP,mlr
+SD,commercial,UnitedHealthcare Insurance,1234,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+TN,commercial,BlueCross BlueShield of Tennessee,608285,yes,marketing name (DBA),BlueCross BlueShield of Tennessee,BCBS of TN Inc,mlr
+TN,commercial,N/A,171785,,marketing name (DBA),Cigna HealthCare of Tennessee; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+TN,commercial,UnitedHealthcare Insurance,125122,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+TN,commercial,UnitedHealthcare Insurance Company of the River Valley,43135,,marketing name (DBA),UnitedHealthcare Insurance Company of the River Valley,UNITEDHEALTH GRP,mlr
+TN,commercial,Aetna Life Insurance,15963,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+TN,commercial,Reliance Standard Life Insurance,2932,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr
+TN,commercial,Alliant Health Plans,1343,,marketing name (DBA),Alliant Health Plans,Health One Alliance Grp,mlr
+TN,marketplace,Celtic Insurance,260383.37,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+TN,marketplace,Oscar Insurance,30220,,marketing name (DBA),Oscar Insurance,,mlr
+TN,marketplace,TRH Health Insurance,20266,,marketing name (DBA),TRH Health Insurance,TRH Health Insurance Company,mlr
+TN,marketplace,US Health and Life Insurance,5580,,marketing name (DBA),US Health and Life Insurance,,mlr
+TN,marketplace,Golden Rule Insurance,1903,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+TX,commercial,"Blue Cross Blue Shield of Illinois, Montana, New Mexico, Oklahoma and Texas",3507937,,marketing name (DBA),"Health Care Service Corporation, a Mutual Legal Reserve",HCSC GRP,mlr
+TX,commercial,UnitedHealthcare of Texas,751828,,marketing name (DBA),UnitedHealthcare of Texas,UNITEDHEALTH GRP,mlr
+TX,commercial,UnitedHealthcare Insurance,731345,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+TX,commercial,Aetna Health Inc. (a Texas corporation),248531,,marketing name (DBA),Aetna Health Inc. (a Texas corporation),CVS Health Group,mlr
+TX,commercial,Scott and White Health Plan,242176,,marketing name (DBA),Scott and White Health Plan,Scott & White GRP,mlr
+TX,commercial,N/A,236889,,marketing name (DBA),Assurity Life Insurance; Cigna HealthCare of Texas; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+TX,commercial,Aetna Life Insurance,121877,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+TX,commercial,Curative Insurance,45697,,marketing name (DBA),Curative Insurance,Curative Inc Grp,mlr
+TX,commercial,Scott & White Care Plans,11259,,marketing name (DBA),Scott & White Care Plans,Scott & White GRP,mlr
+TX,commercial,Baylor Scott & White Insurance,10123,,marketing name (DBA),Baylor Scott & White Insurance,Scott & White GRP,mlr
+TX,commercial,Memorial Hermann Commercial Health Plan,6173,,marketing name (DBA),Memorial Hermann Commercial Health Plan,,mlr
+TX,commercial,Reliance Standard Life Insurance,4385,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr
+TX,commercial,Memorial Hermann Health Insurance,1472,,marketing name (DBA),Memorial Hermann Health Insurance,,mlr
+TX,marketplace,Celtic Insurance,283132.250000001,,marketing name (DBA),Celtic Insurance,CENTENE CORP GRP,mlr
+TX,marketplace,Superior Health Plan,238759,,marketing name (DBA),Superior Health Plan,CENTENE CORP GRP,mlr
+TX,marketplace,Oscar Insurance,141000,,marketing name (DBA),Oscar Insurance,,mlr
+TX,marketplace,Community Health Choice,110756,yes,marketing name (DBA),Community Health Choice,"Community Health Choice, Inc.",mlr
+TX,marketplace,CHRISTUS HEALTH PLAN,49341,,marketing name (DBA),CHRISTUS HEALTH PLAN,,mlr
+TX,marketplace,US Health and Life Insurance,19148,,marketing name (DBA),US Health and Life Insurance,,mlr
+TX,marketplace,Molina Healthcare of Texas,18942,,marketing name (DBA),Molina Healthcare of Texas,Molina Healthcare Inc GRP,mlr
+TX,marketplace,Sendero Health Plans,11923,,marketing name (DBA),Sendero Health Plans,"Sendero Health Plans, inc.",mlr
+TX,marketplace,Moda Health Plan,4486,,marketing name (DBA),Moda Health Plan,Oregon Dental Grp,mlr
+TX,marketplace,Golden Rule Insurance,3484,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+TX,marketplace,Community First Insurance Plans,1974,,marketing name (DBA),Community First Insurance Plans,,mlr
+TX,marketplace,The United States Life Ins. Co. in the City of New York,1425,,marketing name (DBA),The United States Life Ins. Co. in the City of New York,AMERICAN INTL GRP,mlr
+UT,commercial,N/A,573933,,marketing name (DBA),SelectHealth; Connecticut General Life Insurance; Cigna Health and Life Insurance,IHC Inc Grp; Cigna Hlth Grp,mlr
+UT,commercial,Regence BlueCross BlueShield of Utah,162130,yes,marketing name (DBA),Regence BlueCross BlueShield of Utah,REGENCE GRP,mlr
+UT,commercial,Aetna Health of Utah,89847,,marketing name (DBA),Aetna Health of Utah,CVS Health Group,mlr
+UT,commercial,UnitedHealthcare Insurance,53865,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+UT,commercial,Aetna Life Insurance,18986,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+UT,commercial,University of Utah Health Insurance Plans,16230,,marketing name (DBA),University of Utah Health Insurance Plans,,mlr
+UT,marketplace,Molina Healthcare of Utah,5164,yes,marketing name (DBA),Molina Healthcare of Utah,Molina Healthcare Inc GRP,mlr
+VA,commercial,Anthem Health Plans of Virginia,480462,,marketing name (DBA),Anthem Health Plans of Virginia,Elevance Hlth Inc Grp,mlr
+VA,commercial,HealthKeepers,257838,,marketing name (DBA),HealthKeepers,Elevance Hlth Inc Grp,mlr
+VA,commercial,N/A,164603,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+VA,commercial,Group Hospitalization and Medical Services,143211,,marketing name (DBA),Group Hospitalization and Medical Services,CAREFIRST INC GRP,mlr
+VA,commercial,Sentara Health Plans,141290,yes,marketing name (DBA),Sentara Health Plans,Sentara Health Management Group,mlr
+VA,commercial,Kaiser Foundation Health Plan of Mid-Atlantic States,135060,,marketing name (DBA),Kaiser Foundation Health Plan of Mid-Atlantic States,KAISER FOUNDATION GRP,mlr
+VA,commercial,UnitedHealthcare Insurance,130303,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+VA,commercial,CareFirst BlueChoice,76304,,marketing name (DBA),CareFirst BlueChoice,CAREFIRST INC GRP,mlr
+VA,commercial,Innovation Health Plan,29950,,marketing name (DBA),Innovation Health Plan,CVS Health Group,mlr
+VA,commercial,Aetna Life Insurance,29364,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+VA,commercial,Optimum Choice,29287,,marketing name (DBA),Optimum Choice,UNITEDHEALTH GRP,mlr
+VA,commercial,Aetna Health Inc. (a Pennsylvania corporation),19773,,marketing name (DBA),Aetna Health Inc. (a Pennsylvania corporation),CVS Health Group,mlr
+VA,commercial,Innovation Health Insurance,10509,,marketing name (DBA),Innovation Health Insurance,CVS Health Group,mlr
+VA,commercial,UnitedHealthcare of the Mid-Atlantic,10391,,marketing name (DBA),UnitedHealthcare of the Mid-Atlantic,UNITEDHEALTH GRP,mlr
+VA,commercial,Sentara Health Insurance,5864,,marketing name (DBA),Sentara Health Insurance,Sentara Health Management Group,mlr
+VA,commercial,UnitedHealthcare Plan of the River Valley,3325,,marketing name (DBA),UnitedHealthcare Plan of the River Valley,UNITEDHEALTH GRP,mlr
+VA,commercial,Piedmont Community HealthCare HMO,1013,,marketing name (DBA),Piedmont Community HealthCare HMO,Piedmont Comm Hlth Grp,mlr
+VA,marketplace,Golden Rule Insurance,1455,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+VT,commercial,Blue Cross and Blue Shield of Vermont,66147,yes,marketing name (DBA),Blue Cross and Blue Shield of Vermont,Blue Care Network of Michigan,mlr
+VT,commercial,MVP Health Plan,27012,,marketing name (DBA),MVP Health Plan,MVP GRP,mlr
+VT,commercial,N/A,3140,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+WA,commercial,Premera Blue Cross,424755,yes,marketing name (DBA),Premera Blue Cross,Premera Blue Cross Group,mlr
+WA,commercial,Regence BlueShield,297533,yes,marketing name (DBA),Regence BlueShield,REGENCE GRP,mlr
+WA,commercial,Kaiser Foundation Health Plan of Washington,259613,,marketing name (DBA),Kaiser Foundation Health Plan of Washington,KAISER FOUNDATION GRP,mlr
+WA,commercial,Kaiser Foundation Health Plan of Washington Options,107540,,marketing name (DBA),Kaiser Foundation Health Plan of Washington Options,KAISER FOUNDATION GRP,mlr
+WA,commercial,Kaiser Permanente,59087,,marketing name (DBA),Kaiser Foundation Health Plan of the Northwest,KAISER FOUNDATION GRP,mlr
+WA,commercial,UnitedHealthcare of Washington,49744,,marketing name (DBA),UnitedHealthcare of Washington,UNITEDHEALTH GRP,mlr
+WA,commercial,UnitedHealthcare Insurance,42157,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+WA,commercial,Aetna Life Insurance,42037,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+WA,commercial,LifeWise Health Plan of Washington,28933,,marketing name (DBA),LifeWise Health Plan of Washington,Premera Blue Cross Group,mlr
+WA,commercial,N/A,28301,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+WA,commercial,Regence BlueCross BlueShield of Oregon,26920,,marketing name (DBA),Regence BlueCross BlueShield of Oregon,REGENCE GRP,mlr
+WA,commercial,Asuris Northwest Health,17597,,marketing name (DBA),Asuris Northwest Health,REGENCE GRP,mlr
+WA,commercial,PacificSource Health Plans,7811,,marketing name (DBA),PacificSource Health Plans,PacificSource Hlth Plan Grp,mlr
+WA,commercial,Premera Blue Cross HMO,5775,,marketing name (DBA),Premera Blue Cross HMO,Premera Blue Cross Group,mlr
+WA,commercial,LifeWise Assurance,5147,,marketing name (DBA),LifeWise Assurance,Premera Blue Cross Group,mlr
+WA,commercial,Providence Health Plan,1976.65,,marketing name (DBA),Providence Health Plan,,mlr
+WA,marketplace,Coordinated Care Corporation Indiana,83861,,marketing name (DBA),Coordinated Care Corporation Indiana,CENTENE CORP GRP,mlr
+WA,marketplace,Molina Healthcare of Washington,39342,,marketing name (DBA),Molina Healthcare of Washington,Molina Healthcare Inc GRP,mlr
+WA,marketplace,Community Health Plan of Washington,34146,yes,marketing name (DBA),Community Health Plan of Washington,Community Health Plan of Washington,mlr
+WA,marketplace,UnitedHealthcare of Oregon,6746,,marketing name (DBA),UnitedHealthcare of Oregon,UNITEDHEALTH GRP,mlr
+WI,commercial,Unity Health Insurance,243631,,marketing name (DBA),Quartz Health Benefit Plans,University Health Care & Gundersen Lutheran Group,mlr
+WI,commercial,Dean Health Plan,194823,,marketing name (DBA),Dean Health Plan,Medica Grp,mlr
+WI,commercial,Compcare Health Services Insurance,142665,,marketing name (DBA),Compcare Health Services Insurance,Elevance Hlth Inc Grp,mlr
+WI,commercial,UnitedHealthcare Insurance,140245,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+WI,commercial,Blue Cross Blue Shield of Wisconsin,103721,,marketing name (DBA),Blue Cross Blue Shield of Wisconsin,Elevance Hlth Inc Grp,mlr
+WI,commercial,Security Health Plan of Wisconsin,71183,,marketing name (DBA),Security Health Plan of Wisconsin,,mlr
+WI,commercial,Group Health Cooperative of South Central Wisconsin,65182,,marketing name (DBA),Group Health Cooperative of South Central Wisconsin,,mlr
+WI,commercial,UnitedHealthcare of Wisconsin,56125,,marketing name (DBA),UnitedHealthcare of Wisconsin,UNITEDHEALTH GRP,mlr
+WI,commercial,Common Ground Healthcare Cooperative,54105,,marketing name (DBA),Common Ground Healthcare Cooperative,Common Ground Healthcare Cooperative,mlr
+WI,commercial,Network Health Plan,43802,,marketing name (DBA),Network Health Plan,Network Hlth Grp,mlr
+WI,commercial,HealthPartners Insurance,43277,,marketing name (DBA),HealthPartners Insurance,HEALTHPARTNERS GRP,mlr
+WI,commercial,Aspirus Health Plan,25367,,marketing name (DBA),Aspirus Health Plan,,mlr
+WI,commercial,MercyCare Health Plans,15261,,marketing name (DBA),MercyCare Insurance; MercyCare HMO,Mercy Alliance Inc Group,mlr
+WI,commercial,WPS Health Insurance,13257,,marketing name (DBA),Wisconsin Physicians Services Insurance,WISCONSIN PHYSICIANS SERV INS GRP,mlr
+WI,commercial,Group Health Cooperative of Eau Claire,12855,,marketing name (DBA),Group Health Cooperative of Eau Claire,,mlr
+WI,commercial,Medica Insurance,10860,,marketing name (DBA),Medica Insurance,Medica Grp,mlr
+WI,commercial,Medical Associates Health Plan of WI,4283,,marketing name (DBA),Medical Associates Health Plan of WI,Medical Associates Clinic,mlr
+WI,commercial,N/A,2753,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+WI,commercial,Aetna Life Insurance,1696,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+WI,marketplace,Chorus Community Health Plans,13391,,marketing name (DBA),Chorus Community Health Plans,,mlr
+WI,marketplace,Medica Community Health Plan,12893,,marketing name (DBA),Medica Community Health Plan,Medica,mlr
+WI,marketplace,Molina Healthcare of Wisconsin,3363,,marketing name (DBA),Molina Healthcare of Wisconsin,Molina Healthcare Inc GRP,mlr
+WI,marketplace,Golden Rule Insurance,2715,,marketing name (DBA),Golden Rule Insurance,UNITEDHEALTH GRP,mlr
+WV,commercial,Highmark Blue Cross Blue Shield West Virginia,159023,yes,marketing name (DBA),Highmark West Virginia,HIGHMARK GRP,mlr
+WV,commercial,The Health Plan of West Virginia,17376,,marketing name (DBA),The Health Plan of West Virginia,HEALTH PLAN GRP,mlr
+WV,commercial,UnitedHealthcare Insurance,1738,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+WV,commercial,Aetna Life Insurance,1663,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
+WV,commercial,N/A,1649,,marketing name (DBA),Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr
+WV,marketplace,CareSource West Virginia,24874,,marketing name (DBA),CareSource West Virginia,CareSource Management Group,mlr
+WY,commercial,Blue Cross Blue Shield of Wyoming,68090,yes,marketing name (DBA),Blue Cross Blue Shield of Wyoming,,mlr
+WY,commercial,Montana Health Cooperative,13609,,marketing name (DBA),Montana Health Cooperative,Montana Health Cooperative,mlr
+WY,commercial,UnitedHealthcare Insurance,2683,,marketing name (DBA),UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr
+WY,commercial,Aetna Life Insurance,1237,,marketing name (DBA),Aetna Life Insurance,CVS Health Group,mlr
