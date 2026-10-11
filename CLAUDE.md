@@ -1254,7 +1254,9 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   duplicates (CDPHP, The Health Plan of WV, Scott & White, Fallon, Health
   Partners). Migration 035 fixes the live rows (only 034's own rows; saved
   provider and patient choices follow a rename) and the brand map makes
-  the same calls; `parseBrandMap` and `build-payer-migration.mjs` now
+  the same calls (035 is one `do $$` block: the SQL editor ran a
+  begin/commit script's statements separately and lost its temp table,
+  42P01; tested on a local Postgres 16 before the rerun); `parseBrandMap` and `build-payer-migration.mjs` now
   refuse a "|" in a name. Lesson: read the generated list itself, not just
   the flagged rows.
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):

@@ -578,7 +578,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   legal name) and five plans appeared twice under slightly different names
   in one state (CDPHP, The Health Plan of West Virginia, Baylor Scott &
   White, Fallon Health, HealthPartners). Migration 035 fixes them; anyone
-  who already picked a renamed plan keeps it under the new name.
+  who already picked a renamed plan keeps it under the new name. (Its first
+  version failed harmlessly in the Supabase SQL editor and changed nothing;
+  it now runs as one block.)
 - **Which new insurance plans were already listed.** A read-only query,
   `supabase/queries/034_overlaps.sql`, lists the plans from the October
   insurance load whose name was already in that state's list under another

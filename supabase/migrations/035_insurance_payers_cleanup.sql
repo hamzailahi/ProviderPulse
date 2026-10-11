@@ -18,11 +18,17 @@
 -- patient's saved choice of a renamed or merged name follows the new name;
 -- a removed name stays as the text they saved. Safe to re-run.
 --
--- Run in the Supabase SQL editor.
+-- Run in the Supabase SQL editor. The whole fix is one DO block, so it runs
+-- as a single statement and either all of it applies or none does. (The
+-- first version used begin/commit around a temp table; the SQL editor ran
+-- the statements separately and the table was gone by the second one:
+-- 42P01, nothing changed.)
 
-begin;
+do $$
+begin
 
-create temp table pp_035 (old text, new text, state text, category text) on commit drop;
+drop table if exists pp_035;
+create temp table pp_035 (old text, new text, state text, category text);
 insert into pp_035 (old, new, state, category) values
   ('Banner|Aetna',                            'Banner Aetna',                           'AZ', 'commercial'),
   ('DCS/CHP',                                 'DCS Comprehensive Health Plan',          'AZ', 'medicaid'),
@@ -60,7 +66,9 @@ from pp_035 m
 where pp.insurance_payer = m.old and m.new is not null
   and not exists (select 1 from public.insurance_payers q where q.name = m.old);
 
-commit;
+drop table pp_035;
+
+end $$;
 
 -- Check (expect 0 rows): none of the old names remain from 034.
 -- select p.state, p.name from public.insurance_payers p
