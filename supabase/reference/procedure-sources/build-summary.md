@@ -1,5 +1,5 @@
 <!-- Written by scripts/build-procedure-tables.py. -->
-# Procedure tables (dry_run), 2026-10-11 21:09 UTC
+# Procedure tables (apply), 2026-10-11 21:13 UTC
 
 ## Sources
 
@@ -11,11 +11,11 @@
 
 ## Downloads
 
-- downloaded medicaid.parquet: 3,073 MB in 25s
+- downloaded medicaid.parquet: 3,073 MB in 69s
 - downloaded outpatient.csv: 28 MB in 0s
 - downloaded inpatient.csv: 38 MB in 0s
-- downloaded physician-geo.csv: 42 MB in 0s
-- directory: 253 MB in 18s
+- downloaded physician-geo.csv: 42 MB in 1s
+- directory: 253 MB in 17s
 
 ## Medicaid
 
@@ -59,4 +59,9 @@ Top specialties by paid:
 
 - CSVs: 0.21 GB; estimated database need while loading: 1.5 GB
 
-Dry run: nothing written to the database.
+## Apply
+
+- medicaid_procedures: 3083819
+- medicare_hospital_procedures: 208246
+- procedure_codes: 6218
+- loaded in 44s
