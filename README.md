@@ -571,6 +571,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-11
 
+- **Procedure data beyond Medicare Part B, step one.** A new manual,
+  read-only job describes the files the Procedures panel will add: the
+  Medicaid provider spending by procedure that HHS released in February
+  2026, and Medicare's hospital outpatient and inpatient files. It records
+  their columns, sizes and quirks so the importers are written against the
+  real files. Nothing is loaded yet.
 - **Insurance list cleanup.** A second read of the newly loaded plans found
   a few that slipped through review: "Banner|Aetna" in Arizona showed with a
   stray bar (now "Banner Aetna"), four entries were not plan names at all
