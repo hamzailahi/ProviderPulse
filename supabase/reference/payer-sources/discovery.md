@@ -1,5 +1,5 @@
 <!-- Written by scripts/payer-sources-discover.mjs. Read only. -->
-# Payer source discovery, 2026-10-11 19:10 UTC
+# Payer source discovery, 2026-10-11 19:11 UTC
 
 ## 1. Medical Loss Ratio public use files (cms.gov)
 
@@ -29,7 +29,7 @@ Downloaded 7.3 MB.
 Files inside:
 
 ```
-Archive:  /tmp/payers-MMzlKB/mlr.zip
+Archive:  /tmp/payers-t1S6SF/mlr.zip
   Length      Date    Time    Name
 ---------  ---------- -----   ----
     59649  2025-09-12 03:36   MR_Submission_Row_Lookup.csv
