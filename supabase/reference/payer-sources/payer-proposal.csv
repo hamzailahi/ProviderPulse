@@ -18,30 +18,31 @@ AR,medicaid,Empower Healthcare Solutions,15895,,plan name,Empower Healthcare Sol
 AR,medicaid,Summit Community Care,14657,,plan name,Summit Community Care,Anthem,medicaid,medicaid
 AR,medicaid,Arkansas Total Care,13394,,plan name,Arkansas Total Care,Centene,medicaid,medicaid
 AR,medicaid,CareSource,3923,,plan name,CareSource,CareSource,medicaid,medicaid
-AZ,commercial,UnitedHealthcare,638935,yes,reviewed map; plan name,National Foundation Life Insurance; Enterprise Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare of Arizona; UnitedHealthcare Insurance; UnitedHealthcare,UNITEDHEALTH GRP; UnitedHealthcare,mlr; medicaid,commercial; marketplace; medicaid
 AZ,commercial,Blue Cross and Blue Shield of Arizona,422828,,marketing name (DBA),Blue Cross and Blue Shield of Arizona,"Blue Cross and Blue Shield of Arizona, Inc.",mlr,commercial
+AZ,commercial,UnitedHealthcare,229470,yes,reviewed map,National Foundation Life Insurance; Enterprise Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare of Arizona; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 AZ,commercial,Banner|Aetna,121077,,reviewed map,Banner Health and Aetna Health Plan,CVS Health Group,mlr,commercial
 AZ,commercial,Cigna,51394,yes,reviewed map,Cigna HealthCare of Arizona; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 AZ,commercial,Aetna,51134,yes,reviewed map,Banner Health and Aetna Health Insurance; Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
-AZ,commercial,Reliance Standard Life Insurance,3056,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr,commercial
 AZ,marketplace,Ambetter,63405,yes,reviewed map,Arizona Complete Health,CENTENE CORP GRP,mlr,marketplace
 AZ,marketplace,Oscar Health,9507,yes,reviewed map,Oscar Health Plan,,mlr,marketplace
 AZ,marketplace,Medica Community Health Plan,1534,,marketing name (DBA),Medica Community Health Plan,Medica,mlr,marketplace
+AZ,medicaid,UnitedHealthcare Community Plan,409465,,reviewed map,UnitedHealthcare,UnitedHealthcare,medicaid,medicaid
 AZ,medicaid,Mercy Care,359266,yes,plan name,Mercy Care,Dignity Health and Carondelet Health Network,medicaid,medicaid
 AZ,medicaid,Arizona Complete Health - Complete Care Plan,346988,,plan name,Arizona Complete Health - Complete Care Plan,Centene Corporation,medicaid,medicaid
 AZ,medicaid,Banner University Family Care,270030,,plan name,Banner University Family Care,Banner University Family Care,medicaid,medicaid
 AZ,medicaid,Health Choice Arizona,208447,,plan name,Health Choice Arizona,Blue Cross Blue Shield of Arizona,medicaid,medicaid
 AZ,medicaid,Care 1st,71704,,plan name,Care 1st,WellCare/Centene Corporation,medicaid,medicaid
-AZ,medicaid,Molina Complete Care of Arizona,41704,,plan name,Molina Complete Care of Arizona,Molina Complete Care of Arizona,medicaid,medicaid
+AZ,medicaid,Molina Healthcare,41704,yes,reviewed map,Molina Complete Care of Arizona,Molina Complete Care of Arizona,medicaid,medicaid
 AZ,medicaid,DCS/CHP,8557,,plan name,DCS/CHP,Government Agency/Non-Profit Entity,medicaid,medicaid
-CA,commercial,Kaiser Permanente,7852217,,reviewed map; plan name,Kaiser Permanente Insurance; Kaiser Foundation Health Plan; Kaiser Permanente,KAISER FOUNDATION GRP; Kaiser Permanente - Marin; Kaiser Permanente - Mariposa; Kaiser Permanente - Napa; Kaiser Permanente - Orange; Kaiser Permanente - Placer; Kaiser Permanente - San Mateo; Kaiser Permanente - Santa Cruz; Kaiser Permanente - Solano; Kaiser Permanente - Sonoma; Kaiser Permanente - Sutter; Kaiser Permanente - Ventura; Kaiser Permanente - Yolo; Kaiser Permanente - Yuba; CH&W - Imperial; Kaiser Permanente -Alameda; Kaiser Permanente - Contra Costa; Kaiser Permanente -Imperial; Kaiser Permanente,mlr; medicaid,commercial; medicaid
+CA,commercial,Kaiser Permanente,8060147,,reviewed map; plan name,Kaiser Permanente Insurance; Kaiser Foundation Health Plan; Kaiser Permanente; Kaiser Foundation; Kaiser,KAISER FOUNDATION GRP; Kaiser Permanente - Marin; Kaiser Permanente - Mariposa; Kaiser Permanente - Napa; Kaiser Permanente - Orange; Kaiser Permanente - Placer; Kaiser Permanente - San Mateo; Kaiser Permanente - Santa Cruz; Kaiser Permanente - Solano; Kaiser Permanente - Sonoma; Kaiser Permanente - Sutter; Kaiser Permanente - Ventura; Kaiser Permanente - Yolo; Kaiser Permanente - Yuba; Kaiser -Sacramento; Kaiser - San Diego; CH&W - Imperial; Kaiser Permanente -Alameda; Kaiser Permanente - Contra Costa; Kaiser Permanente -Imperial; Kaiser Permanente,mlr; medicaid,commercial; medicaid
+CA,commercial,Anthem Blue Cross,2972636,yes,reviewed map; plan name,Blue Cross of California; Anthem Blue Cross Life and Health Insurance; Anthem Blue Cross Partnership; Anthem Blue Cross Partnership Plan/Region 2; Anthem Blue Cross Partnership Plan; Anthem Blue Cross,"Elevance Hlth Inc Grp; Anthem -Sacramento; Anthem - Region 2; Anthem; Anthem Insurance Companies, Inc.; Anthem - San Francisco; Anthem - Santa Clara; Anthem - Tulare",mlr; medicaid,commercial; medicaid
 CA,commercial,L.A. Care Health Plan,2605695,yes,reviewed map; plan name,Local Initiative Health Authority for Los Angeles County; L.A. Care Health Plan,L.A. Care Health Plan; L.A. Care,mlr; medicaid,commercial; medicaid
 CA,commercial,Blue Shield of California,2229812,yes,reviewed map,Blue Shield of California Life & Health Insurance; California Physicians Service,Blue Shield of California Group,mlr,commercial
-CA,commercial,Anthem Blue Cross,2146106,yes,reviewed map; plan name,Blue Cross of California; Anthem Blue Cross Life and Health Insurance; Anthem Blue Cross,Elevance Hlth Inc Grp; Anthem - Santa Clara,mlr; medicaid,commercial; medicaid
+CA,commercial,Health Net,2096939,yes,reviewed map; plan name,Health Net of California; Health Net Life Insurance; Health Net; Health Net Community Solutions,CENTENE CORP GRP; Health Net -Sacramento; Health Net - Region 2; Health Net - Los Angeles; Health Net,mlr; medicaid,commercial; medicaid
 CA,commercial,UnitedHealthcare,914796,yes,reviewed map,"Unimerica Insurance; UHC of California; U.S. Behavioral Health Plan, CA; National Foundation Life Insurance; UnitedHealthcare Benefits Plan of California; UnitedHealthcare Insurance",UNITEDHEALTH GRP,mlr,commercial
-CA,commercial,Health Net,901991,yes,reviewed map; plan name,Health Net of California; Health Net Life Insurance; Health Net,CENTENE CORP GRP; Health Net -Sacramento; Health Net,mlr; medicaid,commercial; medicaid
 CA,commercial,Aetna,529568,yes,reviewed map,Aetna Health of California; Aetna Life Insurance,CVS Health Group,mlr,commercial
 CA,commercial,ALAMEDA ALLIANCE FOR HEALTH,405852,,marketing name (DBA); plan name,ALAMEDA ALLIANCE FOR HEALTH; Alameda Alliance for Health,AAFH - Alameda,mlr; medicaid,commercial; medicaid
+CA,commercial,Central California Alliance for Health,369935,,marketing name (DBA); plan name; reviewed map,Santa Cruz-Monterey-Merced-San Benito-Mariposa Managed Medical Care Commission; Central California Alliance for Health; Central California Alliance for Health Merced; Central California Alliance for Health/Santa Cruz and Monterey,CCAH - Mariposa; CCAH - San Benito; CCAH - Merced; CCAH - Monterey/Santa Cruz,mlr; medicaid,commercial; medicaid
 CA,commercial,Cigna,331673,yes,reviewed map,Cigna HealthCare of California; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 CA,commercial,CONTRA COSTA HEALTH PLAN,264919,,marketing name (DBA); plan name,CONTRA COSTA HEALTH PLAN; Contra Costa Health Plan,CCHP - Contra Costa,mlr; medicaid,commercial; medicaid
 CA,commercial,Health Plan of San Mateo,146519,,marketing name (DBA); plan name,San Mateo Health Commission; Health Plan of San Mateo,HPSM - San Mateo,mlr; medicaid,commercial; medicaid
@@ -49,42 +50,26 @@ CA,commercial,Sharp Health Plan,137718,,marketing name (DBA),Sharp Health Plan,,
 CA,commercial,Sutter Health Alliance,118165,,marketing name (DBA),Sutter Health Alliance,,mlr,commercial
 CA,commercial,Western Health Advantage,117736,,marketing name (DBA),Western Health Advantage,,mlr,commercial
 CA,commercial,Valley Health Plan,56239,,marketing name (DBA),County of Santa Clara,,mlr,commercial
-CA,commercial,Central California Alliance for Health,26977,,marketing name (DBA); plan name,Santa Cruz-Monterey-Merced-San Benito-Mariposa Managed Medical Care Commission; Central California Alliance for Health,CCAH - Mariposa; CCAH - San Benito,mlr; medicaid,commercial; medicaid
 CA,commercial,Holman Professional Counseling Centers,24320,,marketing name (DBA),Holman Professional Counseling Centers,Holman Professional Counseling Centers,mlr,commercial
 CA,commercial,Scripps Health Plan Services,17656,,marketing name (DBA),Scripps Health Plan Services,,mlr,commercial
-CA,commercial,Nippon Life Insurance Company of America,13965,,marketing name (DBA),Nippon Life Insurance Company of America,,mlr,commercial
 CA,commercial,San Francisco Health Authority,11166,,marketing name (DBA),San Francisco Health Authority,Healthy Workers,mlr,commercial
 CA,commercial,Community Care Health Plan,11105,,marketing name (DBA),Community Care Health Plan,,mlr,commercial
 CA,commercial,Ventura County Health Care Plan,9908,,marketing name (DBA),Ventura County Health Care Plan,,mlr,commercial
 CA,commercial,Chinese Community Health Plan,8321,,marketing name (DBA),Chinese Community Health Plan,,mlr,commercial
 CA,marketplace,Inland Empire Health Plan,1521634,yes,marketing name (DBA); plan name,Inland Empire Health Plan,Inland Empire Health Plan,mlr; medicaid,marketplace; medicaid
-CA,marketplace,Molina Healthcare,59400,yes,reviewed map,MOLINA HEALTHCARE OF CALIFORNIA,Molina Healthcare Inc GRP,mlr,marketplace
-CA,medicaid,Health Net Community Solutions,1194948,,plan name,Health Net Community Solutions,Health Net - Region 2; Health Net - Los Angeles,medicaid,medicaid
+CA,marketplace,Molina Healthcare,688929,yes,reviewed map,MOLINA HEALTHCARE OF CALIFORNIA; Molina Healthcare of CA Partner Plan,Molina Healthcare Inc GRP; Molina -Sacramento; Molina - San Diego; Molina Healthcare,mlr; medicaid,marketplace; medicaid
+CA,medicaid,Partnership HealthPlan of California,900076,,reviewed map,Partnership HealthPlan of CA/Southeast; Partnership HealthPlan of CA/Southwest; Partnership HealthPlan of CA/Northeast; Partnership HealthPlan of CA/Northwest; Partnership HealthPlan of CA,Partnership - Southeast; Partnership - Southwest; Partnership - Northeast; Partnership - Northwest; Partnership,medicaid,medicaid
 CA,medicaid,CalOptima,892359,,plan name,CalOptima,CalOptima-Orange,medicaid,medicaid
-CA,medicaid,Molina Healthcare of CA Partner Plan,629529,,plan name,Molina Healthcare of CA Partner Plan,Molina -Sacramento; Molina - San Diego; Molina Healthcare,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership Plan,549480,,plan name,Anthem Blue Cross Partnership Plan,"Anthem; Anthem Insurance Companies, Inc.; Anthem - San Francisco; Anthem - Santa Clara; Anthem - Tulare",medicaid,medicaid
+CA,medicaid,CalViva Health,437823,,reviewed map; plan name,CalViva Health Kings; CalViva Health,CalViva - Kings; CalViva - Fresno; CalViva Health -Madera,medicaid,medicaid
 CA,medicaid,Health Plan of San Joaquin,412074,,plan name,Health Plan of San Joaquin,Health Plan of San Joaquin,medicaid,medicaid
 CA,medicaid,Community Health Group,405072,,plan name,Community Health Group,CHG - San Diego,medicaid,medicaid
 CA,medicaid,Kern Family Health Care,402077,,plan name,Kern Family Health Care,Kern Health Systems,medicaid,medicaid
-CA,medicaid,CalViva Health,399417,,plan name,CalViva Health,CalViva - Fresno; CalViva Health -Madera,medicaid,medicaid
-CA,medicaid,Partnership HealthPlan of CA,311925,,plan name,Partnership HealthPlan of CA,Partnership,medicaid,medicaid
 CA,medicaid,Santa Clara Family Health Plan,292148,,plan name,Santa Clara Family Health Plan,Santa Clara Family Health Plan,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership,251425,,plan name,Anthem Blue Cross Partnership,Anthem -Sacramento,medicaid,medicaid
 CA,medicaid,Gold Coast Health Plan Ventura,247849,,plan name,Gold Coast Health Plan Ventura,GCHP - Ventura,medicaid,medicaid
 CA,medicaid,CenCal,239520,,plan name,CenCal,CenCal - Santa Barbara; CenCal - San Luis Obispo,medicaid,medicaid
-CA,medicaid,Partnership HealthPlan of CA/Southwest,232181,,plan name,Partnership HealthPlan of CA/Southwest,Partnership - Southwest,medicaid,medicaid
 CA,medicaid,Blue Shield of California Promise,196938,,plan name,Blue Shield of California Promise,Blue Shield - San Diego,medicaid,medicaid
-CA,medicaid,Central California Alliance for Health/Santa Cruz and Monterey,193497,,plan name,Central California Alliance for Health/Santa Cruz and Monterey,CCAH - Monterey/Santa Cruz,medicaid,medicaid
-CA,medicaid,Partnership HealthPlan of CA/Southeast,181366,,plan name,Partnership HealthPlan of CA/Southeast,Partnership - Southeast,medicaid,medicaid
 CA,medicaid,San Francisco Health Plan,176670,,plan name,San Francisco Health Plan,San Francisco Health Plan,medicaid,medicaid
-CA,medicaid,Central California Alliance for Health Merced,149461,,plan name,Central California Alliance for Health Merced,CCAH - Merced,medicaid,medicaid
-CA,medicaid,Kaiser Foundation,132688,,plan name,Kaiser Foundation,Kaiser -Sacramento,medicaid,medicaid
-CA,medicaid,Partnership HealthPlan of CA/Northeast,103734,,plan name,Partnership HealthPlan of CA/Northeast,Partnership - Northeast,medicaid,medicaid
 CA,medicaid,Community Health Plan of Imperial Valley,96485,,plan name,Community Health Plan of Imperial Valley,CHP - Imperial,medicaid,medicaid
-CA,medicaid,Kaiser,75242,,plan name,Kaiser,Kaiser - San Diego,medicaid,medicaid
-CA,medicaid,Partnership HealthPlan of CA/Northwest,70870,,plan name,Partnership HealthPlan of CA/Northwest,Partnership - Northwest,medicaid,medicaid
-CA,medicaid,CalViva Health Kings,38406,,plan name,CalViva Health Kings,CalViva - Kings,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership Plan/Region 2,25625,,plan name,Anthem Blue Cross Partnership Plan/Region 2,Anthem - Region 2,medicaid,medicaid
 CA,medicaid,SCAN Health Plan,19239,,plan name,SCAN Health Plan,SCAN - Los Angeles; SCAN - Riverside and San Bernardino; SCAN - San Diego,medicaid,medicaid
 CA,medicaid,Mountain Valley Health Plan,8514,,plan name,Mountain Valley Health Plan,MVHP - Alpine; MVHP - El Dorado,medicaid,medicaid
 CO,commercial,Kaiser Permanente,360475,,reviewed map,Kaiser Permanente Insurance; Kaiser Foundation Health Plan of Colorado,KAISER FOUNDATION GRP,mlr,commercial
@@ -106,10 +91,10 @@ DC,commercial,UnitedHealthcare,149409,yes,reviewed map,UnitedHealthcare of the M
 DC,commercial,Cigna,71033,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 DC,commercial,Kaiser Permanente,69877,,reviewed map,Kaiser Permanente Insurance; Kaiser Foundation Health Plan of Mid-Atlantic States,KAISER FOUNDATION GRP,mlr,commercial
 DC,commercial,"AMHIC, A Reciprocal Association & Sub",3104,,marketing name (DBA),"AMHIC, A Reciprocal Association & Sub",,mlr,commercial
-DC,medicaid,AmeriHealth Caritas District of Columbia,106839,,plan name,AmeriHealth Caritas District of Columbia,AmeriHealth,medicaid,medicaid
+DC,medicaid,AmeriHealth Caritas,106839,,reviewed map,AmeriHealth Caritas District of Columbia,AmeriHealth,medicaid,medicaid
 DC,medicaid,MedStar Family Choice -DC,56860,,plan name,MedStar Family Choice -DC,MedStar Health,medicaid,medicaid
-DC,medicaid,Amerigroup District of Columbia,56651,,plan name,Amerigroup District of Columbia,Amerigroup,medicaid,medicaid
-DC,medicaid,UnitedHealthcare Community Plan of District of Columbia,12914,,plan name,UnitedHealthcare Community Plan of District of Columbia,UnitedHealthcare,medicaid,medicaid
+DC,medicaid,Amerigroup,56651,,reviewed map,Amerigroup District of Columbia,Amerigroup,medicaid,medicaid
+DC,medicaid,UnitedHealthcare Community Plan,12914,,reviewed map,UnitedHealthcare Community Plan of District of Columbia,UnitedHealthcare,medicaid,medicaid
 DC,medicaid,Health Services for Children with Special Needs,4895,,plan name,Health Services for Children with Special Needs,Children's National,medicaid,medicaid
 DE,commercial,Highmark Blue Cross Blue Shield,102787,,reviewed map,Highmark BCBSD,HIGHMARK GRP,mlr,commercial
 DE,commercial,Aetna,10641,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
@@ -118,35 +103,31 @@ DE,commercial,UnitedHealthcare,3538,yes,reviewed map,Freedom Life Insurance Comp
 DE,marketplace,Independence Blue Cross,6412,,reviewed map,AmeriHealth Caritas VIP Next,INDEPENDENCE BLUE CROSS GRP,mlr,marketplace
 DE,marketplace,Ambetter,1322,yes,reviewed map,Celtic Insurance,CENTENE CORP GRP,mlr,marketplace
 DE,medicaid,Highmark Health Options of Delaware,119253,,plan name,Highmark Health Options of Delaware,Highmark,medicaid,medicaid
-DE,medicaid,AmeriHealth Caritas of Delaware,70089,,plan name,AmeriHealth Caritas of Delaware,AmeriHealth,medicaid,medicaid
+DE,medicaid,AmeriHealth Caritas,70089,,reviewed map,AmeriHealth Caritas of Delaware,AmeriHealth,medicaid,medicaid
 DE,medicaid,Delaware First Health,29825,,plan name,Delaware First Health,Delaware First Health,medicaid,medicaid
 FL,commercial,Florida Blue,1253468,yes,marketing name (DBA),Blue Cross and Blue Shield of Florida,"Blue Cross and Blue Shield of Florida, Inc.",mlr,commercial
 FL,commercial,Health Options,1156932,,marketing name (DBA),Health Options,"Blue Cross and Blue Shield of Florida, Inc.",mlr,commercial
 FL,commercial,Aetna,1025156,yes,reviewed map,Aetna Health Inc. (a Florida corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
 FL,commercial,UnitedHealthcare,789267,yes,reviewed map,Neighborhood Health Partnership; Freedom Life Insurance Company of America; UnitedHealthcare of Florida; Golden Rule Insurance; All Savers Insurance; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 FL,commercial,Cigna,274354,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial; marketplace
+FL,commercial,Molina Healthcare,194483,yes,reviewed map,Molina Healthcare of Florida; Molina Healthcare of Florida - Specialty Plan,Molina Healthcare Inc GRP; Molina Healthcare of Florida; Molina Healthcare of Florida - Specialty Plan,mlr; medicaid,commercial; medicaid
 FL,commercial,Capital Health Plan,111730,,reviewed map,Capital Health Plan,"Blue Cross and Blue Shield of Florida, Inc.",mlr,commercial
 FL,commercial,Florida Health Care Plan,85219,,reviewed map,Florida Health Care Plan,"Blue Cross and Blue Shield of Florida, Inc.",mlr,commercial
-FL,commercial,Molina Healthcare,81017,yes,reviewed map,Molina Healthcare of Florida,Molina Healthcare Inc GRP,mlr,commercial
 FL,commercial,AvMed Health Plans,38704,,marketing name (DBA),AvMed,Sentara Health Management Group,mlr,commercial
 FL,commercial,BeHealthy Florida,6340,,marketing name (DBA),BeHealthy Florida,"Blue Cross and Blue Shield of Florida, Inc.",mlr,commercial
 FL,commercial,Curative Insurance,5694,,marketing name (DBA),Curative Insurance,Curative Inc Grp,mlr,commercial
-FL,commercial,Reliance Standard Life Insurance,2958,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr,commercial
 FL,marketplace,Ambetter,1042093,yes,reviewed map,Sunshine State Health Plan; Celtic Insurance,CENTENE CORP GRP,mlr,marketplace
 FL,marketplace,Oscar Health,871881,yes,reviewed map,Oscar Insurance Company of Florida,,mlr,marketplace
 FL,marketplace,Health First Commercial Plans,53086,,marketing name (DBA),Health First Commercial Plans,,mlr,marketplace
 FL,marketplace,Independence Blue Cross,4202,,reviewed map,AmeriHealth Caritas Florida,INDEPENDENCE BLUE CROSS GRP,mlr,marketplace
-FL,medicaid,Sunshine State Health Plan,1089262,,plan name,Sunshine State Health Plan,"Sunshine State Health Plan, Inc.",medicaid,medicaid
-FL,medicaid,Humana Medical Plan,547549,,plan name,Humana Medical Plan,Humana Medical Plan,medicaid,medicaid
+FL,medicaid,Sunshine Health,1197452,yes,reviewed map,Sunshine State Health Plan; Sunshine State Health Plan - SMI (Specialty Plan),"Sunshine State Health Plan, Inc.; Sunshine State Health Plan - SMI (Specialty Plan)",medicaid,medicaid
+FL,medicaid,Humana Healthy Horizons,547549,,reviewed map,Humana Medical Plan,Humana Medical Plan,medicaid,medicaid
 FL,medicaid,Simply Healthcare Plans,541525,,plan name,Simply Healthcare Plans,"Simply Healthcare Plans, Inc.",medicaid,medicaid
-FL,medicaid,UnitedHealthcare of Florida,271904,,plan name,UnitedHealthcare of Florida,UnitedHealthcare of Florida,medicaid,medicaid
+FL,medicaid,UnitedHealthcare Community Plan,271904,,reviewed map,UnitedHealthcare of Florida,UnitedHealthcare of Florida,medicaid,medicaid
 FL,medicaid,Aetna Better Health,139257,,plan name,Aetna Better Health,Aetna Better Health,medicaid,medicaid
-FL,medicaid,Sunshine State Health Plan - SMI (Specialty Plan),108190,,plan name,Sunshine State Health Plan - SMI (Specialty Plan),Sunshine State Health Plan - SMI (Specialty Plan),medicaid,medicaid
-FL,medicaid,Molina Healthcare of Florida,96302,,plan name,Molina Healthcare of Florida,Molina Healthcare of Florida,medicaid,medicaid
 FL,medicaid,Children's Medical Services Network,87727,,plan name,Children's Medical Services Network,Children's Medical Services Network,medicaid,medicaid
-FL,medicaid,AmeriHealth,86473,,plan name,AmeriHealth,AmeriHealth,medicaid,medicaid
+FL,medicaid,AmeriHealth Caritas,86473,,reviewed map,AmeriHealth,AmeriHealth,medicaid,medicaid
 FL,medicaid,Community Care Plan,40057,,plan name,Community Care Plan,Community Care Plan,medicaid,medicaid
-FL,medicaid,Molina Healthcare of Florida - Specialty Plan,17164,,plan name,Molina Healthcare of Florida - Specialty Plan,Molina Healthcare of Florida - Specialty Plan,medicaid,medicaid
 FL,medicaid,Florida Community Care,16839,,plan name,Florida Community Care,Florida Community Care,medicaid,medicaid
 FL,medicaid,Clear Health Alliance - Specialty Plan,8551,,plan name,Clear Health Alliance - Specialty Plan,Simply dba Clear Health Alliance - Specialty Plan,medicaid,medicaid
 GA,commercial,Anthem Blue Cross and Blue Shield,460989,,reviewed map,Blue Cross Blue Shield Healthcare Plan of Georgia; Anthem Blue Cross and Blue Shield,Elevance Hlth Inc Grp,mlr,commercial; marketplace
@@ -157,18 +138,17 @@ GA,commercial,UnitedHealthcare,113268,yes,reviewed map,UnitedHealthcare of Georg
 GA,commercial,Alliant Health Plans,82789,,marketing name (DBA),Alliant Health Plans,Health One Alliance Grp,mlr,commercial
 GA,commercial,Sidecar Health Insurance,1997,,marketing name (DBA),Sidecar Health Insurance,,mlr,commercial
 GA,marketplace,Ambetter,512704,yes,reviewed map,Ambetter of Peach State,CENTENE CORP GRP,mlr,marketplace
+GA,marketplace,CareSource,415304,,reviewed map,CareSource Georgia,CareSource Management Group; CareSource,mlr; medicaid,marketplace; medicaid
 GA,marketplace,Oscar Health,367102,yes,reviewed map,Oscar Health Plan of Georgia,,mlr,marketplace
-GA,marketplace,CareSource,37169,,reviewed map,CareSource Georgia,CareSource Management Group,mlr,marketplace
 GA,medicaid,Peach State Health Plan,729962,yes,plan name,Peach State Health Plan,Centene,medicaid,medicaid
-GA,medicaid,Amerigroup Community Care,485998,,plan name,Amerigroup Community Care,Elevance Health,medicaid,medicaid
-GA,medicaid,CareSource Georgia,378135,yes,plan name,CareSource Georgia,CareSource,medicaid,medicaid
+GA,medicaid,Amerigroup,485998,,reviewed map,Amerigroup Community Care,Elevance Health,medicaid,medicaid
 HI,commercial,HMSA,687807,,marketing name (DBA); reviewed map,Hawaii Medical Service Association; Hawaii Medical Service Association (HMSA) QUEST Integration,An Independent Licensee of the Blue Cross and Blue Shield Association,mlr; medicaid,commercial; medicaid
 HI,commercial,Kaiser Permanente,183508,,reviewed map,Kaiser Permanente Insurance; Kaiser Foundation Health Plan,KAISER FOUNDATION GRP,mlr,commercial
 HI,commercial,UHA,58935,,marketing name (DBA),University Health Alliance,,mlr,commercial
 HI,commercial,HMAA,36943,,marketing name (DBA),Hawaii Management Alliance Association,,mlr,commercial
 HI,commercial,UnitedHealthcare,2076,yes,reviewed map,UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial
 HI,medicaid,AlohaCare QUEST Integration,75936,,plan name,AlohaCare QUEST Integration,AlohaCare,medicaid,medicaid
-HI,medicaid,UnitedHealthcare Community Plan QUEST Integration,54646,,plan name,UnitedHealthcare Community Plan QUEST Integration,UnitedHealthcare Insurance Company,medicaid,medicaid
+HI,medicaid,UnitedHealthcare Community Plan,54646,,reviewed map,UnitedHealthcare Community Plan QUEST Integration,UnitedHealthcare Insurance Company,medicaid,medicaid
 HI,medicaid,Kaiser Foundation Health Plan QUEST Integration,50757,,plan name,Kaiser Foundation Health Plan QUEST Integration,Based on a relationship between the Kaiser Foundation Health Plan and the Hawaii Permanente Medical Group of physicians and specialists,medicaid,medicaid
 HI,medicaid,Ohana Health Plan QUEST Integration,35916,,plan name,Ohana Health Plan QUEST Integration,Centene Corporation,medicaid,medicaid
 IA,commercial,Wellmark Blue Cross and Blue Shield,468016,yes,reviewed map,Wellmark; Wellmark Health Plan of Iowa,Wellmark Group,mlr,commercial
@@ -178,7 +158,7 @@ IA,commercial,Medica,10210,,reviewed map,Medica Insurance,Medica Grp,mlr,commerc
 IA,commercial,Medical Associates Health Plan,9671,,marketing name (DBA),Medical Associates Health Plan,Medical Associates Clinic,mlr,commercial
 IA,commercial,Aetna,1788,yes,reviewed map,Aetna Life Insurance; Aetna Health of Iowa,CVS Health Group,mlr,commercial
 IA,marketplace,Oscar Health,26767,yes,reviewed map,Oscar Insurance,,mlr,marketplace
-IA,medicaid,Wellpoint of Iowa,222782,,plan name,Wellpoint of Iowa,Elevance Health,medicaid,medicaid
+IA,medicaid,Wellpoint,222782,,reviewed map,Wellpoint of Iowa,Elevance Health,medicaid,medicaid
 IA,medicaid,Iowa Total Care,203393,,plan name,Iowa Total Care,Centene Corporation,medicaid,medicaid
 IA,medicaid,Molina Healthcare,177800,yes,plan name,Molina Healthcare,"Molina Healthcare, Inc.",medicaid,medicaid
 ID,commercial,Regence BlueShield of Idaho,170642,yes,marketing name (DBA),Regence BlueShield of Idaho,REGENCE GRP,mlr,commercial
@@ -190,23 +170,19 @@ ID,commercial,Montana Health Cooperative,7924,,marketing name (DBA),Montana Heal
 ID,commercial,UnitedHealthcare,4543,yes,reviewed map,UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial
 ID,commercial,Moda Health,4449,,reviewed map,Moda Health Plan,Oregon Dental Grp,mlr,commercial
 ID,commercial,Aetna,3930,yes,reviewed map,Aetna Life Insurance,CVS Health Group,mlr,commercial
-ID,marketplace,Molina Healthcare,1052,yes,reviewed map,Molina Healthcare of Utah,Molina Healthcare Inc GRP,mlr,marketplace
-ID,medicaid,Molina of Idaho,8942,,plan name,Molina of Idaho,Molina of Idaho,medicaid,medicaid
+ID,marketplace,Molina Healthcare,9994,yes,reviewed map,Molina Healthcare of Utah; Molina of Idaho,Molina Healthcare Inc GRP; Molina of Idaho,mlr; medicaid,marketplace; medicaid
 IL,commercial,Blue Cross and Blue Shield of Illinois,1962566,yes,reviewed map,"Health Care Service Corporation, a Mutual Legal Reserve",HCSC GRP,mlr,commercial
 IL,commercial,UnitedHealthcare,284917,yes,reviewed map,UnitedHealthcare Plan of the River Valley; UnitedHealthcare of Illinois; National Foundation Life Insurance; UnitedHealthcare Insurance Company of Illinois; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare Insurance Company of the River Valley; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 IL,commercial,Health Alliance,129622,,reviewed map,Health Alliance Medical Plans; Health Alliance Midwest,Carle Holding Co Grp,mlr,commercial
 IL,commercial,Aetna,88791,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
-IL,commercial,State Farm Mutual Automobile Insurance,41515,,marketing name (DBA),State Farm Mutual Automobile Insurance,State Farm Mutual Group,mlr,commercial
 IL,commercial,Cigna,28900,yes,reviewed map,Cigna HealthCare of Illinois; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 IL,commercial,Quartz,9240,,reviewed map,Quartz Health Benefit Plans; Quartz Health Insurance; Quartz Health Plan,University Health Care & Gundersen Lutheran Group,mlr,commercial
-IL,commercial,Nippon Life Insurance Company of America,1827,,marketing name (DBA),Nippon Life Insurance Company of America,,mlr,commercial
 IL,commercial,MercyCare Health Plans,1796,,marketing name (DBA),MercyCare Insurance; MercyCare HMO,Mercy Alliance Inc Group,mlr,commercial
-IL,commercial,Reliance Standard Life Insurance,1628,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr,commercial
 IL,commercial,Medical Associates Health Plan,1466,,marketing name (DBA),Medical Associates Health Plan,Medical Associates Clinic,mlr,commercial
 IL,marketplace,Ambetter,53137,yes,reviewed map,Celtic Insurance,CENTENE CORP GRP,mlr,marketplace
 IL,marketplace,Oscar Health,11138,yes,reviewed map,Oscar Health Plan,,mlr,marketplace
 IL,marketplace,Molina Healthcare of Illinois,7646,,marketing name (DBA),Molina Healthcare of Illinois,,mlr,marketplace
-IL,medicaid,Meridian Health,746805,,plan name,Meridian Health,Centene Corporation,medicaid,medicaid
+IL,medicaid,Meridian,746805,,reviewed map,Meridian Health,Centene Corporation,medicaid,medicaid
 IL,medicaid,Blue Cross Community Health Plans,712533,,plan name,Blue Cross Community Health Plans,HealthCare Service Corporation,medicaid,medicaid
 IL,medicaid,CountyCare Health Plan,424747,,plan name,CountyCare Health Plan,Cook County Health and Hospital Systems,medicaid,medicaid
 IL,medicaid,Aetna Better Health,362690,,plan name,Aetna Better Health,CVS Health Corporation,medicaid,medicaid
@@ -219,13 +195,12 @@ IN,commercial,Cigna,17309,yes,reviewed map,Cigna HealthCare of Indiana; Connecti
 IN,commercial,Aetna,11636,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
 IN,commercial,Indiana University Health Plans,9637,,marketing name (DBA),Indiana University Health Plans,,mlr,commercial
 IN,commercial,SIHO Insurance Services,6279,,marketing name (DBA),Southeastern Indiana Health Organization,,mlr,commercial
+IN,marketplace,CareSource,237425,,reviewed map,CareSource Indiana,"CareSource Management Group; CareSource Indiana, Inc.",mlr; medicaid,marketplace; medicaid
 IN,marketplace,Ambetter,114145,yes,reviewed map,Celtic Insurance,CENTENE CORP GRP,mlr,marketplace
-IN,marketplace,CareSource,82660,,reviewed map,CareSource Indiana,CareSource Management Group,mlr,marketplace
 IN,medicaid,MDwise,344534,yes,plan name,MDwise,McLaren Health Care,medicaid,medicaid
 IN,medicaid,Managed Health Services,326999,,plan name,Managed Health Services,Centene Corporation,medicaid,medicaid
-IN,medicaid,CareSource Indiana,154765,yes,plan name,CareSource Indiana,"CareSource Indiana, Inc.",medicaid,medicaid
 IN,medicaid,UnitedHealthcare Community Plan,42346,,plan name,UnitedHealthcare Community Plan,UnitedHealth Group,medicaid,medicaid
-IN,medicaid,Humana Healthy Horizons of Indiana,35443,,plan name,Humana Healthy Horizons of Indiana,Humana,medicaid,medicaid
+IN,medicaid,Humana Healthy Horizons,35443,,reviewed map,Humana Healthy Horizons of Indiana,Humana,medicaid,medicaid
 KS,commercial,Blue Cross and Blue Shield of Kansas,265920,yes,marketing name (DBA),Blue Cross and Blue Shield of Kansas,BCBS of KS GRP,mlr,commercial
 KS,commercial,Blue KC,119641,,reviewed map,BLUE CARE; BLUE CROSS AND BLUE SHIELD OF KANSAS CITY,BCBS OF KC GRP,mlr,commercial
 KS,commercial,UnitedHealthcare,63788,yes,reviewed map,National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
@@ -235,22 +210,21 @@ KS,marketplace,Ambetter,76039,yes,reviewed map,Celtic Insurance,CENTENE CORP GRP
 KS,marketplace,Oscar Health,12497,yes,reviewed map,Oscar Insurance,,mlr,marketplace
 KS,marketplace,US Health and Life Insurance,2079,,marketing name (DBA),US Health and Life Insurance,,mlr,marketplace
 KS,marketplace,Medica,1809,,reviewed map,Medica Insurance,Medica Grp,mlr,marketplace
-KS,medicaid,UnitedHealthcare Community Plan of Kansas,127984,,plan name,UnitedHealthcare Community Plan of Kansas,"UnitedHealthcare Services, Inc.",medicaid,medicaid
+KS,medicaid,UnitedHealthcare Community Plan,127984,,reviewed map,UnitedHealthcare Community Plan of Kansas,"UnitedHealthcare Services, Inc.",medicaid,medicaid
 KS,medicaid,Sunflower State Health Plan,118053,,plan name,Sunflower State Health Plan,Centene Corporation,medicaid,medicaid
-KS,medicaid,Aetna Better Health of Kansas,112495,,plan name,Aetna Better Health of Kansas,Kansas Foundation for Medical Care,medicaid,medicaid
-KY,commercial,Anthem Blue Cross and Blue Shield,295853,,reviewed map,Anthem Health Plans of Kentucky,Elevance Hlth Inc Grp,mlr,commercial
+KS,medicaid,Aetna Better Health,112495,,reviewed map,Aetna Better Health of Kansas,Kansas Foundation for Medical Care,medicaid,medicaid
+KY,commercial,Anthem Blue Cross and Blue Shield,453217,,reviewed map,Anthem Health Plans of Kentucky; Anthem - Managed Care Organization,Elevance Hlth Inc Grp; Anthem,mlr; medicaid,commercial; medicaid
 KY,commercial,UnitedHealthcare,37754,yes,reviewed map,National Foundation Life Insurance; Golden Rule Insurance; UnitedHealthcare of Ohio; UnitedHealthcare of Kentucky; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 KY,commercial,Aetna,6130,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
 KY,commercial,Cigna,3525,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 KY,marketplace,WELLCARE HEALTH PLANS OF KENTUCKY,26102,,marketing name (DBA),WELLCARE HEALTH PLANS OF KENTUCKY,WellCare Management Group,mlr,marketplace
 KY,marketplace,CareSource,19838,,reviewed map,CareSource Kentucky,CareSource Management Group,mlr,marketplace
 KY,marketplace,Molina Healthcare of Kentucky,1534,,marketing name (DBA),Molina Healthcare of Kentucky,,mlr,marketplace
-KY,medicaid,Wellcare - Managed Care Organization,419036,,plan name,Wellcare - Managed Care Organization,WellCare,medicaid,medicaid
-KY,medicaid,Molina - Managed Care Organization,280749,,plan name,Molina - Managed Care Organization,Molina,medicaid,medicaid
-KY,medicaid,Aetna - Managed Care Organization,222208,,plan name,Aetna - Managed Care Organization,Aetna,medicaid,medicaid
-KY,medicaid,Anthem - Managed Care Organization,157364,,plan name,Anthem - Managed Care Organization,Anthem,medicaid,medicaid
-KY,medicaid,Humana - Managed Care Organization,142985,,plan name,Humana - Managed Care Organization,Humana,medicaid,medicaid
-KY,medicaid,UnitedHealthcare - Managed Care Organization,81613,,plan name,UnitedHealthcare - Managed Care Organization,UnitedHealthcare,medicaid,medicaid
+KY,medicaid,Wellcare,419036,,reviewed map,Wellcare - Managed Care Organization,WellCare,medicaid,medicaid
+KY,medicaid,Molina Healthcare,280749,yes,reviewed map,Molina - Managed Care Organization,Molina,medicaid,medicaid
+KY,medicaid,Aetna Better Health,222208,,reviewed map,Aetna - Managed Care Organization,Aetna,medicaid,medicaid
+KY,medicaid,Humana Healthy Horizons,142985,,reviewed map,Humana - Managed Care Organization,Humana,medicaid,medicaid
+KY,medicaid,UnitedHealthcare Community Plan,81613,,reviewed map,UnitedHealthcare - Managed Care Organization,UnitedHealthcare,medicaid,medicaid
 LA,commercial,Blue Cross and Blue Shield of Louisiana,506615,yes,reviewed map,Vantage Health Plan; Louisiana Health Service and Indemnity; HMO Louisiana,LOUISIANA HLTH SERV GRP,mlr,commercial
 LA,commercial,UnitedHealthcare,131810,yes,reviewed map,National Foundation Life Insurance; Enterprise Life Insurance; UnitedHealthcare of Louisiana; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare Insurance Company of the River Valley; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 LA,commercial,Aetna,7113,yes,reviewed map,Aetna Health Inc. (a LA corp.); Aetna Life Insurance,CVS Health Group,mlr,commercial
@@ -260,15 +234,15 @@ LA,marketplace,CHRISTUS Health Plan Louisiana,17306,,marketing name (DBA),CHRIST
 LA,medicaid,Louisiana Healthcare Connections,400299,,plan name,Louisiana Healthcare Connections,Centene Corporation,medicaid,medicaid
 LA,medicaid,UnitedHealthcare Community Plan,343798,,plan name,UnitedHealthcare Community Plan,UnitedHealthcare Group,medicaid,medicaid
 LA,medicaid,Healthy Blue,253620,,plan name,Healthy Blue,Elevance Health,medicaid,medicaid
-LA,medicaid,AmeriHealth Caritas Louisiana,153970,yes,plan name,AmeriHealth Caritas Louisiana,AmeriHealth Caritas Health Plan,medicaid,medicaid
-LA,medicaid,Aetna Better Health of Louisiana,131535,,plan name,Aetna Better Health of Louisiana,Aetna,medicaid,medicaid
+LA,medicaid,AmeriHealth Caritas,153970,,reviewed map,AmeriHealth Caritas Louisiana,AmeriHealth Caritas Health Plan,medicaid,medicaid
+LA,medicaid,Aetna Better Health,131535,,reviewed map,Aetna Better Health of Louisiana,Aetna,medicaid,medicaid
 LA,medicaid,Humana Healthy Horizons,119887,,plan name,Humana Healthy Horizons,"Humana, Inc.",medicaid,medicaid
 MA,commercial,Blue Cross Blue Shield of Massachusetts,838143,yes,reviewed map,Blue Cross and Blue Shield of Massachusetts HMO Blue; Blue Cross and Blue Shield of Massachusetts,BCBS of MA Grp,mlr,commercial
 MA,commercial,Harvard Pilgrim Health Care,281631,yes,reviewed map,Harvard Pilgrim Health Care; HPHC Insurance,HARVARD PILGRIM HTH CARE GRP,mlr,commercial
 MA,commercial,Tufts Health Plan,225222,yes,reviewed map; plan name,Tufts Associated Health Maintenance Organization; Tufts Insurance; Tufts Health Public Plans; Tufts Health Plan,Tufts Health Plan,mlr; medicaid,commercial; medicaid
 MA,commercial,Boston Medical Center Health Plan,106759,,marketing name (DBA),Boston Medical Center Health Plan,,mlr,commercial
-MA,commercial,UnitedHealthcare,99729,yes,reviewed map; plan name,National Foundation Life Insurance; UnitedHealthcare Insurance; UnitedHealthcare,UNITEDHEALTH GRP; UnitedHealthcare,mlr; medicaid,commercial; medicaid
 MA,commercial,Mass General Brigham Health Plan,90825,yes,reviewed map; marketing name (DBA),Mass General Brigham Health Insurance; Mass General Brigham Health Plan,,mlr,commercial
+MA,commercial,UnitedHealthcare,76140,yes,reviewed map,National Foundation Life Insurance; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial
 MA,commercial,Cigna,54228,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 MA,commercial,Health New England,48022,,marketing name (DBA),Health New England,Baystate Hlth Grp,mlr,commercial
 MA,commercial,Aetna,26645,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
@@ -276,16 +250,15 @@ MA,commercial,Fallon Community Health Plan,12853,,marketing name (DBA),Fallon Co
 MA,medicaid,Mass General Brigham Health Plan with Mass General Brigham ACO,132115,,plan name,Mass General Brigham Health Plan with Mass General Brigham ACO,"Mass General Brigham Health Plan, Inc.",medicaid,medicaid
 MA,medicaid,WellSense Community Alliance,126901,,plan name,WellSense Community Alliance,"Boston Medical Center Health Plan, Inc.",medicaid,medicaid
 MA,medicaid,WellSense Boston Children's ACO,106816,,plan name,WellSense Boston Children's ACO,"Boston Medical Center Health Plan, Inc.",medicaid,medicaid
+MA,medicaid,Tufts Health Together,106390,,reviewed map; plan name,Tufts Health Together with Cambridge Health Alliance (CHA); Tufts Health Together with UMass Memorial Health; Tufts Health Together,"Tufts Health Public Plans, Inc.",medicaid,medicaid
 MA,medicaid,WellSense Beth Israel Lahey Health (BILH) Performance Network ACO,61075,,plan name,WellSense Beth Israel Lahey Health (BILH) Performance Network ACO,"Boston Medical Center Health Plan, Inc.",medicaid,medicaid
 MA,medicaid,WellSense Care Alliance,50270,,plan name,WellSense Care Alliance,"Boston Medical Center Health Plan, Inc.",medicaid,medicaid
 MA,medicaid,BeHealthy Partnership Plan,45272,,plan name,BeHealthy Partnership Plan,"Health New England, Inc.",medicaid,medicaid
-MA,medicaid,Tufts Health Together with UMass Memorial Health,44374,,plan name,Tufts Health Together with UMass Memorial Health,"Tufts Health Public Plans, Inc.",medicaid,medicaid
 MA,medicaid,Fallon Health-Atrius Health Care Collaborative,35757,,plan name,Fallon Health-Atrius Health Care Collaborative,"Fallon Community Health Plan, Inc.",medicaid,medicaid
-MA,medicaid,Tufts Health Together with Cambridge Health Alliance (CHA),32395,,plan name,Tufts Health Together with Cambridge Health Alliance (CHA),"Tufts Health Public Plans, Inc.",medicaid,medicaid
 MA,medicaid,Fallon 365 Care,31491,,plan name,Fallon 365 Care,"Fallon Community Health Plan, Inc.",medicaid,medicaid
-MA,medicaid,Tufts Health Together,29621,,plan name,Tufts Health Together,"Tufts Health Public Plans, Inc.",medicaid,medicaid
 MA,medicaid,WellSense Mercy Alliance,27212,,plan name,WellSense Mercy Alliance,"Boston Medical Center Health Plan, Inc.",medicaid,medicaid
 MA,medicaid,East Boston Neighborhood Health WellSense Alliance,26427,,plan name,East Boston Neighborhood Health WellSense Alliance,"Boston Medical Center Health Plan, Inc.",medicaid,medicaid
+MA,medicaid,UnitedHealthcare Community Plan,23589,,reviewed map,UnitedHealthcare,UnitedHealthcare,medicaid,medicaid
 MA,medicaid,WellSense Signature Alliance,22464,,plan name,WellSense Signature Alliance,"Boston Medical Center Health Plan, Inc.",medicaid,medicaid
 MA,medicaid,WellSense Essential MCO,20712,,plan name,WellSense Essential MCO,"Boston Medical Center Health Plan, Inc.",medicaid,medicaid
 MA,medicaid,WellSense Southcoast Alliance,16909,,plan name,WellSense Southcoast Alliance,"Boston Medical Center Health Plan, Inc.",medicaid,medicaid
@@ -300,12 +273,12 @@ MD,commercial,UnitedHealthcare,177165,yes,reviewed map,UnitedHealthcare of the M
 MD,commercial,Cigna,82411,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 MD,commercial,Aetna,28148,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
 MD,medicaid,Priority Partners,384354,yes,plan name,Priority Partners,Johns Hopkins HealthCare,medicaid,medicaid
-MD,medicaid,Wellpoint Maryland,350641,,plan name,Wellpoint Maryland,Elevance Health,medicaid,medicaid
+MD,medicaid,Wellpoint,350641,,reviewed map,Wellpoint Maryland,Elevance Health,medicaid,medicaid
 MD,medicaid,Maryland Physicians Care,266727,,plan name,Maryland Physicians Care,"Maryland Care, Inc.",medicaid,medicaid
 MD,medicaid,UnitedHealthcare Community Plan,187674,,plan name,UnitedHealthcare Community Plan,UnitedHealthcare of the Mid-Atlantic,medicaid,medicaid
 MD,medicaid,MedStar Family Choice,115530,,plan name,MedStar Family Choice,MedStar Health,medicaid,medicaid
 MD,medicaid,CareFirst BlueCross BlueShield Community Health Plan Maryland,114806,,plan name,CareFirst BlueCross BlueShield Community Health Plan Maryland,CareFirst,medicaid,medicaid
-MD,medicaid,Aetna Better Health of Maryland,75366,,plan name,Aetna Better Health of Maryland,CVS Health,medicaid,medicaid
+MD,medicaid,Aetna Better Health,75366,,reviewed map,Aetna Better Health of Maryland,CVS Health,medicaid,medicaid
 MD,medicaid,Jai Medical Systems,32340,,plan name,Jai Medical Systems,Jai Medical Systems,medicaid,medicaid
 ME,commercial,Anthem Blue Cross and Blue Shield,159167,,reviewed map,Anthem Health Plans of Maine,Elevance Hlth Inc Grp,mlr,commercial
 ME,commercial,Harvard Pilgrim Health Care,53621,,reviewed map,Harvard Pilgrim Health Care; HPHC Insurance,HARVARD PILGRIM HTH CARE GRP,mlr,commercial
@@ -324,17 +297,16 @@ MI,commercial,Cigna,6882,yes,reviewed map,Connecticut General Life Insurance; Ci
 MI,commercial,Aetna,4806,yes,reviewed map,Aetna Life Insurance,CVS Health Group,mlr,commercial
 MI,commercial,GMS Reinsurance,3833,,marketing name (DBA),GMS Reinsurance,,mlr,commercial
 MI,commercial,University of Michigan Health Insurance,2424,,marketing name (DBA),University of Michigan Health Insurance,PHP Insurance Company,mlr,commercial
-MI,commercial,Reliance Standard Life Insurance,1280,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr,commercial
-MI,marketplace,Meridian Health Plan of Michigan,627582,,marketing name (DBA); plan name,Meridian Health Plan of Michigan,"Meridian Health Plan of Michigan, Inc.; Meridian Health Plan of Michigan",mlr; medicaid,marketplace; medicaid
-MI,marketplace,Molina Healthcare,35687,yes,reviewed map,Molina Healthcare of Michigan,Molina Healthcare Inc GRP,mlr,marketplace
+MI,marketplace,Molina Healthcare,442916,yes,reviewed map,Molina Healthcare of Michigan,Molina Healthcare Inc GRP; Molina Healthcare of Michigan,mlr; medicaid,marketplace; medicaid
+MI,marketplace,Meridian Health Plan of Michigan,115109,,marketing name (DBA),Meridian Health Plan of Michigan,"Meridian Health Plan of Michigan, Inc.",mlr,marketplace
 MI,marketplace,Oscar Health,2909,yes,reviewed map,Oscar Insurance,,mlr,marketplace
 MI,marketplace,McLaren Health Plan Community,2418,,marketing name (DBA),McLaren Health Plan Community,McLaren Hlth Grp,mlr,marketplace
-MI,medicaid,Molina Healthcare of Michigan,407229,,plan name,Molina Healthcare of Michigan,Molina Healthcare of Michigan,medicaid,medicaid
+MI,medicaid,Meridian,512473,,reviewed map,Meridian Health Plan of Michigan,Meridian Health Plan of Michigan,medicaid,medicaid
 MI,medicaid,Blue Cross Complete of Michigan,389926,,plan name,Blue Cross Complete of Michigan,Blue Cross Complete of Michigan,medicaid,medicaid
 MI,medicaid,UnitedHealthcare Community Plan,329443,,plan name,UnitedHealthcare Community Plan,UnitedHealthcare,medicaid,medicaid
 MI,medicaid,Priority Health Choice,279115,,plan name,Priority Health Choice,Priority Health Choice,medicaid,medicaid
 MI,medicaid,Upper Peninsula Health Plan,56005,,plan name,Upper Peninsula Health Plan,Upper Peninsula Health Plan,medicaid,medicaid
-MI,medicaid,Aetna Better Health of Michigan,52769,,plan name,Aetna Better Health of Michigan,Aetna Better Health of Michigan,medicaid,medicaid
+MI,medicaid,Aetna Better Health,52769,,reviewed map,Aetna Better Health of Michigan,Aetna Better Health of Michigan,medicaid,medicaid
 MI,medicaid,HAP Empowered,32941,,plan name,HAP Empowered,Health Alliance Plan,medicaid,medicaid
 MI,medicaid,HAP CareSource,14839,,plan name,HAP CareSource,Health Alliance Plan,medicaid,medicaid
 MN,commercial,Blue Cross and Blue Shield of Minnesota,382785,yes,reviewed map,HMO Minnesota; BCBSM,BCBS of MN Grp,mlr,commercial
@@ -349,24 +321,23 @@ MN,marketplace,UCare Minnesota,49414,,marketing name (DBA),UCare Minnesota,UCare
 MN,medicaid,UCare,382233,yes,plan name,UCare,UCare,medicaid,medicaid
 MN,medicaid,Blue Plus,293880,,plan name,Blue Plus,Blue Cross Blue Shield MN; Blue Cross Blue Shield of Minnesota,medicaid,medicaid
 MN,medicaid,Health Partners,160156,,plan name,Health Partners,Health Partners,medicaid,medicaid
-MN,medicaid,Prime West Health,45301,,plan name,Prime West Health,Prime West Health,medicaid,medicaid
-MN,medicaid,UnitedHealthcare of MN,28489,,plan name,UnitedHealthcare of MN,UnitedHealthcare of MN,medicaid,medicaid
+MN,medicaid,PrimeWest Health,47848,,reviewed map,Prime West Health; Prime West,Prime West Health; Prime West,medicaid,medicaid
+MN,medicaid,UnitedHealthcare Community Plan,28489,,reviewed map,UnitedHealthcare of MN,UnitedHealthcare of MN,medicaid,medicaid
 MN,medicaid,Hennepin Health,24393,,plan name,Hennepin Health,Hennepin Health,medicaid,medicaid
 MN,medicaid,South Country Health Alliance,23607,,plan name,South Country Health Alliance,South Country Health Alliance,medicaid,medicaid
 MN,medicaid,Itasca Medical,6701,,plan name,Itasca Medical,Itasca Medical,medicaid,medicaid
-MN,medicaid,Prime West,2547,,plan name,Prime West,Prime West,medicaid,medicaid
-MO,commercial,UnitedHealthcare,495563,yes,reviewed map; plan name,National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare Insurance; UnitedHealthcare,UNITEDHEALTH GRP; Optum,mlr; medicaid,commercial; marketplace; medicaid
 MO,commercial,Anthem Blue Cross and Blue Shield,284112,,reviewed map,Healthy Alliance Life Insurance; HMO Missouri,Elevance Hlth Inc Grp,mlr,commercial
+MO,commercial,UnitedHealthcare,193474,yes,reviewed map,National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 MO,commercial,Blue KC,180962,,reviewed map,BLUE CARE; BLUE CROSS AND BLUE SHIELD OF KANSAS CITY,BCBS OF KC GRP,mlr,commercial
 MO,commercial,Aetna,56114,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
 MO,commercial,Cigna,36913,yes,reviewed map,Cigna HealthCare of St Louis; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 MO,commercial,Cox Health Systems Insurance,32569,,marketing name (DBA),Cox Health Systems Insurance,COX INS GRP,mlr,commercial
 MO,commercial,Medica,13563,,reviewed map,Medica Insurance; Medica Central Insurance; Medica Central Health Plan,Medica Grp,mlr,commercial; marketplace
-MO,commercial,Reliance Standard Life Insurance,1733,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr,commercial
 MO,marketplace,Ambetter,136675,yes,reviewed map,Celtic Insurance,CENTENE CORP GRP,mlr,marketplace
 MO,marketplace,Oscar Health,24772,yes,reviewed map,Oscar Insurance,,mlr,marketplace
 MO,medicaid,Healthy Blue,357698,,plan name,Healthy Blue,Anthem,medicaid,medicaid
 MO,medicaid,Home State Health,314987,yes,plan name,Home State Health,Centene Corporation,medicaid,medicaid
+MO,medicaid,UnitedHealthcare Community Plan,302089,,reviewed map,UnitedHealthcare,Optum,medicaid,medicaid
 MO,medicaid,Show Me Healthy Kids,47172,,plan name,Show Me Healthy Kids,Centene Corporation,medicaid,medicaid
 MS,commercial,Blue Cross & Blue Shield of Mississippi,267094,yes,reviewed map,"BLUE CROSS & BLUE SHIELD OF MISSISSIPPI, A MUTUAL INSURANCE",MISSISSIPPI INS GRP,mlr,commercial
 MS,commercial,Cigna,63769,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
@@ -382,15 +353,16 @@ MT,commercial,PacificSource Health Plans,29991,,reviewed map,PacificSource Healt
 MT,commercial,Montana Health Cooperative,29576,,marketing name (DBA),Montana Health Cooperative,Montana Health Cooperative,mlr,commercial
 MT,commercial,UnitedHealthcare,1293,yes,reviewed map,National Foundation Life Insurance; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial
 NC,commercial,Blue Cross and Blue Shield of North Carolina,1104290,yes,marketing name (DBA),Blue Cross and Blue Shield of North Carolina,,mlr,commercial
-NC,commercial,UnitedHealthcare,606338,yes,reviewed map; plan name,National Foundation Life Insurance; UnitedHealthcare of North Carolina; Golden Rule Insurance; UnitedHealthcare Insurance Company of the River Valley; UnitedHealthcare Insurance; UnitedHealthcare,"UNITEDHEALTH GRP; UnitedHealthcare of North Carolina, Inc.",mlr; medicaid,commercial; marketplace; medicaid
 NC,commercial,Aetna,346953,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
+NC,commercial,UnitedHealthcare,144381,yes,reviewed map,National Foundation Life Insurance; UnitedHealthcare of North Carolina; Golden Rule Insurance; UnitedHealthcare Insurance Company of the River Valley; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 NC,commercial,Cigna,47044,yes,reviewed map,Cigna HealthCare of North Carolina; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial; marketplace
 NC,commercial,FirstCarolinaCare Insurance,3299,,marketing name (DBA),FirstCarolinaCare Insurance,"Health Alliance Medical Plans, Inc.",mlr,commercial
 NC,marketplace,Ambetter of North Carolina,120226,,marketing name (DBA),Ambetter of North Carolina,,mlr,marketplace
 NC,marketplace,Independence Blue Cross,15385,,reviewed map,AmeriHealth Caritas North Carolina,INDEPENDENCE BLUE CROSS GRP,mlr,marketplace
 NC,marketplace,CareSource,8878,,reviewed map,CareSource North Carolina,CareSource Management Group,mlr,marketplace
-NC,medicaid,Healthy Blue of North Carolina,592325,,plan name,Healthy Blue of North Carolina,Blue Cross and Blue Shield of North Carolina,medicaid,medicaid
-NC,medicaid,WellCare,481884,,plan name,WellCare,"WellCare of North Carolina, Inc.",medicaid,medicaid
+NC,medicaid,Healthy Blue,592325,,reviewed map,Healthy Blue of North Carolina,Blue Cross and Blue Shield of North Carolina,medicaid,medicaid
+NC,medicaid,Wellcare,481884,,reviewed map,WellCare,"WellCare of North Carolina, Inc.",medicaid,medicaid
+NC,medicaid,UnitedHealthcare Community Plan,461957,,reviewed map,UnitedHealthcare,"UnitedHealthcare of North Carolina, Inc.",medicaid,medicaid
 NC,medicaid,AmeriHealth Caritas,387174,,plan name,AmeriHealth Caritas,AmeriHealth Caritas of North Carolina,medicaid,medicaid
 NC,medicaid,Carolina Complete Health,274181,,plan name,Carolina Complete Health,"Carolina Complete Health, Inc.",medicaid,medicaid
 NC,medicaid,Trillium Health Resources,77746,,plan name,Trillium Health Resources,Trillium Health Resources,medicaid,medicaid
@@ -409,8 +381,8 @@ NE,commercial,UnitedHealthcare,25620,yes,reviewed map,National Foundation Life I
 NE,commercial,Aetna,6808,yes,reviewed map,Aetna Life Insurance,CVS Health Group,mlr,commercial
 NE,marketplace,Ambetter,70781,yes,reviewed map,Nebraska Total Care,CENTENE CORP GRP,mlr,marketplace
 NE,medicaid,Nebraska Total Care,118214,yes,plan name,Nebraska Total Care,Centene Corporation,medicaid,medicaid
-NE,medicaid,Molina Healthcare of Nebraska,116309,,plan name,Molina Healthcare of Nebraska,"Molina Healthcare, Inc.",medicaid,medicaid
-NE,medicaid,UnitedHealthcare Community Plan of Nebraska,115714,,plan name,UnitedHealthcare Community Plan of Nebraska,UnitedHealthcare,medicaid,medicaid
+NE,medicaid,Molina Healthcare,116309,yes,reviewed map,Molina Healthcare of Nebraska,"Molina Healthcare, Inc.",medicaid,medicaid
+NE,medicaid,UnitedHealthcare Community Plan,115714,,reviewed map,UnitedHealthcare Community Plan of Nebraska,UnitedHealthcare,medicaid,medicaid
 NH,commercial,Anthem Blue Cross and Blue Shield,176158,,reviewed map,Matthew Thornton Health Plan; Anthem Health Plans of New Hampshire,Elevance Hlth Inc Grp,mlr,commercial
 NH,commercial,Harvard Pilgrim Health Care,44083,,reviewed map,Harvard Pilgrim Health Care of New England; HPHC Insurance,HARVARD PILGRIM HTH CARE GRP,mlr,commercial
 NH,commercial,Cigna,13362,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
@@ -419,48 +391,44 @@ NH,commercial,Aetna,1687,yes,reviewed map,Aetna Life Insurance,CVS Health Group,
 NH,marketplace,Ambetter,15496,yes,reviewed map,Celtic Insurance,CENTENE CORP GRP,mlr,marketplace
 NH,medicaid,WellSense Health Plan,72612,yes,plan name,WellSense Health Plan,Boston Medical Center Health Plan,medicaid,medicaid
 NH,medicaid,New Hampshire Healthy Families,69519,,plan name,New Hampshire Healthy Families,Centene,medicaid,medicaid
-NH,medicaid,AmeriHealth Caritas of New Hampshire,39545,,plan name,AmeriHealth Caritas of New Hampshire,AmeriHealth Caritas,medicaid,medicaid
+NH,medicaid,AmeriHealth Caritas,39545,,reviewed map,AmeriHealth Caritas of New Hampshire,AmeriHealth Caritas,medicaid,medicaid
 NJ,commercial,Horizon Blue Cross Blue Shield of NJ,749491,,marketing name (DBA),Horizon Healthcare Services,BCBS OF NJ GRP,mlr,commercial
 NJ,commercial,UnitedHealthcare,170130,yes,reviewed map,Oxford Health Insurance; UnitedHealthcare Insurance; Oxford Health Plans (NJ),UNITEDHEALTH GRP,mlr,commercial
 NJ,commercial,Aetna,159437,yes,reviewed map,Aetna Life Insurance; Aetna Health Inc. (a New Jersey corporation),CVS Health Group,mlr,commercial
 NJ,commercial,AmeriHealth New Jersey,143916,yes,reviewed map,AmeriHealth Insurance Company of New Jersey,INDEPENDENCE BLUE CROSS GRP,mlr,commercial
 NJ,commercial,Cigna,109346,yes,reviewed map,Cigna HealthCare of New Jersey; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
-NJ,commercial,Nippon Life Insurance Company of America,1444,,marketing name (DBA),Nippon Life Insurance Company of America,,mlr,commercial
 NJ,marketplace,Oscar Health,256543,yes,reviewed map,Oscar Garden State Insurance,,mlr,marketplace
-NJ,marketplace,Wellcare,5055,,reviewed map,WellCare Health Insurance Company of New Jersey,,mlr,marketplace
+NJ,marketplace,Wellcare,79511,,reviewed map,WellCare Health Insurance Company of New Jersey; Wellcare of New Jersey,"Wellcare Health Plans, Inc.",mlr; medicaid,marketplace; medicaid
 NJ,medicaid,Horizon NJ Health,860036,,plan name,Horizon NJ Health,Horizon Blue Cross Blue Shield of New Jersey,medicaid,medicaid
 NJ,medicaid,UnitedHealthcare Community Plan,275064,,plan name,UnitedHealthcare Community Plan,UnitedHealthcare,medicaid,medicaid
-NJ,medicaid,Amerigroup New Jersey,167805,,plan name,Amerigroup New Jersey,Anthem,medicaid,medicaid
-NJ,medicaid,Aetna Better Health NJ,93872,,plan name,Aetna Better Health NJ,CVS Health,medicaid,medicaid
-NJ,medicaid,Wellcare of New Jersey,74456,,plan name,Wellcare of New Jersey,"Wellcare Health Plans, Inc.",medicaid,medicaid
-NJ,medicaid,UnitedHealthcare Dual Complete NJ-Y001,38743,,plan name,UnitedHealthcare Dual Complete NJ-Y001,"Oxford Health Plans (NJ), Inc.",medicaid,medicaid
+NJ,medicaid,Amerigroup,167805,,reviewed map,Amerigroup New Jersey,Anthem,medicaid,medicaid
+NJ,medicaid,Aetna Better Health,93872,,reviewed map,Aetna Better Health NJ,CVS Health,medicaid,medicaid
+NJ,medicaid,UnitedHealthcare Dual Complete,38743,,reviewed map,UnitedHealthcare Dual Complete NJ-Y001,"Oxford Health Plans (NJ), Inc.",medicaid,medicaid
 NJ,medicaid,Horizon NJ TotalCare,19596,,plan name,Horizon NJ TotalCare,"Horizon Healthcare of New Jersey, Inc.",medicaid,medicaid
 NJ,medicaid,Wellpoint Full Dual Advantage,12376,,plan name,Wellpoint Full Dual Advantage,"Wellpoint New Jersey, Inc.",medicaid,medicaid
 NJ,medicaid,Aetna Assure Premier Plus,6752,,plan name,Aetna Assure Premier Plus,"Aetna Better Health, Inc.",medicaid,medicaid
 NJ,medicaid,Wellcare Dual Liberty,6525,,plan name,Wellcare Dual Liberty,"Wellcare Health Plans of New Jersey, Inc.",medicaid,medicaid
 NM,commercial,Presbyterian Health Plan,415716,yes,marketing name (DBA); reviewed map; plan name,Presbyterian Health Plan; Presbyterian Insurance,Presbyterian Hlthcare Serv Grp; Presbyterian Healthcare Services,mlr; medicaid,commercial; medicaid
-NM,commercial,Blue Cross and Blue Shield of New Mexico,132417,yes,reviewed map,"Health Care Service Corporation, a Mutual Legal Reserve",HCSC GRP,mlr,commercial
+NM,commercial,Blue Cross and Blue Shield of New Mexico,407123,yes,reviewed map,"Health Care Service Corporation, a Mutual Legal Reserve; Blue Cross Blue Shield of NM",HCSC GRP; Health Care Service Corporation,mlr; medicaid,commercial; medicaid
 NM,commercial,UnitedHealthcare,24652,yes,reviewed map,UnitedHealthcare of New Mexico; National Foundation Life Insurance; Golden Rule Insurance; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 NM,marketplace,Molina Healthcare,49909,yes,reviewed map; plan name,Molina Healthcare of New Mexico; Molina Healthcare,"Molina Healthcare Inc GRP; Molina Healthcare, Inc.",mlr; medicaid,marketplace; medicaid
 NM,marketplace,Western Sky Community Care,5004,yes,marketing name (DBA),Western Sky Community Care,,mlr,marketplace
-NM,medicaid,Blue Cross Blue Shield of NM,274706,,plan name,Blue Cross Blue Shield of NM,Health Care Service Corporation,medicaid,medicaid
-NM,medicaid,UnitedHealthcare Insurance,41784,,plan name,UnitedHealthcare Insurance,UnitedHealth Group,medicaid,medicaid
+NM,medicaid,UnitedHealthcare Community Plan,41784,,reviewed map,UnitedHealthcare Insurance,UnitedHealth Group,medicaid,medicaid
+NV,commercial,Anthem Blue Cross and Blue Shield,326555,,reviewed map,HMO Colorado; Anthem Blue Cross and Blue Shield; Anthem Blue Cross and Blue Shield Healthcare Solutions,Elevance Hlth Inc Grp; Anthem Blue Cross and Blue Shield,mlr; medicaid,commercial; medicaid
 NV,commercial,Health Plan of Nevada,206832,,reviewed map,Health Plan of Nevada,UNITEDHEALTH GRP,mlr,commercial
-NV,commercial,Anthem Blue Cross and Blue Shield,126003,,reviewed map,HMO Colorado; Anthem Blue Cross and Blue Shield,Elevance Hlth Inc Grp,mlr,commercial
 NV,commercial,UnitedHealthcare,87650,yes,reviewed map,Freedom Life Insurance Company of America; Golden Rule Insurance; Sierra Health and Life Insurance; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 NV,commercial,Aetna,20135,yes,reviewed map,Aetna Health of Utah; Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial; marketplace
 NV,commercial,Hometown Health Providers Insurance,14621,,marketing name (DBA),Hometown Health Providers Insurance,Renown Health,mlr,commercial
 NV,commercial,Hometown Health Plan,10657,,marketing name (DBA),Hometown Health Plan,Renown Health,mlr,commercial
 NV,commercial,Select Health,9087,,reviewed map,SelectHealth,IHC Inc Grp,mlr,commercial
 NV,commercial,Cigna,8285,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
-NV,marketplace,Molina Healthcare of Nevada,96395,,marketing name (DBA); plan name,Molina Healthcare of Nevada,Molina Healthcare,mlr; medicaid,marketplace; medicaid
 NV,marketplace,SilverSummit Healthplan,16836,,marketing name (DBA),SilverSummit Healthplan,,mlr,marketplace
-NV,medicaid,UnitedHealthcare Health Plan of Nevada,209874,,plan name,UnitedHealthcare Health Plan of Nevada,UnitedHealthcare,medicaid,medicaid
-NV,medicaid,Anthem Blue Cross and Blue Shield Healthcare Solutions,200552,,plan name,Anthem Blue Cross and Blue Shield Healthcare Solutions,Anthem Blue Cross and Blue Shield,medicaid,medicaid
+NV,medicaid,UnitedHealthcare Community Plan,209874,,reviewed map,UnitedHealthcare Health Plan of Nevada,UnitedHealthcare,medicaid,medicaid
 NV,medicaid,SilverSummit Health Plan,106497,,plan name,SilverSummit Health Plan,Centene,medicaid,medicaid
-NY,commercial,UnitedHealthcare,984057,yes,reviewed map; plan name,UnitedHealthcare of New York; Oxford Health Insurance; UnitedHealthcare Insurance Company of New York; UnitedHealthcare,"UNITEDHEALTH GRP; UnitedHealth Group, Inc.",mlr; medicaid,commercial; marketplace; medicaid
+NV,medicaid,Molina Healthcare,96375,yes,reviewed map,Molina Healthcare of Nevada,Molina Healthcare,medicaid,medicaid
+NY,commercial,UnitedHealthcare,706634,yes,reviewed map,UnitedHealthcare of New York; Oxford Health Insurance; UnitedHealthcare Insurance Company of New York,UNITEDHEALTH GRP,mlr,commercial; marketplace
+NY,commercial,Excellus BlueCross BlueShield,566560,yes,reviewed map,Excellus Health Plan; Excellus,Lifetime HlthCare Grp; Excellus Health Plan; Excellus,mlr; medicaid,commercial; medicaid
 NY,commercial,Aetna,418253,yes,reviewed map,Aetna Health Insurance Company of New York; Aetna Life Insurance,CVS Health Group,mlr,commercial
-NY,commercial,Excellus BlueCross BlueShield,367934,yes,reviewed map,Excellus Health Plan,Lifetime HlthCare Grp,mlr,commercial
 NY,commercial,Anthem Blue Cross and Blue Shield,366398,,reviewed map,Anthem HealthChoice HMO; Anthem HP; Anthem HealthChoice Assurance,Elevance Hlth Inc Grp,mlr,commercial; marketplace
 NY,commercial,EmblemHealth,254818,yes,reviewed map,EmblemHealth Insurance; Health Insurance Plan of Greater New York; EmblemHealth Plan,HIP INS GRP,mlr,commercial
 NY,commercial,Cigna,244294,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
@@ -469,35 +437,30 @@ NY,commercial,CDPHP,147486,,reviewed map,Capital District Physicians Health Plan
 NY,commercial,MVP Health Care,127727,yes,reviewed map,MVP Health Services; MVP Health Plan,MVP GRP,mlr,commercial
 NY,commercial,Independent Health,123386,,marketing name (DBA),Independent Health Association; Independent Health Benefits,,mlr,commercial
 NY,commercial,MetroPlus Health Plan,41206,,marketing name (DBA),MetroPlus Health Plan,,mlr,commercial
-NY,commercial,Nippon Life Insurance Company of America,7368,,marketing name (DBA),Nippon Life Insurance Company of America,,mlr,commercial
 NY,marketplace,Healthfirst PHSP,47240,,marketing name (DBA),Healthfirst PHSP,"Healthfirst PHSP, Inc.",mlr,marketplace
 NY,marketplace,Oscar Health,10291,yes,reviewed map,Oscar Insurance,,mlr,marketplace
 NY,medicaid,Fidelis Care,1530558,yes,plan name,Fidelis Care,Centene Corporation,medicaid,medicaid
-NY,medicaid,Healthfirst,1134065,yes,plan name,Healthfirst,Healthfirst,medicaid,medicaid
-NY,medicaid,MetroPlusHealth Plan,407507,,plan name,MetroPlusHealth Plan,MetroPlusHealth Plan,medicaid,medicaid
+NY,medicaid,Healthfirst,1165758,yes,plan name; reviewed map,Healthfirst; HealthFirst Health Plan,"Healthfirst; HealthFirst Healthplan, Inc.",medicaid,medicaid
+NY,medicaid,MetroPlusHealth,424537,,reviewed map,MetroPlus; MetroPlusHealth Plan; MetroPlusHealth Plan Special Needs,MetroPlus; MetroPlusHealth Plan; MetroPlusHealth Plan Special Needs,medicaid,medicaid
 NY,medicaid,HealthPlus,356032,,plan name,HealthPlus,Anthem,medicaid,medicaid
-NY,medicaid,Molina Healthcare of New York,248939,,plan name,Molina Healthcare of New York,"Molina Healthcare, Inc.",medicaid,medicaid
-NY,medicaid,Excellus,187909,,plan name,Excellus,Excellus,medicaid,medicaid
+NY,medicaid,UnitedHealthcare Community Plan,277423,,reviewed map,UnitedHealthcare,"UnitedHealth Group, Inc.",medicaid,medicaid
+NY,medicaid,Molina Healthcare,248939,yes,reviewed map,Molina Healthcare of New York,"Molina Healthcare, Inc.",medicaid,medicaid
 NY,medicaid,MVP Health Plan,172911,,plan name,MVP Health Plan,MVP Health Plan,medicaid,medicaid
 NY,medicaid,HIP Combined,139834,,plan name,HIP Combined,HIP Combined,medicaid,medicaid
 NY,medicaid,Capital District Physician's Health Plan,88556,,plan name,Capital District Physician's Health Plan,Capital District Physician's Health Plan,medicaid,medicaid
 NY,medicaid,Independent Health/Hudson Valley & WNY,60375,,plan name,Independent Health/Hudson Valley & WNY,Independent Health/Hudson Valley & WNY,medicaid,medicaid
 NY,medicaid,Highmark Western & Northeastern NY,48146,,plan name,Highmark Western & Northeastern NY,Highmark Western & Northeastern NY,medicaid,medicaid
-NY,medicaid,HealthFirst Health Plan,31693,,plan name,HealthFirst Health Plan,"HealthFirst Healthplan, Inc.",medicaid,medicaid
-NY,medicaid,MetroPlus,12652,,plan name,MetroPlus,MetroPlus,medicaid,medicaid
-NY,medicaid,Excellus Health Plan,10717,,plan name,Excellus Health Plan,Excellus Health Plan,medicaid,medicaid
 NY,medicaid,AmidaCare Special Needs,8870,,plan name,AmidaCare Special Needs,AmidaCare Special Needs,medicaid,medicaid
 NY,medicaid,HIP GNY,5159,,plan name,HIP GNY,HIP GNY,medicaid,medicaid
 NY,medicaid,VNS Health Total,4700,,plan name,VNS Health Total,VNS Choice,medicaid,medicaid
 NY,medicaid,ElderPlan,4421,,plan name,ElderPlan,"ElderPlan, Inc.",medicaid,medicaid
-NY,medicaid,MetroPlusHealth Plan Special Needs,4378,,plan name,MetroPlusHealth Plan Special Needs,MetroPlusHealth Plan Special Needs,medicaid,medicaid
 NY,medicaid,VNS Choice Special Needs,3483,,plan name,VNS Choice Special Needs,VNS Choice Special Needs,medicaid,medicaid
 NY,medicaid,VillageCareMAX Total Advantage,3294,,plan name,VillageCareMAX Total Advantage,Village Senior Services Corp.,medicaid,medicaid
 NY,medicaid,Independent Health Association,2685,,plan name,Independent Health Association,Independent Health Association,medicaid,medicaid
 NY,medicaid,Centers Plan for Medicaid Advantage Plus,1870,,plan name,Centers Plan for Medicaid Advantage Plus,"Centers Plan for Healthy Living, LLC",medicaid,medicaid
 NY,medicaid,Partners Health Plan FIDA-IDD,1666,,plan name,Partners Health Plan FIDA-IDD,"Partners Health Plan, Inc.",medicaid,medicaid
 NY,medicaid,Wellcare Fidelis Dual Plus,1602,,plan name,Wellcare Fidelis Dual Plus,Centene Corporation,medicaid,medicaid
-OH,commercial,Anthem Blue Cross and Blue Shield,548497,,reviewed map,Community Insurance,Elevance Hlth Inc Grp,mlr,commercial
+OH,commercial,Anthem Blue Cross and Blue Shield,757663,,reviewed map,Community Insurance; Anthem,Elevance Hlth Inc Grp; Anthem,mlr; medicaid,commercial; medicaid
 OH,commercial,Medical Mutual,275363,,reviewed map,Medical Health Insuring Corporation of Ohio; Medical Mutual of Ohio,Medical Mutual of Ohio,mlr,commercial; marketplace
 OH,commercial,UnitedHealthcare,181690,yes,reviewed map,National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare of Ohio; United Healthcare Life Insurance; All Savers Insurance; UnitedHealthcare Insurance Company of the River Valley; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 OH,commercial,Humana,155380,yes,marketing name (DBA); plan name,Humana Health Plan of Ohio; Humana Insurance; Humana,HUMANA GRP; Humana,mlr; medicaid,commercial; medicaid
@@ -507,17 +470,14 @@ OH,commercial,AultCare,30424,,marketing name (DBA),AultCare Insurance,,mlr,comme
 OH,commercial,SummaCare,17781,,marketing name (DBA),SummaCare; Summa Insurance,Summa Hlth Grp,mlr,commercial
 OH,commercial,Paramount Insurance,17548,,marketing name (DBA),Paramount Insurance,Medical Mutual of Ohio,mlr,commercial
 OH,commercial,Sidecar Health Insurance,7917,,marketing name (DBA),Sidecar Health Insurance,,mlr,commercial
-OH,commercial,Reliance Standard Life Insurance,1884,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr,commercial
 OH,commercial,The Health Plan of West Virginia,1320,,marketing name (DBA),The Health Plan of West Virginia,HEALTH PLAN GRP,mlr,commercial
 OH,marketplace,CareSource,1279348,yes,reviewed map; plan name,CareSource,CareSource Management Group; CareSource,mlr; medicaid,marketplace; medicaid
+OH,marketplace,Molina Healthcare,366119,yes,reviewed map,Molina Healthcare of Ohio,"Molina Healthcare Inc GRP; Molina Healthcare, Inc.",mlr; medicaid,marketplace; medicaid
 OH,marketplace,Ambetter,86278,yes,reviewed map,Buckeye Community Health Plan,CENTENE CORP GRP,mlr,marketplace
-OH,marketplace,Molina Healthcare,77720,yes,reviewed map,Molina Healthcare of Ohio,Molina Healthcare Inc GRP,mlr,marketplace
 OH,marketplace,Oscar Health,72324,yes,reviewed map,Oscar Buckeye State Insurance,,mlr,marketplace
 OH,medicaid,Buckeye Community Health Plan,379811,,plan name,Buckeye Community Health Plan,Centene Corporation,medicaid,medicaid
-OH,medicaid,UnitedHealthcare Community Plan of Ohio,317718,,plan name,UnitedHealthcare Community Plan of Ohio,"UnitedHealthcare; UnitedHealthcare, Inc.",medicaid,medicaid
-OH,medicaid,Molina Healthcare of Ohio,288399,,plan name,Molina Healthcare of Ohio,"Molina Healthcare, Inc.",medicaid,medicaid
-OH,medicaid,Anthem,209166,,plan name,Anthem,Anthem,medicaid,medicaid
-OH,medicaid,AmeriHealth,142802,,plan name,AmeriHealth,AmeriHealth,medicaid,medicaid
+OH,medicaid,UnitedHealthcare Community Plan,317718,,reviewed map,UnitedHealthcare Community Plan of Ohio,"UnitedHealthcare; UnitedHealthcare, Inc.",medicaid,medicaid
+OH,medicaid,AmeriHealth Caritas,142802,,reviewed map,AmeriHealth,AmeriHealth,medicaid,medicaid
 OK,commercial,Blue Cross and Blue Shield of Oklahoma,604722,yes,reviewed map,"Health Care Service Corporation, a Mutual Legal Reserve",HCSC GRP,mlr,commercial
 OK,commercial,CommunityCare HMO,63049,,marketing name (DBA),CommunityCare HMO,CommunityCare Grp,mlr,commercial
 OK,commercial,UnitedHealthcare,43658,yes,reviewed map,National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare of Oklahoma; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
@@ -529,8 +489,8 @@ OK,marketplace,Ambetter,66585,yes,reviewed map,Celtic Insurance,CENTENE CORP GRP
 OK,marketplace,Medica,12439,,reviewed map,Medica Insurance,Medica Grp,mlr,marketplace
 OK,marketplace,Oscar Health,12153,yes,reviewed map,Oscar Insurance,,mlr,marketplace
 OK,medicaid,Oklahoma Complete Health,191381,yes,plan name,Oklahoma Complete Health,Oklahoma Complete Health,medicaid,medicaid
-OK,medicaid,Humana Healthy Horizons of Oklahoma,190134,,plan name,Humana Healthy Horizons of Oklahoma,Humana Healthy Horizons of Oklahoma,medicaid,medicaid
-OK,medicaid,Aetna Better Health of Oklahoma,186183,,plan name,Aetna Better Health of Oklahoma,Aetna Better Health of Oklahoma,medicaid,medicaid
+OK,medicaid,Humana Healthy Horizons,190134,,reviewed map,Humana Healthy Horizons of Oklahoma,Humana Healthy Horizons of Oklahoma,medicaid,medicaid
+OK,medicaid,Aetna Better Health,186183,,reviewed map,Aetna Better Health of Oklahoma,Aetna Better Health of Oklahoma,medicaid,medicaid
 OR,commercial,Kaiser Permanente,341192,,reviewed map,Kaiser Permanente Insurance; Kaiser Foundation Health Plan of the Northwest,KAISER FOUNDATION GRP,mlr,commercial
 OR,commercial,Regence BlueCross BlueShield of Oregon,242510,yes,marketing name (DBA),Regence BlueCross BlueShield of Oregon,REGENCE GRP,mlr,commercial
 OR,commercial,Providence Health Plan,167632,yes,marketing name (DBA),Providence Health Plan,,mlr,commercial
@@ -544,14 +504,13 @@ OR,commercial,Samaritan Health Plans,1337,,marketing name (DBA),Samaritan Health
 OR,medicaid,HealthShare of Oregon,433927,,plan name,HealthShare of Oregon,HealthShare of Oregon,medicaid,medicaid
 OR,medicaid,PacificSource Community Solutions - Marion Polk (CCO),143135,,plan name,PacificSource Community Solutions - Marion Polk (CCO),PacificSource Community Solutions - Marion Polk (CCO),medicaid,medicaid
 OR,medicaid,PacificSource Community Solutions - Lane (CCO),93578,,plan name,PacificSource Community Solutions - Lane (CCO),PacificSource Community Solutions - Lane (CCO),medicaid,medicaid
+OR,medicaid,Trillium Community Health Plan,85643,,plan name; reviewed map,Trillium Community Health Plan; Trillium Community Health Plan - Tri-County,Trillium Community Health Plan; Trillium Community Health Plan - Tri-County,medicaid,medicaid
 OR,medicaid,InterCommunity Health Network,83620,,plan name,InterCommunity Health Network,InterCommunity Health Network,medicaid,medicaid
 OR,medicaid,PacificSource Community Solutions - Central Oregon,75250,,plan name,PacificSource Community Solutions - Central Oregon,PacificSource Community Solutions - Central Oregon,medicaid,medicaid
 OR,medicaid,Eastern Oregon CCO,74566,,plan name,Eastern Oregon CCO,Eastern Oregon CCO,medicaid,medicaid
 OR,medicaid,AllCare Health Plan,67814,,plan name,AllCare Health Plan,AllCare Health Plan,medicaid,medicaid
 OR,medicaid,Jackson Care Connect,64541,,plan name,Jackson Care Connect,Jackson Care Connect,medicaid,medicaid
-OR,medicaid,Trillium Community Health Plan - Tri-County,48296,,plan name,Trillium Community Health Plan - Tri-County,Trillium Community Health Plan - Tri-County,medicaid,medicaid
 OR,medicaid,Umpqua Health Alliance,40562,,plan name,Umpqua Health Alliance,Umpqua Health Alliance,medicaid,medicaid
-OR,medicaid,Trillium Community Health Plan,37347,,plan name,Trillium Community Health Plan,Trillium Community Health Plan,medicaid,medicaid
 OR,medicaid,Columbia Pacific,37190,,plan name,Columbia Pacific,Columbia Pacific,medicaid,medicaid
 OR,medicaid,Yamhill Community Care,34914,,plan name,Yamhill Community Care,Yamhill Community Care,medicaid,medicaid
 OR,medicaid,Advanced Health,29736,,plan name,Advanced Health,Advanced Health,medicaid,medicaid
@@ -566,17 +525,15 @@ PA,commercial,UnitedHealthcare,68718,yes,reviewed map,National Foundation Life I
 PA,commercial,Cigna,49431,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 PA,commercial,Aetna,44167,yes,reviewed map,Aetna HealthAssurance Pennsylvania; Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
 PA,commercial,Geisinger Quality Options,26560,,marketing name (DBA),Geisinger Quality Options,GEISINGER INS GRP,mlr,commercial
-PA,commercial,Reliance Standard Life Insurance,1058,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr,commercial
 PA,marketplace,Pennsylvania Health & Wellness,113693,,marketing name (DBA); plan name,Pennsylvania Health & Wellness,Centene Corporation,mlr; medicaid,marketplace; medicaid
 PA,marketplace,Oscar Health Plan of Pennsylvania,2591,,marketing name (DBA),Oscar Health Plan of Pennsylvania,,mlr,marketplace
 PA,medicaid,UPMC for You,583460,,plan name,UPMC for You,UPMC,medicaid,medicaid
 PA,medicaid,Keystone First,564233,,plan name,Keystone First,Vista,medicaid,medicaid
-PA,medicaid,AmeriHealth Caritas/AmeriHealth Caritas Northeast,353403,,plan name,AmeriHealth Caritas/AmeriHealth Caritas Northeast,Vista,medicaid,medicaid
+PA,medicaid,AmeriHealth Caritas,426331,,plan name; reviewed map,AmeriHealth Caritas; AmeriHealth Caritas/AmeriHealth Caritas Northeast,Vista,medicaid,medicaid
 PA,medicaid,Health Partners Plan,310182,,plan name,Health Partners Plan,Health Partners Plan,medicaid,medicaid
 PA,medicaid,UPMC Community HealthChoices,130300,,plan name,UPMC Community HealthChoices,UPMC,medicaid,medicaid
 PA,medicaid,Highmark Wholecare,121751,,plan name,Highmark Wholecare,Gateway Health Plan,medicaid,medicaid
 PA,medicaid,UnitedHealthcare Community Plan,95611,,plan name,UnitedHealthcare Community Plan,UnitedHealthcare,medicaid,medicaid
-PA,medicaid,AmeriHealth Caritas,72928,,plan name,AmeriHealth Caritas,Vista,medicaid,medicaid
 PR,commercial,Triple-S Salud,401651,yes,marketing name (DBA),Triple-S Salud,,mlr,commercial
 PR,commercial,MAPFRE Life Insurance,40675,,legal name,MAPFRE Life Insurance,MAPFRE Insurance Group,mlr,commercial
 PR,commercial,Mennonite General Hospital,36585,,marketing name (DBA),Mennonite General Hospital,"Mennonite General Hospital, Inc",mlr,commercial
@@ -596,7 +553,7 @@ RI,commercial,Neighborhood Health Plan of Rhode Island,209643,yes,marketing name
 RI,commercial,Blue Cross & Blue Shield of Rhode Island,139562,yes,marketing name (DBA),Blue Cross & Blue Shield of Rhode Island,,mlr,commercial
 RI,commercial,UnitedHealthcare,15219,yes,reviewed map,National Foundation Life Insurance; UnitedHealthcare of New England; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial
 RI,commercial,Harvard Pilgrim Health Care,6388,,reviewed map,Harvard Pilgrim Health Care of New England; HPHC Insurance,HARVARD PILGRIM HTH CARE GRP,mlr,commercial
-RI,medicaid,UnitedHealthcare of Rhode Island Community Plan,81964,,plan name,UnitedHealthcare of Rhode Island Community Plan,"UnitedHealthcare, Inc.",medicaid,medicaid
+RI,medicaid,UnitedHealthcare Community Plan,81964,,reviewed map,UnitedHealthcare of Rhode Island Community Plan,"UnitedHealthcare, Inc.",medicaid,medicaid
 RI,medicaid,Tufts Health Public Plans,15755,,plan name,Tufts Health Public Plans,Point32Health,medicaid,medicaid
 SC,commercial,BlueCross and BlueShield of South Carolina,608763,,marketing name (DBA),BlueCross and BlueShield of South Carolina,BCBS of SC Grp,mlr,commercial
 SC,commercial,BlueChoice HealthPlan of South Carolina,55479,,marketing name (DBA),BlueChoice HealthPlan of South Carolina,BCBS of SC Grp,mlr,commercial
@@ -604,12 +561,11 @@ SC,commercial,UnitedHealthcare,47373,yes,reviewed map,National Foundation Life I
 SC,commercial,Cigna,15867,yes,reviewed map,Cigna HealthCare of South Carolina; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 SC,commercial,Aetna,2748,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
 SC,marketplace,Ambetter,229279,yes,reviewed map,Absolute Total Care,,mlr,marketplace
-SC,marketplace,Molina Healthcare,32805,yes,reviewed map,MOLINA HEALTHCARE OF SOUTH CAROLINA,Molina Healthcare Inc GRP,mlr,marketplace
+SC,marketplace,Molina Healthcare,173394,yes,reviewed map,MOLINA HEALTHCARE OF SOUTH CAROLINA; Molina Healthcare of South Carolina,Molina Healthcare Inc GRP; Molina Healthcare,mlr; medicaid,marketplace; medicaid
 SC,marketplace,Select Health of South Carolina,2774,yes,marketing name (DBA),Select Health of South Carolina,,mlr,marketplace
 SC,medicaid,First Choice by Select Health,323781,,plan name,First Choice by Select Health,AmeriHealth Caritas,medicaid,medicaid
 SC,medicaid,Absolute Total Care,167573,yes,plan name,Absolute Total Care,Centene,medicaid,medicaid
-SC,medicaid,Healthy Blue by Blue Choice,150728,,plan name,Healthy Blue by Blue Choice,BlueCross and BlueShield of South Carolina,medicaid,medicaid
-SC,medicaid,Molina Healthcare of South Carolina,140589,,plan name,Molina Healthcare of South Carolina,Molina Healthcare,medicaid,medicaid
+SC,medicaid,Healthy Blue,150728,,reviewed map,Healthy Blue by Blue Choice,BlueCross and BlueShield of South Carolina,medicaid,medicaid
 SC,medicaid,Humana Healthy Horizons,29918,,plan name,Humana Healthy Horizons,Humana,medicaid,medicaid
 SD,commercial,Wellmark Blue Cross and Blue Shield,127222,,reviewed map,Wellmark; Wellmark of South Dakota,Wellmark Group,mlr,commercial
 SD,commercial,Sanford Health Plan,39374,yes,marketing name (DBA),Sanford Health Plan,Sanford Health Plan/Sanford Health Plan of Minnesota,mlr,commercial
@@ -620,20 +576,17 @@ TN,commercial,BlueCross BlueShield of Tennessee,608285,yes,marketing name (DBA),
 TN,commercial,Cigna,171864,yes,reviewed map,Cigna HealthCare of Tennessee; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial; marketplace
 TN,commercial,UnitedHealthcare,170207,yes,reviewed map,UnitedHealthcare Plan of the River Valley; National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare Insurance Company of the River Valley; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 TN,commercial,Aetna,16258,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
-TN,commercial,Reliance Standard Life Insurance,2932,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr,commercial
 TN,commercial,Alliant Health Plans,1343,,marketing name (DBA),Alliant Health Plans,Health One Alliance Grp,mlr,commercial
 TN,marketplace,Ambetter,260383,yes,reviewed map,Celtic Insurance,CENTENE CORP GRP,mlr,marketplace
 TN,marketplace,Oscar Health,30220,yes,reviewed map,Oscar Insurance,,mlr,marketplace
 TN,marketplace,TRH Health Insurance,20266,,marketing name (DBA),TRH Health Insurance,TRH Health Insurance Company,mlr,marketplace
 TN,marketplace,US Health and Life Insurance,5580,,marketing name (DBA),US Health and Life Insurance,,mlr,marketplace
-TN,medicaid,DentaQuest USA Insurance,1433797,,plan name,DentaQuest USA Insurance,DentaQuest USA Insurance Company,medicaid,medicaid
-TN,medicaid,OptumRx,1275105,,plan name,OptumRx,"OptumRx Holdings, LLC",medicaid,medicaid
 TN,medicaid,Volunteer State Health Plan (BlueCare),541901,,plan name,Volunteer State Health Plan (BlueCare),Blue Cross Blue Shield Association,medicaid,medicaid
 TN,medicaid,UnitedHealthcare Community Plan,429505,yes,plan name,UnitedHealthcare Community Plan,UnitedHealth Group,medicaid,medicaid
 TN,medicaid,Wellpoint,429231,,plan name,Wellpoint,Elevance Health,medicaid,medicaid
 TN,medicaid,Volunteer State Health Plan (TennCare Select),35676,,plan name,Volunteer State Health Plan (TennCare Select),Blue Cross Blue Shield Association,medicaid,medicaid
-TX,commercial,Blue Cross and Blue Shield of Texas,3507937,yes,reviewed map,"Health Care Service Corporation, a Mutual Legal Reserve",HCSC GRP,mlr,commercial
-TX,commercial,UnitedHealthcare,1509743,yes,reviewed map; plan name,UnitedHealthcare of Texas; National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare Benefits of Texas; UnitedHealthcare Insurance; UnitedHealthcare,UNITEDHEALTH GRP; UnitedHealthcare,mlr; medicaid,commercial; marketplace; medicaid
+TX,commercial,Blue Cross and Blue Shield of Texas,3554291,yes,reviewed map,"Health Care Service Corporation, a Mutual Legal Reserve; Blue Cross Blue Shield; Blue Cross and Blue Shield of Texas (BCBSTX)","HCSC GRP; Health Care Service Corporation; Health Care Service Corporation, a Mutual Legal Reserve Company",mlr; medicaid,commercial; medicaid
+TX,commercial,UnitedHealthcare,1486657,yes,reviewed map,UnitedHealthcare of Texas; National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare Benefits of Texas; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 TX,commercial,Aetna,370408,yes,reviewed map,Aetna Life Insurance; Aetna Health Inc. (a Texas corporation),CVS Health Group,mlr,commercial
 TX,commercial,Baylor Scott & White Health Plan,263558,,reviewed map,Baylor Scott & White Insurance; Scott & White Care Plans; Scott and White Health Plan,Scott & White GRP,mlr,commercial
 TX,commercial,Cigna,236891,yes,reviewed map,Cigna HealthCare of Texas; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial; marketplace
@@ -641,85 +594,74 @@ TX,commercial,Community First Health Plans,121575,,marketing name (DBA); plan na
 TX,commercial,FirstCare Health Plans,80115,,marketing name (DBA); plan name,SHA; FirstCare Health Plans,Firstcare Grp; Scott & White Health Plan,mlr; medicaid,commercial; medicaid
 TX,commercial,Curative Insurance,45697,,marketing name (DBA),Curative Insurance,Curative Inc Grp,mlr,commercial
 TX,commercial,Memorial Hermann Commercial Health Plan,6173,,marketing name (DBA),Memorial Hermann Commercial Health Plan,,mlr,commercial
-TX,commercial,Reliance Standard Life Insurance,4385,,marketing name (DBA),Reliance Standard Life Insurance,Tokio Marine Holdings Inc GRP,mlr,commercial
 TX,commercial,Memorial Hermann Health Insurance,1472,,marketing name (DBA),Memorial Hermann Health Insurance,,mlr,commercial
 TX,marketplace,Ambetter,521891,yes,reviewed map,Celtic Insurance; Superior Health Plan,CENTENE CORP GRP,mlr,marketplace
+TX,marketplace,Molina Healthcare,242774,yes,reviewed map,Molina Healthcare of Texas,Molina Healthcare Inc GRP; Molina Healthcare,mlr; medicaid,marketplace; medicaid
 TX,marketplace,Oscar Health,141000,yes,reviewed map,Oscar Insurance,,mlr,marketplace
 TX,marketplace,Community Health Choice,110756,yes,marketing name (DBA),Community Health Choice,"Community Health Choice, Inc.",mlr,marketplace
 TX,marketplace,CHRISTUS HEALTH PLAN,49341,,marketing name (DBA),CHRISTUS HEALTH PLAN,,mlr,marketplace
 TX,marketplace,US Health and Life Insurance,19148,,marketing name (DBA),US Health and Life Insurance,,mlr,marketplace
-TX,marketplace,Molina Healthcare,18942,yes,reviewed map,Molina Healthcare of Texas,Molina Healthcare Inc GRP,mlr,marketplace
 TX,marketplace,Sendero Health Plans,11923,,marketing name (DBA),Sendero Health Plans,"Sendero Health Plans, inc.",mlr,marketplace
 TX,marketplace,Moda Health,4486,,reviewed map,Moda Health Plan,Oregon Dental Grp,mlr,marketplace
 TX,marketplace,Community First Insurance Plans,1974,,marketing name (DBA),Community First Insurance Plans,,mlr,marketplace
-TX,medicaid,Superior Health Plan,784739,,plan name,Superior Health Plan,Centene Corporation,medicaid,medicaid
+TX,medicaid,Superior HealthPlan,950499,yes,reviewed map; plan name,Superior Health Plan; Superior HealthPlan,Centene Corporation,medicaid,medicaid
 TX,medicaid,Wellpoint,684884,,plan name,Wellpoint,"Elevance Health, Inc., LLC",medicaid,medicaid
 TX,medicaid,Texas Children's Health Plan,417218,,plan name,Texas Children's Health Plan,Texas Children's,medicaid,medicaid
-TX,medicaid,UnitedHealthcare Community Plan,312584,,plan name,UnitedHealthcare Community Plan,UnitedHealthcare,medicaid,medicaid
+TX,medicaid,UnitedHealthcare Community Plan,335670,,plan name; reviewed map,UnitedHealthcare Community Plan; UnitedHealthcare,UnitedHealthcare,medicaid,medicaid
 TX,medicaid,Community Health Choice Texas,264093,,plan name,Community Health Choice Texas,Harris County Hospital District dba Harris Health System,medicaid,medicaid
-TX,medicaid,Molina Healthcare of Texas,223832,,plan name,Molina Healthcare of Texas,Molina Healthcare,medicaid,medicaid
 TX,medicaid,Driscoll Children's Health Plan,194012,,plan name,Driscoll Children's Health Plan,Driscoll; Driscoll Children's Hospital,medicaid,medicaid
-TX,medicaid,Superior HealthPlan,165760,yes,plan name,Superior HealthPlan,Centene Corporation,medicaid,medicaid
 TX,medicaid,Parkland Community Health Plan,156752,,plan name,Parkland Community Health Plan,Dallas County Hospital District,medicaid,medicaid
 TX,medicaid,Cook Children's Health Plan,113771,,plan name,Cook Children's Health Plan,Cook Children's Health System; Cook Children's Health Care System,medicaid,medicaid
-TX,medicaid,Aetna Better Health of Texas,113659,,plan name,Aetna Better Health of Texas,Aetna,medicaid,medicaid
+TX,medicaid,Aetna Better Health,113659,,reviewed map,Aetna Better Health of Texas,Aetna,medicaid,medicaid
 TX,medicaid,El Paso Health,67005,,plan name,El Paso Health,El Paso County Hospital District - dba University Medical Center of El Paso,medicaid,medicaid
 TX,medicaid,Scott & White Health Plan,45077,,plan name,Scott & White Health Plan,Baylor Scott & White Holdings,medicaid,medicaid
-TX,medicaid,Blue Cross Blue Shield,38827,,plan name,Blue Cross Blue Shield,Health Care Service Corporation,medicaid,medicaid
 TX,medicaid,Dell Children's Health Plan,28239,,plan name,Dell Children's Health Plan,Seton Insurance Services Corporation,medicaid,medicaid
-TX,medicaid,Blue Cross and Blue Shield of Texas (BCBSTX),7527,,plan name,Blue Cross and Blue Shield of Texas (BCBSTX),"Health Care Service Corporation, a Mutual Legal Reserve Company",medicaid,medicaid
-UT,commercial,Select Health,641211,,reviewed map; plan name,SelectHealth; Select Health,"IHC Inc Grp; Select Health, Inc.",mlr; medicaid,commercial; medicaid
+UT,commercial,Select Health,659832,,reviewed map; plan name,SelectHealth; Select Health; Select Health Integrated,"IHC Inc Grp; Select Health, Inc.",mlr; medicaid,commercial; medicaid
 UT,commercial,Regence BlueCross BlueShield of Utah,162130,yes,marketing name (DBA),Regence BlueCross BlueShield of Utah,REGENCE GRP,mlr,commercial
 UT,commercial,Aetna,108833,yes,reviewed map,Aetna Health of Utah; Aetna Life Insurance,CVS Health Group,mlr,commercial
 UT,commercial,UnitedHealthcare,54844,yes,reviewed map,National Foundation Life Insurance; UnitedHealthcare of Utah; All Savers Insurance; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial
 UT,commercial,Cigna,18559,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 UT,commercial,University of Utah Health Insurance Plans,16230,,marketing name (DBA),University of Utah Health Insurance Plans,,mlr,commercial
-UT,marketplace,Molina Healthcare,5164,yes,reviewed map,Molina Healthcare of Utah,Molina Healthcare Inc GRP,mlr,marketplace
-UT,medicaid,Molina,50740,,plan name,Molina,Molina Healthcare,medicaid,medicaid
-UT,medicaid,Healthy U,49168,,plan name,Healthy U,University of Utah Health Plans,medicaid,medicaid
-UT,medicaid,Health Choice,23980,,plan name,Health Choice,Health Choice Utah,medicaid,medicaid
-UT,medicaid,Select Health Integrated,18621,,plan name,Select Health Integrated,"Select Health, Inc.",medicaid,medicaid
-UT,medicaid,Healthy U Integrated,11455,,plan name,Healthy U Integrated,University of Utah Health Plans,medicaid,medicaid
-UT,medicaid,Molina Integrated,10470,,plan name,Molina Integrated,Molina Healthcare,medicaid,medicaid
-UT,medicaid,Health Choice Integrated,8538,,plan name,Health Choice Integrated,Health Choice Utah,medicaid,medicaid
+UT,marketplace,Molina Healthcare,66374,yes,reviewed map,Molina Healthcare of Utah; Molina; Molina Integrated,Molina Healthcare Inc GRP; Molina Healthcare,mlr; medicaid,marketplace; medicaid
+UT,medicaid,Healthy U,60623,,plan name; reviewed map,Healthy U; Healthy U Integrated,University of Utah Health Plans,medicaid,medicaid
+UT,medicaid,Health Choice Utah,32518,,reviewed map,Health Choice; Health Choice Integrated,Health Choice Utah,medicaid,medicaid
 UT,medicaid,HOME,1449,,plan name,HOME,University of Utah Health Plans,medicaid,medicaid
 VA,commercial,Sentara Health Plans,771221,yes,marketing name (DBA); reviewed map; plan name,Sentara Health Plans; Sentara Health Insurance,Sentara Health Management Group; Sentara Health Plans; Sentara Healthcare,mlr; medicaid,commercial; medicaid
 VA,commercial,Anthem Blue Cross and Blue Shield,738300,,reviewed map,Anthem Health Plans of Virginia; HealthKeepers,Elevance Hlth Inc Grp,mlr,commercial
-VA,commercial,UnitedHealthcare,240567,yes,reviewed map; plan name,UnitedHealthcare Plan of the River Valley; UnitedHealthcare of the Mid-Atlantic; National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; Optimum Choice; All Savers Insurance; MAMSI Life and Health Insurance; UnitedHealthcare Insurance; UnitedHealthcare,UNITEDHEALTH GRP; UnitedHealthcare,mlr; medicaid,commercial; marketplace; medicaid
 VA,commercial,CareFirst BlueCross BlueShield,219515,yes,reviewed map,CareFirst BlueChoice; Group Hospitalization and Medical Services,CAREFIRST INC GRP,mlr,commercial
+VA,commercial,UnitedHealthcare,175102,yes,reviewed map,UnitedHealthcare Plan of the River Valley; UnitedHealthcare of the Mid-Atlantic; National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; Optimum Choice; All Savers Insurance; MAMSI Life and Health Insurance; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 VA,commercial,Cigna,164603,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 VA,commercial,Kaiser Permanente,135363,,reviewed map,Kaiser Permanente Insurance; Kaiser Foundation Health Plan of Mid-Atlantic States,KAISER FOUNDATION GRP,mlr,commercial
 VA,commercial,Aetna,89596,yes,reviewed map,Innovation Health Insurance; Innovation Health Plan; Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
 VA,commercial,Piedmont Community HealthCare HMO,1013,,marketing name (DBA),Piedmont Community HealthCare HMO,Piedmont Comm Hlth Grp,mlr,commercial
-VA,medicaid,Anthem Healthkeepers Plus,424993,,plan name,Anthem Healthkeepers Plus,Elevance,medicaid,medicaid
-VA,medicaid,Aetna Better Health of Virginia,271844,,plan name,Aetna Better Health of Virginia,"Aetna; Anthem Insurance Companies, Inc.",medicaid,medicaid
-VA,medicaid,UnitedHealthcare of the Mid-Atlantic,168493,,plan name,UnitedHealthcare of the Mid-Atlantic,UnitedHealthcare,medicaid,medicaid
-VA,medicaid,Molina Healthcare of Virginia,136424,,plan name,Molina Healthcare of Virginia,"Molina Healthcare; Molina Healthcare, Inc.",medicaid,medicaid
-VA,medicaid,Anthem Healthkeepers,118755,,plan name,Anthem Healthkeepers,Elevance,medicaid,medicaid
+VA,medicaid,Anthem HealthKeepers Plus,543748,,reviewed map,Anthem Healthkeepers; Anthem Healthkeepers Plus,Elevance,medicaid,medicaid
+VA,medicaid,Aetna Better Health,271844,,reviewed map,Aetna Better Health of Virginia,"Aetna; Anthem Insurance Companies, Inc.",medicaid,medicaid
+VA,medicaid,UnitedHealthcare Community Plan,233958,,reviewed map,UnitedHealthcare; UnitedHealthcare of the Mid-Atlantic,UnitedHealthcare,medicaid,medicaid
+VA,medicaid,Molina Healthcare,136424,yes,reviewed map,Molina Healthcare of Virginia,"Molina Healthcare; Molina Healthcare, Inc.",medicaid,medicaid
 VT,commercial,Blue Cross and Blue Shield of Vermont,66147,yes,marketing name (DBA),Blue Cross and Blue Shield of Vermont,Blue Care Network of Michigan,mlr,commercial
 VT,commercial,MVP Health Care,27012,yes,reviewed map,MVP Health Plan,MVP GRP,mlr,commercial
 VT,commercial,Cigna,3140,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 VT,medicaid,Department of Vermont Health Access,165372,,plan name,Department of Vermont Health Access,Vermont Agency of Human Services,medicaid,medicaid
 WA,commercial,Premera Blue Cross,464610,yes,reviewed map,Premera Blue Cross HMO; LifeWise Assurance; LifeWise Health Plan of Washington; Premera Blue Cross,Premera Blue Cross Group,mlr,commercial
 WA,commercial,Kaiser Permanente,426240,,reviewed map,Kaiser Permanente Insurance; Kaiser Foundation Health Plan of the Northwest; Kaiser Foundation Health Plan of Washington; Kaiser Foundation Health Plan of Washington Options,KAISER FOUNDATION GRP,mlr,commercial
-WA,commercial,UnitedHealthcare,306725,yes,reviewed map; plan name,UnitedHealthcare of Washington; National Foundation Life Insurance; UnitedHealthcare of Oregon; UnitedHealthcare Insurance; UnitedHealthcare,UNITEDHEALTH GRP; UnitedHealthcare,mlr; medicaid,commercial; marketplace; medicaid
 WA,commercial,Regence BlueShield,297533,yes,marketing name (DBA),Regence BlueShield,REGENCE GRP,mlr,commercial
+WA,commercial,UnitedHealthcare,98647,yes,reviewed map,UnitedHealthcare of Washington; National Foundation Life Insurance; UnitedHealthcare of Oregon; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 WA,commercial,Aetna,42037,yes,reviewed map,Aetna Life Insurance,CVS Health Group,mlr,commercial
 WA,commercial,Cigna,28301,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 WA,commercial,Regence BlueCross BlueShield of Oregon,26920,,marketing name (DBA),Regence BlueCross BlueShield of Oregon,REGENCE GRP,mlr,commercial
 WA,commercial,Asuris Northwest Health,17597,,marketing name (DBA),Asuris Northwest Health,REGENCE GRP,mlr,commercial
 WA,commercial,PacificSource Health Plans,7811,,reviewed map,PacificSource Health Plans,PacificSource Hlth Plan Grp,mlr,commercial
 WA,commercial,Providence Health Plan,1977,,marketing name (DBA),Providence Health Plan,,mlr,commercial
+WA,marketplace,Molina Healthcare,876799,yes,reviewed map,Molina Healthcare of Washington,Molina Healthcare Inc GRP; Molina Healthcare of Washington,mlr; medicaid,marketplace; medicaid
 WA,marketplace,Ambetter,83861,yes,reviewed map,Coordinated Care Corporation Indiana,CENTENE CORP GRP,mlr,marketplace
-WA,marketplace,Molina Healthcare,39342,yes,reviewed map,Molina Healthcare of Washington,Molina Healthcare Inc GRP,mlr,marketplace
 WA,marketplace,Community Health Plan of Washington,34146,yes,marketing name (DBA),Community Health Plan of Washington,Community Health Plan of Washington,mlr,marketplace
-WA,medicaid,Molina Healthcare of Washington,837457,,plan name,Molina Healthcare of Washington,Molina Healthcare of Washington,medicaid,medicaid
 WA,medicaid,Community Health Plan,252143,,plan name,Community Health Plan,Community Health Plan,medicaid,medicaid
+WA,medicaid,UnitedHealthcare Community Plan,208078,,reviewed map,UnitedHealthcare,UnitedHealthcare,medicaid,medicaid
 WA,medicaid,Coordinated Care of Washington,196657,,plan name,Coordinated Care of Washington,Coordinated Care of Washington,medicaid,medicaid
 WA,medicaid,Amerigroup,166570,,plan name,Amerigroup,Amerigroup,medicaid,medicaid
 WA,medicaid,Multiple Sites,7137,,plan name,Multiple Sites,Multiple Sites,medicaid,medicaid
+WI,commercial,Anthem Blue Cross and Blue Shield,374632,,reviewed map,Compcare Health Services Insurance; Blue Cross Blue Shield of Wisconsin; Anthem Blue Cross Blue Shield,Elevance Hlth Inc Grp; Elevance Health,mlr; medicaid,commercial; medicaid
 WI,commercial,Quartz,286191,yes,reviewed map; plan name,Quartz Health Benefit Plans; Quartz Health Insurance; Quartz Health Plan; Quartz,University Health Care & Gundersen Lutheran Group; Quartz Health Insurance Corporation,mlr; medicaid,commercial; medicaid
-WI,commercial,Anthem Blue Cross and Blue Shield,246386,,reviewed map,Compcare Health Services Insurance; Blue Cross Blue Shield of Wisconsin,Elevance Hlth Inc Grp,mlr,commercial
 WI,commercial,Dean Health Plan,235034,,reviewed map; plan name,Dean Health Plan,Medica Grp; Dean Health System and SSM Health Care,mlr; medicaid,commercial; medicaid
 WI,commercial,UnitedHealthcare,199731,yes,reviewed map,National Foundation Life Insurance; Golden Rule Insurance; UnitedHealthcare of Wisconsin; All Savers Insurance; UnitedHealthcare Insurance,UNITEDHEALTH GRP,mlr,commercial; marketplace
 WI,commercial,Security Health Plan of Wisconsin,135128,,marketing name (DBA); plan name,Security Health Plan of Wisconsin,Marshfield Clinic Health System,mlr; medicaid,commercial; medicaid
@@ -736,15 +678,12 @@ WI,commercial,Medical Associates Health Plan of WI,4283,,marketing name (DBA),Me
 WI,commercial,Cigna,2753,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 WI,commercial,Aetna,1696,yes,reviewed map,Aetna Life Insurance,CVS Health Group,mlr,commercial
 WI,marketplace,Chorus Community Health Plans,133882,,marketing name (DBA); plan name,Chorus Community Health Plans,Children's Wisconsin,mlr; medicaid,marketplace; medicaid
+WI,marketplace,Molina Healthcare,80609,yes,reviewed map,Molina Healthcare of Wisconsin; Molina HealthCare of Wisconsin,"Molina Healthcare Inc GRP; Molina Healthcare, Inc.",mlr; medicaid,marketplace; medicaid
 WI,marketplace,Medica Community Health Plan,12893,,marketing name (DBA),Medica Community Health Plan,Medica,mlr,marketplace
-WI,marketplace,Molina Healthcare,3363,yes,reviewed map,Molina Healthcare of Wisconsin,Molina Healthcare Inc GRP,mlr,marketplace
 WI,medicaid,UnitedHealthcare Community Plan,217773,,plan name,UnitedHealthcare Community Plan,UnitedHealth Group,medicaid,medicaid
-WI,medicaid,Anthem Blue Cross Blue Shield,128246,yes,plan name,Anthem Blue Cross Blue Shield,Elevance Health,medicaid,medicaid
-WI,medicaid,Molina Healthcare of Wisconsin,77246,,plan name,Molina Healthcare of Wisconsin; Molina HealthCare of Wisconsin,"Molina Healthcare, Inc.",medicaid,medicaid
 WI,medicaid,MHS Health Wisconsin,52337,,plan name,MHS Health Wisconsin,Centene Corporation,medicaid,medicaid
-WI,medicaid,Independent Care Health Plan,35217,,plan name,Independent Care Health Plan,Humana,medicaid,medicaid
+WI,medicaid,Independent Care Health Plan (iCare),36713,,reviewed map,Independent Care Health Plan; Independent Care Health Plan - iCare,"Humana; Humana, Inc.",medicaid,medicaid
 WI,medicaid,Group Health Cooperative of South Central WI,6801,,plan name,Group Health Cooperative of South Central WI,Group Health Cooperative of South Central WI,medicaid,medicaid
-WI,medicaid,Independent Care Health Plan - iCare,1496,,plan name,Independent Care Health Plan - iCare,"Humana, Inc.",medicaid,medicaid
 WI,medicaid,My Choice Wisconsin,1282,,plan name,My Choice Wisconsin,"Molina Healthcare, Inc.",medicaid,medicaid
 WV,commercial,Highmark Blue Cross Blue Shield,159023,,reviewed map,Highmark West Virginia,HIGHMARK GRP,mlr,commercial
 WV,commercial,The Health Plan of West Virginia,17376,,marketing name (DBA),The Health Plan of West Virginia,HEALTH PLAN GRP,mlr,commercial
@@ -752,8 +691,8 @@ WV,commercial,UnitedHealthcare,2268,yes,reviewed map,National Foundation Life In
 WV,commercial,Aetna,1753,yes,reviewed map,Aetna Health Inc. (a Pennsylvania corporation); Aetna Life Insurance,CVS Health Group,mlr,commercial
 WV,commercial,Cigna,1649,yes,reviewed map,Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
 WV,marketplace,CareSource,24874,,reviewed map,CareSource West Virginia,CareSource Management Group,mlr,marketplace
-WV,medicaid,Aetna Better Health of WV,164545,,plan name,Aetna Better Health of WV,CVS/Caremark,medicaid,medicaid
-WV,medicaid,Wellpoint West Virginia,145177,,plan name,Wellpoint West Virginia,Elevance,medicaid,medicaid
+WV,medicaid,Aetna Better Health,164545,,reviewed map,Aetna Better Health of WV,CVS/Caremark,medicaid,medicaid
+WV,medicaid,Wellpoint,145177,,reviewed map,Wellpoint West Virginia,Elevance,medicaid,medicaid
 WV,medicaid,The Health Plan of WV,97594,,plan name,The Health Plan of WV,The Health Plan of WV,medicaid,medicaid
 WY,commercial,Blue Cross Blue Shield of Wyoming,68090,yes,marketing name (DBA),Blue Cross Blue Shield of Wyoming,,mlr,commercial
 WY,commercial,Montana Health Cooperative,13609,,marketing name (DBA),Montana Health Cooperative,Montana Health Cooperative,mlr,commercial
