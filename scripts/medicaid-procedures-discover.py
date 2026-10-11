@@ -39,23 +39,32 @@ for u in ['https://opendata.hhs.gov/datasets/medicaid-provider-spending', 'https
     except Exception as e:
         note(f'- {u}: {e}')
 
-note(f'\n## Hugging Face: {REPO}\n')
-try:
-    info = json.loads(get(f'https://huggingface.co/api/datasets/{REPO}'))
-    note(f"- author: {info.get('author')}; last modified: {info.get('lastModified')}; card: {json.dumps(info.get('cardData', {}))[:600]}")
-    files = [s['rfilename'] for s in info.get('siblings', [])]
-    note('- repository files: ' + ', '.join(files[:40]))
-    pq = json.loads(get(f'https://huggingface.co/api/datasets/{REPO}/parquet'))
-    note('- parquet listing: ' + json.dumps(pq)[:1500])
-except Exception as e:
-    note(f'**metadata failed:** {e}'); done(1)
-
+note('\n## HHS Open Data catalog\n')
 urls = []
-def walk(x):
-    if isinstance(x, str) and x.endswith('.parquet'): urls.append(x)
-    elif isinstance(x, dict): [walk(v) for v in x.values()]
-    elif isinstance(x, list): [walk(v) for v in x]
-walk(pq)
+try:
+    cat = json.loads(get('https://opendata.hhs.gov/data.json'))
+    sets = cat.get('dataset', cat if isinstance(cat, list) else [])
+    note(f'- {len(sets)} datasets in the catalog')
+    for d in sets:
+        t = d.get('title', '')
+        if 'medicaid' in t.lower() or 'provider spending' in t.lower():
+            note(f"- **{t}** (modified {d.get('modified')}, id {d.get('identifier')})")
+            for x in d.get('distribution', []):
+                u = x.get('downloadURL') or x.get('accessURL')
+                note(f"    - {x.get('title') or ''} [{x.get('format') or x.get('mediaType') or ''}] {u}")
+                if u and ('hcpcs' in (u + (x.get('title') or '')).lower() or 'HCPCS' in t) and u.lower().split('?')[0].endswith(('.parquet', '.csv', '.zip')):
+                    urls.append(u)
+    page = get('https://opendata.hhs.gov/datasets/medicaid-provider-spending').decode('utf-8', 'replace')
+    import re
+    links = sorted(set(re.findall(r'https?://[^"\'\s<>]+\.(?:parquet|csv|zip)[^"\'\s<>]*', page)))
+    note('- links on the dataset page: ' + (', '.join(links) or 'none'))
+    other = sorted(set(u for u in re.findall(r'https?://[^"\'\s<>)]+', page) if any(k in u.lower() for k in ('download', 'api', 'storage', 's3', 'blob', 'files', 'parquet'))))
+    note('- other download-like links on the page: ' + (', '.join(other[:40]) or 'none'))
+    for u in links:
+        if 'hcpcs' in u.lower() and u not in urls: urls.append(u)
+except Exception as e:
+    note(f'**catalog failed:** {e}'); done(1)
+note('\n(Hugging Face copy skipped: HHS-Official/medicaid-provider-spending answered 401, gated, on 2026-10-11.)')
 if not urls:
     note('**no parquet URLs found**'); done(1)
 note(f'\n{len(urls)} parquet file(s):\n')
@@ -63,7 +72,10 @@ for u in urls: note(f'- {u}')
 
 con = duckdb.connect()
 con.execute('INSTALL httpfs; LOAD httpfs;')
-src = 'read_parquet([' + ','.join("'" + u + "'" for u in urls) + '])'
+reader = 'read_parquet' if urls[0].lower().split('?')[0].endswith('.parquet') else 'read_csv_auto'
+if urls[0].lower().split('?')[0].endswith('.zip'):
+    note('**the HCPCS file is a zip; download and unzip before DuckDB (next step)**'); done(1)
+src = reader + '([' + ','.join("'" + u + "'" for u in urls) + '])'
 def q(sql):
     return con.execute(sql.replace('SRC', src)).fetchall()
 def cols_of():
