@@ -706,7 +706,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) written 2026-10-11, not yet applied. `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11. `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
@@ -1229,7 +1229,9 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   on purpose. Final run: 661 state plans, 271 already listed.
   `scripts/build-payer-migration.mjs` turns the proposal into migration
   `034_insurance_payers_state_plans.sql` (390 rows, sort order 70, skips
-  what 003 lists, `on conflict do nothing`); regenerate rather than edit.
+  what 003 lists, `on conflict do nothing`; applied 2026-10-11); regenerate
+  rather than edit. A later refresh: rerun the job, then generate the next
+  numbered migration (the conflict rule makes it add only new plans).
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
   read-only sizes of every table and index, dead rows, index use, WAL, to
   `supabase/reference/db-size-report.md`. Run it before any disk decision.

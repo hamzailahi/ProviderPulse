@@ -580,8 +580,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   Humana Healthy Horizons and so on, and regional variants fold together
   (Partnership HealthPlan, WellSense, Kaiser Permanente). A migration
   generated from the approved list (390 new state plans: 150 commercial,
-  33 marketplace-only, 207 Medicaid) adds them to the pickers once it is
-  run in Supabase; 271 more were already listed.
+  33 marketplace-only, 207 Medicaid) is applied, so they are in every plan
+  picker now; 271 more were already listed.
 - **More insurance plans, step one.** A new manual, read-only job finds
   the official CMS files listing every company selling private, employer
   and marketplace health insurance in each state, and every Medicaid
