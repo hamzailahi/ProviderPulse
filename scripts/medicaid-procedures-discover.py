@@ -44,6 +44,10 @@ import re
 try:
     page = get('https://opendata.hhs.gov/datasets/medicaid-provider-spending').decode('utf-8', 'replace')
     note('- page scripts: ' + ', '.join(sorted(set(re.findall(r'src="([^"]+)"', page)))[:20]))
+    allurls = sorted(set(re.findall(r'https?:(?:\\\\)?/(?:\\\\)?/[^"\'\s<>\\]+', page)))
+    note('- every URL in the page: ' + ', '.join(allurls[:80]))
+    tail = re.sub(r'\s+', ' ', page[-6000:]).replace('`', "'")
+    note('- page tail (the embedded dataset record): `' + tail + '`')
     note('- page head: `' + re.sub(r'\s+', ' ', page[:1500]).replace('`', "'") + '`')
     for js in sorted(set(re.findall(r'src="([^"]+\.js)"', page)))[:6]:
         u = js if js.startswith('http') else 'https://opendata.hhs.gov' + ('' if js.startswith('/') else '/') + js
