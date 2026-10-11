@@ -1,5 +1,5 @@
 <!-- Written by scripts/build-payer-proposal.mjs. A proposal for review; nothing is loaded. -->
-# Insurance plan proposal, 2026-10-11 15:27 UTC
+# Insurance plan proposal, 2026-10-11 15:28 UTC
 
 Sources: https://www.cms.gov/files/zip/mlr-public-use-file-2024.zip and https://download.medicaid.gov/data/managed-care-enrollment-by-program-and-plan2024-table4.csv. Cutoff: at least 1,000 members in the state.
 
@@ -27,7 +27,7 @@ Largest state filings (check these look right):
 
 Medicaid: 7,804 rows; newest year 2024; 505 comprehensive managed care plan rows, 70,563,848 enrollees.
 
-Proposed: **809** state plans (391 with Medicaid, 92 individual-market only, 364 commercial); 268 are already in the list. Below the cutoff and left out: 817. Left out by the reviewed map as not medical plans: 53 (The United States Life Ins. Co. in the City of New York, ACN Group of California).
+Proposed: **760** state plans (349 with Medicaid, 92 individual-market only, 365 commercial); 268 are already in the list. Below the cutoff and left out: 806. Left out by the reviewed map as not medical plans: 53 (The United States Life Ins. Co. in the City of New York, ACN Group of California).
 
 Largest parent groups (candidates for the reviewed brand map):
 

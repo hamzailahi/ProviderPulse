@@ -34,19 +34,22 @@ AZ,medicaid,Health Choice Arizona,208447,,plan name,Health Choice Arizona,Blue C
 AZ,medicaid,Care 1st,71704,,plan name,Care 1st,WellCare/Centene Corporation,medicaid,medicaid
 AZ,medicaid,Molina Complete Care of Arizona,41704,,plan name,Molina Complete Care of Arizona,Molina Complete Care of Arizona,medicaid,medicaid
 AZ,medicaid,DCS/CHP,8557,,plan name,DCS/CHP,Government Agency/Non-Profit Entity,medicaid,medicaid
-CA,commercial,Kaiser Permanente,6644911,,reviewed map,Kaiser Permanente Insurance; Kaiser Foundation Health Plan,KAISER FOUNDATION GRP,mlr,commercial
+CA,commercial,Kaiser Permanente,7852217,,reviewed map; plan name,Kaiser Permanente Insurance; Kaiser Foundation Health Plan; Kaiser Permanente,KAISER FOUNDATION GRP; Kaiser Permanente - Marin; Kaiser Permanente - Mariposa; Kaiser Permanente - Napa; Kaiser Permanente - Orange; Kaiser Permanente - Placer; Kaiser Permanente - San Mateo; Kaiser Permanente - Santa Cruz; Kaiser Permanente - Solano; Kaiser Permanente - Sonoma; Kaiser Permanente - Sutter; Kaiser Permanente - Ventura; Kaiser Permanente - Yolo; Kaiser Permanente - Yuba; CH&W - Imperial; Kaiser Permanente -Alameda; Kaiser Permanente - Contra Costa; Kaiser Permanente -Imperial; Kaiser Permanente,mlr; medicaid,commercial; medicaid
+CA,commercial,L.A. Care Health Plan,2605695,yes,reviewed map; plan name,Local Initiative Health Authority for Los Angeles County; L.A. Care Health Plan,L.A. Care Health Plan; L.A. Care,mlr; medicaid,commercial; medicaid
 CA,commercial,Blue Shield of California,2229812,yes,reviewed map,Blue Shield of California Life & Health Insurance; California Physicians Service,Blue Shield of California Group,mlr,commercial
-CA,commercial,Anthem Blue Cross,2047228,yes,reviewed map,Blue Cross of California; Anthem Blue Cross Life and Health Insurance,Elevance Hlth Inc Grp,mlr,commercial
+CA,commercial,Anthem Blue Cross,2146106,yes,reviewed map; plan name,Blue Cross of California; Anthem Blue Cross Life and Health Insurance; Anthem Blue Cross,Elevance Hlth Inc Grp; Anthem - Santa Clara,mlr; medicaid,commercial; medicaid
 CA,commercial,UnitedHealthcare,914796,yes,reviewed map,"Unimerica Insurance; UHC of California; U.S. Behavioral Health Plan, CA; National Foundation Life Insurance; UnitedHealthcare Benefits Plan of California; UnitedHealthcare Insurance",UNITEDHEALTH GRP,mlr,commercial
+CA,commercial,Health Net,901991,yes,reviewed map; plan name,Health Net of California; Health Net Life Insurance; Health Net,CENTENE CORP GRP; Health Net -Sacramento; Health Net,mlr; medicaid,commercial; medicaid
 CA,commercial,Aetna,529568,yes,reviewed map,Aetna Health of California; Aetna Life Insurance,CVS Health Group,mlr,commercial
-CA,commercial,Health Net,513971,yes,reviewed map,Health Net of California; Health Net Life Insurance,CENTENE CORP GRP,mlr,commercial
+CA,commercial,ALAMEDA ALLIANCE FOR HEALTH,405852,,marketing name (DBA); plan name,ALAMEDA ALLIANCE FOR HEALTH; Alameda Alliance for Health,AAFH - Alameda,mlr; medicaid,commercial; medicaid
 CA,commercial,Cigna,331673,yes,reviewed map,Cigna HealthCare of California; Connecticut General Life Insurance; Cigna Health and Life Insurance,Cigna Hlth Grp,mlr,commercial
-CA,commercial,L.A. Care Health Plan,246195,yes,reviewed map,Local Initiative Health Authority for Los Angeles County,L.A. Care Health Plan,mlr,commercial
+CA,commercial,CONTRA COSTA HEALTH PLAN,264919,,marketing name (DBA); plan name,CONTRA COSTA HEALTH PLAN; Contra Costa Health Plan,CCHP - Contra Costa,mlr; medicaid,commercial; medicaid
 CA,commercial,Health Plan of San Mateo,146519,,marketing name (DBA); plan name,San Mateo Health Commission; Health Plan of San Mateo,HPSM - San Mateo,mlr; medicaid,commercial; medicaid
 CA,commercial,Sharp Health Plan,137718,,marketing name (DBA),Sharp Health Plan,,mlr,commercial
 CA,commercial,Sutter Health Alliance,118165,,marketing name (DBA),Sutter Health Alliance,,mlr,commercial
 CA,commercial,Western Health Advantage,117736,,marketing name (DBA),Western Health Advantage,,mlr,commercial
 CA,commercial,Valley Health Plan,56239,,marketing name (DBA),County of Santa Clara,,mlr,commercial
+CA,commercial,Central California Alliance for Health,26977,,marketing name (DBA); plan name,Santa Cruz-Monterey-Merced-San Benito-Mariposa Managed Medical Care Commission; Central California Alliance for Health,CCAH - Mariposa; CCAH - San Benito,mlr; medicaid,commercial; medicaid
 CA,commercial,Holman Professional Counseling Centers,24320,,marketing name (DBA),Holman Professional Counseling Centers,Holman Professional Counseling Centers,mlr,commercial
 CA,commercial,Scripps Health Plan Services,17656,,marketing name (DBA),Scripps Health Plan Services,,mlr,commercial
 CA,commercial,Nippon Life Insurance Company of America,13965,,marketing name (DBA),Nippon Life Insurance Company of America,,mlr,commercial
@@ -54,88 +57,36 @@ CA,commercial,San Francisco Health Authority,11166,,marketing name (DBA),San Fra
 CA,commercial,Community Care Health Plan,11105,,marketing name (DBA),Community Care Health Plan,,mlr,commercial
 CA,commercial,Ventura County Health Care Plan,9908,,marketing name (DBA),Ventura County Health Care Plan,,mlr,commercial
 CA,commercial,Chinese Community Health Plan,8321,,marketing name (DBA),Chinese Community Health Plan,,mlr,commercial
-CA,commercial,CONTRA COSTA HEALTH PLAN,6554,,marketing name (DBA),CONTRA COSTA HEALTH PLAN,,mlr,commercial
-CA,commercial,ALAMEDA ALLIANCE FOR HEALTH,5790,,marketing name (DBA),ALAMEDA ALLIANCE FOR HEALTH,,mlr,commercial
+CA,marketplace,Inland Empire Health Plan,1521634,yes,marketing name (DBA); plan name,Inland Empire Health Plan,Inland Empire Health Plan,mlr; medicaid,marketplace; medicaid
 CA,marketplace,Molina Healthcare,59400,yes,reviewed map,MOLINA HEALTHCARE OF CALIFORNIA,Molina Healthcare Inc GRP,mlr,marketplace
-CA,marketplace,Inland Empire Health Plan,28932,yes,marketing name (DBA),Inland Empire Health Plan,,mlr,marketplace
-CA,medicaid,L.A. Care Health Plan/ Los Angeles,2359500,,plan name,L.A. Care Health Plan/ Los Angeles,L.A. Care,medicaid,medicaid
-CA,medicaid,Health Net Community Solutions/Los Angeles,1177460,,plan name,Health Net Community Solutions/Los Angeles,Health Net - Los Angeles,medicaid,medicaid
-CA,medicaid,CalOptima/Orange,892359,,plan name,CalOptima/Orange,CalOptima-Orange,medicaid,medicaid
-CA,medicaid,Inland Empire Health Plan/Riverside,766890,,plan name,Inland Empire Health Plan/Riverside,Inland Empire Health Plan,medicaid,medicaid
-CA,medicaid,Inland Empire Health Plan/San Bernardino,725812,,plan name,Inland Empire Health Plan/San Bernardino,Inland Empire Health Plan,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/Los Angeles,589634,,plan name,Kaiser Permanente/Los Angeles,Kaiser Permanente,medicaid,medicaid
-CA,medicaid,Community Health Group/San Diego,405072,,plan name,Community Health Group/San Diego,CHG - San Diego,medicaid,medicaid
+CA,medicaid,Health Net Community Solutions,1194948,,plan name,Health Net Community Solutions,Health Net - Region 2; Health Net - Los Angeles,medicaid,medicaid
+CA,medicaid,CalOptima,892359,,plan name,CalOptima,CalOptima-Orange,medicaid,medicaid
+CA,medicaid,Molina Healthcare of CA Partner Plan,629529,,plan name,Molina Healthcare of CA Partner Plan,Molina -Sacramento; Molina - San Diego; Molina Healthcare,medicaid,medicaid
+CA,medicaid,Anthem Blue Cross Partnership Plan,549480,,plan name,Anthem Blue Cross Partnership Plan,"Anthem; Anthem Insurance Companies, Inc.; Anthem - San Francisco; Anthem - Santa Clara; Anthem - Tulare",medicaid,medicaid
+CA,medicaid,Health Plan of San Joaquin,412074,,plan name,Health Plan of San Joaquin,Health Plan of San Joaquin,medicaid,medicaid
+CA,medicaid,Community Health Group,405072,,plan name,Community Health Group,CHG - San Diego,medicaid,medicaid
 CA,medicaid,Kern Family Health Care,402077,,plan name,Kern Family Health Care,Kern Health Systems,medicaid,medicaid
-CA,medicaid,Alameda Alliance for Health/Alameda,400062,,plan name,Alameda Alliance for Health/Alameda,AAFH - Alameda,medicaid,medicaid
-CA,medicaid,CalViva Health/Fresno,350145,,plan name,CalViva Health/Fresno,CalViva - Fresno,medicaid,medicaid
+CA,medicaid,CalViva Health,399417,,plan name,CalViva Health,CalViva - Fresno; CalViva Health -Madera,medicaid,medicaid
 CA,medicaid,Partnership HealthPlan of CA,311925,,plan name,Partnership HealthPlan of CA,Partnership,medicaid,medicaid
-CA,medicaid,Molina Healthcare of CA Partner Plan/San Diego,300655,,plan name,Molina Healthcare of CA Partner Plan/San Diego,Molina - San Diego,medicaid,medicaid
 CA,medicaid,Santa Clara Family Health Plan,292148,,plan name,Santa Clara Family Health Plan,Santa Clara Family Health Plan,medicaid,medicaid
-CA,medicaid,Contra Costa Health Plan/Contra Costa,258365,,plan name,Contra Costa Health Plan/Contra Costa,CCHP - Contra Costa,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership/Sacramento,251425,,plan name,Anthem Blue Cross Partnership/Sacramento,Anthem -Sacramento,medicaid,medicaid
+CA,medicaid,Anthem Blue Cross Partnership,251425,,plan name,Anthem Blue Cross Partnership,Anthem -Sacramento,medicaid,medicaid
 CA,medicaid,Gold Coast Health Plan Ventura,247849,,plan name,Gold Coast Health Plan Ventura,GCHP - Ventura,medicaid,medicaid
-CA,medicaid,Health Plan of San Joaquin/San Joaquin,242120,,plan name,Health Plan of San Joaquin/San Joaquin,Health Plan of San Joaquin,medicaid,medicaid
+CA,medicaid,CenCal,239520,,plan name,CenCal,CenCal - Santa Barbara; CenCal - San Luis Obispo,medicaid,medicaid
 CA,medicaid,Partnership HealthPlan of CA/Southwest,232181,,plan name,Partnership HealthPlan of CA/Southwest,Partnership - Southwest,medicaid,medicaid
-CA,medicaid,Blue Shield of California Promise/San Diego,196938,,plan name,Blue Shield of California Promise/San Diego,Blue Shield - San Diego,medicaid,medicaid
+CA,medicaid,Blue Shield of California Promise,196938,,plan name,Blue Shield of California Promise,Blue Shield - San Diego,medicaid,medicaid
 CA,medicaid,Central California Alliance for Health/Santa Cruz and Monterey,193497,,plan name,Central California Alliance for Health/Santa Cruz and Monterey,CCAH - Monterey/Santa Cruz,medicaid,medicaid
 CA,medicaid,Partnership HealthPlan of CA/Southeast,181366,,plan name,Partnership HealthPlan of CA/Southeast,Partnership - Southeast,medicaid,medicaid
 CA,medicaid,San Francisco Health Plan,176670,,plan name,San Francisco Health Plan,San Francisco Health Plan,medicaid,medicaid
-CA,medicaid,CenCal/Santa Barbara,172391,,plan name,CenCal/Santa Barbara,CenCal - Santa Barbara,medicaid,medicaid
-CA,medicaid,Health Plan of San Joaquin/Stanislaus,169954,,plan name,Health Plan of San Joaquin/Stanislaus,Health Plan of San Joaquin,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership Plan/Fresno,155552,,plan name,Anthem Blue Cross Partnership Plan/Fresno,"Anthem Insurance Companies, Inc.",medicaid,medicaid
 CA,medicaid,Central California Alliance for Health Merced,149461,,plan name,Central California Alliance for Health Merced,CCAH - Merced,medicaid,medicaid
-CA,medicaid,Health Net/Sacramento,146866,,plan name,Health Net/Sacramento,Health Net -Sacramento,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership Plan/Tulare,146544,,plan name,Anthem Blue Cross Partnership Plan/Tulare,Anthem - Tulare,medicaid,medicaid
-CA,medicaid,Molina Healthcare of CA Partner Plan/San Bernardino,140972,,plan name,Molina Healthcare of CA Partner Plan/San Bernardino,Molina Healthcare,medicaid,medicaid
-CA,medicaid,Health Net/Tulare,139186,,plan name,Health Net/Tulare,Health Net,medicaid,medicaid
-CA,medicaid,Kaiser Foundation/Sacramento,132688,,plan name,Kaiser Foundation/Sacramento,Kaiser -Sacramento,medicaid,medicaid
-CA,medicaid,Molina Healthcare of CA Partner Plan/Riverside,114560,,plan name,Molina Healthcare of CA Partner Plan/Riverside,Molina Healthcare,medicaid,medicaid
+CA,medicaid,Kaiser Foundation,132688,,plan name,Kaiser Foundation,Kaiser -Sacramento,medicaid,medicaid
 CA,medicaid,Partnership HealthPlan of CA/Northeast,103734,,plan name,Partnership HealthPlan of CA/Northeast,Partnership - Northeast,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership Plan/Santa Clara,98878,,plan name,Anthem Blue Cross Partnership Plan/Santa Clara,Anthem - Santa Clara,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross/Santa Clara,98878,,plan name,Anthem Blue Cross/Santa Clara,Anthem - Santa Clara,medicaid,medicaid
 CA,medicaid,Community Health Plan of Imperial Valley,96485,,plan name,Community Health Plan of Imperial Valley,CHP - Imperial,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/San Bernardino,91179,,plan name,Kaiser Permanente/San Bernardino,Kaiser Permanente,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/Riverside,85162,,plan name,Kaiser Permanente/Riverside,Kaiser Permanente,medicaid,medicaid
-CA,medicaid,Kaiser/San Diego,75242,,plan name,Kaiser/San Diego,Kaiser - San Diego,medicaid,medicaid
-CA,medicaid,Molina Healthcare of CA Partner Plan/Sacramento,73342,,plan name,Molina Healthcare of CA Partner Plan/Sacramento,Molina -Sacramento,medicaid,medicaid
+CA,medicaid,Kaiser,75242,,plan name,Kaiser,Kaiser - San Diego,medicaid,medicaid
 CA,medicaid,Partnership HealthPlan of CA/Northwest,70870,,plan name,Partnership HealthPlan of CA/Northwest,Partnership - Northwest,medicaid,medicaid
-CA,medicaid,Health Net/Stanislaus,68257,,plan name,Health Net/Stanislaus,Health Net,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ Alameda,68249,,plan name,Kaiser Permanente/ Alameda,Kaiser Permanente -Alameda,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ Orange,67923,,plan name,Kaiser Permanente/ Orange,Kaiser Permanente - Orange,medicaid,medicaid
-CA,medicaid,CenCal/San Luis Obispo,67129,,plan name,CenCal/San Luis Obispo,CenCal - San Luis Obispo,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ Contra Costa,54509,,plan name,Kaiser Permanente/ Contra Costa,Kaiser Permanente - Contra Costa,medicaid,medicaid
-CA,medicaid,CalViva Health/Madera,49272,,plan name,CalViva Health/Madera,CalViva Health -Madera,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/Santa Clara,44693,,plan name,Kaiser Permanente/Santa Clara,Kaiser Permanente,medicaid,medicaid
 CA,medicaid,CalViva Health Kings,38406,,plan name,CalViva Health Kings,CalViva - Kings,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ Solano,37239,,plan name,Kaiser Permanente/ Solano,Kaiser Permanente - Solano,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership Plan/San Francisco,34872,,plan name,Anthem Blue Cross Partnership Plan/San Francisco,Anthem - San Francisco,medicaid,medicaid
-CA,medicaid,Health Net/San Joaquin,33711,,plan name,Health Net/San Joaquin,Health Net,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership Plan/Kern,33250,,plan name,Anthem Blue Cross Partnership Plan/Kern,Anthem,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership Plan/Madera,28681,,plan name,Anthem Blue Cross Partnership Plan/Madera,"Anthem Insurance Companies, Inc.",medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership Plan/El Dorado,26547,,plan name,Anthem Blue Cross Partnership Plan/El Dorado,Anthem,medicaid,medicaid
 CA,medicaid,Anthem Blue Cross Partnership Plan/Region 2,25625,,plan name,Anthem Blue Cross Partnership Plan/Region 2,Anthem - Region 2,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ Sonoma,25414,,plan name,Kaiser Permanente/ Sonoma,Kaiser Permanente - Sonoma,medicaid,medicaid
-CA,medicaid,Anthem Blue Cross Partnership Plan/Kings,24920,,plan name,Anthem Blue Cross Partnership Plan/Kings,"Anthem Insurance Companies, Inc.",medicaid,medicaid
-CA,medicaid,Kaiser Permanente/San Joaquin,23954,,plan name,Kaiser Permanente/San Joaquin,Kaiser Permanente,medicaid,medicaid
-CA,medicaid,Central California Alliance for Health/San Benito,20645,,plan name,Central California Alliance for Health/San Benito,CCAH - San Benito,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/San Francisco,20495,,plan name,Kaiser Permanente/San Francisco,Kaiser Permanente,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/Kern,20108,,plan name,Kaiser Permanente/Kern,Kaiser Permanente,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ Placer,17552,,plan name,Kaiser Permanente/ Placer,Kaiser Permanente - Placer,medicaid,medicaid
-CA,medicaid,Health Net Community Solutions,17488,,plan name,Health Net Community Solutions,Health Net - Region 2,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ San Mateo,14944,,plan name,Kaiser Permanente/ San Mateo,Kaiser Permanente - San Mateo,medicaid,medicaid
-CA,medicaid,SCAN Health Plan/Los Angeles,12111,,plan name,SCAN Health Plan/Los Angeles,SCAN - Los Angeles,medicaid,medicaid
-CA,medicaid,Mountain Valley Health Plan/El Dorado,8478,,plan name,Mountain Valley Health Plan/El Dorado,MVHP - El Dorado,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ Ventura,7774,,plan name,Kaiser Permanente/ Ventura,Kaiser Permanente - Ventura,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ Napa,7478,,plan name,Kaiser Permanente/ Napa,Kaiser Permanente - Napa,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ Marin,6808,,plan name,Kaiser Permanente/ Marin,Kaiser Permanente - Marin,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/Fresno,6296,,plan name,Kaiser Permanente/Fresno,Kaiser Permanente,medicaid,medicaid
-CA,medicaid,SCAN Health Plan/San Bernardino,5767,,plan name,SCAN Health Plan/San Bernardino,SCAN - Riverside and San Bernardino,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/Stanislaus,5732,,plan name,Kaiser Permanente/Stanislaus,Kaiser Permanente,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/ Yolo,5653,,plan name,Kaiser Permanente/ Yolo,Kaiser Permanente - Yolo,medicaid,medicaid
-CA,medicaid,Central California Alliance for Health/ Mariposa,5620,,plan name,Central California Alliance for Health/ Mariposa,CCAH - Mariposa,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/El Dorado,3950,,plan name,Kaiser Permanente/El Dorado,Kaiser Permanente,medicaid,medicaid
-CA,medicaid,SCAN Health Plan/San Diego,1361,,plan name,SCAN Health Plan/San Diego,SCAN - San Diego,medicaid,medicaid
-CA,medicaid,Kaiser Permanente/Madera,1053,,plan name,Kaiser Permanente/Madera,Kaiser Permanente,medicaid,medicaid
+CA,medicaid,SCAN Health Plan,19239,,plan name,SCAN Health Plan,SCAN - Los Angeles; SCAN - Riverside and San Bernardino; SCAN - San Diego,medicaid,medicaid
+CA,medicaid,Mountain Valley Health Plan,8514,,plan name,Mountain Valley Health Plan,MVHP - Alpine; MVHP - El Dorado,medicaid,medicaid
 CO,commercial,Kaiser Permanente,360475,,reviewed map,Kaiser Permanente Insurance; Kaiser Foundation Health Plan of Colorado,KAISER FOUNDATION GRP,mlr,commercial
 CO,commercial,Anthem Blue Cross and Blue Shield,286147,,reviewed map,HMO Colorado; Anthem Blue Cross and Blue Shield,Elevance Hlth Inc Grp,mlr,commercial
 CO,commercial,UnitedHealthcare,201118,yes,reviewed map,National Foundation Life Insurance; Freedom Life Insurance Company of America; Golden Rule Insurance; UnitedHealthcare of Colorado; UnitedHealthcare Insurance; Rocky Mountain Health Maintenance Organization,UNITEDHEALTH GRP,mlr,commercial; marketplace
