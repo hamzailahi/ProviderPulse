@@ -51,6 +51,7 @@ check('the builder runs in dry-run mode', p.status === 0 && /dry run, nothing wr
 check('cardiology counts its 3 coded listings, not the 6 that carry its name', listings('Heart / cardiology') === 3, String(listings('Heart / cardiology')));
 check('dermatology counts the listings whose code says dermatology', listings('Skin / dermatology') === 2);
 check('primary care counts the family NP and the primary care clinic by code', listings('Primary care / family doctor') === 2);
+check('nursing and physician assistant are searchable but not scored', listings('Nursing (RN, LPN)') === null && listings('Physician assistant') === null);
 check('a category that is searchable but not scored gets no benchmark', listings('Other health services') === null && listings('Hospital-based clinicians') === null);
 check('the uncoded listing is reported', /provider_individuals: 7 rows, 4 distinct taxonomy codes, 1 without one/.test(out), out.match(/provider_individuals:.*/) && out.match(/provider_individuals:.*/)[0]);
 check('state density still counts every listing, coded or not', /TN: 7 listings/.test(out) && /AR: 1 listings/.test(out), (out.match(/  (TN|AR): .*/g) || []).join(' | '));

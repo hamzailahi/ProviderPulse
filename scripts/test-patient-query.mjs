@@ -52,7 +52,7 @@ ok(!TaxonomyMap.codesFor('Other health services').includes('390200000X'), 'Stude
 ok(TaxonomyMap.codesFor('Primary care / family doctor').includes('363LF0000X'), 'Family NP under Primary care');
 ok(TaxonomyMap.codesFor('Behavior therapy (ABA)').includes('106S00000X'), 'Behavior Technician under ABA');
 // The market model scores every specialty except the two nobody opens a practice in.
-ok(SPECIALTIES.SCORED.length === SPECIALTIES.length - 2 && SPECIALTIES.NOT_SCORED.every(l => SPECIALTIES.some(s => s[0] === l)), 'scored list is all but the two not-scored labels');
+ok(SPECIALTIES.SCORED.length === SPECIALTIES.length - 4 && SPECIALTIES.NOT_SCORED.every(l => SPECIALTIES.some(s => s[0] === l)), 'scored list is all but the four not-scored labels');
 ok(!SPECIALTIES.some(s => s[0] === 'Speech & hearing'), 'the old Speech & hearing label is gone everywhere');
 
 console.log(`${pass} passed, ${fail} failed`);

@@ -71,10 +71,13 @@ const SPECIALTIES = [
 // dashboard's #tax= deep links and the navigator.
 //
 // SCORED_SPECIALTIES is what the market model scores (market-score, the
-// assistant, the benchmark builder, the demand trainer). Two categories are
-// searchable but not scored: nobody opens a practice in them, so an
-// "opportunity" for them would mean nothing.
-var NOT_SCORED = ['Hospital-based clinicians', 'Other health services'];
+// assistant, the benchmark builder, the demand trainer). Four categories are
+// searchable but not scored. Nobody opens a practice in the first two, so an
+// "opportunity" for them would mean nothing. Nurses are almost always
+// employed, and most physician assistant codes already count toward primary
+// care's supply, so scoring them separately would double-report (the user's
+// call, 2026-10-11).
+var NOT_SCORED = ['Hospital-based clinicians', 'Other health services', 'Nursing (RN, LPN)', 'Physician assistant'];
 var SCORED_SPECIALTIES = SPECIALTIES.filter(function (s) { return NOT_SCORED.indexOf(s[0]) === -1; });
 
 if (typeof window !== 'undefined') window.SCORED_SPECIALTIES = SCORED_SPECIALTIES;

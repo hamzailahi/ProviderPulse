@@ -177,9 +177,11 @@ about the market on screen, and shows what it is doing as it works
 
 ## The market opportunity model
 
-The Insights tab classifies 42 of the 44 patient-facing specialties in
-the area around a ZIP (Hospital-based clinicians and Other health services
-are searchable but not scored: nobody opens a practice in them). A listing
+The Insights tab classifies 40 of the 44 patient-facing specialties in
+the area around a ZIP. Four are searchable but not scored: nobody opens a
+practice in Hospital-based clinicians or Other health services, nurses are
+almost always employed, and physician assistants already count toward
+primary care. A listing
 belongs to a specialty by its official NUCC code, the same table patient
 search uses. The area is the ZIP plus everything within 25 miles. It lives in
 `v2/assets/market-model.js`, runs inside `market-score.js`, and is covered
@@ -408,7 +410,7 @@ v2/admin-review.html         OIG review queue
 v2/assets/                   shared browser modules, several also loaded by functions:
                                directory.js       map, search and taxonomy helpers
                                taxonomy-map.js    NUCC code to official grouping (generated)
-                               specialties.js     the 44 patient-facing specialties (42 scored by the market model)
+                               specialties.js     the 44 patient-facing specialties (40 scored by the market model)
                                market-model.js    the market opportunity model
 v2/netlify/functions/        backend: auth, matching, scoring, screening, audits, appointments
 v2/netlify/functions/lib/    pure logic (scoring, query planning, auth, geocoding)
@@ -567,6 +569,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-11
 
+- **Health-need profiles for the new categories reviewed.** Hospice now
+  weighs cognitive disability (dementia is its leading diagnosis), as does
+  speech therapy; care coordination is driven by social need (no insurance,
+  food insecurity, no reliable transport, diabetes) instead of frailty.
+  Nursing and Physician assistant are no longer scored as markets, since
+  nurses are employed and most PAs already count toward primary care; both
+  stay fully searchable. The model now scores 40 categories.
 - **The old six provider groups are retired.** The opportunity panels no
   longer score Primary care, Specialty, Surgical, Dental and Behavioral as
   broad groups (their national rates were counted from organizations only

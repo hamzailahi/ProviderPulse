@@ -316,7 +316,7 @@ check('every tool except query_database is strict', I.TOOLS.filter(t => t.name !
 check('strict schemas list every property as required', I.TOOLS.filter(t => t.strict).every(t => Object.keys(t.input_schema.properties).every(k => t.input_schema.required.includes(k))));
 {
   const enumOf = n => I.TOOLS.find(t => t.name === n).input_schema.properties.specialty.enum;
-  check('scored tools offer the 42 scored labels plus null', enumOf('get_market_insights').length === 43 && !enumOf('get_market_insights').includes('Other health services'));
+  check('scored tools offer the scored labels plus null', enumOf('get_market_insights').length === require('../v2/assets/specialties.js').SCORED.length + 1 && !enumOf('get_market_insights').includes('Other health services') && !enumOf('get_market_insights').includes('Physician assistant'));
   check('find_providers and update_map offer all 44 labels plus null', enumOf('find_providers').length === 45 && enumOf('update_map').length === 45);
 }
 

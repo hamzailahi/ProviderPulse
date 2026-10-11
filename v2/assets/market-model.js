@@ -78,7 +78,7 @@
     'Plastic & reconstructive surgery': { m: [], d: [] },
     // Renamed 2026-10-09: hearing moved to its own category, which keeps the
     // old hearing-loss profile. Speech therapy follows stroke and children.
-    'Speech & language therapy': { m: [['STROKE', .6]], d: [['under18', .6]] },
+    'Speech & language therapy': { m: [['STROKE', .6], ['COGNITION', .3]], d: [['under18', .6]] },
     'Nutrition & dietitian': { m: [['OBESITY', 1], ['DIABETES', .8], ['HIGHCHOL', .4]], d: [] },
     'Acupuncture, massage & naturopathy': { m: [['ARTHRITIS', .5], ['MHLTH', .3]], d: [] },
     'Urgent care & emergency': { m: [['CHECKUP', .5, 1]], d: [] },
@@ -87,18 +87,21 @@
     'Home health & in-home care': { m: [['MOBILITY', 1], ['SELFCARE', .8], ['INDEPLIVE', .6]], d: [['over65', .7]] },
     'Nursing & assisted living': { m: [['INDEPLIVE', .8], ['COGNITION', .6]], d: [['over65', 1]] },
     'Medical equipment & supplies': { m: [['MOBILITY', .6], ['DIABETES', .4]], d: [['over65', .5]] },
-    // Added with the NUCC code table (2026-10-09). Provisional: the same rule
-    // as above (only measures already imported; none where nothing defensible
-    // exists, so the score rests on supply and payers and says so).
+    // Added with the NUCC code table (2026-10-09), reviewed with the user
+    // 2026-10-11. Same rule as above: none where nothing defensible exists
+    // (infection and genetics), so the score rests on supply and payers and
+    // says so. Speech gained cognition (swallowing and speech therapy in
+    // dementia), hospice gained cognition (dementia is now its leading
+    // diagnosis), and care coordination moved from frailty to social need:
+    // case managers and community health workers mostly serve low-income,
+    // chronically ill patients.
     'Hearing & audiology': { m: [['HEARING', 1]], d: [['over65', .5]] },
     'Behavior therapy (ABA)': { m: [], d: [['under18', 1]] },
-    'Nursing (RN, LPN)': { m: [['SELFCARE', .6], ['DIABETES', .4]], d: [['over65', .5]] },
-    'Physician assistant': { m: [['BPHIGH', 1], ['DIABETES', 1], ['HIGHCHOL', .8], ['OBESITY', .6], ['CHECKUP', .6, 1], ['CSMOKING', .3]], d: [['over65', .3]] },
-    'Care coordination & community health': { m: [['INDEPLIVE', .6], ['SELFCARE', .5], ['LONELINESS', .4]], d: [['over65', .5]] },
+    'Care coordination & community health': { m: [['ACCESS2', .6], ['FOODINSECU', .5], ['LACKTRPT', .4], ['DIABETES', .4]], d: [] },
     'General surgery': { m: [['OBESITY', .4], ['CANCER', .3]], d: [['over65', .5]] },
     'Infectious disease': { m: [], d: [] },
     'Genetics & genetic counseling': { m: [], d: [] },
-    'Hospice & palliative care': { m: [['CANCER', .6], ['COPD', .4], ['CHD', .4]], d: [['over65', 1]] }
+    'Hospice & palliative care': { m: [['CANCER', .6], ['COGNITION', .6], ['COPD', .4], ['CHD', .4]], d: [['over65', 1]] }
   };
 
   // Which federal shortage designation (HPSA discipline) applies. HRSA designates
@@ -393,7 +396,8 @@
     ARTHRITIS: 'arthritis', LPA: 'physical inactivity', MOBILITY: 'mobility disability', CHD: 'coronary heart disease', STROKE: 'stroke',
     CASTHMA: 'asthma', COPD: 'COPD', SLEEP: 'short sleep', COLON_SCREEN: 'missed colon screening', KIDNEY: 'kidney disease',
     CANCER: 'cancer', COGNITION: 'cognitive disability', HEARING: 'hearing disability', PHLTH: 'frequent physical distress',
-    SELFCARE: 'self-care disability', INDEPLIVE: 'independent-living disability'
+    SELFCARE: 'self-care disability', INDEPLIVE: 'independent-living disability',
+    ACCESS2: 'no health insurance (18-64)', FOODINSECU: 'food insecurity', LACKTRPT: 'lack of reliable transportation'
   };
 
   function round2(x) { return Math.round(x * 100) / 100; }

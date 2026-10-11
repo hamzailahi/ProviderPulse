@@ -76,7 +76,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `dashboard.css`, `dashboard-v3.css`, `dashboard-v3.js` | `index.html` (v3 files layer the redesign over the original dashboard) |
 | `forms.css` | `register-provider.html`, `auth.html`, `admin-review.html`, `404.html` |
 | `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code`), `milesBetween`, MapTiler key, ZIP centroid lookup |
-| `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (42: all but `NOT_SCORED`, Hospital-based clinicians and Other health services) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
+| `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (40: all but `NOT_SCORED`: Hospital-based clinicians, Other health services, Nursing (RN, LPN) and Physician assistant) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
 | `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
 | `demand-model.js` | the learned demand model (ridge regression per specialty, state-held-out validation, `addAcs`/`addPlaces` area builders shared by trainer and scorer); browser + `require` |
@@ -481,18 +481,24 @@ keyword matching and no default bucket**. Three phases, each gated:
    (one lookup per listing; a code in several specialties counts in each;
    no code counts in none); without it, it falls back to `taxMatches` on
    names (old callers and tests). `market-score` selects `taxonomy_code`,
-   scores `SPECIALTIES.SCORED` (42), and a what-if listing carries a code
+   scores `SPECIALTIES.SCORED` (40 since 2026-10-11, 42 before), and a what-if listing carries a code
    that belongs to that specialty alone where one exists. The assistant's
    `find_providers` filters by code; insights, compare and scenario offer
-   the 42 scored labels, find_providers and update_map all 44. The
+   the scored labels, find_providers and update_map all 44. The
    benchmark builder tallies `taxonomy_code` per NPI slice and sums each
    specialty's codes (`scripts/test-market-benchmarks.mjs` runs it end to
    end against a fake database); state density still counts every row,
    coded or not. The parked demand trainer reads `taxonomy_code` too. The
-   frozen 33-label list and its alias are gone. Nine new scored labels got
-   **provisional** `PROFILES` (only measures already imported; ABA,
-   infectious disease and genetics have no defensible measure);
-   "Speech & hearing" became "Speech & language therapy" (stroke, under 18)
+   frozen 33-label list and its alias are gone. The new labels' `PROFILES`
+   were **reviewed with the user 2026-10-11**: hearing (hearing disability,
+   65+) and ABA (under 18; PLACES has no child or autism measure) kept;
+   speech (stroke, cognition, under 18) and hospice (cancer, cognition, COPD,
+   CHD, 65+) gained cognition; care coordination moved to social need
+   (`ACCESS2`, `FOODINSECU`, `LACKTRPT`, diabetes); infectious disease and
+   genetics stay with no measure; Nursing and Physician assistant left the
+   scored list (nurses are employed; PA codes already count in primary
+   care). Their old benchmark rows linger unused.
+   "Speech & hearing" became "Speech & language therapy"
    and hearing kept the old hearing-loss profile. **Benchmarks rebuilt by
    code 2026-10-11** (dry run then write, 123 rows, ~16 min each): 9,049,543
    listings read, 7 without a code (the backfill's exceptions); e.g. primary
@@ -1014,7 +1020,7 @@ far was a bad input faithfully reported.
 ## Market opportunity model (`assets/market-model.js`)
 
 Runs inside `market-score.js` over a catchment of the ZIP plus nearby ZCTAs
-within 25 miles (by centroid). For each of the 42 scored specialties
+within 25 miles (by centroid). For each of the 40 scored specialties
 (`SPECIALTIES.SCORED`), with listings assigned by NUCC code:
 
 | Factor | Weight | Input |
