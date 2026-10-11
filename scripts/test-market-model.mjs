@@ -5,7 +5,7 @@
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const M = require('../v2/assets/market-model.js');
-const SPECIALTIES = require('../v2/assets/specialties.js').MARKET;   // the market side's frozen list until phase 3b
+const SPECIALTIES = require('../v2/assets/specialties.js').SCORED;
 
 let pass = 0, fail = 0;
 const check = (l, c, d) => { if (c) { pass++; console.log(`  PASS  ${l}`); } else { fail++; console.log(`  FAIL  ${l}${d ? '\n        ' + d : ''}`); } };
@@ -80,7 +80,7 @@ const prim = one(base({ specialties: [PRIMARY], groupOf: () => 'primary', places
   benchmarks: { measures: { CHECKUP: anchors }, specialties: { 'Primary care / family doctor': { rate_per_1k: 0.6 } } } }));
 check('prevention measures are inverted (low checkups = high need)', prim.evidence.need.parts[0].inverted && prim.factors.need >= 90, JSON.stringify(prim.evidence.need));
 check('every model measure is a known PLACES id list', M.measureIds().includes('CHD') && M.measureIds().includes('KIDNEY'));
-check('all 33 specialties have a profile', SPECIALTIES.every(s => M.PROFILES[s[0]]));
+check('every scored specialty has a profile', SPECIALTIES.every(s => M.PROFILES[s[0]]));
 
 console.log('\n5. Reasons');
 r = one(base({ rows: cardRows(5, 6) }));
@@ -96,6 +96,21 @@ check('pct interpolates between anchors', Math.round(M.pct(anchors, 7)) === 63);
 check('pct clamps to 5 and 95', M.pct(anchors, 0) === 5 && M.pct(anchors, 99) === 95);
 check('pct refuses missing anchors', M.pct(null, 5) === null);
 check('rankIn is a percentile within a sample', M.rankIn([1, 2, 3, 4], 3) === 62.5);
+
+console.log('\n7. Specialty membership by NUCC code (phase 3b)');
+{
+  const TM = require('../v2/assets/taxonomy-map.js');
+  const byCode = M.score(base({ specialties: [CARD, DERM], codesFor: l => TM.codesFor(l), rows: [
+    // the stored name says cardiology, the code says dermatology: the code wins
+    { primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207N00000X', latitude: 35, longitude: -90 },
+    { primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207RC0000X', latitude: 35, longitude: -90 },
+    { primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: null, latitude: 35, longitude: -90 }
+  ] })).specialties;
+  const c = byCode.find(s => s.specialty === CARD[0]), d = byCode.find(s => s.specialty === DERM[0]);
+  check('with codesFor, a listing counts under its code\'s specialty, not its name', c.clinicians === 1 && d.clinicians === 1, `card ${c.clinicians}, derm ${d.clinicians}`);
+  check('a listing with no code counts in no specialty', c.clinicians + d.clinicians === 2);
+  check('every scored specialty has codes', SPECIALTIES.every(s => TM.codesFor(s[0]).length > 0));
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

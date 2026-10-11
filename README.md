@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-09. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-11. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -177,8 +177,11 @@ about the market on screen, and shows what it is doing as it works
 
 ## The market opportunity model
 
-The Insights tab classifies every one of 33 patient-facing specialties in
-the area around a ZIP (up to 25 miles). It lives in
+The Insights tab classifies 42 of the 44 patient-facing specialties in
+the area around a ZIP (Hospital-based clinicians and Other health services
+are searchable but not scored: nobody opens a practice in them). A listing
+belongs to a specialty by its official NUCC code, the same table patient
+search uses. The area is the ZIP plus everything within 25 miles. It lives in
 `v2/assets/market-model.js`, runs inside `market-score.js`, and is covered
 by `scripts/test-market-model.mjs`.
 
@@ -407,7 +410,7 @@ v2/assets/                   shared browser modules, several also loaded by func
                                directory.js       map, search and taxonomy helpers
                                taxonomy-map.js    NUCC code to official grouping (generated)
                                taxonomy-groups.js six specialty groups, used for supply counts
-                               specialties.js     the 44 patient-facing specialties (33 for the market model)
+                               specialties.js     the 44 patient-facing specialties (42 scored by the market model)
                                health-demand.js   CDC PLACES need model by group
                                market-model.js    the market opportunity model
 v2/netlify/functions/        backend: auth, matching, scoring, screening, audits, appointments
@@ -511,6 +514,7 @@ node scripts/test-acs.mjs                 # the Census detail import, and the ri
 node scripts/test-scenario.mjs            # the what-if re-score changes supply only
 node scripts/test-answer-check.mjs        # assistant figures must trace to tool results
 node scripts/test-density-benchmark.mjs   # the state comparison is like for like, and honest when unavailable
+node scripts/test-market-benchmarks.mjs   # the benchmark builder counts each specialty's listings by code
 node scripts/test-signup-gate.mjs         # patient sign-up is closed unless explicitly opened
 node scripts/test-market-assistant.mjs    # the assistant: steps, tools, history rules (needs npm ci in v2/)
 node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list, specialty coverage
@@ -563,6 +567,20 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-10-11
+
+- **Market scores count providers by their official code.** The market
+  model, the AI assistant's provider lookups, the national benchmark job
+  and the (parked) demand trainer now decide a listing's specialty from its
+  NUCC code through the approved table, the same way patient search does.
+  The model now scores 42 categories: the 33 it scored before (speech
+  therapy under its new name) and nine of the new ones, each with a
+  provisional health-need profile. Hospital-based clinicians and Other
+  health services stay searchable but are not scored. The national rates
+  per category must be rebuilt by running the "Build market benchmarks"
+  job; until it runs, the new and renamed categories compare supply at the
+  broad group level and say so.
 
 ### 2026-10-09
 

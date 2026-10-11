@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 const require = createRequire(import.meta.url);
+const SCORED_COUNT = require('../v2/assets/specialties.js').SCORED.length;
 const D = require('../v2/assets/demand-model.js');
 
 let pass = 0, fail = 0;
@@ -124,7 +125,7 @@ const J = b => ({ ok: true, status: 200, json: async () => b, text: async () => 
 const page = (u, rows, key) => { const m = u.match(new RegExp(key + '=gt\\\\.([^&]+)')); return m ? [] : rows; };
 globalThis.fetch = async (url, init) => {
   const u = decodeURIComponent(String(url));
-  if (u.includes('provider_individuals')) return J(u.includes('npi=gt.') ? [] : C.map((c, i) => ({ npi: String(1000000000 + i), primary_taxonomy: 'Cardiovascular Disease Physician' })).filter(r => r.npi.startsWith(u.match(/npi=gte\\.(\\d+)/)[1])));
+  if (u.includes('provider_individuals')) return J(u.includes('npi=gt.') ? [] : C.map((c, i) => ({ npi: String(1000000000 + i), primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207RC0000X' })).filter(r => r.npi.startsWith(u.match(/npi=gte\\.(\\d+)/)[1])));
   if (u.includes('zip_county_crosswalk')) return J(page(u, C.map((c, i) => ({ id: i + 1, zip: c.zip, fips: c.fips, state: c.state, res_ratio: 1 })), 'id'));
   if (u.includes('medicare_county_enrollment')) return J(page(u, C.map(c => ({ fips: c.fips, state: c.state, original_medicare_benes: c.enroll })), 'fips'));
   if (u.includes('census_acs_zcta')) return J(page(u, C.map(c => ({ zip: c.zip, pop_total: 1000, households: 400, median_hh_income: 50000 + (Number(c.zip) % 7) * 3000, poverty_universe: 900, poverty_below: 50 + (Number(c.zip) % 5) * 10,
@@ -141,7 +142,7 @@ const run = (extra = {}, a = []) => spawnSync(process.execPath, ['--import', pre
 let p = run();
 const written = (() => { try { return JSON.parse(readFileSync(out, 'utf8')); } catch (e) { return null; } })();
 const hm = written && written.find(r => r.key === 'Heart / cardiology');
-check('the trainer runs and writes one row per specialty', p.status === 0 && written && written.length === 33 && written.every(r => r.kind === 'demand_model'), (p.stdout + p.stderr).slice(-600));
+check('the trainer runs and writes one row per specialty', p.status === 0 && written && written.length === SCORED_COUNT && written.every(r => r.kind === 'demand_model'), (p.stdout + p.stderr).slice(-600));
 check('cardiology is learned from the claims and usable', hm && hm.data.usable && hm.data.r2_cv > 0.5, hm && JSON.stringify({ r2: hm.data.r2_cv, reason: hm.data.reason }));
 check('specialties with no clinicians in the file are stored as unusable', written && !written.find(r => r.key === 'Skin / dermatology').data.usable);
 check('the log names held-out scores and what demand adds beyond supply', /held-out R2/.test(p.stdout) && /demand adds/.test(p.stdout), p.stdout.slice(-800));

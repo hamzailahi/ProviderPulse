@@ -76,7 +76,9 @@
     'Foot & ankle / podiatry': { m: [['DIABETES', 1], ['OBESITY', .5], ['ARTHRITIS', .4]], d: [['over65', .3]] },
     'Pain management': { m: [['ARTHRITIS', 1], ['PHLTH', .4], ['MOBILITY', .4]], d: [] },
     'Plastic & reconstructive surgery': { m: [], d: [] },
-    'Speech & hearing': { m: [['HEARING', 1]], d: [['over65', .5]] },
+    // Renamed 2026-10-09: hearing moved to its own category, which keeps the
+    // old hearing-loss profile. Speech therapy follows stroke and children.
+    'Speech & language therapy': { m: [['STROKE', .6]], d: [['under18', .6]] },
     'Nutrition & dietitian': { m: [['OBESITY', 1], ['DIABETES', .8], ['HIGHCHOL', .4]], d: [] },
     'Acupuncture, massage & naturopathy': { m: [['ARTHRITIS', .5], ['MHLTH', .3]], d: [] },
     'Urgent care & emergency': { m: [['CHECKUP', .5, 1]], d: [] },
@@ -84,7 +86,19 @@
     'Pharmacy': { m: [['DIABETES', .5], ['BPHIGH', .5]], d: [] },
     'Home health & in-home care': { m: [['MOBILITY', 1], ['SELFCARE', .8], ['INDEPLIVE', .6]], d: [['over65', .7]] },
     'Nursing & assisted living': { m: [['INDEPLIVE', .8], ['COGNITION', .6]], d: [['over65', 1]] },
-    'Medical equipment & supplies': { m: [['MOBILITY', .6], ['DIABETES', .4]], d: [['over65', .5]] }
+    'Medical equipment & supplies': { m: [['MOBILITY', .6], ['DIABETES', .4]], d: [['over65', .5]] },
+    // Added with the NUCC code table (2026-10-09). Provisional: the same rule
+    // as above (only measures already imported; none where nothing defensible
+    // exists, so the score rests on supply and payers and says so).
+    'Hearing & audiology': { m: [['HEARING', 1]], d: [['over65', .5]] },
+    'Behavior therapy (ABA)': { m: [], d: [['under18', 1]] },
+    'Nursing (RN, LPN)': { m: [['SELFCARE', .6], ['DIABETES', .4]], d: [['over65', .5]] },
+    'Physician assistant': { m: [['BPHIGH', 1], ['DIABETES', 1], ['HIGHCHOL', .8], ['OBESITY', .6], ['CHECKUP', .6, 1], ['CSMOKING', .3]], d: [['over65', .3]] },
+    'Care coordination & community health': { m: [['INDEPLIVE', .6], ['SELFCARE', .5], ['LONELINESS', .4]], d: [['over65', .5]] },
+    'General surgery': { m: [['OBESITY', .4], ['CANCER', .3]], d: [['over65', .5]] },
+    'Infectious disease': { m: [], d: [] },
+    'Genetics & genetic counseling': { m: [], d: [] },
+    'Hospice & palliative care': { m: [['CANCER', .6], ['COPD', .4], ['CHD', .4]], d: [['over65', 1]] }
   };
 
   var DEMO_LABEL = { over65: 'residents 65+', under18: 'children under 18', age19to44: 'adults 19-44 (census proxy)' };
@@ -138,7 +152,10 @@
      input = {
        specialties: SPECIALTIES rows [label, mapTerms, nppesTerm],
        groupOf(label) -> taxonomy group key,
-       rows: catchment listings [{ primary_taxonomy, latitude, longitude }],
+       rows: catchment listings [{ taxonomy_code, primary_taxonomy, latitude, longitude }],
+       codesFor(label) -> NUCC codes in that specialty (TaxonomyMap.codesFor);
+         when given, a listing belongs to a specialty by its code. Without it
+         (older callers, tests) taxMatches(stored, terms) matches by name.
        taxMatches(stored, terms) -> bool,
        center: { lat, lng },
        adults: catchment adults 18+,
@@ -161,11 +178,24 @@
     // Pre-bucket listings per specialty once.
     var bySpec = {};
     input.specialties.forEach(function (s) { bySpec[s[0]] = []; });
-    (input.rows || []).forEach(function (r) {
+    if (input.codesFor) {
+      // By NUCC code: one lookup per listing. A code may sit in several
+      // specialties (the reviewed table says so explicitly); a listing with no
+      // code belongs to none.
+      var specsOf = {};
       input.specialties.forEach(function (s) {
-        if (input.taxMatches(r.primary_taxonomy, s[1].split(','))) bySpec[s[0]].push(r);
+        input.codesFor(s[0]).forEach(function (c) { (specsOf[c] = specsOf[c] || []).push(s[0]); });
       });
-    });
+      (input.rows || []).forEach(function (r) {
+        (specsOf[r.taxonomy_code] || []).forEach(function (label) { bySpec[label].push(r); });
+      });
+    } else {
+      (input.rows || []).forEach(function (r) {
+        input.specialties.forEach(function (s) {
+          if (input.taxMatches(r.primary_taxonomy, s[1].split(','))) bySpec[s[0]].push(r);
+        });
+      });
+    }
 
     input.specialties.forEach(function (s) {
       var label = s[0], prof = PROFILES[label] || { m: [], d: [] };

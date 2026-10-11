@@ -28,12 +28,12 @@ globalThis.fetch = async (url) => {
   if (u.includes('cdc_places?zip=eq.')) return J([{ zip: '38017', lat: 35.04, lon: -89.66 }]);
   if (u.includes('cdc_places?measureid=eq.')) return J([{ zip: '38017', lat: 35.04, lon: -89.66 }, { zip: '38138', lat: 35.09, lon: -89.80 }]);
   if (u.includes('/clinics?zip=in')) return J(u.includes('npi=gt.') ? [] : [
-    { npi: '1000000001', name: 'HEART CLINIC', city: 'COLLIERVILLE', primary_taxonomy: 'Cardiovascular Disease Physician', latitude: 35.05, longitude: -89.66 },
-    { npi: '1000000002', name: 'SMILE DENTAL', city: 'COLLIERVILLE', primary_taxonomy: 'General Practice Dentistry', latitude: 35.05, longitude: -89.66 },
-    { npi: '1000000003', name: 'FAR HEART', city: 'NOWHERE', primary_taxonomy: 'Cardiovascular Disease Physician', latitude: 36.5, longitude: -89.66 }
+    { npi: '1000000001', name: 'HEART CLINIC', city: 'COLLIERVILLE', primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207RC0000X', latitude: 35.05, longitude: -89.66 },
+    { npi: '1000000002', name: 'SMILE DENTAL', city: 'COLLIERVILLE', primary_taxonomy: 'General Practice Dentistry', taxonomy_code: '1223G0001X', latitude: 35.05, longitude: -89.66 },
+    { npi: '1000000003', name: 'FAR HEART', city: 'NOWHERE', primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207RC0000X', latitude: 36.5, longitude: -89.66 }
   ]);
   if (u.includes('/provider_individuals?zip=in')) return J(u.includes('npi=gt.') ? [] : [
-    { npi: '1000000010', name: 'JANE CARDIO', city: 'GERMANTOWN', primary_taxonomy: 'Cardiovascular Disease Physician', latitude: 35.08, longitude: -89.78 }
+    { npi: '1000000010', name: 'JANE CARDIO', city: 'GERMANTOWN', primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207RC0000X', latitude: 35.08, longitude: -89.78 }
   ]);
   if (u.includes('/clinics?select=')) return J([{ state: 'TN' }, { state: 'TN' }]);
   return J([]);
@@ -314,7 +314,11 @@ check('a malformed chat id is dropped', traces[traces.length - 1].cid === '');
 console.log('\n8. Tool schemas');
 check('every tool except query_database is strict', I.TOOLS.filter(t => t.name !== 'query_database').every(t => t.strict === true && t.input_schema.additionalProperties === false));
 check('strict schemas list every property as required', I.TOOLS.filter(t => t.strict).every(t => Object.keys(t.input_schema.properties).every(k => t.input_schema.required.includes(k))));
-check('the specialty enum covers all 33 labels plus null', I.TOOLS[0].input_schema.properties.specialty.enum.length === 34);
+{
+  const enumOf = n => I.TOOLS.find(t => t.name === n).input_schema.properties.specialty.enum;
+  check('scored tools offer the 42 scored labels plus null', enumOf('get_market_insights').length === 43 && !enumOf('get_market_insights').includes('Other health services'));
+  check('find_providers and update_map offer all 44 labels plus null', enumOf('find_providers').length === 45 && enumOf('update_map').length === 45);
+}
 
 console.log('\n9. A rejected request shape degrades instead of breaking (keep last: it flips module state)');
 const bad = Object.create(A.BadRequestError.prototype);

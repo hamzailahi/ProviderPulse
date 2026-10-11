@@ -15,8 +15,8 @@ const check = (l, c, d) => { if (c) { pass++; console.log(`  PASS  ${l}`); } els
 const SPEC = 'Heart / cardiology';
 const home = { zip: '38017', lat: 35.04, lon: -89.66, pop_18plus: 30000 };
 const dem = { zip: '38017', state: 'TN', 'Total Population': 40000, 'Insured Population': 37000 };
-const heart = (i, lat, lon) => ({ npi: '10000000' + i, primary_taxonomy: 'Cardiovascular Disease Physician', latitude: lat, longitude: lon });
-const dentist = { npi: '3000000001', primary_taxonomy: 'General Practice Dentistry', latitude: 35.04, longitude: -89.66 };
+const heart = (i, lat, lon) => ({ npi: '10000000' + i, primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207RC0000X', latitude: lat, longitude: lon });
+const dentist = { npi: '3000000001', primary_taxonomy: 'General Practice Dentistry', taxonomy_code: '1223G0001X', latitude: 35.04, longitude: -89.66 };
 let cardiologists = [heart(1, 35.10, -89.66), heart(2, 35.12, -89.66)];   // 4 to 8 miles away
 globalThis.fetch = async (url) => {
   const u = decodeURIComponent(String(url));
@@ -38,7 +38,7 @@ const run = async q => JSON.parse((await handler({ httpMethod: 'GET', queryStrin
 
 console.log('1. No scenario unless asked');
 let d = await run({});
-check('the model is present and there is no scenario by default', d.model && d.model.specialties.length === 33 && !d.model.scenario);
+check('the model is present and there is no scenario by default', d.model && d.model.specialties.length === require('../v2/assets/specialties.js').SCORED.length && !d.model.scenario);
 const base = d.model.specialties.find(s => s.specialty === SPEC);
 
 console.log('\n2. Adding clinicians changes supply and nothing else');

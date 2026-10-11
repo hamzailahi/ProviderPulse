@@ -22,16 +22,18 @@
 //
 //   kind 'specialty' key = specialty label from assets/specialties.js
 //                    data = { rate_per_1k, clinicians, adults }
-//                    Listings nationally whose primary_taxonomy matches any of
-//                    the specialty's mapTerms, per 1,000 US adults, using the
-//                    same word-start match market-score.js applies locally.
+//                    Listings nationally whose NUCC taxonomy_code the reviewed
+//                    table puts in the specialty (TaxonomyMap.codesFor), per
+//                    1,000 US adults: the same membership market-score.js
+//                    applies locally. Listings with no code count in no
+//                    specialty (they still count in state density).
 //
 // WHY A FULL SCAN, NOT count=exact + ilike. primary_taxonomy has no index, so
 // an ilike count over ~7M rows hits the statement timeout (57014, confirmed
-// on the first run). Instead every row's taxonomy is read in 1,000-row pages
+// on the first run). Instead every row's code is read in 1,000-row pages
 // keyed on npi (the primary key / unique index on both tables, so each page
 // is an index range scan), split into 20 NPI-prefix slices fetched in
-// parallel, and tallied per distinct taxonomy string here.
+// parallel, and tallied per distinct code here.
 //
 // Until this has run, market-score.js falls back to the six broad groups and
 // says so in every specialty's caveats and confidence.
@@ -42,7 +44,9 @@
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const MarketModel = require('../v2/assets/market-model.js');
-const SPECIALTIES = require('../v2/assets/specialties.js').MARKET;   // the market side's frozen list until phase 3b
+const SPECIALTIES = require('../v2/assets/specialties.js').SCORED;
+// A specialty's national rate counts the listings whose NUCC code the reviewed table puts in it.
+const TaxonomyMap = require('../v2/assets/taxonomy-map.js');
 
 const TABLE = 'market_benchmarks';
 const GEO_MEASURE = 'DENTAL';   // same measure market-score.js reads pop_18plus from
@@ -81,8 +85,6 @@ function quantile(sorted, q) {
   return Number((sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo)).toFixed(3));
 }
 
-const taxNorm = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
-const taxMatches = (stored, terms) => terms.some(t => (' ' + taxNorm(stored)).includes(' ' + taxNorm(t)));
 
 // NPIs are 10 digits beginning 1 or 2: slices "10".."29" cover every row.
 const SLICES = Array.from({ length: 20 }, (_, i) => String(10 + i));
@@ -92,10 +94,10 @@ async function tallySlice(table, prefix, tally, stateTally) {
   let last = null, n = 0;
   for (;;) {
     const seek = last ? `npi=gt.${last}` : `npi=gte.${prefix}`;
-    const res = await rest(`${table}?select=npi,primary_taxonomy,state&${seek}&npi=lt.${upper}&order=npi&limit=1000`);
+    const res = await rest(`${table}?select=npi,taxonomy_code,state&${seek}&npi=lt.${upper}&order=npi&limit=1000`);
     const rows = await res.json();
     for (const r of rows) {
-      const t = r.primary_taxonomy || ''; tally.set(t, (tally.get(t) || 0) + 1);
+      const t = r.taxonomy_code || ''; tally.set(t, (tally.get(t) || 0) + 1);
       const st = String(r.state || '').trim().toUpperCase();
       if (st) stateTally.set(st, (stateTally.get(st) || 0) + 1);
     }
@@ -114,7 +116,7 @@ async function tallyTable(table) {
     while (next < SLICES.length) { const n = await tallySlice(table, SLICES[next++], tally, stateTally); total += n; }
   };
   await Promise.all(Array.from({ length: 6 }, worker));
-  console.log(`  ${table}: ${total.toLocaleString()} rows, ${tally.size} distinct taxonomies`);
+  console.log(`  ${table}: ${total.toLocaleString()} rows, ${tally.size} distinct taxonomy codes, ${(tally.get('') || 0).toLocaleString()} without one`);
   return { tally, stateTally, total };
 }
 
@@ -183,10 +185,9 @@ async function main() {
   }
   console.log(`  all states: ${(allListings / totalPop * 1000).toFixed(2)} listings per 1,000 residents`);
 
-  for (const [label, mapTerms] of SPECIALTIES) {
-    const terms = mapTerms.split(',').map(s => s.trim()).filter(Boolean);
+  for (const [label] of SPECIALTIES) {
     let clinicians = 0;
-    for (const [t, n] of merged) if (taxMatches(t, terms)) clinicians += n;
+    for (const code of TaxonomyMap.codesFor(label)) clinicians += merged.get(code) || 0;
     const data = { rate_per_1k: Number(((clinicians / adults) * 1000).toFixed(4)), clinicians, adults };
     console.log(`  ${label}: ${clinicians.toLocaleString()} listings, ${data.rate_per_1k}/1k`);
     if (clinicians > 0) rows.push({ kind: 'specialty', key: label, data });

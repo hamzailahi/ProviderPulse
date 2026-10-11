@@ -58,7 +58,9 @@ const HealthDemand = require('../../assets/health-demand.js');
 // confidence, reasons). See that file's header for the five factors.
 const MarketModel = require('../../assets/market-model.js');
 const DemandModel = require('../../assets/demand-model.js');
-const SPECIALTIES = require('../../assets/specialties.js').MARKET;   // the market side's frozen list until phase 3b
+const SPECIALTIES = require('../../assets/specialties.js').SCORED;
+// Specialty membership is by NUCC code, from the reviewed table.
+const TaxonomyMap = require('../../assets/taxonomy-map.js');
 
 // Census columns the model reads for age mix and income (demographics_raw).
 const AGE_INCOME_COLS = [
@@ -536,9 +538,9 @@ exports.handler = async (event) => {
         const zipVariants = [...new Set(memberZips.flatMap(z => [z, String(parseInt(z, 10))]))];
 
         const [clinicPage, individualPage, placesPage, catchAcsPage] = await Promise.all([
-          pagedGet(`clinics?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,latitude,longitude`,
+          pagedGet(`clinics?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude`,
             'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
-          pagedGet(`provider_individuals?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,latitude,longitude`,
+          pagedGet(`provider_individuals?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude`,
             'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
           pagedGet(`cdc_places?zip=in.(${memberZips.join(',')})` +
             `&measureid=in.(${[...new Set(HealthDemand.measureIds().concat(MarketModel.measureIds()))].join(',')})` +
@@ -764,6 +766,7 @@ exports.handler = async (event) => {
             groupOf: label => TaxonomyGroups.keyFor((SPECIALTIES.find(x => x[0] === label) || [0, ''])[1].split(',')[0]),
             // ?npi= is the viewing provider: their own listing is not a competitor.
             rows: clinicPage.rows.concat(individualPage.rows).filter(r => !selfNpi || String(r.npi) !== selfNpi),
+            codesFor: label => TaxonomyMap.codesFor(label),
             taxMatches: (stored, terms) => terms.some(t => (' ' + taxNorm(stored)).includes(' ' + taxNorm(t))),
             milesBetween, center: { lat: oLat, lng: oLon }, adults: catchmentAdults,
             places, demo, pay, shortage, groupNeedPct, groupAccess,
@@ -772,8 +775,7 @@ exports.handler = async (event) => {
             learnedNeed
           };
           const scored = MarketModel.score(baseInput);
-          const wantRaw = String((event.queryStringParameters || {}).specialty || '');
-          const want = require('../../assets/specialties.js').MARKET_LABEL_ALIASES[wantRaw] || wantRaw;
+          const want = String((event.queryStringParameters || {}).specialty || '');
           model = {
             version: scored.version, weights: scored.weights,
             benchmarks: scored.specialties.some(x => x.evidence.access && x.evidence.access.basis === 'specialty') ? 'specialty' : 'group',
@@ -791,8 +793,12 @@ exports.handler = async (event) => {
           const addN = Math.max(0, Math.min(5, parseInt((event.queryStringParameters || {}).add, 10) || 0));
           const specRow = SPECIALTIES.find(x => x[0] === want);
           if (addN && specRow) {
+            // A scenario listing carries one of the specialty's codes, preferring a
+            // code that belongs to no other specialty, so only this one gains supply.
+            const codes = TaxonomyMap.codesFor(want);
+            const code = codes.find(c => TaxonomyMap.get(c).patientSpecialties.length === 1) || codes[0];
             const term = specRow[1].split(',')[0].trim();
-            const fake = Array.from({ length: addN }, () => ({ npi: 'scenario', primary_taxonomy: term, latitude: oLat, longitude: oLon }));
+            const fake = Array.from({ length: addN }, () => ({ npi: 'scenario', primary_taxonomy: term, taxonomy_code: code, latitude: oLat, longitude: oLon }));
             const afterAll = MarketModel.score(Object.assign({}, baseInput, { rows: baseInput.rows.concat(fake) }));
             const pick = x => x && ({
               score: x.score, archetype: x.archetype_name, confidence: x.confidence, clinicians: x.clinicians, factors: x.factors,

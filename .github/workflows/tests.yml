@@ -70,7 +70,9 @@ jobs:
         run: node scripts/test-signup-gate.mjs
 
       - name: Market opportunity model
-        run: node scripts/test-market-model.mjs
+        run: |
+          node scripts/test-market-model.mjs
+          node scripts/test-market-benchmarks.mjs
 
       - name: NUCC taxonomy map (and the generated file is in sync)
         run: |

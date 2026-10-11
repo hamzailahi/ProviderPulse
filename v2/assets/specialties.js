@@ -64,28 +64,22 @@ const SPECIALTIES = [
   ['Other health services', 'Specialist,Technician,Interpreter,Driver', 'Specialist']
 ];
 
-// Patient search, the portal and the dashboard filter find a specialty's
-// listings by NUCC code (TaxonomyMap.codesFor(label), from the reviewed table
-// in supabase/reference/taxonomy-overrides.csv). mapTerms remain for what
+// Every surface finds a specialty's listings by NUCC code
+// (TaxonomyMap.codesFor(label), from the reviewed table in
+// supabase/reference/taxonomy-overrides.csv). mapTerms remain only for what
 // still matches by name: claimed listings' self-reported specialty, the
-// dashboard's #tax= deep links and the market side below.
+// dashboard's #tax= deep links and the navigator.
 //
-// MARKET_SPECIALTIES is the market model's list (market-score, the assistant,
-// the benchmark builder, the demand trainer): the 33 labels as they were
-// before the code table, with "Speech & hearing" under its old name and terms,
-// because market_benchmarks rows are keyed by those labels. It goes away when
-// the market side moves to codes and the benchmarks are rebuilt (phase 3b).
-var MARKET_SPECIALTIES = SPECIALTIES.slice(0, 33).map(function (s) {
-  return s[0] === 'Speech & language therapy'
-    ? ['Speech & hearing', 'Speech-Language Pathologist,Audiologist,Hearing Instrument Specialist,Hearing and Speech Clinic/Center,Speech & Hearing', 'Speech-Language Pathologist']
-    : s;
-});
-// The dashboard sends the patient-facing label; the market side knows it by the old one.
-var MARKET_LABEL_ALIASES = { 'Speech & language therapy': 'Speech & hearing' };
+// SCORED_SPECIALTIES is what the market model scores (market-score, the
+// assistant, the benchmark builder, the demand trainer). Two categories are
+// searchable but not scored: nobody opens a practice in them, so an
+// "opportunity" for them would mean nothing.
+var NOT_SCORED = ['Hospital-based clinicians', 'Other health services'];
+var SCORED_SPECIALTIES = SPECIALTIES.filter(function (s) { return NOT_SCORED.indexOf(s[0]) === -1; });
 
-if (typeof window !== 'undefined') { window.MARKET_SPECIALTIES = MARKET_SPECIALTIES; window.MARKET_LABEL_ALIASES = MARKET_LABEL_ALIASES; }
+if (typeof window !== 'undefined') window.SCORED_SPECIALTIES = SCORED_SPECIALTIES;
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = SPECIALTIES;
-  module.exports.MARKET = MARKET_SPECIALTIES;
-  module.exports.MARKET_LABEL_ALIASES = MARKET_LABEL_ALIASES;
+  module.exports.SCORED = SCORED_SPECIALTIES;
+  module.exports.NOT_SCORED = NOT_SCORED;
 }

@@ -34,7 +34,9 @@ import { resolve } from './lib/cms-catalog.mjs';
 const require = createRequire(import.meta.url);
 const DemandModel = require('../v2/assets/demand-model.js');
 const MarketModel = require('../v2/assets/market-model.js');
-const SPECIALTIES = require('../v2/assets/specialties.js').MARKET;   // the market side's frozen list until phase 3b
+const SPECIALTIES = require('../v2/assets/specialties.js').SCORED;
+// A clinician's specialty comes from their NUCC code through the reviewed table.
+const TaxonomyMap = require('../v2/assets/taxonomy-map.js');
 
 const args = process.argv.slice(2);
 const opt = (n, d = null) => (args.indexOf(n) !== -1 ? args[args.indexOf(n) + 1] : d);
@@ -78,8 +80,12 @@ async function pageAll(table, select, key, extra = '') {
   }
 }
 
-const taxNorm = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
-const taxMatches = (stored, terms) => terms.some(t => (' ' + taxNorm(stored)).includes(' ' + taxNorm(t)));
+// code -> scored specialty labels, from the reviewed table.
+const specsByCode = new Map();
+for (const [label] of SPECIALTIES) for (const c of TaxonomyMap.codesFor(label)) {
+  if (!specsByCode.has(c)) specsByCode.set(c, []);
+  specsByCode.get(c).push(label);
+}
 
 // ---- 1. the claims file -----------------------------------------------------
 async function readPuf() {
@@ -114,8 +120,8 @@ async function taxonomies(puf) {
       let last = null;
       for (;;) {
         const seek = last ? `npi=gt.${last}` : `npi=gte.${prefix}`;
-        const rows = await (await rest(`provider_individuals?select=npi,primary_taxonomy&${seek}&npi=lt.${upper}&order=npi&limit=1000`)).json();
-        for (const r of rows) if (puf.has(String(r.npi))) tax.set(String(r.npi), r.primary_taxonomy || '');
+        const rows = await (await rest(`provider_individuals?select=npi,taxonomy_code&${seek}&npi=lt.${upper}&order=npi&limit=1000`)).json();
+        for (const r of rows) if (puf.has(String(r.npi))) tax.set(String(r.npi), r.taxonomy_code || '');
         if (rows.length < 1000) break;
         last = rows[rows.length - 1].npi;
       }
@@ -197,8 +203,7 @@ async function main() {
     const county = mainCounty.get(p.zip);
     if (t == null || !county) continue;
     placed++;
-    for (const [label, mapTerms] of SPECIALTIES) {
-      if (!taxMatches(t, mapTerms.split(',').map(s => s.trim()).filter(Boolean))) continue;
+    for (const label of specsByCode.get(t) || []) {
       if (!patients.has(label)) { patients.set(label, new Map()); clinicians.set(label, new Map()); }
       patients.get(label).set(county.fips, (patients.get(label).get(county.fips) || 0) + p.benes);
       clinicians.get(label).set(county.fips, (clinicians.get(label).get(county.fips) || 0) + 1);

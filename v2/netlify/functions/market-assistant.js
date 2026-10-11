@@ -36,7 +36,11 @@ const Anthropic = AnthropicModule.default || AnthropicModule;
 const { getUser, isProvider } = require('./lib/auth.js');
 const { validatePlan, buildPath, summarise, TABLES, OPS } = require('./lib/query-plan.js');
 const { verifyText } = require('./lib/answer-check.js');
-const SPECIALTIES = require('../../assets/specialties.js').MARKET;   // the market side's frozen list until phase 3b
+// Every searchable specialty (find_providers, update_map) and the ones the
+// market model scores (insights, compare, scenario). Membership is by NUCC code.
+const SPECIALTIES = require('../../assets/specialties.js');
+const SCORED = SPECIALTIES.SCORED;
+const TaxonomyMap = require('../../assets/taxonomy-map.js');
 const marketScore = require('./market-score.js');
 
 const MODEL = 'claude-opus-5-5';
@@ -53,6 +57,7 @@ const STEP_BUDGET_MS = HARD_BUDGET_MS - MODEL_MIN_BUDGET_MS;   // = 5500ms into 
 const MAX_ROUNDS_PER_QUESTION = 8;
 const MAX_HISTORY_BYTES = 350000;
 const SPEC_LABELS = SPECIALTIES.map(s => s[0]);
+const SCORED_LABELS = SCORED.map(s => s[0]);
 const GEO_MEASURE = 'DENTAL';     // the PLACES measure market-score reads centroids from
 
 const JSONH = { 'Content-Type': 'application/json' };
@@ -178,6 +183,7 @@ Style: lead with the answer. Short paragraphs and bullets; a markdown table when
 // Tools
 // ---------------------------------------------------------------------------
 const specEnum = { type: ['string', 'null'], enum: SPEC_LABELS.concat([null]) };
+const scoredEnum = { type: ['string', 'null'], enum: SCORED_LABELS.concat([null]) };
 const zipProp = { type: 'string', description: '5-digit US ZIP code' };
 
 const TOOLS = [
@@ -189,7 +195,7 @@ const TOOLS = [
       type: 'object',
       properties: {
         zip: zipProp,
-        specialty: Object.assign({ description: 'Specialty to explain in detail, or null for primary care' }, specEnum)
+        specialty: Object.assign({ description: 'Specialty to explain in detail, or null for primary care' }, scoredEnum)
       },
       required: ['zip', 'specialty'],
       additionalProperties: false
@@ -203,7 +209,7 @@ const TOOLS = [
       type: 'object',
       properties: {
         zips: { type: 'array', items: zipProp, description: '2 to 4 ZIP codes' },
-        specialty: Object.assign({ description: 'Specialty to compare' }, specEnum)
+        specialty: Object.assign({ description: 'Specialty to compare' }, scoredEnum)
       },
       required: ['zips', 'specialty'],
       additionalProperties: false
@@ -217,7 +223,7 @@ const TOOLS = [
       type: 'object',
       properties: {
         zip: zipProp,
-        specialty: { type: 'string', enum: SPEC_LABELS, description: 'Specialty that would open' },
+        specialty: { type: 'string', enum: SCORED_LABELS, description: 'Specialty that would open' },
         clinicians: { type: 'integer', description: 'How many clinicians open, 1 to 5' }
       },
       required: ['zip', 'specialty', 'clinicians'],
@@ -309,9 +315,6 @@ const TOOLS = [
 // Tool implementations
 // ---------------------------------------------------------------------------
 const isZip = z => typeof z === 'string' && /^\d{5}$/.test(z);
-const taxNorm = s => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
-const taxMatches = (stored, terms) => terms.some(t => (' ' + taxNorm(stored)).includes(' ' + taxNorm(t)));
-const termsFor = label => ((SPECIALTIES.find(s => s[0] === label) || [0, ''])[1]).split(',').map(s => s.trim()).filter(Boolean);
 const milesBetween = (lat1, lon1, lat2, lon2) => {
   const R = 3958.8, r = Math.PI / 180;
   const a = Math.sin((lat2 - lat1) * r / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin((lon2 - lon1) * r / 2) ** 2;
@@ -430,13 +433,13 @@ async function findProviders({ zip, specialty, radius_miles }) {
   // the per-listing distance filter below is what decides.
   const zips = [...new Set([zip].concat(box.filter(r => milesBetween(lat, lon, +r.lat, +r.lon) <= radius + 3).map(r => r.zip)))].slice(0, 150);
   const variants = [...new Set(zips.flatMap(z => [z, String(parseInt(z, 10))]))].join(',');
-  const terms = termsFor(label);
+  const codes = new Set(TaxonomyMap.codesFor(label));
 
   // Keyset on npi (unique), up to 4 pages per table.
   const pageAll = async table => {
     const out = []; let last = '';
     for (let i = 0; i < 4; i++) {
-      const rows = await get(`${table}?zip=in.(${variants})&select=npi,name,city,primary_taxonomy,latitude,longitude${last ? `&npi=gt.${last}` : ''}&order=npi&limit=1000`, 7000);
+      const rows = await get(`${table}?zip=in.(${variants})&select=npi,name,city,primary_taxonomy,taxonomy_code,latitude,longitude${last ? `&npi=gt.${last}` : ''}&order=npi&limit=1000`, 7000);
       out.push(...rows);
       if (rows.length < 1000) return { rows: out, truncated: false };
       last = rows[rows.length - 1].npi;
@@ -447,7 +450,7 @@ async function findProviders({ zip, specialty, radius_miles }) {
   const hits = [];
   for (const [rows, type] of [[orgs.rows, 'organization'], [people.rows, 'individual']]) {
     for (const r of rows) {
-      if (!taxMatches(r.primary_taxonomy, terms) || r.latitude == null) continue;
+      if (!codes.has(r.taxonomy_code) || r.latitude == null) continue;
       const mi = milesBetween(lat, lon, +r.latitude, +r.longitude);
       if (mi <= radius) hits.push({ name: r.name, type, taxonomy: r.primary_taxonomy, city: r.city, miles: Math.round(mi * 10) / 10 });
     }

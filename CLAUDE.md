@@ -76,7 +76,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `dashboard.css`, `dashboard-v3.css`, `dashboard-v3.js` | `index.html` (v3 files layer the redesign over the original dashboard) |
 | `forms.css` | `register-provider.html`, `auth.html`, `admin-review.html`, `404.html` |
 | `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code`), `milesBetween`, MapTiler key, ZIP centroid lookup |
-| `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.MARKET` is the market side's frozen 33-label list, `require`d by `market-score.js`, the assistant, the benchmark builder and the demand trainer until phase 3b |
+| `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (42: all but `NOT_SCORED`, Hospital-based clinicians and Other health services) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
 | `taxonomy-groups.js` | six specialty groups; `market-score.js` counts supply with it and the dashboard's Insights tab names them. The map no longer uses it (NUCC phase 2). **Being replaced** by `taxonomy-map.js` |
 | `taxonomy-map.js` | the dashboard map's classifier since 2026-10-09, and `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `health-demand.js` | CDC PLACES need model per group; browser + `require` |
@@ -331,7 +331,10 @@ The tables that bridge the vocabularies:
   `[label, mapTerms, nppesTerm]` (33 until 2026-10-09; see NUCC codes phase
   3). Patient-facing search finds a label's listings by **code**
   (`TaxonomyMap.codesFor`); `mapTerms` still serve claimed listings'
-  self-reported specialty, `#tax=` deep links and the market side. `mapTerms` match `clinics.primary_taxonomy`;
+  self-reported specialty, `#tax=` deep links, the navigator and My
+  market's guess at a provider's own specialty (`specFor`, from
+  `taxonomy_desc`). The market side matches by code too since 2026-10-11.
+  `mapTerms` match `clinics.primary_taxonomy`;
   `nppesTerm` goes to the NPPES API. Every `nppesTerm` was verified live
   (NPPES says `Dietitian`, not `Registered Dietitian`). Frozen, hand-verified
   data. Note that "Orthopedics & sports injury" includes the bare term
@@ -342,8 +345,10 @@ The tables that bridge the vocabularies:
   Rules are **ordered, and discipline wins over venue**: a `Dental
   Clinic/Center` is dental. `facility` is only for entities with **no**
   clinical discipline, so no clinician is ever classified as a facility.
-  `market-score.js` uses it for supply counts and Insights for its group
-  names; the map moved to NUCC groupings on 2026-10-09. Do not add a second
+  `market-score.js` still uses it for the ZIP-level verdict's clinician
+  count, the per-group access and need fallbacks, the shortage discipline
+  and Insights' group names; the map moved to NUCC groupings on 2026-10-09
+  and per-specialty supply to codes on 2026-10-11. Do not add a second
   clinician/facility split anywhere.
 
 **Matching rule.** Normalize both sides (lowercase, `&`→`and`, punctuation to
@@ -476,13 +481,30 @@ keyword matching and no default bucket**. Three phases, each gated:
    `patient.js`). The 11 new labels' `nppesTerm`s are NUCC classification
    names **not verified live** (NPPES was unreachable): check them before
    relying on the navigator for those categories.
-   **3b, market side (next):** `market-score`, the assistant, the benchmark
-   builder and the demand trainer use `SPECIALTIES.MARKET` (the 33 old
-   labels, "Speech & hearing" under its old name and terms;
-   `MARKET_LABEL_ALIASES` maps the new name back). Re-key them on codes,
-   rebuild `market_benchmarks`, then delete the frozen list.
+   **3b, market side, shipped 2026-10-11.** `MarketModel.score` takes
+   `codesFor(label)` and buckets each catchment listing by `taxonomy_code`
+   (one lookup per listing; a code in several specialties counts in each;
+   no code counts in none); without it, it falls back to `taxMatches` on
+   names (old callers and tests). `market-score` selects `taxonomy_code`,
+   scores `SPECIALTIES.SCORED` (42), and a what-if listing carries a code
+   that belongs to that specialty alone where one exists. The assistant's
+   `find_providers` filters by code; insights, compare and scenario offer
+   the 42 scored labels, find_providers and update_map all 44. The
+   benchmark builder tallies `taxonomy_code` per NPI slice and sums each
+   specialty's codes (`scripts/test-market-benchmarks.mjs` runs it end to
+   end against a fake database); state density still counts every row,
+   coded or not. The parked demand trainer reads `taxonomy_code` too. The
+   frozen 33-label list and its alias are gone. Nine new scored labels got
+   **provisional** `PROFILES` (only measures already imported; ABA,
+   infectious disease and genetics have no defensible measure);
+   "Speech & hearing" became "Speech & language therapy" (stroke, under 18)
+   and hearing kept the old hearing-loss profile. **Until the benchmark job
+   reruns**, `market_benchmarks` specialty rows are the 2026-09-29 name-based
+   counts under the old labels: renamed and new labels fall back to group
+   level with a caveat, and the old "Speech & hearing" row lingers unused
+   (the job upserts and never deletes).
 
-Until phase 3b ships, `taxonomy-groups.js` remains the classifier for supply counts and Insights.
+`taxonomy-groups.js` remains the classifier for the ZIP-level verdict, the group fallbacks and Insights' group names (see the taxonomy-groups bullet); replacing it is the remaining step.
 `show_on_map` and patient specialties are data in the overrides CSV, never
 code; the only hidden code is `390200000X` (Student, Health Care).
 `taxonomy-map.js` and `supabase/reference/taxonomy_map.csv` are generated
@@ -978,7 +1000,8 @@ far was a bad input faithfully reported.
 ## Market opportunity model (`assets/market-model.js`)
 
 Runs inside `market-score.js` over a catchment of the ZIP plus nearby ZCTAs
-within 25 miles (by centroid). For each of the 33 specialties:
+within 25 miles (by centroid). For each of the 42 scored specialties
+(`SPECIALTIES.SCORED`), with listings assigned by NUCC code:
 
 | Factor | Weight | Input |
 |---|---|---|
@@ -1011,7 +1034,8 @@ Benchmarks come from `market_benchmarks`, built by
 `scripts/build-market-benchmarks.mjs` (quarterly workflow, or run by hand).
 Measure anchors are unweighted national ZCTA percentiles; specialty rates are
 listings per 1,000 US adults, counted by paging both provider tables on `npi`
-in 20 NPI-prefix slices and tallying per distinct taxonomy. First full run
+in 20 NPI-prefix slices, tallying per `taxonomy_code` and summing each
+specialty's codes (by name until 2026-10-11). First full run
 2026-09-29: 29 measures and 33 specialties written. That run's log reported
 1.8M rows read out of roughly 9M, because parallel workers raced on the
 running total; the per-taxonomy tallies were unaffected, and the total is now
@@ -1082,8 +1106,8 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   not per-row fields. Needs `HUD_API_TOKEN`.
 - **Demand model** (`train-demand-model.mjs`, **manual only, parked**): streams the CMS
   by-Provider PUF (`Rndrng_NPI`, `Rndrng_Prvdr_Zip5`, `Tot_Benes`), takes each
-  clinician's specialty from `provider_individuals` by NPI (word-start match on
-  `mapTerms`), places ZIPs in their majority county (HUD crosswalk), and learns
+  clinician's specialty from `provider_individuals` by NPI (their
+  `taxonomy_code` through the reviewed table), places ZIPs in their majority county (HUD crosswalk), and learns
   patients per 1,000 **original-Medicare** enrollees from county aggregates of
   `census_acs_zcta` and `cdc_places`. Writes `market_benchmarks` kind
   `demand_model` (migration 025). Catalog lookup shared with the activity import
@@ -1234,15 +1258,16 @@ function, asset and script and a `require` of every function.
 node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) case
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
-node scripts/test-market-model.mjs        # 30: the market opportunity model
+node scripts/test-market-model.mjs        # 33: the market opportunity model, incl. bucketing by code
 node scripts/test-demand-model.mjs        # 45: the learned demand model, trainer end to end, and scoring
 node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick
 node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 14: the what-if re-score changes supply only
-node scripts/test-market-assistant.mjs    # 58: the assistant, figure repair, tracing (needs npm ci in v2/)
+node scripts/test-market-assistant.mjs    # 59: the assistant, figure repair, tracing (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
+node scripts/test-market-benchmarks.mjs   # 7: the benchmark builder end to end, specialty rates by code
 node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 ```

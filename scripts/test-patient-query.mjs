@@ -51,9 +51,9 @@ ok(TaxonomyMap.codesFor('No such specialty').length === 0, 'an unknown label has
 ok(!TaxonomyMap.codesFor('Other health services').includes('390200000X'), 'Student is in no specialty');
 ok(TaxonomyMap.codesFor('Primary care / family doctor').includes('363LF0000X'), 'Family NP under Primary care');
 ok(TaxonomyMap.codesFor('Behavior therapy (ABA)').includes('106S00000X'), 'Behavior Technician under ABA');
-// The market side keeps its 33 pre-code labels until its benchmarks are rebuilt.
-ok(SPECIALTIES.MARKET.length === 33 && SPECIALTIES.MARKET.some(s => s[0] === 'Speech & hearing'), 'market list frozen at 33 labels');
-ok(SPECIALTIES.MARKET_LABEL_ALIASES['Speech & language therapy'] === 'Speech & hearing', 'renamed label aliased for the market side');
+// The market model scores every specialty except the two nobody opens a practice in.
+ok(SPECIALTIES.SCORED.length === SPECIALTIES.length - 2 && SPECIALTIES.NOT_SCORED.every(l => SPECIALTIES.some(s => s[0] === l)), 'scored list is all but the two not-scored labels');
+ok(!SPECIALTIES.some(s => s[0] === 'Speech & hearing'), 'the old Speech & hearing label is gone everywhere');
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
