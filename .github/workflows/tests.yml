@@ -13,13 +13,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       # The functions' one dependency (the Anthropic SDK), so every function
       # can be loaded below exactly as Netlify bundles it.
@@ -82,6 +86,11 @@ jobs:
 
       - name: Insurance plan proposal logic
         run: node scripts/test-payers.mjs
+
+      - name: Procedure tables builder (Medicaid and Medicare hospital), end to end on fixtures
+        run: |
+          pip install -q duckdb==1.1.3
+          python3 scripts/test-procedure-tables.py
 
       - name: Market assistant (stepped agent, tools, history rules)
         run: node scripts/test-market-assistant.mjs

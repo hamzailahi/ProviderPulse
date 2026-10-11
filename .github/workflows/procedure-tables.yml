@@ -1,0 +1,83 @@
+name: Procedure tables
+
+# Manual. Builds the Procedures panel's Medicaid and Medicare hospital tables
+# (migration 036) with scripts/build-procedure-tables.py. dry_run reads the
+# directory (read only) and writes only a summary; apply also loads the three
+# tables, refusing unless disk_free_gb covers the estimate. Run once a year,
+# after HHS and CMS publish a new year.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: dry_run writes nothing to the database; apply loads the tables
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+      disk_free_gb:
+        description: Free database disk in GB, from Supabase (needed for apply)
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: procedure-tables
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install DuckDB and openpyxl
+        run: pip install duckdb==1.1.3 openpyxl==3.1.5
+
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Add the repository secret SUPABASE_DB_URL (Supabase, Connect, Session pooler string)."
+            exit 1
+          fi
+
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          args=(--mode "${{ inputs.mode }}" --out supabase/reference/procedure-sources)
+          if [ -n "${{ inputs.disk_free_gb }}" ]; then args+=(--disk-free-gb "${{ inputs.disk_free_gb }}"); fi
+          python3 scripts/build-procedure-tables.py "${args[@]}"
+
+      - name: Summary
+        if: always()
+        run: |
+          [ -f supabase/reference/procedure-sources/build-summary.md ] && cat supabase/reference/procedure-sources/build-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Commit the summary
+        if: always()
+        run: |
+          git add supabase/reference/procedure-sources/build-summary.md 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Procedure tables (${{ inputs.mode }}) $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

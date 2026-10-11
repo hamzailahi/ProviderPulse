@@ -152,7 +152,9 @@ colors for individual clinicians, muted ones for organizations), and the
 map key doubles as a filter: each grouping in view has a checkbox and a
 count. A provider's popup shows its full classification and code. The **Insights** tab comes first and carries the market opportunity
 model described next. Demographics, health data and procedures are all
-still there as tabs. **Reports** is a builder on top of the assistant
+still there as tabs; **Procedures** switches between Medicare clinicians
+(Part B), Medicare hospital outpatient, Medicare hospital inpatient and
+Medicaid, and remembers the choice. **Reports** is a builder on top of the assistant
 below: pick a market memo, expansion one-pager or client pitch, the
 specialty, optional ZIPs to compare, who it is for and what it must
 answer, and the assistant writes it. Every document from the session
@@ -450,7 +452,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`035_insurance_payers_cleanup.sql`; 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
+`036_procedure_sources.sql`; 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
 
 ## Environment variables
 
@@ -492,6 +494,9 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched |
 | `taxonomy-inventory.yml` | manual only | lists every taxonomy name stored in the directory tables with row counts, plus the newest official NUCC code set and the CMS Medicare specialty crosswalk, in `supabase/reference/`, and rebuilds the taxonomy map from them; read only against the database |
 | `taxonomy-indexes.yml` | manual only | builds the `taxonomy_code` indexes (migration 030) without locking the tables, then checks all three are valid |
+| `procedure-sources.yml` | manual, read only | describes the Medicaid provider spending file (HHS) and the Medicare hospital outpatient and inpatient files (CMS) the Procedures panel's extra sources are built from |
+| `procedure-tables.yml` | manual, yearly once HHS and CMS publish a new year | builds the Procedures panel's Medicaid table (per ZIP, specialty and procedure code) and the Medicare hospital tables (per hospital and payment group) from those files; `dry_run` writes nothing and reports what was dropped and how big it is; `apply` refuses unless the free disk entered covers the load |
+| `nppes-terms-check.yml` | manual, read only | sends every specialty's registry search term to NPPES and records what comes back |
 | `db-size-report.yml` | manual only | read-only report of table, index and write-ahead-log sizes and dead rows, written to `supabase/reference/db-size-report.md` |
 | `taxonomy-backfill.yml` | manual only | gives every listing its official NUCC taxonomy code from the NPPES monthly file and loads the `taxonomy_map` table. `dry_run` writes nothing and reports coverage and exceptions; `apply` refuses unless the free disk entered covers the rewrite |
 | `schema-snapshot.yml` | weekly, Mondays | dumps the live database's structure (tables, indexes, policies, grants; no data) to `supabase/schema/public.sql` and commits it only when it changed, so every such commit records a schema change |
@@ -518,6 +523,7 @@ node scripts/test-market-benchmarks.mjs   # the benchmark builder counts each sp
 node scripts/test-signup-gate.mjs         # patient sign-up is closed unless explicitly opened
 node scripts/test-market-assistant.mjs    # the assistant: steps, tools, history rules (needs npm ci in v2/)
 node scripts/test-payers.mjs              # the insurance plan proposal: names, members, Medicaid plans, the cutoff
+python3 scripts/test-procedure-tables.py  # the Medicaid and Medicare hospital procedure builder, end to end on small files (needs duckdb)
 node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list, specialty coverage
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 ```
@@ -571,6 +577,19 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-11
 
+- **Procedures now cover Medicaid and Medicare hospitals.** The Procedures
+  tab has a switch: Medicare clinicians (what it showed before), Medicare
+  hospital outpatient (by payment group), Medicare hospital inpatient (by
+  diagnosis group) and Medicaid. Medicaid comes from the provider spending
+  file HHS released in February 2026, newest year (2024), placed at each
+  provider's ZIP and specialty in our directory, with claims, total paid and
+  paid per claim. HHS withholds small cells (under 12 patients), and its
+  monthly patient counts cannot be added into a head count, so the panel
+  shows "patient-months" and says why. Junk rows in the source (malformed
+  codes, impossible amounts) are dropped and counted, never shown. Private
+  insurance has no public equivalent: insurers publish prices, not volumes.
+  The tables arrive with migration 036 and a dry run, then a load, of the
+  new "Procedure tables" job.
 - **Procedure data beyond Medicare Part B, step one.** A new manual,
   read-only job describes the files the Procedures panel will add: the
   Medicaid provider spending by procedure that HHS released in February

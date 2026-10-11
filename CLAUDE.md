@@ -716,7 +716,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) written 2026-10-11, not yet applied. `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
@@ -771,6 +771,31 @@ Tables:
   (e.g. stream the CMS source file in GitHub Actions and load the summary),
   and **budget scratch space and I/O for any large rewrite, not just the size
   of the result.**
+- `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`
+  (036): the Procedures panel's other sources, public read, filled only by
+  `procedure-tables.yml` (`scripts/build-procedure-tables.py`, DuckDB in
+  Actions; `apply` truncates and reloads all three through unlogged staging
+  tables in one transaction). Medicaid is HHS's Medicaid Provider Spending by
+  HCPCS (T-MSIS, released 2026-02; the HHS page embeds its file list, a 3.1 GB
+  Parquet on Azure blob; the Hugging Face copy is gated, 401): newest year,
+  servicing NPI else billing NPI, placed at that NPI's ZIP and CMS specialty
+  (taxonomy_map's first `cms_specialty_name`, else the NUCC classification)
+  from `clinics` + `provider_individuals`, summed per ZIP x specialty x code.
+  Discovery (`supabase/reference/procedure-sources/`, 2026-10-11): 238M rows
+  2018 to 2024, 34.4M in 2024; CPT codes are present; cells under 12 patients
+  are withheld; 2018 carries trillion-dollar junk and 2024 $51.5B on malformed
+  codes, so malformed codes and NPIs, negative amounts and more than $250,000
+  per claim line are dropped and counted, as are NPIs not in the directory.
+  `TOTAL_PATIENTS` is per month, so `patient_months` is never called a head
+  count. Code descriptions come from CMS's physician-by-geography file and,
+  best effort, the HCPCS Level II file; state-only codes (Z9525, W1793) have
+  none. Medicare hospitals are the Outpatient (APC) and Inpatient (DRG)
+  Hospitals by Provider and Service files, newest year, one row per
+  hospital and code; CMS blanks counts under 11 and those rows are skipped.
+  The panel toggle (`procSource`, `pp.dash.procSource` in localStorage)
+  leaves the Medicare Part B path untouched; the other sources render with
+  `escHtml`. Private insurance has no public volume data (Transparency in
+  Coverage files are prices without volumes; state APCDs are restricted).
 - `insurance_payers`: national + per-state plans, public read.
 - `leie_exclusions`: `id` primary key (**not** NPI: most rows have none, and
   177 NPIs repeat). Service role only.
@@ -1264,6 +1289,10 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   `supabase/reference/db-size-report.md`. Run it before any disk decision.
 - **NPPES terms check** (`nppes-terms-check.yml`, manual, read only): see
   NUCC codes phase 3a.
+- **Procedure sources** (`procedure-sources.yml`, manual, read only) and
+  **Procedure tables** (`procedure-tables.yml`, manual, `dry_run` / `apply`
+  with `disk_free_gb`): see the 036 tables under Supabase schema. Run the
+  tables job yearly after HHS and CMS publish a new year.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is
@@ -1380,6 +1409,7 @@ node scripts/test-density-benchmark.mjs   # 13: the state density comparison is 
 node scripts/test-market-benchmarks.mjs   # 7: the benchmark builder end to end, specialty rates by code
 node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
+python3 scripts/test-procedure-tables.py   # 17: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 ```
 

@@ -303,6 +303,18 @@
 
             <div id="procedures-panel" style="display:none;flex:1;overflow-y:auto;padding:14px;background:var(--bg-base);">
                 <div style="margin-bottom:10px;position:sticky;top:0;background:var(--bg-base);padding-bottom:8px;z-index:10;border-bottom:1px solid var(--border);">
+                    <div id="procSourceToggle" role="group" aria-label="Procedure data source" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+                        <button type="button" class="proc-src" data-src="medicare" aria-pressed="true">Medicare clinicians</button>
+                        <button type="button" class="proc-src" data-src="outpatient" aria-pressed="false">Medicare hospital outpatient</button>
+                        <button type="button" class="proc-src" data-src="inpatient" aria-pressed="false">Medicare hospital inpatient</button>
+                        <button type="button" class="proc-src" data-src="medicaid" aria-pressed="false">Medicaid</button>
+                    </div>
+                    <style>
+                        .proc-src{font:500 11px 'DM Sans',sans-serif;padding:5px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-secondary);cursor:pointer;}
+                        .proc-src[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;}
+                        .proc-src:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+                        @media (max-width:640px){.proc-src{font-size:12px;padding:7px 10px;}}
+                    </style>
                     <input id="proceduresSearch" type="text" placeholder="Search by HCPCS code, description, or specialty..." 
                         style="width:100%;box-sizing:border-box;padding:7px 10px;font-size:11px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'DM Sans',sans-serif;outline:none;"
                         oninput="filterProcedures(this.value)">
@@ -3447,6 +3459,7 @@
         let proceduresRawData = {}; // store for search filtering
 
         function filterProcedures(query) {
+            if (procSource !== 'medicare') { renderOtherProcedures(query.trim().toLowerCase()); return; }
             if (!proceduresRawData || Object.keys(proceduresRawData).length === 0) return;
             const q = query.trim().toLowerCase();
             renderProceduresHTML(proceduresRawData, q);
@@ -3553,6 +3566,8 @@
             const searchEl = document.getElementById('proceduresSearch');
             if (searchEl) searchEl.value = '';
             proceduresRawData = {};
+            procZips = zips || [];
+            if (procSource !== 'medicare') return fetchOtherProcedures();
 
             if (!zips || zips.length === 0) {
                 el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">No ZIPs loaded.</em>';
@@ -3610,6 +3625,148 @@
             } catch(e) {
                 el.innerHTML = `<em style="color:var(--orange);font-size:12px;">Error: ${e.message}</em>`;
             }
+        }
+
+        /* ---- Procedures: Medicaid and Medicare hospital sources (migration 036) ----
+           Read from the public aggregate tables the "Procedure tables" job loads.
+           Every value placed in HTML goes through escHtml. */
+        let procSource = 'medicare';
+        try { const v = localStorage.getItem('pp.dash.procSource'); if (['medicare', 'outpatient', 'inpatient', 'medicaid'].includes(v)) procSource = v; } catch (e) {}
+        let procZips = [];
+        let otherProcData = null;        // { source, groups: {name: [rows]}, year }
+        const PROC_SOURCES = {
+            outpatient: { label: 'Medicare hospital outpatient', group: 'hospital', unitNote: 'Hospital outpatient services billed to traditional Medicare, by payment group (APC)',
+                cols: [['patients', 'Pts', 'n'], ['services', 'Svcs', 'n'], ['avg_charge', 'Avg Billed', '$'], ['avg_allowed', 'Avg Allowed', '$'], ['avg_paid', 'Avg Paid', '$']],
+                foot: 'Pts = unique Medicare patients · Svcs = services · Avg Billed = average hospital charge · Avg Allowed = average Medicare allowed amount · Avg Paid = average Medicare payment. Rows with fewer than 11 patients are withheld by CMS.' },
+            inpatient: { label: 'Medicare hospital inpatient', group: 'hospital', unitNote: 'Inpatient stays billed to traditional Medicare, by diagnosis-related group (DRG)',
+                cols: [['patients', 'Stays', 'n'], ['avg_charge', 'Avg Billed', '$'], ['avg_allowed', 'Avg Total Paid', '$'], ['avg_paid', 'Avg Medicare Paid', '$']],
+                foot: 'Stays = discharges · Avg Billed = average covered charge · Avg Total Paid = average total payment (Medicare, patient and other payers) · Avg Medicare Paid = Medicare\'s share. DRGs with fewer than 11 stays at a hospital are withheld by CMS.' },
+            medicaid: { label: 'Medicaid', group: 'specialty', unitNote: 'Medicaid and CHIP claims (fee-for-service and managed care), placed at each provider\'s listed ZIP',
+                cols: [['claims', 'Claims', 'n'], ['patient_months', 'Pt-months', 'n'], ['paid', 'Total Paid', '$0'], ['per_claim', 'Paid/Claim', '$'], ['providers', 'Providers', 'n']],
+                foot: 'Claims = claim lines · Pt-months = monthly unique patients added across months (a patient seen in three months counts three times, so it is not a head count) · Total Paid = Medicaid paid · Paid/Claim = Total Paid ÷ Claims. HHS withholds any provider-code-month with fewer than 12 patients, so small practices undercount. State data quality varies.' }
+        };
+
+        function setProcSource(src) {
+            procSource = src;
+            try { localStorage.setItem('pp.dash.procSource', src); } catch (e) {}
+            document.querySelectorAll('#procSourceToggle .proc-src').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.src === src)));
+            const searchEl = document.getElementById('proceduresSearch');
+            if (searchEl) {
+                searchEl.value = '';
+                searchEl.placeholder = src === 'medicare' ? 'Search by HCPCS code, description, or specialty...'
+                    : src === 'medicaid' ? 'Search by code, description, or specialty...' : 'Search by code, description, or hospital...';
+            }
+            if (procZips.length) fetchProceduresData(procZips);
+            else document.getElementById('proceduresContent').innerHTML =
+                `<em style="color:var(--text-muted);font-size:12px;">Click a ZIP boundary or search a ZIP to load ${escHtml(src === 'medicare' ? 'Medicare' : PROC_SOURCES[src].label)} procedure data.</em>`;
+        }
+        document.querySelectorAll('#procSourceToggle .proc-src').forEach(b => {
+            b.addEventListener('click', () => setProcSource(b.dataset.src));
+            b.setAttribute('aria-pressed', String(b.dataset.src === procSource));
+        });
+
+        async function procPaged(path) {
+            let all = [], offset = 0;
+            while (true) {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}&limit=1000&offset=${offset}`, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                if (res.status === 404) throw new Error('not loaded yet');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const batch = await res.json();
+                all = all.concat(batch);
+                if (batch.length < 1000 || all.length >= 50000) break;
+                offset += 1000;
+            }
+            return all;
+        }
+
+        async function fetchOtherProcedures() {
+            const src = procSource, cfg = PROC_SOURCES[src];
+            const el = document.getElementById('proceduresContent');
+            otherProcData = null;
+            if (!procZips.length) { el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">No ZIPs loaded.</em>'; return; }
+            el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">⏳ Loading ${escHtml(cfg.label)} procedure data...</em>`;
+            const zipList = procZips.map(z => String(z).padStart(5, '0')).join(',');
+            try {
+                const groups = {}; let year = null;
+                if (src === 'medicaid') {
+                    const rows = await procPaged(`medicaid_procedures?zip=in.(${zipList})&select=specialty,code,claims,patient_months,paid,providers,year&order=specialty,code`);
+                    const codes = [...new Set(rows.map(r => r.code))];
+                    const desc = {};
+                    for (let i = 0; i < codes.length; i += 150) {
+                        const chunk = codes.slice(i, i + 150).map(c => encodeURIComponent(c)).join(',');
+                        (await procPaged(`procedure_codes?code=in.(${chunk})&select=code,description`)).forEach(d => { desc[d.code] = d.description; });
+                    }
+                    const by = {};
+                    rows.forEach(r => {
+                        year = r.year;
+                        const k = r.specialty + '\u0000' + r.code;
+                        const p = by[k] || (by[k] = { group: r.specialty, code: r.code, description: desc[r.code] || null, claims: 0, patient_months: 0, paid: 0, providers: 0 });
+                        p.claims += Number(r.claims) || 0; p.patient_months += Number(r.patient_months) || 0;
+                        p.paid += Number(r.paid) || 0; p.providers += Number(r.providers) || 0;
+                    });
+                    Object.values(by).forEach(p => { p.per_claim = p.claims ? p.paid / p.claims : null; (groups[p.group] = groups[p.group] || []).push(p); });
+                } else {
+                    const rows = await procPaged(`medicare_hospital_procedures?zip=in.(${zipList})&setting=eq.${src}&select=hospital,code,description,patients,services,avg_charge,avg_allowed,avg_paid,year&order=hospital,code`);
+                    rows.forEach(r => { year = r.year; (groups[r.hospital] = groups[r.hospital] || []).push({ ...r, group: r.hospital }); });
+                }
+                if (!Object.keys(groups).length) {
+                    el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">No ${escHtml(cfg.label)} procedure data for these ZIPs.</em>`;
+                    return;
+                }
+                otherProcData = { source: src, groups, year };
+                renderOtherProcedures('');
+            } catch (e) {
+                el.innerHTML = e.message === 'not loaded yet'
+                    ? `<em style="color:var(--text-muted);font-size:12px;">${escHtml(cfg.label)} procedure data has not been loaded yet.</em>`
+                    : `<em style="color:var(--orange);font-size:12px;">Error: ${escHtml(e.message)}</em>`;
+            }
+        }
+
+        function renderOtherProcedures(filter) {
+            const el = document.getElementById('proceduresContent');
+            if (!otherProcData || otherProcData.source !== procSource) return;
+            const cfg = PROC_SOURCES[otherProcData.source];
+            const sortKey = cfg.cols[0][0];
+            const fmtN = v => v != null ? Math.round(v).toLocaleString() : '—';
+            const fmtD = v => v != null ? '$' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+            const fmtD0 = v => v != null ? '$' + Math.round(v).toLocaleString() : '—';
+            const cell = (t, v) => t === '$' ? fmtD(v) : t === '$0' ? fmtD0(v) : fmtN(v);
+            let html = '', shown = 0;
+            const names = Object.keys(otherProcData.groups).sort((a, b) =>
+                otherProcData.groups[b].reduce((s, p) => s + (p[sortKey] || 0), 0) - otherProcData.groups[a].reduce((s, p) => s + (p[sortKey] || 0), 0));
+            names.forEach(name => {
+                const groupMatch = !filter || name.toLowerCase().includes(filter);
+                const procs = otherProcData.groups[name]
+                    .filter(p => groupMatch || String(p.code).toLowerCase().includes(filter) || (p.description || '').toLowerCase().includes(filter))
+                    .sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0));
+                if (!procs.length) return;
+                shown += procs.length;
+                const color = cfg.group === 'specialty' ? getSpecColor(name) : 'var(--accent)';
+                const max = procs[0][sortKey] || 1;
+                html += `<div style="margin-bottom:18px;">
+                    <div style="font-size:11px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                        <span>${escHtml(name)}</span>
+                        <span style="font-weight:400;font-size:10px;color:var(--text-muted);white-space:nowrap;">${procs.length} code${procs.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:10px;min-width:480px;">
+                    <thead><tr style="background:var(--bg-surface);"><th style="text-align:left;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);">Procedure</th>
+                    ${cfg.cols.map(c => `<th style="text-align:right;padding:5px 4px;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;">${escHtml(c[1])}</th>`).join('')}</tr></thead><tbody>
+                    ${procs.map(p => `<tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:5px 4px;max-width:200px;">
+                            <div style="color:var(--text-muted);font-size:9px;">${escHtml(p.code)}</div>
+                            <div style="color:var(--text-secondary);line-height:1.3;">${p.description ? escHtml(p.description) : '<span style="color:var(--text-muted);">No public description (often a state-specific Medicaid code)</span>'}</div>
+                            <div style="background:var(--bg-elevated);border-radius:2px;height:2px;margin-top:3px;overflow:hidden;"><div style="width:${Math.min(100, Math.round((p[sortKey] || 0) / max * 100))}%;height:100%;background:${color};"></div></div>
+                        </td>
+                        ${cfg.cols.map((c, i) => `<td style="padding:5px 4px;text-align:right;white-space:nowrap;${i === 0 ? `font-weight:600;color:${color};` : 'color:var(--text-secondary);'}">${cell(c[2], p[c[0]])}</td>`).join('')}
+                    </tr>`).join('')}
+                    </tbody></table></div></div>`;
+            });
+            if (!html) { el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">No results for "${escHtml(filter)}".</em>`; return; }
+            const groupWord = cfg.group === 'hospital' ? 'hospitals' : 'specialties';
+            const summary = filter
+                ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${shown} results for "${escHtml(filter)}" — <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div>`
+                : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">${shown.toLocaleString()} code${shown !== 1 ? 's' : ''} across ${names.length} ${names.length !== 1 ? groupWord : groupWord.replace(/ies$/, 'y').replace(/s$/, '')} · ${escHtml(otherProcData.year || '')} ${escHtml(cfg.unitNote)}</div>`;
+            el.innerHTML = summary + html + `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;">${escHtml(cfg.foot)}</div>`;
         }
 
         function getSpecColor(specialty) {
