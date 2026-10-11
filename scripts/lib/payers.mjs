@@ -144,7 +144,7 @@ export function medicaidPlans(rows, brandMap) {
       if (tail && region.includes(tail)) rawPlan = rawPlan.slice(0, slash);
     }
     const plan = cleanName(rawPlan), parent = (r['Parent Organization'] || '').trim();
-    const mapped = lookup(brandMap, 'plan', r['Plan Name']) || lookup(brandMap, 'parent', parent);
+    const mapped = lookup(brandMap, 'plan', rawPlan) || lookup(brandMap, 'plan', r['Plan Name']) || lookup(brandMap, 'parent', parent);
     out.push({
       source: 'medicaid', state: st, legal_name: plan, dba: '', group: parent, program: (r['Program Name'] || '').trim(),
       members, markets: null, brand: mapped || plan, brand_basis: mapped ? 'reviewed map' : 'plan name', category: 'medicaid', year

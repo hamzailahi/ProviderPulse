@@ -106,5 +106,11 @@ ok(ca[0].brand === 'Inland Empire Health Plan' && ca[1].brand === 'Inland Empire
 ok(ca[2].brand === 'Partnership HealthPlan of CA/Southwest', 'a slash that is not the row\'s region is left for review');
 ok(rollUp(ca, 1000).kept.find(x => x.brand === 'Inland Empire Health Plan').members === 1350000, 'county rows merge into one plan');
 
+const hn = medicaidPlans([{ State: 'California', 'Program Name': 'GMC (Comprehensive MCO)', 'Plan Name': 'Health Net Community Solutions/Sacramento', 'Geographic Region': 'Sacramento', 'Total Enrollment': '5000', Year: '2024' }],
+  parseBrandMap('match_type,match,brand\nplan,Health Net Community Solutions,Health Net\nplan,OptumRx,-\n'));
+ok(hn[0].brand === 'Health Net', 'the reviewed map matches a plan name after its county label is dropped');
+ok(medicaidPlans([{ State: 'Tennessee', 'Program Name': 'TennCare (Comprehensive MCO)', 'Plan Name': 'OptumRx', 'Total Enrollment': '9000', Year: '2024' }],
+  parseBrandMap('match_type,match,brand\nplan,OptumRx,-\n'))[0].brand === '-', 'a plan the review removed is marked for exclusion');
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
