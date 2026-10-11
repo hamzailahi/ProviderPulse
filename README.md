@@ -577,10 +577,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   The model now scores 42 categories: the 33 it scored before (speech
   therapy under its new name) and nine of the new ones, each with a
   provisional health-need profile. Hospital-based clinicians and Other
-  health services stay searchable but are not scored. The national rates
-  per category must be rebuilt by running the "Build market benchmarks"
-  job; until it runs, the new and renamed categories compare supply at the
-  broad group level and say so.
+  health services stay searchable but are not scored.
+- **National benchmarks rebuilt by code.** The "Build market benchmarks"
+  job reran on all 9 million listings, so every scored category, new ones
+  included, is compared against a national rate counted the same way as
+  the local one (for example primary care 4.78 listings per 1,000 adults,
+  orthopedics 0.42 now that general surgeons count under General surgery).
 
 ### 2026-10-09
 

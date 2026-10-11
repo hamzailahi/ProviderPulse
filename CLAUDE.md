@@ -498,11 +498,13 @@ keyword matching and no default bucket**. Three phases, each gated:
    **provisional** `PROFILES` (only measures already imported; ABA,
    infectious disease and genetics have no defensible measure);
    "Speech & hearing" became "Speech & language therapy" (stroke, under 18)
-   and hearing kept the old hearing-loss profile. **Until the benchmark job
-   reruns**, `market_benchmarks` specialty rows are the 2026-09-29 name-based
-   counts under the old labels: renamed and new labels fall back to group
-   level with a caveat, and the old "Speech & hearing" row lingers unused
-   (the job upserts and never deletes).
+   and hearing kept the old hearing-loss profile. **Benchmarks rebuilt by
+   code 2026-10-11** (dry run then write, 123 rows, ~16 min each): 9,049,543
+   listings read, 7 without a code (the backfill's exceptions); e.g. primary
+   care 1,234,150 (4.78/1k adults), ABA 665,583, orthopedics 107,315 (0.42,
+   general surgeons now counted under General surgery, 101,262). The old
+   "Speech & hearing" row lingers unused (the job upserts and never
+   deletes).
 
 `taxonomy-groups.js` remains the classifier for the ZIP-level verdict, the group fallbacks and Insights' group names (see the taxonomy-groups bullet); replacing it is the remaining step.
 `show_on_map` and patient specialties are data in the overrides CSV, never
