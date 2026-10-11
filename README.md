@@ -578,7 +578,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   will be built from them, shown as card brand names, limited to insurers
   with at least 1,000 members in a state, and reviewed as a spreadsheet
   before it reaches the plan pickers. Medicare Advantage plans already load
-  monthly from CMS.
+  monthly from CMS. The first proposal covers 760 state plans (private,
+  employer, marketplace and Medicaid managed care) and is out for review.
 - **Health-need profiles for the new categories reviewed.** Hospice now
   weighs cognitive disability (dementia is its leading diagnosis), as does
   speech therapy; care coordination is driven by social need (no insurance,

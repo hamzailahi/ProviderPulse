@@ -1212,6 +1212,14 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   commercial, then marketplace, then medicaid; one row per state, category and brand,
   at least 1,000 members. Output `payer-proposal.csv` and
   `payer-proposal-summary.md`, for the user's review. Nothing loads yet.
+  Third run, 2026-10-11: 73.3M covered lives (fully insured only; self-funded
+  employer plans file no MLR), 70.6M Medicaid managed care enrollees; 760
+  state plans proposed (365 commercial, 92 individual-market only, 349 with
+  Medicaid), 268 already listed, 806 under the cutoff, 53 excluded. Sent to
+  the user as a spreadsheet with 99 rows flagged (possibly not medical:
+  life insurers, dental and pharmacy managers; legal-looking names;
+  look-alike names in the same state and market, e.g. Kaiser three ways in
+  Medi-Cal). Loading waits for approval, through a numbered migration.
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
   read-only sizes of every table and index, dead rows, index use, WAL, to
   `supabase/reference/db-size-report.md`. Run it before any disk decision.
