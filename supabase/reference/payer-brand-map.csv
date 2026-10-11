@@ -1,0 +1,74 @@
+match_type,match,brand,note
+group,UNITEDHEALTH GRP,UnitedHealthcare,"Every UnitedHealth insurer (UnitedHealthcare of X, Oxford, Golden Rule, Optimum Choice, Neighborhood Health Partnership) sells as UnitedHealthcare"
+company,Health Plan of Nevada,Health Plan of Nevada,"UnitedHealth-owned but sold under its own name"
+company,"U.S. Behavioral Health Plan, California",-,"Behavioral health subcontractor, not a plan a patient names"
+company,ACN Group of California,-,"Chiropractic and therapy network, not a medical plan"
+group,CVS Health Group,Aetna,"Aetna Life, Aetna Health Inc. (each state), Aetna Health of California/Utah"
+company,Banner Health and Aetna Health Plan,Banner|Aetna,"Joint venture, sold under both names"
+group,Cigna Hlth Grp,Cigna,"Cigna files its marketing name as N/A"
+group,Connecticut General Life Insurance Company,Cigna,"Cigna's main insurer"
+group,KAISER FOUNDATION GRP,Kaiser Permanente,
+group,Elevance Hlth Inc Grp,Anthem Blue Cross and Blue Shield,"Anthem (and Empire in New York, renamed Anthem in 2023) everywhere except California"
+company_state,Anthem Blue Cross|CA,Anthem Blue Cross,
+company_state,Blue Cross of California|CA,Anthem Blue Cross,
+company_state,Anthem Blue Cross Life and Health Insurance|CA,Anthem Blue Cross,
+company_state,"Health Care Service Corporation, a Mutual Legal Reserve|IL",Blue Cross and Blue Shield of Illinois,"HCSC files one company in five states"
+company_state,"Health Care Service Corporation, a Mutual Legal Reserve|TX",Blue Cross and Blue Shield of Texas,
+company_state,"Health Care Service Corporation, a Mutual Legal Reserve|MT",Blue Cross and Blue Shield of Montana,
+company_state,"Health Care Service Corporation, a Mutual Legal Reserve|NM",Blue Cross and Blue Shield of New Mexico,
+company_state,"Health Care Service Corporation, a Mutual Legal Reserve|OK",Blue Cross and Blue Shield of Oklahoma,
+group,CENTENE CORP GRP,Ambetter,"Centene's commercial filings are its Ambetter marketplace plans (Celtic, Ambetter of X, Superior, Buckeye, Coordinated Care, Nebraska Total Care)"
+company,Health Net of California,Health Net,"Centene's Health Net brand"
+company,Health Net of Arizona,Health Net,
+company,Health Net Life Insurance,Health Net,
+company,Absolute Total Care,Ambetter,"Centene plan in South Carolina; no group filed"
+group,Molina Healthcare Inc GRP,Molina Healthcare,
+group,Blue Cross and Blue Shield of Florida,Florida Blue,"Florida Blue and its HMO, Health Options"
+company,Capital Health Plan,Capital Health Plan,"Florida Blue-owned, own brand in Tallahassee"
+company,Florida Health Care Plan,Florida Health Care Plan,"Florida Blue-owned, own brand"
+group,CAREFIRST INC GRP,CareFirst BlueCross BlueShield,"CareFirst BlueChoice, Group Hospitalization and Medical Services, CareFirst of Maryland"
+group,HIGHMARK GRP,Highmark Blue Cross Blue Shield,
+company_state,"BlueCross BlueShield of Western New York, BlueShield of Northeastern New York|NY",Highmark Blue Cross Blue Shield of Western New York,
+group,INDEPENDENCE BLUE CROSS GRP,Independence Blue Cross,"Independence Assurance, Keystone Health Plan East"
+company,AmeriHealth Insurance Company of New Jersey,AmeriHealth New Jersey,"Independence-owned, own brand"
+group,BCBS of MA Grp,Blue Cross Blue Shield of Massachusetts,"Includes HMO Blue"
+group,Wellmark Group,Wellmark Blue Cross and Blue Shield,
+group,BCBS OF KC GRP,Blue KC,
+group,LOUISIANA HLTH SERV GRP,Blue Cross and Blue Shield of Louisiana,"Includes HMO Louisiana"
+group,MISSISSIPPI INS GRP,Blue Cross & Blue Shield of Mississippi,
+group,BCBS of MN Grp,Blue Cross and Blue Shield of Minnesota,"Includes Blue Plus"
+group,HARVARD PILGRIM HTH CARE GRP,Harvard Pilgrim Health Care,"Includes HPHC Insurance"
+group,Tufts Health Plan,Tufts Health Plan,
+group,Medica Grp,Medica,
+company,Dean Health Plan,Dean Health Plan,"Medica-owned, own brand in Wisconsin"
+group,HEALTHPARTNERS GRP,HealthPartners,
+group,HIP INS GRP,EmblemHealth,
+company,ConnectiCare Benefits,ConnectiCare,"EmblemHealth-owned, own brand in Connecticut"
+company,ConnectiCare Insurance,ConnectiCare,
+group,IHC Inc Grp,Select Health,"Intermountain's plan; files its marketing name as N/A"
+group,MVP GRP,MVP Health Care,
+group,CDPHP,CDPHP,
+group,Oregon Dental Grp,Moda Health,
+group,Lifetime HlthCare Grp,Excellus BlueCross BlueShield,
+group,Premera Blue Cross Group,Premera Blue Cross,
+group,University Health Care & Gundersen Lutheran Group,Quartz,"Unity Health Insurance and Gundersen's plan now sell as Quartz"
+group,UPMC HLTH SYSTEM GRP,UPMC Health Plan,
+group,CAPITAL BLUE CROSS GRP,Capital Blue Cross,
+group,Capital Advantage Assurance Company,Capital Blue Cross,
+group,Scott & White GRP,Baylor Scott & White Health Plan,
+group,L.A. Care Health Plan,L.A. Care Health Plan,"Filed as Local Initiative Health Authority for Los Angeles County"
+group,Henry Ford Health Systems Group,HAP,"Health Alliance Plan of Michigan"
+group,CareSource Management Group,CareSource,
+group,Carle Holding Co Grp,Health Alliance,
+group,Sanford Health Plan/Sanford Health,Sanford Health Plan,
+group,PacificSource Hlth Plan Grp,PacificSource Health Plans,
+group,AMERICAN INTL GRP,-,"AIG's US Life files limited group coverage, not a medical plan patients name"
+company,Oscar Insurance,Oscar Health,
+company,Oscar Insurance Company of Florida,Oscar Health,
+company,Oscar Health Plan of Georgia,Oscar Health,
+company,Oscar Garden State Insurance,Oscar Health,
+company,Oscar Buckeye State Insurance,Oscar Health,
+company,Oscar Health Plan of California,Oscar Health,
+company,Oscar Insurance Company of Texas,Oscar Health,
+company,Oscar Health Plan of New York,Oscar Health,
+company,Oscar Health Plan,Oscar Health,

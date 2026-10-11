@@ -75,11 +75,11 @@ const mcd = medicaidPlans(mcdRows, brandMap);
 say(`\nMedicaid: ${mcdRows.length.toLocaleString()} rows; newest year ${mcd[0] ? mcd[0].year : '?'}; ${mcd.length.toLocaleString()} comprehensive managed care plan rows, ${mcd.reduce((a, x) => a + x.members, 0).toLocaleString()} enrollees.`);
 
 // ---- roll up and compare with what is already listed ----
-const { kept, dropped } = rollUp(mlr.concat(mcd), MIN);
+const { kept, dropped, excluded } = rollUp(mlr.concat(mcd), MIN);
 const seeded = new Set();
 for (const m of readFileSync('supabase/migrations/003_insurance_payers.sql', 'utf8').matchAll(/\('([^']+)',\s*(null|'([A-Z]{2})')/g)) seeded.add((m[3] || '*') + '|' + m[1].toLowerCase());
 const already = x => seeded.has(x.state + '|' + x.brand.toLowerCase()) || seeded.has('*|' + x.brand.toLowerCase());
-say(`\nProposed: **${kept.length.toLocaleString()}** state plans (${kept.filter(x => x.category === 'medicaid').length} Medicaid, ${kept.filter(x => x.category === 'marketplace').length} individual-market only, ${kept.filter(x => x.category === 'commercial').length} commercial); ${kept.filter(already).length} are already in the list. Below the cutoff and left out: ${dropped.length.toLocaleString()}.`);
+say(`\nProposed: **${kept.length.toLocaleString()}** state plans (${kept.filter(x => x.category === 'medicaid').length} Medicaid, ${kept.filter(x => x.category === 'marketplace').length} individual-market only, ${kept.filter(x => x.category === 'commercial').length} commercial); ${kept.filter(already).length} are already in the list. Below the cutoff and left out: ${dropped.length.toLocaleString()}. Left out by the reviewed map as not medical plans: ${excluded.length} (${[...new Set(excluded.map(x => x.legal_name))].join(', ') || 'none'}).`);
 
 const q = v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
 const lines = [['state', 'category', 'brand', 'members', 'already_listed', 'brand_basis', 'source_names', 'parent_group', 'sources'].join(',')];

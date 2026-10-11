@@ -50,21 +50,31 @@ export function cleanName(s) {
   return t.replace(/[,\s]+$/, '');
 }
 
-// Reviewed brand map: exact matches only (type = group | company | dba | plan | parent).
+// A filed marketing name that says nothing ("N/A") is no name.
+export const realName = s => (/^(n\/?a|none|null|-)?$/i.test(String(s || '').trim()) ? '' : String(s).trim());
+
+// Reviewed brand map: exact matches only, on the cleaned name the review sheet
+// shows. match_type: company | company_state ("Company|ST", for one company
+// branded differently per state) | dba | group | plan | parent. A brand of "-"
+// leaves the entry out of the list (not a medical plan a patient names).
+export const EXCLUDE = '-';
+const key = (type, value) => type + '\u0000' + (type === 'group' || type === 'parent' ? String(value).trim() : cleanName(value)).toLowerCase();
 export function parseBrandMap(text) {
   const map = new Map();
   for (const r of objects(text)) {
     const type = (r.match_type || '').trim(), match = (r.match || '').trim(), brand = (r.brand || '').trim();
     if (!type || !match) continue;
-    if (!['group', 'company', 'dba', 'plan', 'parent'].includes(type)) throw new Error(`brand map: unknown match_type "${type}"`);
+    if (!['group', 'company', 'company_state', 'dba', 'plan', 'parent'].includes(type)) throw new Error(`brand map: unknown match_type "${type}"`);
     if (!brand) throw new Error(`brand map: ${type} "${match}" has no brand`);
-    const k = type + '\u0000' + match.toLowerCase();
+    if (type === 'company_state' && !/\|[A-Z]{2}$/.test(match)) throw new Error(`brand map: company_state "${match}" must end in |ST`);
+    const k = key(type, match);
     if (map.has(k)) throw new Error(`brand map: ${type} "${match}" listed twice`);
     map.set(k, brand);
   }
   return map;
 }
-const lookup = (map, type, value) => (value ? map.get(type + '\u0000' + String(value).trim().toLowerCase()) : undefined);
+const lookup = (map, type, value) => (value ? map.get(key(type, value)) : undefined);
+const lookupCompanyState = (map, company, st) => (company ? map.get('company_state\u0000' + (cleanName(company) + '|' + st).toLowerCase()) : undefined);
 
 // ---------------------------------------------------------------- MLR ------
 // Pick the Part 1/2 row that counts covered lives, by its official label.
@@ -74,7 +84,8 @@ export function coveredLivesCode(rowLookup) {
   return hits.map(r => r.lookup_code);
 }
 // One market's value: the year-end figure, else the total.
-const num = v => { const n = Number(v); return v === '' || v == null || !isFinite(n) ? null : n; };
+// Numbers may carry thousands separators ("72,966") or be blank.
+const num = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/[,\s]/g, '')); return isFinite(n) ? n : null; };
 export function marketLives(row, market) {
   for (const col of [`cmm_${market}_yearly`, `cmm_${market}_total`]) { const n = num(row[col]); if (n !== null) return n; }
   return 0;
@@ -91,9 +102,10 @@ export function mlrInsurers(headers, lives, livesCodes, brandMap) {
     const st = stateCode(h.business_state);
     if (!st) continue;                                   // "Grand Total" and unknown rows
     const m = { individual: marketLives(r, 'individual'), small_group: marketLives(r, 'small_group'), large_group: marketLives(r, 'large_group') };
-    const members = m.individual + m.small_group + m.large_group;
-    const legal = cleanName(h.company_name), dba = cleanName(h.dba_marketing_name);
-    const mapped = lookup(brandMap, 'company', h.company_name) || lookup(brandMap, 'dba', h.dba_marketing_name) || lookup(brandMap, 'group', h.group_affiliation);
+    const members = Math.round(m.individual + m.small_group + m.large_group);
+    const legal = cleanName(h.company_name), dba = cleanName(realName(h.dba_marketing_name));
+    const mapped = lookupCompanyState(brandMap, h.company_name, st) || lookup(brandMap, 'company', h.company_name) ||
+      (dba && lookup(brandMap, 'dba', dba)) || lookup(brandMap, 'group', h.group_affiliation);
     out.push({
       source: 'mlr', state: st, legal_name: legal, dba, group: (h.group_affiliation || '').trim(),
       members, markets: m, brand: mapped || dba || legal, brand_basis: mapped ? 'reviewed map' : dba ? 'marketing name (DBA)' : 'legal name',
@@ -116,7 +128,7 @@ export function medicaidPlans(rows, brandMap) {
     if (Number(r.Year) !== year || !isComprehensive(r['Program Name'])) continue;
     const st = stateCode(r.State);
     if (!st) continue;
-    const members = num(r['Total Enrollment']) || 0;
+    const members = Math.round(num(r['Total Enrollment']) || 0);
     const plan = cleanName(r['Plan Name']), parent = (r['Parent Organization'] || '').trim();
     const mapped = lookup(brandMap, 'plan', r['Plan Name']) || lookup(brandMap, 'parent', parent);
     out.push({
@@ -128,9 +140,11 @@ export function medicaidPlans(rows, brandMap) {
 }
 
 // One row per (state, brand, category): members summed, every source name kept.
+// Entries the reviewed map excludes ("-") come back separately.
 export function rollUp(items, minMembers) {
-  const by = new Map();
+  const by = new Map(), excluded = [];
   for (const it of items) {
+    if (it.brand === EXCLUDE) { excluded.push(it); continue; }
     const k = [it.state, it.category, it.brand.toLowerCase()].join('\u0000');
     const cur = by.get(k) || { state: it.state, category: it.category, brand: it.brand, members: 0, sources: new Set(), names: new Set(), groups: new Set(), bases: new Set() };
     cur.members += it.members;
@@ -138,5 +152,5 @@ export function rollUp(items, minMembers) {
     by.set(k, cur);
   }
   const all = [...by.values()].map(x => ({ ...x, sources: [...x.sources], names: [...x.names], groups: [...x.groups], bases: [...x.bases] }));
-  return { kept: all.filter(x => x.members >= minMembers), dropped: all.filter(x => x.members < minMembers) };
+  return { kept: all.filter(x => x.members >= minMembers), dropped: all.filter(x => x.members < minMembers), excluded };
 }

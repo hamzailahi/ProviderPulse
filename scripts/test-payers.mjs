@@ -2,7 +2,7 @@
 // rows use the column names recorded live in
 // supabase/reference/payer-sources/discovery.md. No network.
 // Run: node scripts/test-payers.mjs
-import { cleanName, stateCode, coveredLivesCode, marketLives, mlrInsurers, medicaidPlans, rollUp, parseBrandMap, parseCsv } from './lib/payers.mjs';
+import { realName, EXCLUDE, cleanName, stateCode, coveredLivesCode, marketLives, mlrInsurers, medicaidPlans, rollUp, parseBrandMap, parseCsv } from './lib/payers.mjs';
 
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) pass++; else { fail++; console.log('FAIL', n); } };
@@ -71,6 +71,24 @@ ok(dropped.some(x => x.brand === 'Tiny Mutual') && dropped.some(x => x.brand ===
 throws(() => parseBrandMap('match_type,match,brand\nregex,Unit.*,X\n'), /unknown match_type/, 'no pattern matching');
 throws(() => parseBrandMap('match_type,match,brand\ngroup,A,\n'), /no brand/, 'a mapping needs a brand');
 throws(() => parseBrandMap('match_type,match,brand\ngroup,A,B\ngroup,a,C\n'), /twice/, 'duplicate mapping refused');
+
+// fixes from the first real run (2026-10-11)
+ok(realName('N/A') === '' && realName('none') === '' && realName('Florida Blue') === 'Florida Blue', '"N/A" marketing names count as no name');
+const m2 = medicaidPlans([{ State: 'Florida', 'Program Name': 'SMMC (Comprehensive MCO + MLTSS)', 'Plan Name': 'Sunshine State Health Plan', 'Total Enrollment': '1,234,567', Year: '2024', 'Parent Organization': 'Centene' }], new Map());
+ok(m2[0].members === 1234567, 'enrollment with thousands separators is read');
+const bm2 = parseBrandMap('match_type,match,brand\ncompany_state,"Health Care Service Corporation, a Mutual Legal Reserve|TX",Blue Cross and Blue Shield of Texas\ncompany,ACN Group of California,-\ngroup,Cigna Hlth Grp,Cigna\n');
+const h2 = [
+  { mr_submission_template_id: '7', business_state: 'TX', company_name: 'Health Care Service Corporation, a Mutual Legal Reserve Company', dba_marketing_name: 'Blue Cross Blue Shield of Illinois, Montana, New Mexico, Oklahoma, Texas', group_affiliation: 'HCSC GRP' },
+  { mr_submission_template_id: '8', business_state: 'CA', company_name: 'ACN Group of California, Inc.', dba_marketing_name: '', group_affiliation: 'UNITEDHEALTH GRP' },
+  { mr_submission_template_id: '9', business_state: 'TN', company_name: 'Cigna HealthCare of Tennessee, Inc.', dba_marketing_name: 'N/A', group_affiliation: 'Cigna Hlth Grp' }
+];
+const r2 = mlrInsurers(h2, [L('7', '1,000', '', ''), L('8', '5000', '', ''), L('9', '', '3000', '')], ['NUMBER_OF_COVERED_LIVES'], bm2);
+ok(r2[0].brand === 'Blue Cross and Blue Shield of Texas' && r2[0].members === 1000, 'one company branded per state; separators in MLR numbers read');
+ok(r2[1].brand === EXCLUDE, 'a "-" brand marks an entry to leave out');
+ok(r2[2].brand === 'Cigna', 'an N/A marketing name falls through to the group map');
+const ru = rollUp(r2, 1000);
+ok(ru.excluded.length === 1 && !ru.kept.some(x => x.brand === EXCLUDE), 'excluded entries never reach the list');
+throws(() => parseBrandMap('match_type,match,brand\ncompany_state,Acme,X\n'), /\|ST/, 'company_state needs a state');
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
