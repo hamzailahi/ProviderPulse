@@ -1,0 +1,41 @@
+name: Payer sources
+
+# Manual only, read only. Finds and describes the official CMS files the
+# insurance plan list is built from (insurer MLR filings and Medicaid managed
+# care enrollment) and commits what it found to
+# supabase/reference/payer-sources/. Touches no database and needs no secret.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Discover the source files
+        run: node scripts/payer-sources-discover.mjs supabase/reference/payer-sources
+
+      - name: Commit what was found
+        if: always()
+        run: |
+          git add supabase/reference/payer-sources
+          if git diff --cached --quiet; then
+            echo "Nothing new." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Payer source discovery $(date -u +%F) [skip netlify]"
+          git push origin HEAD:main

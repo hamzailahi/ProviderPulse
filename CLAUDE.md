@@ -1177,6 +1177,18 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   CONCURRENTLY` refuses that (error 25001, 2026-10-09). Drops invalid leftovers
   first; fails unless all three indexes are valid. Use the same pattern for any
   future concurrent index migration.
+- **Payer sources** (`payer-sources.yml`, manual, read only,
+  `scripts/payer-sources-discover.mjs`): finds the newest CMS Medical Loss
+  Ratio public use zip (every insurer per state and market, with covered
+  lives) and data.medicaid.gov's Medicaid managed care enrollment by plan,
+  and commits their URLs, columns and sample rows to
+  `supabase/reference/payer-sources/discovery.md`. Step one of the insurance
+  expansion (2026-10-11, the user's scope: private/employer/ACA and Medicaid
+  managed care; brand names through a reviewed mapping; at least 1,000
+  members in the state; a spreadsheet review before anything loads). The
+  parser is written against what discovery records. cms.gov and
+  data.medicaid.gov are unreachable from the cloud dev container, so this
+  runs in Actions.
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
   read-only sizes of every table and index, dead rows, index use, WAL, to
   `supabase/reference/db-size-report.md`. Run it before any disk decision.

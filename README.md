@@ -482,6 +482,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `medicare-activity-import.yml` | monthly, the 12th | CMS Physician & Other Practitioners PUF + PECOS Order & Referring |
 | `medicare-enrollment-import.yml` | monthly, the 18th | CMS Medicare Monthly Enrollment, newest month only, overwriting the table rather than accumulating history |
 | `medicare-advantage-payers-import.yml` | monthly, the 22nd | CMS MA enrollment by state joined to the MA Contract Directory, so plans show the brand name patients recognize rather than the legal entity |
+| `payer-sources.yml` | manual, read only | finds the CMS insurer filings (MLR) and Medicaid managed care plan files the expanded plan list is built from, and records their columns and samples |
 | `zip-county-crosswalk-import.yml` | quarterly, the 25th of Jan/Apr/Jul/Oct | HUD USPS ZIP Code Crosswalk API: which county each ZIP falls in, weighted by residential addresses |
 | `train-demand-model.yml` | manual only (parked 2026-10-06, see the changelog) | trains the learned demand model from the CMS Medicare claims-by-provider file, the Census detail and CDC PLACES; dry run first |
 | `import-sahie.yml` | yearly, September 10 (SAHIE trails by about two years) | Census SAHIE county uninsured estimates for people under 65 into `sahie_county` |
@@ -569,6 +570,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-11
 
+- **More insurance plans, step one.** A new manual, read-only job finds
+  the official CMS files listing every company selling private, employer
+  and marketplace health insurance in each state, and every Medicaid
+  managed care plan, and records what they contain. The expanded plan list
+  will be built from them, shown as card brand names, limited to insurers
+  with at least 1,000 members in a state, and reviewed as a spreadsheet
+  before it reaches the plan pickers. Medicare Advantage plans already load
+  monthly from CMS.
 - **Health-need profiles for the new categories reviewed.** Hospice now
   weighs cognitive disability (dementia is its leading diagnosis), as does
   speech therapy; care coordination is driven by social need (no insurance,
