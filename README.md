@@ -588,8 +588,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   shows "patient-months" and says why. Junk rows in the source (malformed
   codes, impossible amounts) are dropped and counted, never shown. Private
   insurance has no public equivalent: insurers publish prices, not volumes.
-  The tables arrive with migration 036 and a dry run, then a load, of the
-  new "Procedure tables" job.
+  Loaded 2026-10-11: 3.1 million Medicaid rows covering $189B of 2024
+  spending across 21,013 ZIPs, and 208,000 hospital rows from about 3,000
+  hospitals.
 - **Procedure data beyond Medicare Part B, step one.** A new manual,
   read-only job describes the files the Procedures panel will add: the
   Medicaid provider spending by procedure that HHS released in February
