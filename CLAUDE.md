@@ -473,9 +473,14 @@ keyword matching and no default bucket**. Three phases, each gated:
    for the new categories sit in `CONDITION_HINTS` (hearing, speech and ABA
    first, before ENT and mental health); hints read the raw lowercased text.
    Covered by `scripts/test-patient-query.mjs` (it lifts the code out of
-   `patient.js`). The 11 new labels' `nppesTerm`s are NUCC classification
-   names **not verified live** (NPPES was unreachable): check them before
-   relying on the navigator for those categories.
+   `patient.js`). All 44 `nppesTerm`s, the 11 new ones included, were
+   **verified live 2026-10-11** by `nppes-terms-check.yml`
+   (`scripts/verify-nppes-terms.mjs`, results in
+   `supabase/reference/nppes-terms-check.md`): every term returns providers
+   in five metros and 86 to 100% carry a matching taxonomy. Known quirk:
+   NPPES files neurologists under the classification "Psychiatry &
+   Neurology", so the term `Psychiatry` also returns them (243 of 1,000).
+   Rerun the job after editing any `nppesTerm`.
    **3b, market side, shipped 2026-10-11.** `MarketModel.score` takes
    `codesFor(label)` and buckets each catchment listing by `taxonomy_code`
    (one lookup per listing; a code in several specialties counts in each;
@@ -1235,6 +1240,8 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
   read-only sizes of every table and index, dead rows, index use, WAL, to
   `supabase/reference/db-size-report.md`. Run it before any disk decision.
+- **NPPES terms check** (`nppes-terms-check.yml`, manual, read only): see
+  NUCC codes phase 3a.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is

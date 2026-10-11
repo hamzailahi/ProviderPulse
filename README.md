@@ -574,9 +574,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 - **Checking the registry search terms.** A new manual, read-only job sends
   every specialty's registry search term to the live NPPES API, the way the
   care navigator does, and records how many providers come back and whether
-  they really practise that specialty. It exists to confirm the 11
-  categories added in October, which could not be checked when they were
-  written.
+  they really practise that specialty. First run: all 44 terms pass,
+  including the 11 categories added in October, which could not be checked
+  when they were written.
 - **Insurance plan list approved.** The review removed carriers that are
   not medical plans (Reliance Standard Life, Nippon Life, State Farm, and
   TennCare's dental and pharmacy managers) and merged duplicate names, so
