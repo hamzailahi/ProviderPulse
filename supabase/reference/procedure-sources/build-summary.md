@@ -1,5 +1,5 @@
 <!-- Written by scripts/build-procedure-tables.py. -->
-# Procedure tables (dry_run), 2026-10-11 21:04 UTC
+# Procedure tables (dry_run), 2026-10-11 21:09 UTC
 
 ## Sources
 
@@ -11,18 +11,18 @@
 
 ## Downloads
 
-- downloaded medicaid.parquet: 3,073 MB in 93s
-- downloaded outpatient.csv: 28 MB in 1s
-- downloaded inpatient.csv: 38 MB in 1s
-- downloaded physician-geo.csv: 42 MB in 1s
-- directory: 253 MB in 21s
+- downloaded medicaid.parquet: 3,073 MB in 25s
+- downloaded outpatient.csv: 28 MB in 0s
+- downloaded inpatient.csv: 38 MB in 0s
+- downloaded physician-geo.csv: 42 MB in 0s
+- directory: 253 MB in 18s
 
 ## Medicaid
 
 - newest year: 2024
 - rows 34,445,846, paid $267,938,154,374
 - dropped, malformed code: 167,198 rows, $51,532,783,493
-- dropped, malformed or missing NPI: 29,584 rows, $25,774,349,840
+- dropped, no valid servicing or billing NPI: 29,584 rows, $25,774,349,840
 - dropped, no claims or negative paid: 501 rows, $-272,802
 - dropped, NPI not in our directory: 145,058 rows, $1,727,376,272, 5,112 NPIs
 - kept: 3,083,819 ZIP x specialty x code rows, $188,903,917,571 paid, 2,858,452,763 claim lines, 21,013 ZIPs
