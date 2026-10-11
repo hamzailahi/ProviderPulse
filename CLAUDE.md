@@ -477,10 +477,15 @@ keyword matching and no default bucket**. Three phases, each gated:
    **verified live 2026-10-11** by `nppes-terms-check.yml`
    (`scripts/verify-nppes-terms.mjs`, results in
    `supabase/reference/nppes-terms-check.md`): every term returns providers
-   in five metros and 86 to 100% carry a matching taxonomy. Known quirk:
-   NPPES files neurologists under the classification "Psychiatry &
-   Neurology", so the term `Psychiatry` also returns them (243 of 1,000).
-   Rerun the job after editing any `nppesTerm`.
+   in five metros and 86 to 100% carry a matching taxonomy. NPPES matches
+   the whole "Classification, Specialization" text, and combined boards
+   leak: `Psychiatry` returned neurologists ("Psychiatry & Neurology,
+   Neurology", 243 of 1,000) and `Neurology` psychiatrists.
+   `practisesSearched` in `patient-match.js` drops a result whose every
+   matching taxonomy matched only through such a board name (fixed
+   2026-10-11, before the wider-area retry counts results). The check
+   script reports raw NPPES output, not the filtered list. Rerun the job
+   after editing any `nppesTerm`.
    **3b, market side, shipped 2026-10-11.** `MarketModel.score` takes
    `codesFor(label)` and buckets each catchment listing by `taxonomy_code`
    (one lookup per listing; a code in several specialties counts in each;
@@ -1345,7 +1350,7 @@ function, asset and script and a `require` of every function.
 ```bash
 node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) case
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
-node scripts/test-claimed-relevance.mjs   # 37: specialty gating (imports the real practisesAny)
+node scripts/test-claimed-relevance.mjs   # 49: specialty gating (imports the real practisesAny), NPPES board-name results
 node scripts/test-market-model.mjs        # 33: the market opportunity model, incl. bucketing by code
 node scripts/test-demand-model.mjs        # 45: the learned demand model, trainer end to end, and scoring
 node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick

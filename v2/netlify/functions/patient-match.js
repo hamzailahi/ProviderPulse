@@ -126,6 +126,26 @@ function taxonomyTerms(conditions, latestUserText, concernDescription) {
   return [...terms].slice(0, 3);
 }
 
+// NPPES matches taxonomy_description against the whole "Classification,
+// Specialization" text, and some classifications are combined boards:
+// "Psychiatry & Neurology, Neurology" matches a search for Psychiatry, so a
+// mental-health search returned neurologists (243 of 1,000 in the live check,
+// 2026-10-11), and a Neurology search returned psychiatrists. A provider is
+// dropped when every taxonomy that matched did so only through such a board
+// name while its specialization names something else. Providers whose
+// matching taxonomy is unclear (no taxonomy text) are kept.
+const has = (text, term) => (' ' + String(text || '').toLowerCase()).includes(' ' + term.toLowerCase());
+function boardOnlyMatch(desc, term) {
+  const i = String(desc || '').indexOf(', ');
+  if (i < 0) return false;
+  const cls = desc.slice(0, i), spec = desc.slice(i + 2);
+  return cls.includes('&') && cls.toLowerCase() !== term.toLowerCase() && has(cls, term) && !has(spec, term);
+}
+function practisesSearched(rec, term) {
+  const matched = (rec.taxonomies || []).filter(t => has(t.desc, term));
+  return !matched.length || !matched.every(t => boardOnlyMatch(t.desc, term));
+}
+
 async function nppesSearch(zip, taxonomy) {
   // NPPES accepts a full 5-digit ZIP OR a 5-digit + wildcard. Full ZIP is more reliable.
   // Try full ZIP first, then broaden to state if empty.
@@ -133,7 +153,7 @@ async function nppesSearch(zip, taxonomy) {
     try {
       const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
       const data = await r.json();
-      return data.results || [];
+      return (data.results || []).filter(rec => practisesSearched(rec, taxonomy));
     } catch { return []; }
   };
   const enc = encodeURIComponent(taxonomy);
@@ -570,3 +590,4 @@ ${specialty
 
 // Exported for scripts/test-claimed-relevance.mjs only.
 exports.practisesAny = practisesAny;
+exports.practisesSearched = practisesSearched;

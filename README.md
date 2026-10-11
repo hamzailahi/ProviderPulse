@@ -506,7 +506,7 @@ every pull request and push to main.
 ```bash
 node scripts/test-accuracy-signals.mjs    # the directory-accuracy scoring engine
 node scripts/test-query-plan.mjs          # the query-plan allowlist behind the assistant's database tool
-node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings
+node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings and NPPES results
 node scripts/test-market-model.mjs        # the market opportunity model
 node scripts/test-demand-model.mjs        # the learned demand model, its trainer, and how scoring uses it
 node scripts/test-sahie.mjs               # Census county uninsured estimates and how Insights reports them
@@ -571,6 +571,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-11
 
+- **Mental health searches no longer suggest neurologists.** The national
+  registry files psychiatrists and neurologists under one board, "Psychiatry
+  & Neurology", so the care navigator's search for a psychiatrist also
+  returned neurologists (about a quarter of results in a live check), and a
+  neurology search returned psychiatrists. Those results are now dropped
+  before the navigator sees them, and the search widens to nearby ZIPs when
+  too few remain.
 - **Checking the registry search terms.** A new manual, read-only job sends
   every specialty's registry search term to the live NPPES API, the way the
   care navigator does, and records how many providers come back and whether

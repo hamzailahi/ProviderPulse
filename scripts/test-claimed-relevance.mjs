@@ -8,7 +8,7 @@
 // passing even after patient-match.js drifted away from it.
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { practisesAny } = require('../v2/netlify/functions/patient-match.js');
+const { practisesAny, practisesSearched } = require('../v2/netlify/functions/patient-match.js');
 
 let pass = 0, fail = 0;
 const check = (l, c, d) => { if (c) { pass++; console.log(`  PASS  ${l}`); } else { fail++; console.log(`  FAIL  ${l}${d ? '\n        ' + d : ''}`); } };
@@ -66,6 +66,21 @@ console.log('\n6. Realistic end-to-end shape');
   check('a multi-term search including FM injects it',
     inject(['Pediatrics', 'Family Medicine']).length === 1);
 }
+
+console.log('\nN. NPPES results: a combined board name is not the specialty (live check, 2026-10-11)');
+const rec = (...descs) => ({ taxonomies: descs.map((desc, i) => ({ desc, primary: i === 0 })) });
+check('neurologist dropped from a Psychiatry search', !practisesSearched(rec('Psychiatry & Neurology, Neurology'), 'Psychiatry'));
+check('child neurologist dropped from a Psychiatry search', !practisesSearched(rec('Psychiatry & Neurology, Neurology with Special Qualifications in Child Neurology'), 'Psychiatry'));
+check('psychiatrist kept for Psychiatry', practisesSearched(rec('Psychiatry & Neurology, Psychiatry'), 'Psychiatry'));
+check('child psychiatrist kept for Psychiatry', practisesSearched(rec('Psychiatry & Neurology, Child & Adolescent Psychiatry'), 'Psychiatry'));
+check('neurologist who also lists psychiatry kept', practisesSearched(rec('Psychiatry & Neurology, Neurology', 'Psychiatry & Neurology, Psychiatry'), 'Psychiatry'));
+check('psychiatrist dropped from a Neurology search', !practisesSearched(rec('Psychiatry & Neurology, Psychiatry'), 'Neurology'));
+check('neurologist kept for Neurology', practisesSearched(rec('Psychiatry & Neurology, Neurology'), 'Neurology'));
+check('board named in full still matches (Allergy & Immunology, Allergy)', practisesSearched(rec('Allergy & Immunology, Allergy'), 'Allergy & Immunology'));
+check('OB-GYN subspecialty kept', practisesSearched(rec('Obstetrics & Gynecology, Gynecologic Oncology'), 'Obstetrics & Gynecology'));
+check('Hematology & Oncology as a specialization kept', practisesSearched(rec('Internal Medicine, Hematology & Oncology'), 'Hematology & Oncology'));
+check('ordinary match kept', practisesSearched(rec('Internal Medicine, Cardiovascular Disease'), 'Cardiovascular Disease'));
+check('no taxonomy text kept (unclear, not wrong)', practisesSearched(rec(null), 'Podiatrist'));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
