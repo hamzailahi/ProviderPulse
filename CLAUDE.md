@@ -778,7 +778,7 @@ Tables:
   tables in one transaction). Medicaid is HHS's Medicaid Provider Spending by
   HCPCS (T-MSIS, released 2026-02; the HHS page embeds its file list, a 3.1 GB
   Parquet on Azure blob; the Hugging Face copy is gated, 401): newest year,
-  servicing NPI else billing NPI, placed at that NPI's ZIP and CMS specialty
+  the servicing NPI when valid, else the billing NPI when valid, placed at that NPI's ZIP and CMS specialty
   (taxonomy_map's first `cms_specialty_name`, else the NUCC classification)
   from `clinics` + `provider_individuals`, summed per ZIP x specialty x code.
   Discovery (`supabase/reference/procedure-sources/`, 2026-10-11): 238M rows
@@ -1409,7 +1409,7 @@ node scripts/test-density-benchmark.mjs   # 13: the state density comparison is 
 node scripts/test-market-benchmarks.mjs   # 7: the benchmark builder end to end, specialty rates by code
 node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
-python3 scripts/test-procedure-tables.py   # 17: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
+python3 scripts/test-procedure-tables.py   # 19: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 ```
 

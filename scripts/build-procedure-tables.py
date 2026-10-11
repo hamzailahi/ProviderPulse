@@ -17,7 +17,8 @@ mode, loads them. Runs in GitHub Actions ("Procedure tables" workflow).
 Columns are the ones recorded by the discovery job in
 supabase/reference/procedure-sources/ (2026-10-11).
 
-Medicaid rows: the servicing NPI, else the billing NPI; placed at that NPI's
+Medicaid rows: the servicing NPI when it is a valid 10-digit NPI, else the
+billing NPI when that is; placed at that NPI's
 ZIP and specialty in our own directory (clinics + provider_individuals), so
 the panel matches the map. Specialty is the CMS specialty for the NPI's NUCC
 code (supabase/reference/taxonomy_map.csv), else the NUCC classification.
@@ -157,12 +158,13 @@ say('\n## Medicaid\n')
 year = one(f"SELECT max(substr(CLAIM_FROM_MONTH, 1, 4)) FROM read_parquet({lit(med)})")[0]
 say(f'- newest year: {year}')
 con.execute(f"""CREATE OR REPLACE TABLE raw AS
-  SELECT COALESCE(NULLIF(trim(SERVICING_PROVIDER_NPI_NUM), ''), NULLIF(trim(BILLING_PROVIDER_NPI_NUM), '')) AS npi,
+  SELECT CASE WHEN regexp_matches(trim(COALESCE(SERVICING_PROVIDER_NPI_NUM, '')), '{NPI_RE}') THEN trim(SERVICING_PROVIDER_NPI_NUM)
+              WHEN regexp_matches(trim(COALESCE(BILLING_PROVIDER_NPI_NUM, '')), '{NPI_RE}') THEN trim(BILLING_PROVIDER_NPI_NUM) END AS npi,
          upper(trim(HCPCS_CODE)) AS code, TOTAL_PATIENTS AS patients, TOTAL_CLAIM_LINES AS claims, TOTAL_PAID AS paid
   FROM read_parquet({lit(med)}) WHERE substr(CLAIM_FROM_MONTH, 1, 4) = '{year}'""")
 con.execute(f"""CREATE OR REPLACE TABLE checked AS SELECT *,
   CASE WHEN code IS NULL OR NOT regexp_matches(code, '{CODE_RE}') THEN 'malformed code'
-       WHEN npi IS NULL OR NOT regexp_matches(npi, '{NPI_RE}') THEN 'malformed or missing NPI'
+       WHEN npi IS NULL THEN 'no valid servicing or billing NPI'
        WHEN claims IS NULL OR claims <= 0 OR paid IS NULL OR paid < 0 THEN 'no claims or negative paid'
        WHEN paid / claims > {MAX_PAID_PER_LINE} THEN 'paid per claim line over {MAX_PAID_PER_LINE:,}'
        ELSE NULL END AS drop_reason FROM raw""")

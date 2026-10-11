@@ -27,7 +27,8 @@ rows = [
   ('1111111111', None,         '99213', '2024-03', 12, 12, 600.0),    # no servicing: billing NPI (a clinic in 38018)
   ('1111111111', '3333333333', 'T1019', '2024-05', 40, 400, 20000.0), # HCPCS Level II, home health
   ('1111111111', '2222222222', '20',    '2024-04', 900, 9000, 5e12),  # malformed code (the real file has these)
-  ('1111111111', 'ABC',        '99214', '2024-04', 12, 12, 100.0),    # malformed NPI (falls back? no: servicing present)
+  ('1111111111', 'ABC',        '99214', '2024-04', 12, 12, 100.0),    # malformed servicing NPI: falls back to the billing NPI
+  (None,         'XYZ',        '99214', '2024-04', 12, 12, 100.0),    # neither NPI valid: dropped
   ('1111111111', '2222222222', '99214', '2024-06', 12, 1, 900000.0),  # impossible paid per line
   ('1111111111', '9999999999', '99214', '2024-06', 12, 12, 700.0),    # NPI not in the directory
   ('1111111111', '2222222222', '99213', '2023-12', 99, 99, 99999.0),  # older year: ignored
@@ -86,7 +87,10 @@ ok(k is not None and k['claims'] == '12', 'billing NPI used when there is no ser
 ok(('38017', 'Home Health Agency (HHA)', 'T1019') in key, 'HCPCS Level II codes kept')
 ok(not any(m['code'] == '20' for m in med), 'malformed code dropped')
 ok(not any(float(m['paid']) > 100000 for m in med), 'impossible paid per claim line dropped')
-ok(len(med) == 3, f'exactly three cells survive (got {len(med)})')
+ok(len(med) == 4, f'exactly four cells survive (got {len(med)})')
+k2 = key.get(('38018', 'Clinic/Center', '99214'))
+ok(k2 is not None and k2['claims'] == '12', 'a malformed servicing NPI falls back to a valid billing NPI')
+ok('no valid servicing or billing NPI: 1 rows' in summary, 'a row with no valid NPI at all is dropped and counted')
 ok('NPI not in our directory: 1 rows' in summary, 'NPI outside the directory dropped and counted')
 ok('malformed code: 1 rows' in summary and 'paid per claim line over' in summary, 'every drop reason reported')
 
@@ -94,7 +98,7 @@ o = [h for h in hosp if h['setting'] == 'outpatient']; i = [h for h in hosp if h
 ok(len(o) == 1 and o[0]['code'] == '5072' and o[0]['patients'] == '175' and float(o[0]['avg_paid']) == 1080.95, 'outpatient row with suppressed counts skipped; the rest mapped')
 ok(len(i) == 1 and i[0]['code'] == '003' and i[0]['patients'] == '11' and i[0]['services'] == '', 'inpatient DRG keeps its leading zero; discharges as patients; no services')
 ok(i and i[0]['description'] == 'ECMO OR TRACHEOSTOMY, WITH MV' and i[0]['year'] == '2024', 'quoted description with a comma survives; data year from the file name')
-ok({c['code'] for c in codes} == {'99213'}, 'descriptions only for codes the Medicaid table uses (99214 had no surviving rows)')
+ok({c['code'] for c in codes} == {'99213', '99214'}, 'descriptions only for codes the Medicaid table uses (T1019 has none in the fixture)')
 ok('Dry run: nothing written' in summary, 'dry run writes nothing')
 
 r = subprocess.run([sys.executable, 'scripts/build-procedure-tables.py', '--mode', 'apply', '--disk-free-gb', '0', '--out', P('out2'), '--work', P('work2'),
