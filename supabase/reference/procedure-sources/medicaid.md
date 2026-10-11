@@ -1,35 +1,106 @@
 <!-- Written by scripts/medicaid-procedures-discover.py. Read only. -->
-# Medicaid procedure source, 2026-10-11 20:55 UTC
+# Medicaid procedure source, 2026-10-11 20:56 UTC
 
 - https://opendata.hhs.gov/datasets/medicaid-provider-spending: HTTP 200, 27,805 bytes
 - https://opendata.hhs.gov/data.json: HTTP 200, 22,938 bytes
 
-## HHS Open Data: which API answers
+## HHS Open Data dataset page
 
 - page scripts: /_next/static/chunks/173-612faaf36529d211.js, /_next/static/chunks/4bd1b696-d01d525ddc465c01.js, /_next/static/chunks/507-f85945db39928704.js, /_next/static/chunks/517-e90ec3310139a0b0.js, /_next/static/chunks/708-365158ec2258c74a.js, /_next/static/chunks/78-0a3095c147967759.js, /_next/static/chunks/app/datasets/%5Bslug%5D/page-32a56e3a25b1acf7.js, /_next/static/chunks/app/layout-5f952530d146977e.js, /_next/static/chunks/main-app-f8b48c13f823c184.js, /_next/static/chunks/polyfills-42372ed130431b0a.js, /_next/static/chunks/webpack-97f598895b7bc15e.js, /pixel-flag.svg
 - every URL in the page: http://www.w3.org/2000/svg, https://opendata.hhs.gov/, https://opendata.hhs.gov/datasets/medicaid-provider-spending/, https://opendata.hhs.gov/opengraph-image.png?51d6105915ccf6e6, https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.csv, https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.csv.zip, https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.duckdb, https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.parquet, https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.vortex, https://www.medicaid.gov/dq-atlas/welcome
-- page tail (the embedded dataset record): `tes\":\"Initial release with data from January 2018 through December 2024\",\"artifacts\":[{\"name\":\"medicaid-provider-spending.csv\",\"format\":\"csv\",\"size\":11550141995,\"url\":\"https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.csv\",\"checksum\":\"sha256:35c2012ae49940956c62ef1c5326e055619f3963e427305c98566bf38f6af14a\"},{\"name\":\"medicaid-provider-spending.csv.zip\",\"format\":\"zip\",\"size\":3761921469,\"url\":\"https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.csv.zip\",\"checksum\":\"sha256:3387c48ea9600c15e8e6b43e68599b814cc66b24723e8d7aba2f556a8136f149\"},{\"name\":\"medicaid-provider-spending.parquet\",\"format\":\"parquet\",\"size\":3072545478,\"url\":\"https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.parquet\",\"checksum\":\"sha256:f646d426126638dd0177cb14a86bfe7d7e9ed6b081a3e1c270bfe5070fb3fb94\"},{\"name\":\"medicaid-provider-spending.duckdb\",\"format\":\"duckdb\",\"size\":3756797952,\"url\":\"https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.duckdb\",\"checksum\":\"sha256:7bb010ecf3daede0689eb037b83e68cff0c822cc54f066a7c0541178ee43d601\"},{\"name\":\"medicaid-provider-spending.vortex\",\"format\":\"vortex\",\"size\":3609439240,\"url\":\"https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.vortex\",\"checksum\":\"sha256:9596da927acea5cf47ceff1476928b5fb4c84e3030553265851ba96582302697\"}],\"schema\":[{\"name\":\"BILLING_PROVIDER_NPI_NUM\",\"type\":\"string\",\"description\":\"Billing-provider National Provider Identifier carried on the claim header. Can be blank when no usable 10-digit billing NPI is available on the source claim.\"},{\"name\":\"SERVICING_PROVIDER_NPI_NUM\",\"type\":\"string\",\"description\":\"Servicing-provider National Provider Identifier carried on the claim line. Can be blank when no usable 10-digit servicing NPI is available on the source claim.\"},{\"name\":\"HCPCS_CODE\",\"type\":\"string\",\"description\":\"Procedure code from the Medicaid claim line. Stored as a string so submitted code formatting is preserved.\"},{\"name\":\"CLAIM_FROM_MONTH\",\"type\":\"string\",\"description\":\"Claim-line month in YYYY-MM format, using the line through date when present and otherwise the line from date.\"},{\"name\":\"TOTAL_PATIENTS\",\"type\":\"integer\",\"description\":\"Number of unique beneficiaries represented in the billing-provider-servicing-provider-HCPCS-month cell.\"},{\"name\":\"TOTAL_CLAIM_LINES\",\"type\":\"integer\",\"description\":\"Number of claim lines represented in the billing-provider-servicing-provider-HCPCS-month cell.\"},{\"name\":\"TOTAL_PAID\",\"type\":\"float\",\"description\":\"Total Medicaid paid amount summed from claim-line paid amounts for the cell.\"}],\"documentationHtml\":\"$10\",\"hasExamples\":true,\"exampleFiles\":[\"monthly-spending.json\",\"top-procedures.json\",\"top-providers.json\"]}],\"publishedAt\":\"2026-02-09\"}}]}]\n"])</script><script>self.__next_f.push([1,"a:[[\"$\",\"meta\",\"0\",{\"charSet\":\"utf-8\"}],[\"$\",\"title\",\"1\",{\"children\":\"Medicaid Provider Spending by HCPCS | HHS Open Data\"}],[\"$\",\"meta\",\"2\",{\"name\":\"description\",\"content\":\"Provider-level Medicaid spending data from T-MSIS, aggregated by billing or servicing provider, HCPCS code, and month. Covers fee-for-service, managed care, and CHIP claims from 2018-2024.\"}],[\"$\",\"meta\",\"3\",{\"name\":\"author\",\"content\":\"HHS Data Team\"}],[\"$\",\"link\",\"4\",{\"rel\":\"manifest\",\"href\":\"/manifest.webmanifest\",\"crossOrigin\":\"$undefined\"}],[\"$\",\"meta\",\"5\",{\"name\":\"keywords\",\"content\":\"HHS,open data,healthcare,government data,transparency\"}],[\"$\",\"meta\",\"6\",{\"name\":\"robots\",\"content\":\"index, follow\"}],[\"$\",\"link\",\"7\",{\"rel\":\"canonical\",\"href\":\"https://opendata.hhs.gov/datasets/medicaid-provider-spending/\"}],[\"$\",\"meta\",\"8\",{\"property\":\"og:title\",\"content\":\"HHS Open Data\"}],[\"$\",\"meta\",\"9\",{\"property\":\"og:description\",\"content\":\"Access official HHS datasets for research, analysis, and transparency.\"}],[\"$\",\"meta\",\"10\",{\"property\":\"og:url\",\"content\":\"https://opendata.hhs.gov/\"}],[\"$\",\"meta\",\"11\",{\"property\":\"og:site_name\",\"content\":\"HHS Open Data\"}],[\"$\",\"meta\",\"12\",{\"property\":\"og:locale\",\"content\":\"en_US\"}],[\"$\",\"meta\",\"13\",{\"property\":\"og:image:type\",\"content\":\"image/png\"}],[\"$\",\"meta\",\"14\",{\"property\":\"og:image:width\",\"content\":\"1200\"}],[\"$\",\"meta\",\"15\",{\"property\":\"og:image:height\",\"content\":\"630\"}],[\"$\",\"meta\",\"16\",{\"property\":\"og:image\",\"content\":\"https://opendata.hhs.gov/opengraph-image.png?51d6105915ccf6e6\"}],[\"$\",\"meta\",\"17\",{\"property\":\"og:type\",\"content\":\"website\"}],[\"$\",\"meta\",\"18\",{\"name\":\"twitter:card\",\"content\":\"summary_large_image\"}],[\"$\",\"meta\",\"19\",{\"name\":\"twitter:title\",\"content\":\"HHS Open Data\"}],[\"$\",\"meta\",\"20\",{\"name\":\"twitter:description\",\"content\":\"Access official HHS datasets for research, analysis, and transparency.\"}],[\"$\",\"meta\",\"21\",{\"name\":\"twitter:image:type\",\"content\":\"image/png\"}],[\"$\",\"meta\",\"22\",{\"name\":\"twitter:image:width\",\"content\":\"1200\"}],[\"$\",\"meta\",\"23\",{\"name\":\"twitter:image:height\",\"content\":\"630\"}],[\"$\",\"meta\",\"24\",{\"name\":\"twitter:image\",\"content\":\"https://opendata.hhs.gov/opengraph-image.png?51d6105915ccf6e6\"}],[\"$\",\"link\",\"25\",{\"rel\":\"icon\",\"href\":\"/icon.svg?2fdf8604b46d58f5\",\"type\":\"image/svg+xml\",\"sizes\":\"any\"}]]\n"])</script><script>self.__next_f.push([1,"8:null\n"])</script></body></html>`
-- page head: `<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="preload" href="/_next/static/media/e4af272ccee01ff0-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="stylesheet" href="/_next/static/css/cd1bbaa6c77f9e9d.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-97f598895b7bc15e.js"/><script src="/_next/static/chunks/4bd1b696-d01d525ddc465c01.js" async=""></script><script src="/_next/static/chunks/517-e90ec3310139a0b0.js" async=""></script><script src="/_next/static/chunks/main-app-f8b48c13f823c184.js" async=""></script><script src="/_next/static/chunks/173-612faaf36529d211.js" async=""></script><script src="/_next/static/chunks/507-f85945db39928704.js" async=""></script><script src="/_next/static/chunks/app/layout-5f952530d146977e.js" async=""></script><script src="/_next/static/chunks/78-0a3095c147967759.js" async=""></script><script src="/_next/static/chunks/708-365158ec2258c74a.js" async=""></script><script src="/_next/static/chunks/app/datasets/%5Bslug%5D/page-32a56e3a25b1acf7.js" async=""></script><meta name="next-size-adjust" content=""/><title>Medicaid Provider Spending by HCPCS | HHS Open Data</title><meta name="description" content="Provider-level Medicaid spending data from T-MSIS, aggreg`
-- https://opendata.hhs.gov/_next/static/chunks/173-612faaf36529d211.js: 9,803 bytes; api-like strings: 
-    relative api paths: 
-- https://opendata.hhs.gov/_next/static/chunks/4bd1b696-d01d525ddc465c01.js: 167,094 bytes; api-like strings: 
-    relative api paths: 
-- https://opendata.hhs.gov/_next/static/chunks/507-f85945db39928704.js: 13,783 bytes; api-like strings: https://fonts.googleapis.com/css
-    relative api paths: 
-- https://opendata.hhs.gov/_next/static/chunks/517-e90ec3310139a0b0.js: 201,332 bytes; api-like strings: https://nextjs.org/docs/app/api-reference/functions/unstable_cache, https://nextjs.org/docs/app/api-reference/functions/use-search-params, https://nextjs.org/docs/messages/next-dynamic-api-wrong-context, https://nextjs.org/docs/messages/sync-dynamic-apis
-    relative api paths: 
-- https://opendata.hhs.gov/_next/static/chunks/708-365158ec2258c74a.js: 506,777 bytes; api-like strings: 
-    relative api paths: 
-- https://opendata.hhs.gov/_next/static/chunks/78-0a3095c147967759.js: 25,076 bytes; api-like strings: 
-    relative api paths: 
-- /api/1/metastore/schemas/dataset/items: 22,936 bytes: `<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="preload" href="/_next/static/media/e4af272ccee01ff0-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="stylesheet" href="/_next/static/css/cd1bbaa6c77f9e9d.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-97f598895b7bc15e.js"/><script src="/_next/static/chunks`
-- /api/datasets/medicaid-provider-spending: 22,936 bytes: `<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="preload" href="/_next/static/media/e4af272ccee01ff0-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="stylesheet" href="/_next/static/css/cd1bbaa6c77f9e9d.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-97f598895b7bc15e.js"/><script src="/_next/static/chunks`
-- /api/datasets: 22,936 bytes: `<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="preload" href="/_next/static/media/e4af272ccee01ff0-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="stylesheet" href="/_next/static/css/cd1bbaa6c77f9e9d.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-97f598895b7bc15e.js"/><script src="/_next/static/chunks`
-- /api/v1/datasets/medicaid-provider-spending: 22,936 bytes: `<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="preload" href="/_next/static/media/e4af272ccee01ff0-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="stylesheet" href="/_next/static/css/cd1bbaa6c77f9e9d.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-97f598895b7bc15e.js"/><script src="/_next/static/chunks`
-- /catalog.json: 22,936 bytes: `<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="preload" href="/_next/static/media/e4af272ccee01ff0-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="stylesheet" href="/_next/static/css/cd1bbaa6c77f9e9d.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-97f598895b7bc15e.js"/><script src="/_next/static/chunks`
-- /api/3/action/package_show?id=medicaid-provider-spending: 22,936 bytes: `<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="preload" href="/_next/static/media/e4af272ccee01ff0-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="stylesheet" href="/_next/static/css/cd1bbaa6c77f9e9d.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-97f598895b7bc15e.js"/><script src="/_next/static/chunks`
-- /api/dataset/medicaid-provider-spending: 22,936 bytes: `<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="preload" href="/_next/static/media/e4af272ccee01ff0-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><link rel="stylesheet" href="/_next/static/css/cd1bbaa6c77f9e9d.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-97f598895b7bc15e.js"/><script src="/_next/static/chunks`
 
-## HHS Open Data catalog
+(Hugging Face copy skipped: HHS-Official/medicaid-provider-spending answered 401, gated, on 2026-10-11.)
 
-**catalog failed:** Expecting value: line 1 column 1 (char 0)
+1 parquet file(s):
+
+- https://stopendataprod.blob.core.windows.net/datasets/medicaid-provider-spending/2026-02-09/dataset/medicaid-provider-spending.parquet
+- downloaded 3.07 GB in 26s
+
+### Schema
+
+- `BILLING_PROVIDER_NPI_NUM` VARCHAR
+- `SERVICING_PROVIDER_NPI_NUM` VARCHAR
+- `HCPCS_CODE` VARCHAR
+- `CLAIM_FROM_MONTH` VARCHAR
+- `TOTAL_PATIENTS` BIGINT
+- `TOTAL_CLAIM_LINES` BIGINT
+- `TOTAL_PAID` DOUBLE
+
+Columns used below: month=CLAIM_FROM_MONTH hcpcs=HCPCS_CODE patients=TOTAL_PATIENTS paid=TOTAL_PAID servicing=SERVICING_PROVIDER_NPI_NUM billing=BILLING_PROVIDER_NPI_NUM
+
+### Size and range
+
+- rows 238,015,729; months 2018-01 to 2024-12 (2s)
+
+### Rows per year
+
+- 2018: 28,571,776 rows, 766,860 servicing NPIs, 8,457 codes, paid $20,383,877,394,620
+- 2019: 31,015,879 rows, 831,705 servicing NPIs, 8,634 codes, paid $222,929,227,068
+- 2020: 28,995,632 rows, 883,467 servicing NPIs, 8,653 codes, paid $182,725,957,403
+- 2021: 36,832,518 rows, 970,988 servicing NPIs, 8,766 codes, paid $220,840,385,816
+- 2022: 38,430,374 rows, 1,004,476 servicing NPIs, 8,814 codes, paid $244,655,272,048
+- 2023: 39,723,704 rows, 1,045,855 servicing NPIs, 8,982 codes, paid $276,433,297,242
+- 2024: 34,445,846 rows, 1,009,984 servicing NPIs, 8,699 codes, paid $267,938,154,374
+
+### Code shapes (newest year)
+
+- CPT Category I (5 digits): 22,875,732 rows, paid $60,009,232,537
+- HCPCS Level II: 9,170,049 rows, paid $156,148,278,039
+- CPT Category II/III: 2,232,867 rows, paid $247,860,306
+- other: 167,198 rows, paid $51,532,783,493
+
+### Smallest patient counts (newest year), to see suppression
+
+- patients=12: 2,753,499 rows
+- patients=13: 2,385,300 rows
+- patients=14: 2,087,220 rows
+- patients=15: 1,837,915 rows
+- patients=16: 1,632,398 rows
+- patients=17: 1,456,739 rows
+- patients=18: 1,309,814 rows
+- patients=19: 1,180,737 rows
+- patients=20: 1,072,936 rows
+- patients=21: 974,104 rows
+- patients=22: 892,466 rows
+- patients=23: 815,290 rows
+- patients=24: 751,799 rows
+- patients=25: 691,734 rows
+- patients=26: 641,038 rows
+
+### Servicing NPI missing or equal to billing (newest year)
+
+- servicing null=False, equals billing=False: 22,901,512 rows
+- servicing null=False, equals billing=True: 9,734,912 rows
+- servicing null=True, equals billing=None: 942,311 rows
+- servicing null=False, equals billing=None: 867,111 rows
+
+### Top codes by paid (newest year)
+
+- T1019: patients 11,585,702, paid $29,995,511,874
+- Z9525: patients 8,645,671, paid $20,539,952,083
+- T1015: patients 35,645,310, paid $8,612,868,731
+- S5125: patients 4,163,564, paid $8,529,555,863
+- T2016: patients 903,150, paid $8,261,656,760
+- W1793: patients 1,307,019, paid $6,783,842,716
+- 99214: patients 69,529,918, paid $5,203,251,715
+- 99213: patients 89,330,418, paid $4,944,135,105
+- H2016: patients 922,277, paid $4,622,464,642
+- 99284: patients 24,930,035, paid $3,479,100,967
+- S5130: patients 2,445,471, paid $3,216,936,975
+- S5140: patients 581,388, paid $2,823,339,180
+- 90837: patients 10,261,849, paid $2,755,486,222
+- 99283: patients 15,908,298, paid $2,572,896,842
+- 99285: patients 13,869,707, paid $2,398,878,088
+
+### Sample rows
+
+```
+(None, '5200000300', '20', '2018-06', 915, 8403, 7469333333258.64)
+(None, '5200000300', '20', '2018-01', 874, 7368, 6549333333267.84)
+(None, '5200000300', '20', '2018-02', 878, 6962, 6188444444382.56)
+(None, '5200000300', '20', '2019-10', 1161, 12022, 14222639332.01)
+(None, '5200000300', '20', '2018-08', 933, 9265, 8000320099.16)
+(None, '5200000300', '20', '2019-11', 1119, 10717, 6222605122.45)
+(None, '5200000300', '20', '2019-12', 1048, 10641, 5333705522.27)
+(None, '5200000300', '20', '2019-06', 1036, 10129, 5333678366.19)
+```
