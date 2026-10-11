@@ -4,7 +4,7 @@ company,Health Plan of Nevada,Health Plan of Nevada,"UnitedHealth-owned but sold
 company,"U.S. Behavioral Health Plan, California",-,"Behavioral health subcontractor, not a plan a patient names"
 company,ACN Group of California,-,"Chiropractic and therapy network, not a medical plan"
 group,CVS Health Group,Aetna,"Aetna Life, Aetna Health Inc. (each state), Aetna Health of California/Utah"
-company,Banner Health and Aetna Health Plan,Banner|Aetna,"Joint venture, sold under both names"
+company,Banner Health and Aetna Health Plan,Banner Aetna,"Joint venture, sold under both names"
 group,Cigna Hlth Grp,Cigna,"Cigna files its marketing name as N/A"
 group,Connecticut General Life Insurance Company,Cigna,"Cigna's main insurer"
 group,KAISER FOUNDATION GRP,Kaiser Permanente,
@@ -241,3 +241,14 @@ plan,East Boston Neighborhood Health WellSense Alliance,WellSense Health Plan,
 plan,Fallon Health-Atrius Health Care Collaborative,Fallon Health,"MassHealth ACO plans; the card says Fallon Health"
 plan,Fallon 365 Care,Fallon Health,
 plan,Berkshire Fallon Health Collaborative,Fallon Health,
+company,Holman Professional Counseling Centers,-,"Employee counseling program, not a medical plan (reviewed 2026-10-11, 035)"
+company,"AMHIC, A Reciprocal Association & Sub",-,"Not a plan name a patient would recognise (reviewed 2026-10-11, 035)"
+company,GMS Reinsurance,-,"Reinsurer, not a plan a patient names (reviewed 2026-10-11, 035)"
+plan,Multiple Sites,-,"Placeholder in the Medicaid file, not a plan (reviewed 2026-10-11, 035)"
+plan,DCS/CHP,DCS Comprehensive Health Plan,"Arizona's plan for children in foster care"
+plan,HOME,HOME (University of Utah Health Plans),"Utah Medicaid plan for people with developmental disabilities"
+plan,Capital District Physician's Health Plan,CDPHP,
+plan,The Health Plan of WV,The Health Plan of West Virginia,
+plan,Scott & White Health Plan,Baylor Scott & White Health Plan,
+company,Fallon Community Health Plan,Fallon Health,
+plan,Health Partners,HealthPartners,

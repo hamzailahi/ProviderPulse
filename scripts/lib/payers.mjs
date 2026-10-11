@@ -71,6 +71,7 @@ export function parseBrandMap(text) {
     if (!type || !match) continue;
     if (!['group', 'company', 'company_state', 'dba', 'plan', 'parent'].includes(type)) throw new Error(`brand map: unknown match_type "${type}"`);
     if (!brand) throw new Error(`brand map: ${type} "${match}" has no brand`);
+    if (brand.includes('|')) throw new Error(`brand map: ${type} "${match}" brand "${brand}" contains "|"; a brand is one name`);
     if (type === 'company_state' && !/\|[A-Z]{2}$/.test(match)) throw new Error(`brand map: company_state "${match}" must end in |ST`);
     const k = key(type, match);
     if (map.has(k)) throw new Error(`brand map: ${type} "${match}" listed twice`);

@@ -21,6 +21,7 @@ for (const r of rows) {
   if (!/^[A-Z]{2}$/.test(r.state)) throw new Error(`bad state "${r.state}"`);
   if (!CATS.has(r.category)) throw new Error(`bad category "${r.category}" for ${r.brand}`);
   if (r.brand === '-') throw new Error(`excluded brand left in the proposal (${r.state})`);
+  if (/[|]/.test(r.brand)) throw new Error(`"${r.brand}" (${r.state}) contains "|"; a plan name is one name`);
 }
 const seen = new Set();
 for (const r of rows) { const k = r.state + '|' + r.brand.toLowerCase(); if (seen.has(k)) throw new Error(`duplicate ${k}`); seen.add(k); }

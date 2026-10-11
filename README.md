@@ -450,7 +450,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`034_insurance_payers_state_plans.sql`; 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
+`035_insurance_payers_cleanup.sql`; 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
 
 ## Environment variables
 
@@ -571,6 +571,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-11
 
+- **Insurance list cleanup.** A second read of the newly loaded plans found
+  a few that slipped through review: "Banner|Aetna" in Arizona showed with a
+  stray bar (now "Banner Aetna"), four entries were not plan names at all
+  (a reinsurer, a counseling program, a placeholder and an unrecognisable
+  legal name) and five plans appeared twice under slightly different names
+  in one state (CDPHP, The Health Plan of West Virginia, Baylor Scott &
+  White, Fallon Health, HealthPartners). Migration 035 fixes them; anyone
+  who already picked a renamed plan keeps it under the new name.
 - **Which new insurance plans were already listed.** A read-only query,
   `supabase/queries/034_overlaps.sql`, lists the plans from the October
   insurance load whose name was already in that state's list under another

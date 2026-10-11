@@ -112,5 +112,8 @@ ok(hn[0].brand === 'Health Net', 'the reviewed map matches a plan name after its
 ok(medicaidPlans([{ State: 'Tennessee', 'Program Name': 'TennCare (Comprehensive MCO)', 'Plan Name': 'OptumRx', 'Total Enrollment': '9000', Year: '2024' }],
   parseBrandMap('match_type,match,brand\nplan,OptumRx,-\n'))[0].brand === '-', 'a plan the review removed is marked for exclusion');
 
+let piped = false; try { parseBrandMap('match_type,match,brand\ncompany,Banner Health and Aetna Health Plan,Banner|Aetna\n'); } catch { piped = true; }
+ok(piped, 'a brand with "|" is refused (it once loaded as one literal name)');
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

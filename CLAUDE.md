@@ -716,7 +716,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11. `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) written, not yet applied. `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
@@ -1247,7 +1247,16 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   category to `medicare` monthly), listed by the read-only
   `supabase/queries/034_overlaps.sql`. Pickers ignore category, so nothing
   is missing; grouping pickers by type would need several categories per
-  name.
+  name. Reading the loaded list found mistakes the review missed: the brand
+  map's "Banner|Aetna" (meant "both names") loaded as one literal name,
+  four non-plan names (Multiple Sites, GMS Reinsurance, AMHIC, Holman
+  counseling), two cryptic ones (DCS/CHP, HOME) and five same-state
+  duplicates (CDPHP, The Health Plan of WV, Scott & White, Fallon, Health
+  Partners). Migration 035 fixes the live rows (only 034's own rows; saved
+  provider and patient choices follow a rename) and the brand map makes
+  the same calls; `parseBrandMap` and `build-payer-migration.mjs` now
+  refuse a "|" in a name. Lesson: read the generated list itself, not just
+  the flagged rows.
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
   read-only sizes of every table and index, dead rows, index use, WAL, to
   `supabase/reference/db-size-report.md`. Run it before any disk decision.
@@ -1368,7 +1377,7 @@ node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless 
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
 node scripts/test-market-benchmarks.mjs   # 7: the benchmark builder end to end, specialty rates by code
 node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
-node scripts/test-payers.mjs              # 39: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
+node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 ```
 
