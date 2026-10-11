@@ -706,7 +706,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) written 2026-10-11, not yet applied. `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
@@ -1219,7 +1219,17 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   the user as a spreadsheet with 99 rows flagged (possibly not medical:
   life insurers, dental and pharmacy managers; legal-looking names;
   look-alike names in the same state and market, e.g. Kaiser three ways in
-  Medi-Cal). Loading waits for approval, through a numbered migration.
+  Medi-Cal). **Approved 2026-10-11** with non-medical carriers removed
+  (Reliance Standard, Nippon Life, State Farm, TennCare's DentaQuest and
+  OptumRx) and duplicates merged through `plan` and `company` rows in the
+  brand map (state suffixes dropped: Molina Healthcare, Aetna Better Health,
+  UnitedHealthcare Community Plan for every UnitedHealthcare Medicaid plan,
+  regional and ACO variants folded). A commercial brand and its Medicaid
+  brand (UnitedHealthcare vs UnitedHealthcare Community Plan) stay separate
+  on purpose. Final run: 661 state plans, 271 already listed.
+  `scripts/build-payer-migration.mjs` turns the proposal into migration
+  `034_insurance_payers_state_plans.sql` (390 rows, sort order 70, skips
+  what 003 lists, `on conflict do nothing`); regenerate rather than edit.
 - **Database size report** (`db-size-report.yml`, manual, `scripts/db-size-report.sh`):
   read-only sizes of every table and index, dead rows, index use, WAL, to
   `supabase/reference/db-size-report.md`. Run it before any disk decision.
@@ -1338,7 +1348,7 @@ node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless 
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
 node scripts/test-market-benchmarks.mjs   # 7: the benchmark builder end to end, specialty rates by code
 node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
-node scripts/test-payers.mjs              # 37: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
+node scripts/test-payers.mjs              # 39: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 ```
 

@@ -450,7 +450,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`033_abandon_procedures_summary.sql`; 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
+`034_insurance_payers_state_plans.sql`; 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
 
 ## Environment variables
 
@@ -579,7 +579,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   Medicaid plans read UnitedHealthcare Community Plan, Aetna Better Health,
   Humana Healthy Horizons and so on, and regional variants fold together
   (Partnership HealthPlan, WellSense, Kaiser Permanente). A migration
-  generated from the approved list adds the new plans to the pickers.
+  generated from the approved list (390 new state plans: 150 commercial,
+  33 marketplace-only, 207 Medicaid) adds them to the pickers once it is
+  run in Supabase; 271 more were already listed.
 - **More insurance plans, step one.** A new manual, read-only job finds
   the official CMS files listing every company selling private, employer
   and marketplace health insurance in each state, and every Medicaid
