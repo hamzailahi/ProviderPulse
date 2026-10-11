@@ -204,10 +204,9 @@ Three rules keep it honest:
 
 1. **Unknown is never average.** A missing factor is left out and the
    weights are renormalized. It is never filled with 50.
-2. **Every fallback is disclosed.** If a specialty has to be compared at
-   the broad-group level, or the shortage score falls back to the state
-   median, it shows up in that specialty's data notes and lowers its
-   confidence (high, medium or low).
+2. **Every fallback is disclosed.** If the shortage score falls back to
+   the state median, or a factor has no data, it shows up in that
+   specialty's data notes and lowers its confidence (high, medium or low).
 3. **Every score explains itself.** The three factors that moved it most
    are written out in plain English, and every factor bar shows the
    evidence behind it.
@@ -409,9 +408,7 @@ v2/admin-review.html         OIG review queue
 v2/assets/                   shared browser modules, several also loaded by functions:
                                directory.js       map, search and taxonomy helpers
                                taxonomy-map.js    NUCC code to official grouping (generated)
-                               taxonomy-groups.js six specialty groups, used for supply counts
                                specialties.js     the 44 patient-facing specialties (42 scored by the market model)
-                               health-demand.js   CDC PLACES need model by group
                                market-model.js    the market opportunity model
 v2/netlify/functions/        backend: auth, matching, scoring, screening, audits, appointments
 v2/netlify/functions/lib/    pure logic (scoring, query planning, auth, geocoding)
@@ -570,6 +567,16 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-11
 
+- **The old six provider groups are retired.** The opportunity panels no
+  longer score Primary care, Specialty, Surgical, Dental and Behavioral as
+  broad groups (their national rates were counted from organizations only
+  and understated supply). Everything now comes from the per-specialty
+  model: Insights shows where a provider's own specialty stands, the
+  biggest openings among specialties already present, and which ones have
+  no listing nearby; the pitch page lists the six strongest openings and how
+  many specialties are absent. Clinician counts follow each listing's
+  official classification, and the federal shortage score used for each
+  specialty is chosen per specialty. No keyword-based classifier is left.
 - **Market scores count providers by their official code.** The market
   model, the AI assistant's provider lookups, the national benchmark job
   and the (parked) demand trainer now decide a listing's specialty from its

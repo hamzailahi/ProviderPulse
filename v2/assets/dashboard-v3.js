@@ -4,7 +4,7 @@
 
    Loaded after index.html's main script and built on its globals (map,
    taxonomies, selectedTaxonomies, groupedData, zipDemographics, renderMap,
-   switchTab, buildVgroups, applyNavigatorTaxonomyFilter, authHeaders ...).
+   switchTab, applyNavigatorTaxonomyFilter, authHeaders ...).
    It adds, rather than rewrites:
 
      - Two modes. "My market" (providers): opens on the provider's own ZIP and
@@ -310,16 +310,18 @@ window.renderVerdict = function (zip) {
 
 function visibleCount() { return (typeof currentlyVisiblePractices !== 'undefined' && currentlyVisiblePractices) ? currentlyVisiblePractices.length : 0; }
 
-// Providers loaded in the area whose group matches, for "where you stand".
-function competitors(groupKey) {
+// Providers loaded on the map whose NUCC code is in the specialty, for "where you stand".
+function competitors(label) {
   var out = { total: 0, verified: 0 };
-  if (typeof groupedData === 'undefined') return out;
+  if (typeof groupedData === 'undefined' || !window.TaxonomyMap || !label) return out;
+  var codes = {};
+  TaxonomyMap.codesFor(label).forEach(function (c) { codes[c] = true; });
   var seen = {};
   Object.keys(groupedData).forEach(function (k) {
     (groupedData[k].practices || []).forEach(function (p) {
       var npi = String(p['NPI'] || '');
       if (!npi || seen[npi] || (profile && npi === String(profile.npi))) return;
-      if (TaxonomyGroups.keyFor(p['Primary Taxonomy']) !== groupKey) return;
+      if (!codes[p['Taxonomy Code']]) return;
       seen[npi] = true; out.total++;
       if (typeof registeredProviders !== 'undefined' && registeredProviders[npi] && p._src !== 'secondary') out.verified++;
     });
@@ -368,23 +370,26 @@ function paintInsights() {
       el('p', {}, meaning))));
   if (anchorNote) p.appendChild(el('p', { class: 'ins-note' }, anchorNote));
 
-  // Where you stand (My market)
+  // Where you stand (My market): the provider's own specialty in the model.
+  var specs = (d.model && d.model.specialties) || [];
   if (mode === 'mine' && profile) {
-    var gk = TaxonomyGroups.keyFor(profile.taxonomy_desc);
-    var g = d.groups && d.groups[gk];
-    var comp = competitors(gk);
+    var myLabel = mySpec && mySpec.label;
+    var g = specs.filter(function (x) { return x.specialty === myLabel; })[0];
+    var comp = competitors(myLabel);
     var you = el('div', { class: 'ins-card you' },
-      el('div', { class: 'ins-eyebrow' }, 'Where you stand · ' + (TaxonomyGroups.get(gk) || {}).name));
-    if (g && g.available) {
-      you.appendChild(el('div', { class: 'ins-big' }, el('span', { class: 'chip ' + (g.score >= 70 ? 'under' : g.score >= 50 ? 'balanced' : 'served') }, titleWord(g.label) + ' · ' + g.score)));
-      you.appendChild(el('p', {}, fmtN(g.clinicians) + ' ' + (TaxonomyGroups.get(gk) || {}).name.toLowerCase() + ' providers within ' +
+      el('div', { class: 'ins-eyebrow' }, 'Where you stand · ' + (myLabel || 'your specialty')));
+    if (g) {
+      var acc = (g.evidence && g.evidence.access) || {};
+      you.appendChild(el('div', { class: 'ins-big' }, el('span', { class: 'chip ' + (g.score >= 70 ? 'under' : g.score >= 50 ? 'balanced' : 'served') }, g.archetype_name + ' · ' + g.score)));
+      you.appendChild(el('p', {}, fmtN(g.clinicians) + ' ' + myLabel.toLowerCase() + ' listings within ' +
         ((d.catchment && d.catchment.radius_miles) || 25) + ' miles serve about ' + fmtN(d.catchment && d.catchment.adults_18plus) + ' adults' +
-        (g.per_1k_adults != null && g.national_per_1k_adults != null
-          ? ' (' + g.per_1k_adults.toFixed(2) + ' per 1,000 vs ' + Number(g.national_per_1k_adults).toFixed(2) + ' nationally).' : '.')));
-    } else if (g) {
-      you.appendChild(el('p', {}, g.reason || 'No specialty breakdown for this area.'));
+        (acc.per_1k != null && acc.national_per_1k != null
+          ? ' (' + Number(acc.per_1k).toFixed(2) + ' per 1,000 vs ' + Number(acc.national_per_1k).toFixed(2) + ' nationally).' : '.')));
+    } else {
+      you.appendChild(el('p', {}, d.model && d.model.reason ? d.model.reason
+        : (myLabel ? myLabel + ' is searchable but not scored as a market.' : 'Your specialty could not be matched to one we score.')));
     }
-    you.appendChild(el('p', {}, 'On the map right now: ', el('b', {}, fmtN(comp.total)), ' others in your group, ',
+    you.appendChild(el('p', {}, 'On the map right now: ', el('b', {}, fmtN(comp.total)), ' others in your specialty, ',
       el('b', {}, fmtN(comp.verified)), ' verified on ProviderPulse.' + (comp.total && !comp.verified ? ' Being verified with insurance and hours listed sets you apart.' : '')));
     you.appendChild(el('div', { class: 'ins-actions' },
       el('a', { class: 'ins-btn', href: '/portal#/competition' }, 'See competitors'),
@@ -433,34 +438,27 @@ function paintInsights() {
       m.providers_per_1k.toFixed(1) + ' listings per 1,000 residents. ' + fmtN(m.organizations) + ' organizations and ' + fmtN(m.individual_physicians) +
       ' individual clinicians. Not compared: the ' + (d.state || 'state') + ' benchmark has not been built yet, so this area\'s score rests on payer mix and shortage only.']);
   }
-  var groups = d.groups && d.groups.available !== false ? d.groups : null;
-  if (groups) {
-    var ranked = Object.keys(groups).filter(function (k) { return groups[k] && groups[k].available; })
-      .sort(function (a, b) { return groups[b].score - groups[a].score; });
-    var unserved = Object.keys(groups).filter(function (k) { return groups[k] && groups[k].verdict === 'unserved'; });
-    if (ranked.length) {
-      var top = ranked[0];
-      F.push([groups[top].score >= 70 ? 'good' : 'neutral', 'Biggest opening',
-        (TaxonomyGroups.get(top) || { name: top }).name + ' scores ' + groups[top].score + ' (' + titleWord(groups[top].label).toLowerCase() + ') within ' +
-        ((d.catchment && d.catchment.radius_miles) || 25) + ' miles' +
-        (ranked.length > 1 ? '; next is ' + (TaxonomyGroups.get(ranked[1]) || { name: ranked[1] }).name + ' at ' + groups[ranked[1]].score : '') + '.']);
-    }
-    if (unserved.length) {
-      F.push(['good', 'No providers at all', unserved.map(function (k) { return (TaxonomyGroups.get(k) || { name: k }).name; }).join(', ') +
-        ' has no listings within ' + ((d.catchment && d.catchment.radius_miles) || 25) + ' miles.']);
-    }
+  // From the per-specialty model: the strongest scores among specialties that
+  // already have listings here (unserved ones get their own line below), and
+  // never "not enough data".
+  var radiusMi = (d.catchment && d.catchment.radius_miles) || 25;
+  var ranked = specs.filter(function (x) { return x.clinicians > 0 && x.archetype !== 'insufficient' && typeof x.score === 'number'; })
+    .sort(function (a, b) { return b.score - a.score; });
+  var unserved = specs.filter(function (x) { return x.clinicians === 0; }).map(function (x) { return x.specialty; });
+  if (ranked.length) {
+    F.push([ranked[0].score >= 70 ? 'good' : 'neutral', 'Biggest opening',
+      ranked[0].specialty + ' scores ' + ranked[0].score + ' (' + ranked[0].archetype_name.toLowerCase() + ') within ' + radiusMi + ' miles' +
+      (ranked.length > 1 ? '; next are ' + ranked.slice(1, 3).map(function (x) { return x.specialty + ' at ' + x.score; }).join(' and ') : '') + '.']);
+  }
+  if (unserved.length) {
+    F.push(['good', 'No providers at all', unserved.slice(0, 5).join(', ') + (unserved.length > 5 ? ' and ' + (unserved.length - 5) + ' more' : '') +
+      (unserved.length === 1 ? ' has' : ' have') + ' no listings within ' + radiusMi + ' miles.']);
   }
   p.appendChild(el('div', { class: 'ins-card' },
     el('div', { class: 'ins-eyebrow' }, 'What stands out'),
     el('ul', { class: 'ins-findings' }, F.map(function (f) {
       return el('li', { class: tone(f[0]) }, el('i', { 'aria-hidden': 'true' }), el('div', {}, el('b', {}, f[1]), el('p', {}, f[2])));
     }))));
-
-  // Per-specialty breakdown (existing builder in index.html)
-  if (typeof buildVgroups === 'function' && d.groups) {
-    var vg = buildVgroups(d.groups, d.catchment, d.zip);
-    if (vg) p.appendChild(el('div', { class: 'ins-card' }, el('div', { class: 'ins-eyebrow' }, 'Opportunity by specialty group'), vg));
-  }
 
   p.appendChild(el('div', { class: 'ins-card' },
     el('div', { class: 'ins-eyebrow' }, 'Go deeper'),

@@ -5,7 +5,7 @@
    in one catchment and classifies each into an ARCHETYPE with a strategy, a
    score, the reasons behind it, and a confidence level.
 
-   Pure and dependency-free, like health-demand.js and accuracy-signals.js:
+   Pure and dependency-free, like accuracy-signals.js:
    market-score.js gathers the inputs, this file only computes, and
    scripts/test-market-model.mjs tests it without a network. Every number it
    emits has to survive "why does it say that about my area?", so each factor
@@ -16,8 +16,8 @@
 
      need        CDC PLACES modelled prevalence of the conditions that drive
                  THIS specialty's caseload, plus age mix, as a national
-                 percentile (per-measure benchmarks) or, until those are
-                 built, the specialty's group percentile from health-demand.
+                 percentile (per-measure benchmarks), or, only when a caller
+                 passes group fallbacks, a group percentile.
      access      Clinicians of this specialty per 1,000 adults in the
                  catchment vs the national rate. 50 = national rate,
                  100 = none, 0 = twice the national rate.
@@ -33,8 +33,8 @@
 
    A factor that cannot be computed is left out and the remaining weights
    renormalised. It is never filled with a neutral 50: unknown is not
-   average, and confidence drops instead (the rule health-demand.js and
-   accuracy-signals.js already follow).
+   average, and confidence drops instead (the rule accuracy-signals.js
+   already follows).
 
    ARCHETYPES are rules over the factors, not a clustering algorithm, so the
    label always has a sentence-length reason. See classify().
@@ -101,6 +101,15 @@
     'Hospice & palliative care': { m: [['CANCER', .6], ['COPD', .4], ['CHD', .4]], d: [['over65', 1]] }
   };
 
+  // Which federal shortage designation (HPSA discipline) applies. HRSA designates
+  // three: primary care, dental and mental health; everything else is judged
+  // against primary care, as before.
+  var SHORTAGE_DISCIPLINE = {
+    'Mental health & counseling': 'mental',
+    'Behavior therapy (ABA)': 'mental',
+    'Dental': 'dental'
+  };
+
   var DEMO_LABEL = { over65: 'residents 65+', under18: 'children under 18', age19to44: 'adults 19-44 (census proxy)' };
 
   var ARCHETYPES = {
@@ -151,7 +160,11 @@
 
      input = {
        specialties: SPECIALTIES rows [label, mapTerms, nppesTerm],
-       groupOf(label) -> taxonomy group key,
+       groupOf(label) -> group key, OPTIONAL: only for the group-level need and
+         access fallbacks below (groupNeedPct / groupAccess). market-score no
+         longer passes any of the three (the six groups were retired
+         2026-10-11); a specialty without a benchmark or measure is then left
+         unknown and says so.
        rows: catchment listings [{ taxonomy_code, primary_taxonomy, latitude, longitude }],
        codesFor(label) -> NUCC codes in that specialty (TaxonomyMap.codesFor);
          when given, a listing belongs to a specialty by its code. Without it
@@ -199,7 +212,7 @@
 
     input.specialties.forEach(function (s) {
       var label = s[0], prof = PROFILES[label] || { m: [], d: [] };
-      var group = input.groupOf(label);
+      var group = input.groupOf ? input.groupOf(label) : null;
       var f = {}, ev = {}, caveats = [];
 
       /* ---- need ---- */
@@ -265,7 +278,7 @@
       }
 
       /* ---- shortage ---- */
-      var disc = group === 'behavioral' ? 'mental' : group === 'dental' ? 'dental' : 'primary';
+      var disc = SHORTAGE_DISCIPLINE[label] || 'primary';
       var sh = input.shortage && input.shortage[disc];
       if (sh && sh.score != null) {
         f.shortage = clamp((sh.score / 25) * 100);

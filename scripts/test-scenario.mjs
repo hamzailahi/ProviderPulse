@@ -17,6 +17,7 @@ const home = { zip: '38017', lat: 35.04, lon: -89.66, pop_18plus: 30000 };
 const dem = { zip: '38017', state: 'TN', 'Total Population': 40000, 'Insured Population': 37000 };
 const heart = (i, lat, lon) => ({ npi: '10000000' + i, primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207RC0000X', latitude: lat, longitude: lon });
 const dentist = { npi: '3000000001', primary_taxonomy: 'General Practice Dentistry', taxonomy_code: '1223G0001X', latitude: 35.04, longitude: -89.66 };
+let withHpsa = false;
 let cardiologists = [heart(1, 35.10, -89.66), heart(2, 35.12, -89.66)];   // 4 to 8 miles away
 globalThis.fetch = async (url) => {
   const u = decodeURIComponent(String(url));
@@ -29,6 +30,10 @@ globalThis.fetch = async (url) => {
   if (u.includes('demographics_raw?state')) return J([dem]);
   if (u.includes('clinics?zip=in.(')) return J(cardiologists.concat([dentist]));
   if (u.includes('provider_individuals?zip=in.(')) return J([]);
+  // ZIP-level supply count: one clinician by code section, one organization, one with no code.
+  if (u.includes('hpsa_designations')) return J(withHpsa ? [{ id: 1, hpsa_score: 20, hpsa_type: 'x', discipline: 'Mental Health', county: 'Shelby' }, { id: 2, hpsa_score: 5, hpsa_type: 'x', discipline: 'Primary Care', county: 'Shelby' }] : []);
+  if (u.includes('clinics?or=(')) return J([{ npi: '1', taxonomy_code: '261QP2300X' }, { npi: '2', taxonomy_code: null }]);
+  if (u.includes('provider_individuals?or=(')) return J([{ npi: '3', taxonomy_code: '207Q00000X' }]);
   if (u.includes('market_benchmarks')) return J([{ kind: 'specialty', key: SPEC, data: { rate_per_1k: 0.22 } }]);
   return J([]);
 };
@@ -64,6 +69,21 @@ check('an unknown specialty means no scenario', !d.model.scenario);
 cardiologists = [];
 d = await run({ add: '1' });
 check('from an unserved market the first clinician still moves access off 100', d.model.scenario.before.clinicians === 0 && d.model.scenario.after.clinicians === 1 && d.model.scenario.after.factors.access < 100);
+
+console.log('\n4. The six groups are retired (2026-10-11)');
+cardiologists = [heart(1, 35.10, -89.66)];
+withHpsa = true;
+d = await run({});
+check('the response carries no six-group breakdown', d.groups === undefined && d.catchment && d.catchment.weights === undefined);
+check('ZIP-level clinicians count codes in the Individual section; organizations and uncoded rows are not clinicians',
+  d.metrics.providers === 3 && d.metrics.clinicians === 1 && d.metrics.facilities === 1, JSON.stringify(d.metrics));
+const mh = d.model.specialties.find(s => s.specialty === 'Mental health & counseling');
+const card = d.model.specialties.find(s => s.specialty === SPEC);
+check('shortage discipline is chosen per specialty (mental health -> mental 20, cardiology -> primary 5)',
+  mh.evidence.shortage && mh.evidence.shortage.discipline === 'mental' && mh.evidence.shortage.hpsa === 20 &&
+  card.evidence.shortage && card.evidence.shortage.discipline === 'primary' && card.evidence.shortage.hpsa === 5,
+  JSON.stringify([mh.evidence.shortage, card.evidence.shortage]));
+check('no specialty falls back to a group basis', d.model.specialties.every(s => !s.evidence.access || s.evidence.access.basis !== 'group'));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

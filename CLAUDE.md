@@ -77,9 +77,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `forms.css` | `register-provider.html`, `auth.html`, `admin-review.html`, `404.html` |
 | `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code`), `milesBetween`, MapTiler key, ZIP centroid lookup |
 | `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (42: all but `NOT_SCORED`, Hospital-based clinicians and Other health services) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
-| `taxonomy-groups.js` | six specialty groups; `market-score.js` counts supply with it and the dashboard's Insights tab names them. The map no longer uses it (NUCC phase 2). **Being replaced** by `taxonomy-map.js` |
-| `taxonomy-map.js` | the dashboard map's classifier since 2026-10-09, and `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
-| `health-demand.js` | CDC PLACES need model per group; browser + `require` |
+| `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
 | `demand-model.js` | the learned demand model (ridge regression per specialty, state-held-out validation, `addAcs`/`addPlaces` area builders shared by trainer and scorer); browser + `require` |
 
@@ -340,16 +338,12 @@ The tables that bridge the vocabularies:
   data. Note that "Orthopedics & sports injury" includes the bare term
   `Surgery`, which also matches general surgeons (about 193k listings
   nationally); tightening it changes patient search too.
-- `assets/taxonomy-groups.js`: collapses the live values into **six** groups:
-  `primary`, `specialty`, `surgical`, `dental`, `behavioral`, `facility`.
-  Rules are **ordered, and discipline wins over venue**: a `Dental
-  Clinic/Center` is dental. `facility` is only for entities with **no**
-  clinical discipline, so no clinician is ever classified as a facility.
-  `market-score.js` still uses it for the ZIP-level verdict's clinician
-  count, the per-group access and need fallbacks, the shortage discipline
-  and Insights' group names; the map moved to NUCC groupings on 2026-10-09
-  and per-specialty supply to codes on 2026-10-11. Do not add a second
-  clinician/facility split anywhere.
+- The six keyword groups (`taxonomy-groups.js`: primary, specialty,
+  surgical, dental, behavioral, facility) are **gone** (2026-10-11), with
+  `health-demand.js` and market-score's per-group `groups` breakdown and its
+  hard-coded clinics-only national rates. Clinician vs facility is now the
+  code's NUCC **Section** (Individual vs Non-Individual); specialty is the
+  reviewed code table. Do not reintroduce keyword groups.
 
 **Matching rule.** Normalize both sides (lowercase, `&`→`and`, punctuation to
 spaces, trim), then require `(' ' + stored).includes(' ' + term)`. The leading
@@ -377,7 +371,7 @@ NUCC 26.1): 909 distinct names over 10,175,703 rows (1.90M `clinics`, 7.15M
 (`Facility / Clinic`, `Therapy & Rehabilitation`, a raw code `246ZS0400X`, a
 typo `Biostatiscian`, ...), so the category form is now nearly gone. 347
 clinician names (2.42M rows) fall under no patient specialty, led by
-`Behavior Technician` (562,631 rows), which `taxonomy-groups.js` also files
+`Behavior Technician` (562,631 rows), which the old keyword groups also filed
 under Specialty Medicine rather than Behavioral Health. Three `mapTerms`
 match nothing stored: `Podiatry`, `Speech & Hearing`, `Alternative Medicine`.
 Being acted on: see NUCC codes below.
@@ -437,7 +431,8 @@ keyword matching and no default bucket**. Three phases, each gated:
    (navigator injections) are never hidden by grouping. The **Exact
    taxonomies** dropdown and the specialty filter still match stored
    **names** until phase 3; their dots borrow the grouping colour.
-   `market-score.js` and Insights still use the six groups.
+   (The six groups were retired from market-score and Insights on
+   2026-10-11.)
 3. **Patient specialties (after review).** The 33 specialties re-keyed on
    codes; every visible Individual code (698 in v26.1) must belong to at least
    one, explicitly, in `supabase/reference/taxonomy-overrides.csv`
@@ -506,7 +501,24 @@ keyword matching and no default bucket**. Three phases, each gated:
    "Speech & hearing" row lingers unused (the job upserts and never
    deletes).
 
-`taxonomy-groups.js` remains the classifier for the ZIP-level verdict, the group fallbacks and Insights' group names (see the taxonomy-groups bullet); replacing it is the remaining step.
+**Retirement of the six groups, 2026-10-11** (the user's choice: replace
+them with specialties). market-score no longer computes `groups` (per-group
+need from `health-demand.js`, supply against constants counted from `clinics`
+alone, which undercounted like the old 5.8) and no longer passes `groupOf` /
+`groupNeedPct` / `groupAccess`, so the model's group fallbacks never fire in
+production (they remain in `market-model.js`, tested, for callers that pass
+them). `metrics.clinicians` counts listings whose code is in the Individual
+section and `metrics.facilities` the Non-Individual ones (uncoded rows are
+neither). The HPSA discipline is chosen per specialty (`SHORTAGE_DISCIPLINE`
+in `market-model.js`: mental health and ABA to mental, dental to dental, the
+rest primary). Insights' "Where you stand" uses the provider's specialty in
+the model; "Biggest opening" ranks specialties that have listings here
+(unserved ones get their own line); the "Opportunity by specialty group" card
+and index.html's `buildVgroups` are gone. The pitch page shows the top 6
+served specialties and a count of unserved ones. A PLACES-less ZIP (Puerto
+Rico) returns `model: {available:false, reason}`. Covered by section 4 of
+`scripts/test-scenario.mjs`. **The NUCC code work is complete**: no keyword
+classifier remains.
 `show_on_map` and patient specialties are data in the overrides CSV, never
 code; the only hidden code is `390200000X` (Student, Health Care).
 `taxonomy-map.js` and `supabase/reference/taxonomy_map.csv` are generated
@@ -1017,8 +1029,9 @@ Rules that must hold:
 
 - **Unknown is never average.** A missing factor is dropped and weights
   renormalized; it is never filled with 50.
-- **Fallbacks are disclosed and cost confidence.** Group-level need or access
-  (no benchmark yet) and a state-median shortage each add a caveat. Confidence
+- **Fallbacks are disclosed and cost confidence.** A state-median shortage
+  adds a caveat; group-level need or access does too, but only callers that
+  pass group fallbacks get them (market-score no longer does). Confidence
   is the data-backed weight share minus penalties (group basis −0.15 each,
   truncated counts −0.1, under 5,000 adults −0.15); high ≥ 0.8, medium ≥ 0.55.
 - **Archetypes** (`classify`): insufficient if low confidence and < 3 factors;
@@ -1264,7 +1277,7 @@ node scripts/test-market-model.mjs        # 33: the market opportunity model, in
 node scripts/test-demand-model.mjs        # 45: the learned demand model, trainer end to end, and scoring
 node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick
 node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking
-node scripts/test-scenario.mjs            # 14: the what-if re-score changes supply only
+node scripts/test-scenario.mjs            # 18: the what-if re-score changes supply only; no six-group breakdown, clinicians by code section, shortage per specialty
 node scripts/test-market-assistant.mjs    # 59: the assistant, figure repair, tracing (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"

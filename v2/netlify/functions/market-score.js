@@ -50,10 +50,8 @@ const CORS = {
 const WEIGHTS = { supply: 0.40, payer: 0.30, shortage: 0.30 };
 
 // Shared with the map so "provider" means the same thing in both places.
-const TaxonomyGroups = require('../../assets/taxonomy-groups.js');
 // CDC PLACES -> per-taxonomy need, and the national supply rate. See that file
 // for what the prevalence figures are and, more importantly, what they are not.
-const HealthDemand = require('../../assets/health-demand.js');
 // The explainable per-specialty opportunity model (archetype, score,
 // confidence, reasons). See that file's header for the five factors.
 const MarketModel = require('../../assets/market-model.js');
@@ -150,8 +148,6 @@ const CATCHMENT_MAX_CLINIC_ROWS = 12000;
 // ~2,500 ZIPs lose their catchment for no reason.
 const GEO_MEASURE = 'DENTAL';
 
-const PER_GROUP_WEIGHTS = { need: 0.35, supply: 0.35, payer: 0.15, shortage: 0.15 };
-
 // Great-circle distance in miles. Haversine rather than the equirectangular
 // approximation patient.js uses: at a 25-mile radius the flat-earth error is
 // small, but it grows with latitude and Alaska is in this dataset.
@@ -161,15 +157,6 @@ const milesBetween = (lat1, lon1, lat2, lon2) => {
   const a = Math.sin(dLat / 2) ** 2 +
     Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
-};
-
-// HPSA carries a discipline, so three of the five groups get a shortage signal
-// matched to what they actually practise instead of the state primary-care
-// median. The other two fall back, and say so.
-const HPSA_DISCIPLINE = {
-  primary: /primary/i,
-  dental: /dental/i,
-  behavioral: /mental/i
 };
 
 // hpsa_designations stores FULL state names ("Tennessee") while clinics and
@@ -297,8 +284,8 @@ exports.handler = async (event) => {
     // row sets is safe -- no NPI can appear in both.
     const stripped = String(parseInt(zip, 10));
     const [clinicPage, individualPage, stateDemPage, acsPage] = await Promise.all([
-      pagedGet(`clinics?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy`, 'npi'),
-      pagedGet(`provider_individuals?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,primary_taxonomy`, 'npi'),
+      pagedGet(`clinics?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,taxonomy_code`, 'npi'),
+      pagedGet(`provider_individuals?or=(zip.eq.${zip},zip.eq.${stripped})&select=npi,taxonomy_code`, 'npi'),
       pagedGet(`demographics_raw?state=eq.${encodeURIComponent(state)}&select=zip,%22Total%20Population%22,%22Insured%20Population%22,${DEM_EXTRA}`, 'zip'),
       // Optional: a missing table or a failed read means "no ACS detail", never an error.
       pagedGet(`census_acs_zcta?state=eq.${encodeURIComponent(state)}&select=${ACS_COLS}`, 'zip').catch(() => ({ rows: [] }))
@@ -316,7 +303,12 @@ exports.handler = async (event) => {
     const listings = allRows.length;
     const organizations = clinicRows.length;
     const individuals = individualRows.length;
-    const clinicians = allRows.filter(r => TaxonomyGroups.isClinician(r.primary_taxonomy)).length;
+    // A clinician is a listing whose NUCC code sits in the official Individual
+    // section (a person's discipline), whichever table it came from; a missing
+    // or unknown code counts as neither clinician nor facility.
+    const sectionOf = c => (c && TaxonomyMap.has(c) ? (TaxonomyMap.get(c).individual ? 'I' : 'O') : null);
+    const clinicians = allRows.filter(r => sectionOf(r.taxonomy_code) === 'I').length;
+    const facilities = allRows.filter(r => sectionOf(r.taxonomy_code) === 'O').length;
     const providers = listings;
     const per1k = pop ? (listings / pop) * 1000 : null;
 
@@ -492,9 +484,10 @@ exports.handler = async (event) => {
     // =======================================================================
     // Everything above stays exactly as it was: register-provider.html and the
     // dashboard read `score`, `label`, `finding`, `components` and `metrics`,
-    // and this block only ADDS `groups`. A consumer that ignores it is
-    // unaffected.
-    let groups = null, catchment = null, model = null;
+    // and this block only ADDS `catchment` and `model`. A consumer that
+    // ignores them is unaffected. (The six-group `groups` breakdown was
+    // retired 2026-10-11: the per-specialty model replaces it.)
+    let catchment = null, model = null;
 
     try {
       const home = await get(
@@ -506,7 +499,7 @@ exports.handler = async (event) => {
         // not one begins with "00", while PR ZIPs are a real share of clinics.
         // Refusing is the point -- a neutral midpoint would rate every Puerto
         // Rican ZIP as average need, which is a fabricated finding.
-        groups = { available: false, reason: 'CDC PLACES publishes no data for this ZIP (Puerto Rico and some territories are not covered)' };
+        model = { available: false, reason: 'CDC PLACES publishes no data for this ZIP (Puerto Rico and some territories are not covered)' };
       } else {
         const oLat = Number(origin.lat), oLon = Number(origin.lon);
         // Bounding box first so Postgres can use the lat/lon index, then an
@@ -543,7 +536,7 @@ exports.handler = async (event) => {
           pagedGet(`provider_individuals?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude`,
             'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
           pagedGet(`cdc_places?zip=in.(${memberZips.join(',')})` +
-            `&measureid=in.(${[...new Set(HealthDemand.measureIds().concat(MarketModel.measureIds()))].join(',')})` +
+            `&measureid=in.(${MarketModel.measureIds().join(',')})` +
             `&select=zip,measureid,value,pop_18plus,data_year`, 'zip', { cap: 4000, ms: 7000 }),
           // Census detail for the learned demand model. Optional: a missing table
           // or failed read means no learned value, and the hand-weighted need stays.
@@ -551,101 +544,6 @@ exports.handler = async (event) => {
             '&select=zip,pop_total,households,median_hh_income,poverty_universe,poverty_below,age_male,age_female,ins_universe,ins_uninsured,ins_medicaid,education',
             'zip', { cap: 400, ms: 6000 }).catch(() => ({ rows: [] }))
         ]);
-
-        // Supply: count listings per group across the catchment, organisations
-        // and individual physicians both — same reasoning as the ZIP-level
-        // count above, and the same taxonomy classifier so this stays the one
-        // place that decides what counts as a clinician (see taxonomy-groups.js).
-        const counts = {};
-        for (const r of clinicPage.rows.concat(individualPage.rows)) {
-          const g = TaxonomyGroups.keyFor(r.primary_taxonomy);
-          counts[g] = (counts[g] || 0) + 1;
-        }
-
-        // Need: compute per ZIP, then population-weight. Averaging the raw
-        // prevalences across ZIPs would let a 400-person ZIP count as much as a
-        // 40,000-person one.
-        const rowsByZip = {};
-        for (const r of placesPage.rows) (rowsByZip[r.zip] = rowsByZip[r.zip] || []).push(r);
-        const needByZip = {};
-        for (const z of Object.keys(rowsByZip)) needByZip[z] = HealthDemand.needByGroup(rowsByZip[z]);
-
-        groups = {};
-        for (const key of Object.keys(HealthDemand.NEED_BY_GROUP)) {
-          let wsum = 0, w = 0, coverage = null;
-          for (const m of members) {
-            const n = needByZip[m.zip] && needByZip[m.zip][key];
-            if (!n || !n.available || n.index == null || !m.pop) continue;
-            wsum += n.index * m.pop; w += m.pop;
-            if (coverage === null || (n.coverage != null && n.coverage < coverage)) coverage = n.coverage;
-          }
-          const needIndex = w ? wsum / w : null;
-          const needPct = HealthDemand.needPercentile(key, needIndex);
-          const clinicians = counts[key] || 0;
-
-          // Discipline-matched shortage where HPSA has one, else the ZIP-level
-          // fallback -- and the response says which was used.
-          const rx = HPSA_DISCIPLINE[key];
-          let shortageScore = shortage, shortageBasis = 'state primary-care median (no discipline match)';
-          if (rx) {
-            const matched = hpsaRows.filter(h => rx.test(h.discipline || ''));
-            const med = median(matched.map(h => Number(h.hpsa_score)).filter(n => isFinite(n)));
-            if (med !== null) {
-              shortageScore = clamp((med / 25) * 100, 0, 100);
-              shortageBasis = `state HPSA median for ${matched.length} ${key} designations`;
-            }
-          }
-
-          if (clinicians === 0) {
-            // Not "maximum opportunity". Nobody practises within the catchment,
-            // so residents already travel further than this radius -- which is a
-            // finding, not a score. Refusing here is the same rule that makes
-            // the ZIP-level branch refuse a ZIP with no population.
-            groups[key] = {
-              available: false, verdict: 'unserved',
-              reason: `no ${key} listings within ${CATCHMENT_MAX_MILES} miles`,
-              need_index: needIndex, need_percentile: needPct,
-              clinicians: 0, confidence: HealthDemand.NEED_BY_GROUP[key].confidence
-            };
-            continue;
-          }
-
-          const supplyPct = HealthDemand.supplyScore(key, clinicians, catchmentAdults);
-          const parts2 = [];
-          let total = 0, wt = 0;
-          const add = (v, weight, name) => {
-            if (v === null || v === undefined) return;
-            total += v * weight; wt += weight; parts2.push(name);
-          };
-          add(needPct, PER_GROUP_WEIGHTS.need, 'need');
-          add(supplyPct, PER_GROUP_WEIGHTS.supply, 'supply');
-          add(payer, PER_GROUP_WEIGHTS.payer, 'payer');
-          add(shortageScore, PER_GROUP_WEIGHTS.shortage, 'shortage');
-
-          const gScore = wt ? Math.round(total / wt) : null;
-          groups[key] = {
-            available: true,
-            score: gScore,
-            label: gScore === null ? null
-              : gScore >= 70 ? 'UNDERSERVED' : gScore >= 50 ? 'BALANCED' : 'WELL SERVED',
-            need_index: needIndex,
-            need_percentile: needPct === null ? null : Math.round(needPct),
-            need_coverage: coverage,
-            clinicians,
-            per_1k_adults: catchmentAdults ? (clinicians / catchmentAdults) * 1000 : null,
-            national_per_1k_adults: HealthDemand.NATIONAL_RATE[key],
-            supply_score: supplyPct === null ? null : Math.round(supplyPct),
-            shortage_score: Math.round(shortageScore),
-            shortage_basis: shortageBasis,
-            // A comparative caseload figure, NOT an unduplicated patient count:
-            // the need index behind it is a weighted mean of overlapping
-            // prevalences, so a comorbid adult is represented more than once.
-            caseload_index: HealthDemand.caseloadPer(
-              { available: true, index: needIndex, adults: catchmentAdults }, clinicians),
-            confidence: HealthDemand.NEED_BY_GROUP[key].confidence,
-            components_used: parts2
-          };
-        }
 
         catchment = {
           zips: memberZips,
@@ -657,8 +555,7 @@ exports.handler = async (event) => {
           clinic_rows: clinicPage.rows.length,
           individual_rows: individualPage.rows.length,
           truncated: clinicPage.truncated || individualPage.truncated || placesPage.truncated || boxPage.truncated,
-          basis: 'ZCTA centroid distance; approximates adjacency, not drive time',
-          weights: PER_GROUP_WEIGHTS
+          basis: 'ZCTA centroid distance; approximates adjacency, not drive time'
         };
 
         // ---- per-specialty opportunity model (assets/market-model.js) ------
@@ -722,15 +619,6 @@ exports.handler = async (event) => {
             }
           });
 
-          // Group-level fallbacks from the breakdown computed just above.
-          const groupNeedPct = {}, groupAccess = {};
-          Object.keys(groups).forEach(k => {
-            const g = groups[k] || {};
-            if (g.need_percentile != null) groupNeedPct[k] = g.need_percentile;
-            if (g.supply_score != null) groupAccess[k] = g.supply_score;
-            else if (g.verdict === 'unserved') groupAccess[k] = 100;
-          });
-
           // National benchmarks (scripts/build-market-benchmarks.mjs). Absent
           // until that job has run; the model then falls back and says so.
           const bmRows = await get('market_benchmarks?select=kind,key,data&limit=500', 4000);
@@ -763,13 +651,12 @@ exports.handler = async (event) => {
           const selfNpi = /^\d{10}$/.test(String((event.queryStringParameters || {}).npi || '')) ? String(event.queryStringParameters.npi) : '';
           const baseInput = {
             specialties: SPECIALTIES,
-            groupOf: label => TaxonomyGroups.keyFor((SPECIALTIES.find(x => x[0] === label) || [0, ''])[1].split(',')[0]),
             // ?npi= is the viewing provider: their own listing is not a competitor.
             rows: clinicPage.rows.concat(individualPage.rows).filter(r => !selfNpi || String(r.npi) !== selfNpi),
             codesFor: label => TaxonomyMap.codesFor(label),
             taxMatches: (stored, terms) => terms.some(t => (' ' + taxNorm(stored)).includes(' ' + taxNorm(t))),
             milesBetween, center: { lat: oLat, lng: oLon }, adults: catchmentAdults,
-            places, demo, pay, shortage, groupNeedPct, groupAccess,
+            places, demo, pay, shortage,
             benchmarks: Object.keys(benchmarks.measures).length || Object.keys(benchmarks.specialties).length ? benchmarks : null,
             catchmentTruncated: catchment.truncated, radiusMiles: CATCHMENT_MAX_MILES,
             learnedNeed
@@ -822,9 +709,9 @@ exports.handler = async (event) => {
         }
       }
     } catch (e) {
-      // The ZIP-level verdict is the product; the per-group breakdown is an
+      // The ZIP-level verdict is the product; the per-specialty model is an
       // addition. A failure here must not take the whole response down.
-      groups = { available: false, reason: 'Per-specialty breakdown is unavailable right now' };
+      model = { available: false, reason: 'Per-specialty breakdown is unavailable right now' };
     }
 
     return {
@@ -847,7 +734,7 @@ exports.handler = async (event) => {
           providers: listings,
           clinicians: clinicians,
           total_listings: listings,
-          facilities: listings - clinicians,
+          facilities: facilities,
           // Added 2026-08-19: the total above used to mean "clinics only".
           // These two are what it's actually made of now, so the total is
           // checkable instead of a single opaque number.
@@ -872,10 +759,7 @@ exports.handler = async (event) => {
         // the importers have run.
         medicare: medicareMix,
         sahie,
-        // Per-specialty verdict. NOTE: these describe the CATCHMENT named in
-        // `catchment`, not this ZIP. Do not render a group score under a
-        // ZIP-only heading.
-        groups,
+        // The CATCHMENT the model scores, not this ZIP.
         catchment,
         // Per-specialty archetype / score / confidence (assets/market-model.js).
         // `headline` is ?specialty= when given, else primary care.

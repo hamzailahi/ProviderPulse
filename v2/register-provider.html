@@ -133,45 +133,38 @@ function verdictClass(label) {
   return 'well';
 }
 
-const SPECIALTY_LABEL = {
-  primary: 'Primary Care', specialty: 'Specialty Medicine', surgical: 'Surgical',
-  dental: 'Dental & Vision', behavioral: 'Behavioral Health'
-};
-// The five keys market-score always tries, in a fixed display order, so a
-// group missing from the response (an error mid-computation) still shows as
-// absent rather than silently shrinking the row count.
-const SPECIALTY_ORDER = ['primary', 'specialty', 'surgical', 'dental', 'behavioral'];
-
 // This ZIP form has no specialty selector -- a prospective provider hasn't
-// registered yet, so their discipline isn't known. Showing all five lets a
-// dentist and a psychiatrist both get a useful read from the same lookup.
+// registered yet, so their discipline isn't known. It shows the strongest
+// openings from market-score's per-specialty model (42 specialties, listings
+// assigned by NUCC code), so a dentist and a psychiatrist both get a useful read.
 //
 // EVERY score here describes the CATCHMENT named in `catchment`, not the ZIP
 // alone -- market-score pools nearby ZIPs because most ZIPs have too few
 // listings in any one specialty to score in isolation (see market-score.js).
 // The radius is stated explicitly so this is never mistaken for a ZIP-only
 // figure.
-function specialtyHtml(groups, catchment, zip) {
-  if (!groups) return '';
-  if (groups.available === false) {
-    return '<div class="specialty-note">' + esc(groups.reason || 'Per-specialty breakdown unavailable for this ZIP.') + '</div>';
+const SPECIALTY_ROWS = 6;
+function specialtyHtml(model, catchment, zip) {
+  if (!model) return '';
+  if (model.available === false || !Array.isArray(model.specialties)) {
+    return '<div class="specialty-note">' + esc(model.reason || 'Per-specialty breakdown unavailable for this ZIP.') + '</div>';
   }
   const radius = catchment ? catchment.radius_miles : null;
-  const rows = SPECIALTY_ORDER.filter(k => groups[k]).map(k => {
-    const g = groups[k];
-    const name = SPECIALTY_LABEL[k] || k;
-    if (!g.available) {
-      return '<div class="spec-row"><span class="spec-name">' + esc(name) + '</span>' +
-        '<span class="spec-unserved">' + esc(g.reason || 'no listings nearby') + '</span></div>';
-    }
-    return '<div class="spec-row"><span class="spec-name">' + esc(name) + '</span>' +
-      '<span class="chip ' + verdictClass(g.label) + '">' + esc(g.label) + ' · ' + g.score + '</span></div>';
-  }).join('');
-  if (!rows) return '';
-  return '<div class="specialty-note">Opportunity by specialty' +
+  // Specialties with listings here, strongest first; unserved ones are counted below.
+  const ranked = model.specialties
+    .filter(x => x.clinicians > 0 && x.archetype !== 'insufficient' && typeof x.score === 'number')
+    .sort((a, b) => b.score - a.score)
+    .slice(0, SPECIALTY_ROWS);
+  const rows = ranked.map(x => '<div class="spec-row"><span class="spec-name">' + esc(x.specialty) + '</span>' +
+    '<span class="chip ' + (x.score >= 70 ? 'under' : x.score >= 50 ? 'bal' : 'well') + '">' +
+    esc(x.archetype_name) + ' · ' + x.score + '</span></div>').join('');
+  const none = model.specialties.filter(x => x.clinicians === 0).length;
+  if (!rows && !none) return '';
+  return '<div class="specialty-note">Strongest openings' +
     (radius ? ', within ' + radius + ' miles of ' + esc(zip) : '') +
-    '. Modelled from CDC health-measure prevalence, not patient searches.</div>' +
-    '<div class="specialty-rows">' + rows + '</div>';
+    '. Each specialty is scored from health need, supply against the national rate, payers, shortage and competition, not from patient searches.</div>' +
+    '<div class="specialty-rows">' + rows + '</div>' +
+    (none ? '<div class="specialty-note">' + none + ' of ' + model.specialties.length + ' specialties have no listing in this area at all.</div>' : '');
 }
 
 async function claimedInZip(zip) {
@@ -294,7 +287,7 @@ $('formZip').onsubmit = async e => {
       html += '<div class="note"><b>' + scoreRes.medicare.medicare_advantage_pct + '%</b> of Medicare beneficiaries ' +
         medScope + ' are on Medicare Advantage (' + esc(scoreRes.medicare.as_of) + ')</div>';
     }
-    html += specialtyHtml(scoreRes.groups, scoreRes.catchment, zip);
+    html += specialtyHtml(scoreRes.model, scoreRes.catchment, zip);
     if (Array.isArray(scoreRes.sources)) {
       html += '<div class="src">Sources: ' + esc(scoreRes.sources.join(' · ')) + '</div>';
     }

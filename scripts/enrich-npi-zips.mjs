@@ -14,7 +14,7 @@
 // TWO DESTINATION TABLES, NOT ONE. NPI-2 rows go to `clinics` -- the existing
 // table is entirely NPI-2 organisational records today (verified 20/20
 // sampled, see CLAUDE.md's "NPI-1 vs NPI-2" section), and every downstream
-// consumer (market-score, taxonomy-groups, the audit engine) assumes that.
+// consumer (market-score, the audit engine) assumes that.
 // NPI-1 rows go to the new `provider_individuals` table instead of mixing
 // into `clinics`, which is exactly the mixing that would break those
 // assumptions.
