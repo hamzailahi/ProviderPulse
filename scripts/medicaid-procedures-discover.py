@@ -39,6 +39,34 @@ for u in ['https://opendata.hhs.gov/datasets/medicaid-provider-spending', 'https
     except Exception as e:
         note(f'- {u}: {e}')
 
+note('\n## HHS Open Data: which API answers\n')
+import re
+try:
+    page = get('https://opendata.hhs.gov/datasets/medicaid-provider-spending').decode('utf-8', 'replace')
+    note('- page scripts: ' + ', '.join(sorted(set(re.findall(r'src="([^"]+)"', page)))[:20]))
+    note('- page head: `' + re.sub(r'\s+', ' ', page[:1500]).replace('`', "'") + '`')
+    for js in sorted(set(re.findall(r'src="([^"]+\.js)"', page)))[:6]:
+        u = js if js.startswith('http') else 'https://opendata.hhs.gov' + ('' if js.startswith('/') else '/') + js
+        try:
+            body = get(u).decode('utf-8', 'replace')
+            hits = sorted(set(re.findall(r'(?:https?:)?//[A-Za-z0-9.-]+(?:/[A-Za-z0-9._~%/-]*)?(?:api|download|parquet|metastore|datastore|files)[A-Za-z0-9._~%/?=&-]*', body)))
+            note(f'- {u}: {len(body):,} bytes; api-like strings: ' + ', '.join(hits[:30]))
+            rel = sorted(set(re.findall(r'["\'](/api/[^"\']{0,80})["\']', body)))
+            note('    relative api paths: ' + ', '.join(rel[:30]))
+        except Exception as e:
+            note(f'- {u}: {e}')
+except Exception as e:
+    note(f'- page: {e}')
+for path in ['/api/1/metastore/schemas/dataset/items', '/api/datasets/medicaid-provider-spending', '/api/datasets',
+             '/api/v1/datasets/medicaid-provider-spending', '/catalog.json', '/api/3/action/package_show?id=medicaid-provider-spending',
+             '/api/dataset/medicaid-provider-spending']:
+    u = 'https://opendata.hhs.gov' + path
+    try:
+        b = get(u).decode('utf-8', 'replace')
+        note(f'- {path}: {len(b):,} bytes: `' + re.sub(r'\s+', ' ', b[:600]).replace('`', "'") + '`')
+    except Exception as e:
+        note(f'- {path}: {e}')
+
 note('\n## HHS Open Data catalog\n')
 urls = []
 try:
