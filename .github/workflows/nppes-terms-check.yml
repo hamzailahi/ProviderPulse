@@ -1,0 +1,37 @@
+name: NPPES terms check
+
+# Manual only, read only. Sends every specialty's nppesTerm to the live NPPES
+# registry API (as patient-match does) and commits the results to
+# supabase/reference/nppes-terms-check.md. NPPES is unreachable from the cloud
+# dev container, so this runs here. Touches no database and needs no secret.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Query NPPES for every term
+        run: node scripts/verify-nppes-terms.mjs supabase/reference/nppes-terms-check.md
+
+      - name: Commit the results
+        run: |
+          git add supabase/reference/nppes-terms-check.md
+          if git diff --cached --quiet; then echo "Nothing new."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "NPPES terms check $(date -u +%F) [skip netlify]"
+          git push origin HEAD:main
