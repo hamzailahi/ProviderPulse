@@ -1,5 +1,5 @@
 <!-- Written by scripts/build-procedure-tables.py. -->
-# Procedure tables (apply), 2026-10-11 21:13 UTC
+# Procedure tables (apply), 2026-10-12 01:51 UTC
 
 ## Sources
 
@@ -11,11 +11,11 @@
 
 ## Downloads
 
-- downloaded medicaid.parquet: 3,073 MB in 69s
+- downloaded medicaid.parquet: 3,073 MB in 243s
 - downloaded outpatient.csv: 28 MB in 0s
 - downloaded inpatient.csv: 38 MB in 0s
-- downloaded physician-geo.csv: 42 MB in 1s
-- directory: 253 MB in 17s
+- downloaded physician-geo.csv: 42 MB in 0s
+- directory: 253 MB in 16s
 
 ## Medicaid
 
@@ -48,6 +48,7 @@ Top specialties by paid:
 - inpatient: 145,879 rows, 2,906 hospitals, 4,952,481 discharges (2024)
 - outpatient: 62,367 rows, 2,987 hospitals, 4,725,270 patients (2024)
 - skipped (suppressed counts, missing ZIP or duplicates): 53,815
+- 3,084 hospitals; 2,977 placed at their ZIP centre, 107 matched by exact ZIP only
 
 ## Code descriptions
 
@@ -64,4 +65,5 @@ Top specialties by paid:
 - medicaid_procedures: 3083819
 - medicare_hospital_procedures: 208246
 - procedure_codes: 6218
-- loaded in 44s
+- medicare_hospitals: 3084
+- loaded in 42s
