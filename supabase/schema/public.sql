@@ -270,6 +270,8 @@ CREATE TABLE public.clinic_secondary_locations (
     location_type text DEFAULT 'secondary'::text NOT NULL,
     source text DEFAULT 'nppes_bulk_march_2026'::text NOT NULL,
     refreshed_at timestamp with time zone DEFAULT now() NOT NULL,
+    taxonomy_code text,
+    taxonomy_code_source text,
     CONSTRAINT clinic_secondary_locations_entity_type_check CHECK ((entity_type = ANY (ARRAY['1'::text, '2'::text])))
 );
 
@@ -289,7 +291,9 @@ CREATE TABLE public.clinics (
     latitude numeric(10,8),
     longitude numeric(11,8),
     primary_taxonomy character varying(255),
-    created_at timestamp without time zone DEFAULT now()
+    created_at timestamp without time zone DEFAULT now(),
+    taxonomy_code text,
+    taxonomy_code_source text
 );
 
 
@@ -746,6 +750,22 @@ CREATE TABLE public.market_benchmarks (
 
 
 --
+-- Name: medicaid_procedures; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.medicaid_procedures (
+    zip character varying(5) NOT NULL,
+    specialty text NOT NULL,
+    code character varying(5) NOT NULL,
+    claims bigint NOT NULL,
+    patient_months bigint NOT NULL,
+    paid numeric(16,2) NOT NULL,
+    providers integer NOT NULL,
+    year smallint NOT NULL
+);
+
+
+--
 -- Name: medicare_county_enrollment; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -761,6 +781,41 @@ CREATE TABLE public.medicare_county_enrollment (
     aged_total_benes integer,
     disabled_total_benes integer,
     refreshed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: medicare_hospital_procedures; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.medicare_hospital_procedures (
+    setting text NOT NULL,
+    ccn character varying(10) NOT NULL,
+    hospital text NOT NULL,
+    zip character varying(5) NOT NULL,
+    code character varying(10) NOT NULL,
+    description text,
+    patients integer,
+    services integer,
+    avg_charge numeric(14,2),
+    avg_allowed numeric(14,2),
+    avg_paid numeric(14,2),
+    year smallint NOT NULL,
+    CONSTRAINT medicare_hospital_procedures_setting_check CHECK ((setting = ANY (ARRAY['outpatient'::text, 'inpatient'::text])))
+);
+
+
+--
+-- Name: medicare_hospitals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.medicare_hospitals (
+    ccn character varying(10) NOT NULL,
+    hospital text NOT NULL,
+    zip character varying(5) NOT NULL,
+    lat double precision,
+    lon double precision,
+    year smallint NOT NULL
 );
 
 
@@ -797,6 +852,17 @@ CREATE TABLE public.patient_profiles (
 
 
 --
+-- Name: procedure_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.procedure_codes (
+    code character varying(5) NOT NULL,
+    description text NOT NULL,
+    source text NOT NULL
+);
+
+
+--
 -- Name: provider_individuals; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -814,7 +880,9 @@ CREATE TABLE public.provider_individuals (
     enumeration_type text DEFAULT 'NPI-1'::text NOT NULL,
     source text DEFAULT 'nppes_zip_enrichment'::text NOT NULL,
     refreshed_at timestamp with time zone DEFAULT now() NOT NULL,
-    affiliated_clinic_npi text
+    affiliated_clinic_npi text,
+    taxonomy_code text,
+    taxonomy_code_source text
 );
 
 
@@ -920,6 +988,28 @@ CREATE TABLE public.sahie_county (
     uninsured_pct numeric,
     uninsured_pct_moe numeric,
     refreshed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: taxonomy_map; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.taxonomy_map (
+    nucc_code text NOT NULL,
+    "grouping" text NOT NULL,
+    classification text NOT NULL,
+    specialization text DEFAULT ''::text NOT NULL,
+    display_name text NOT NULL,
+    section text NOT NULL,
+    cms_specialty_code text DEFAULT ''::text NOT NULL,
+    cms_specialty_name text DEFAULT ''::text NOT NULL,
+    patient_specialties text[] DEFAULT '{}'::text[] NOT NULL,
+    show_on_map boolean DEFAULT true NOT NULL,
+    nucc_version text NOT NULL,
+    loaded_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT taxonomy_map_nucc_code_check CHECK ((nucc_code ~ '^[0-9A-Z]{9}X$'::text)),
+    CONSTRAINT taxonomy_map_section_check CHECK ((section = ANY (ARRAY['Individual'::text, 'Non-Individual'::text])))
 );
 
 
@@ -1225,11 +1315,35 @@ ALTER TABLE ONLY public.market_benchmarks
 
 
 --
+-- Name: medicaid_procedures medicaid_procedures_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.medicaid_procedures
+    ADD CONSTRAINT medicaid_procedures_pkey PRIMARY KEY (zip, specialty, code);
+
+
+--
 -- Name: medicare_county_enrollment medicare_county_enrollment_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.medicare_county_enrollment
     ADD CONSTRAINT medicare_county_enrollment_pkey PRIMARY KEY (fips);
+
+
+--
+-- Name: medicare_hospital_procedures medicare_hospital_procedures_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.medicare_hospital_procedures
+    ADD CONSTRAINT medicare_hospital_procedures_pkey PRIMARY KEY (setting, ccn, code);
+
+
+--
+-- Name: medicare_hospitals medicare_hospitals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.medicare_hospitals
+    ADD CONSTRAINT medicare_hospitals_pkey PRIMARY KEY (ccn);
 
 
 --
@@ -1246,6 +1360,14 @@ ALTER TABLE ONLY public.npi_activity
 
 ALTER TABLE ONLY public.patient_profiles
     ADD CONSTRAINT patient_profiles_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: procedure_codes procedure_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.procedure_codes
+    ADD CONSTRAINT procedure_codes_pkey PRIMARY KEY (code);
 
 
 --
@@ -1302,6 +1424,14 @@ ALTER TABLE ONLY public.provider_profiles
 
 ALTER TABLE ONLY public.sahie_county
     ADD CONSTRAINT sahie_county_pkey PRIMARY KEY (fips);
+
+
+--
+-- Name: taxonomy_map taxonomy_map_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.taxonomy_map
+    ADD CONSTRAINT taxonomy_map_pkey PRIMARY KEY (nucc_code);
 
 
 --
@@ -1399,10 +1529,24 @@ CREATE INDEX clinic_secondary_locations_parent_npi_idx ON public.clinic_secondar
 
 
 --
+-- Name: clinic_secondary_locations_taxonomy_code_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX clinic_secondary_locations_taxonomy_code_idx ON public.clinic_secondary_locations USING btree (taxonomy_code);
+
+
+--
 -- Name: clinic_secondary_locations_zip_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX clinic_secondary_locations_zip_idx ON public.clinic_secondary_locations USING btree (zip);
+
+
+--
+-- Name: clinics_taxonomy_code_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX clinics_taxonomy_code_idx ON public.clinics USING btree (taxonomy_code);
 
 
 --
@@ -1539,6 +1683,13 @@ CREATE INDEX medicare_county_enrollment_state_idx ON public.medicare_county_enro
 
 
 --
+-- Name: medicare_hospital_procedures_zip_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX medicare_hospital_procedures_zip_idx ON public.medicare_hospital_procedures USING btree (zip, setting);
+
+
+--
 -- Name: npi_activity_refreshed_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1557,6 +1708,13 @@ CREATE INDEX provider_hours_idx ON public.provider_profiles USING btree (((offic
 --
 
 CREATE INDEX provider_individuals_affiliated_clinic_idx ON public.provider_individuals USING btree (affiliated_clinic_npi) WHERE (affiliated_clinic_npi IS NOT NULL);
+
+
+--
+-- Name: provider_individuals_taxonomy_code_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX provider_individuals_taxonomy_code_idx ON public.provider_individuals USING btree (taxonomy_code);
 
 
 --
@@ -1977,6 +2135,19 @@ CREATE POLICY "market_benchmarks public read" ON public.market_benchmarks FOR SE
 
 
 --
+-- Name: medicaid_procedures; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.medicaid_procedures ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: medicaid_procedures medicaid_procedures public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "medicaid_procedures public read" ON public.medicaid_procedures FOR SELECT USING (true);
+
+
+--
 -- Name: medicare_county_enrollment medicare enrollment is public; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -1988,6 +2159,32 @@ CREATE POLICY "medicare enrollment is public" ON public.medicare_county_enrollme
 --
 
 ALTER TABLE public.medicare_county_enrollment ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: medicare_hospital_procedures; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.medicare_hospital_procedures ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: medicare_hospital_procedures medicare_hospital_procedures public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "medicare_hospital_procedures public read" ON public.medicare_hospital_procedures FOR SELECT USING (true);
+
+
+--
+-- Name: medicare_hospitals; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.medicare_hospitals ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: medicare_hospitals medicare_hospitals public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "medicare_hospitals public read" ON public.medicare_hospitals FOR SELECT USING (true);
+
 
 --
 -- Name: npi_activity; Type: ROW SECURITY; Schema: public; Owner: -
@@ -2065,6 +2262,19 @@ CREATE POLICY "payers are public" ON public.insurance_payers FOR SELECT USING (a
 
 
 --
+-- Name: procedure_codes; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.procedure_codes ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: procedure_codes procedure_codes public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "procedure_codes public read" ON public.procedure_codes FOR SELECT USING (true);
+
+
+--
 -- Name: provider_individuals; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2113,6 +2323,19 @@ ALTER TABLE public.sahie_county ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY "sahie_county public read" ON public.sahie_county FOR SELECT USING (true);
+
+
+--
+-- Name: taxonomy_map; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.taxonomy_map ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: taxonomy_map taxonomy_map public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "taxonomy_map public read" ON public.taxonomy_map FOR SELECT USING (true);
 
 
 --
@@ -2438,12 +2661,39 @@ GRANT ALL ON TABLE public.market_benchmarks TO service_role;
 
 
 --
+-- Name: TABLE medicaid_procedures; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.medicaid_procedures TO anon;
+GRANT ALL ON TABLE public.medicaid_procedures TO authenticated;
+GRANT ALL ON TABLE public.medicaid_procedures TO service_role;
+
+
+--
 -- Name: TABLE medicare_county_enrollment; Type: ACL; Schema: public; Owner: -
 --
 
 GRANT ALL ON TABLE public.medicare_county_enrollment TO anon;
 GRANT ALL ON TABLE public.medicare_county_enrollment TO authenticated;
 GRANT ALL ON TABLE public.medicare_county_enrollment TO service_role;
+
+
+--
+-- Name: TABLE medicare_hospital_procedures; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.medicare_hospital_procedures TO anon;
+GRANT ALL ON TABLE public.medicare_hospital_procedures TO authenticated;
+GRANT ALL ON TABLE public.medicare_hospital_procedures TO service_role;
+
+
+--
+-- Name: TABLE medicare_hospitals; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.medicare_hospitals TO anon;
+GRANT ALL ON TABLE public.medicare_hospitals TO authenticated;
+GRANT ALL ON TABLE public.medicare_hospitals TO service_role;
 
 
 --
@@ -2462,6 +2712,15 @@ GRANT ALL ON TABLE public.npi_activity TO service_role;
 GRANT ALL ON TABLE public.patient_profiles TO anon;
 GRANT ALL ON TABLE public.patient_profiles TO authenticated;
 GRANT ALL ON TABLE public.patient_profiles TO service_role;
+
+
+--
+-- Name: TABLE procedure_codes; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.procedure_codes TO anon;
+GRANT ALL ON TABLE public.procedure_codes TO authenticated;
+GRANT ALL ON TABLE public.procedure_codes TO service_role;
 
 
 --
@@ -2516,6 +2775,15 @@ GRANT ALL ON TABLE public.provider_profiles TO service_role;
 GRANT ALL ON TABLE public.sahie_county TO anon;
 GRANT ALL ON TABLE public.sahie_county TO authenticated;
 GRANT ALL ON TABLE public.sahie_county TO service_role;
+
+
+--
+-- Name: TABLE taxonomy_map; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.taxonomy_map TO anon;
+GRANT ALL ON TABLE public.taxonomy_map TO authenticated;
+GRANT ALL ON TABLE public.taxonomy_map TO service_role;
 
 
 --
