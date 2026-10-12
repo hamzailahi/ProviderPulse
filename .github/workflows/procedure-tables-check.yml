@@ -1,0 +1,59 @@
+name: Procedure tables check
+
+# Manual, read only. Shows what the dashboard's Procedures panel would get for
+# one ZIP from the 036 tables, through the public key exactly as the browser
+# asks, next to the same counts read directly. Output goes to the run summary
+# only; nothing is written or committed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip:
+        description: ZIP to check
+        default: "38017"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Check
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          ZIP: ${{ inputs.zip }}
+        run: |
+          set -u
+          [[ "$ZIP" =~ ^[0-9]{5}$ ]] || { echo "::error::zip must be 5 digits"; exit 1; }
+          U="https://khkmdultmrggpfvkbfzj.supabase.co/rest/v1"
+          K="sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ"
+          {
+            echo "## Public key, as the browser asks ($ZIP)"
+            for q in "medicare_hospital_procedures?zip=in.($ZIP)&setting=eq.outpatient&select=hospital,code,patients&limit=3" \
+                     "medicare_hospital_procedures?zip=in.($ZIP)&setting=eq.inpatient&select=hospital,code,patients&limit=3" \
+                     "medicaid_procedures?zip=in.($ZIP)&select=specialty,code,claims&limit=3" \
+                     "procedure_codes?select=code,description&limit=2" \
+                     "medicare_hospital_procedures?select=zip,hospital&limit=2"; do
+              echo; echo "\`$q\`"; echo '```'
+              curl -s -w '\nHTTP %{http_code}\n' "$U/$q" -H "apikey: $K" | head -c 1500
+              echo '```'
+            done
+            echo; echo "## Direct (read only)"; echo '```'
+            psql "$SUPABASE_DB_URL" -X -q -c "set default_transaction_read_only = on;" -c "
+              select setting, count(*) rows, count(distinct ccn) hospitals from public.medicare_hospital_procedures where zip = '$ZIP' group by 1;
+              select count(*) medicaid_rows from public.medicaid_procedures where zip = '$ZIP';
+              select setting, zip, hospital from public.medicare_hospital_procedures where hospital ilike '%collierville%' or hospital ilike '%baptist%' group by 1,2,3 order by 2 limit 20;
+              select tablename, policyname, roles, cmd, qual from pg_policies where tablename in ('medicaid_procedures','medicare_hospital_procedures','procedure_codes');
+              select grantee, table_name, privilege_type from information_schema.role_table_grants where table_name in ('medicaid_procedures','medicare_hospital_procedures','procedure_codes') and grantee in ('anon','authenticated');" 2>&1
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"

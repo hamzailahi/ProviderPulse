@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-11. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-12. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -496,6 +496,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `taxonomy-indexes.yml` | manual only | builds the `taxonomy_code` indexes (migration 030) without locking the tables, then checks all three are valid |
 | `procedure-sources.yml` | manual, read only | describes the Medicaid provider spending file (HHS) and the Medicare hospital outpatient and inpatient files (CMS) the Procedures panel's extra sources are built from |
 | `procedure-tables.yml` | manual, yearly once HHS and CMS publish a new year | builds the Procedures panel's Medicaid table (per ZIP, specialty and procedure code) and the Medicare hospital tables (per hospital and payment group) from those files; `dry_run` writes nothing and reports what was dropped and how big it is; `apply` refuses unless the free disk entered covers the load |
+| `procedure-tables-check.yml` | manual, read only | shows what the Procedures panel gets for one ZIP through the public key, beside direct counts and the tables' policies |
 | `nppes-terms-check.yml` | manual, read only | sends every specialty's registry search term to NPPES and records what comes back |
 | `db-size-report.yml` | manual only | read-only report of table, index and write-ahead-log sizes and dead rows, written to `supabase/reference/db-size-report.md` |
 | `taxonomy-backfill.yml` | manual only | gives every listing its official NUCC taxonomy code from the NPPES monthly file and loads the `taxonomy_map` table. `dry_run` writes nothing and reports coverage and exceptions; `apply` refuses unless the free disk entered covers the rewrite |
@@ -574,6 +575,11 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-10-12
+
+- **A check for the Procedures panel's data.** A manual, read-only job shows
+  what the panel receives for a ZIP, to diagnose an empty result.
 
 ### 2026-10-11
 
