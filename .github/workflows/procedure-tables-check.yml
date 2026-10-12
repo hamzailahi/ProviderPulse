@@ -52,7 +52,8 @@ jobs:
             psql "$SUPABASE_DB_URL" -X -q -c "set default_transaction_read_only = on;" -c "
               select setting, count(*) rows, count(distinct ccn) hospitals from public.medicare_hospital_procedures where zip = '$ZIP' group by 1;
               select count(*) medicaid_rows from public.medicaid_procedures where zip = '$ZIP';
-              select setting, zip, hospital from public.medicare_hospital_procedures where hospital ilike '%collierville%' or hospital ilike '%baptist%' group by 1,2,3 order by 2 limit 20;
+              select zip, hospital, count(*) filter (where setting = 'outpatient') outpatient_codes, count(*) filter (where setting = 'inpatient') inpatient_codes
+                from public.medicare_hospital_procedures where left(zip, 3) = left('$ZIP', 3) or hospital ilike '%collierville%' group by 1, 2 order by 1, 2;
               select tablename, policyname, roles, cmd, qual from pg_policies where tablename in ('medicaid_procedures','medicare_hospital_procedures','procedure_codes');
               select grantee, table_name, privilege_type from information_schema.role_table_grants where table_name in ('medicaid_procedures','medicare_hospital_procedures','procedure_codes') and grantee in ('anon','authenticated');" 2>&1
             echo '```'
