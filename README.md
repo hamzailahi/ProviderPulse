@@ -583,8 +583,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   (Collierville, 38017, had none), because each hospital is listed only at
   the address it bills Medicare under, often a system's main campus. They
   now list hospitals within 25 miles of the area in view (50 if none),
-  closest first, each with its distance. Needs migration 037 and a rerun
-  of the "Procedure tables" job. A new read-only check job shows what the
+  closest first, each with its distance (3,084 hospitals loaded, 2,977 of
+  them placed on the map). A new read-only check job shows what the
   panel receives for any ZIP.
 
 ### 2026-10-11

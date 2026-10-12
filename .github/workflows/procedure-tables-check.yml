@@ -54,6 +54,10 @@ jobs:
               select count(*) medicaid_rows from public.medicaid_procedures where zip = '$ZIP';
               select zip, hospital, count(*) filter (where setting = 'outpatient') outpatient_codes, count(*) filter (where setting = 'inpatient') inpatient_codes
                 from public.medicare_hospital_procedures where left(zip, 3) = left('$ZIP', 3) or hospital ilike '%collierville%' group by 1, 2 order by 1, 2;
+              with c as (select lat, lon from public.cdc_places where measureid = 'DENTAL' and zip = '$ZIP' limit 1)
+              select h.hospital, h.zip, round((3958.8 * 2 * asin(sqrt(power(sin(radians(h.lat - c.lat) / 2), 2)
+                     + cos(radians(c.lat)) * cos(radians(h.lat)) * power(sin(radians(h.lon - c.lon) / 2), 2))))::numeric, 1) as miles
+                from public.medicare_hospitals h, c where h.lat is not null order by miles limit 15;
               select tablename, policyname, roles, cmd, qual from pg_policies where tablename in ('medicaid_procedures','medicare_hospital_procedures','procedure_codes');
               select grantee, table_name, privilege_type from information_schema.role_table_grants where table_name in ('medicaid_procedures','medicare_hospital_procedures','procedure_codes') and grantee in ('anon','authenticated');" 2>&1
             echo '```'
