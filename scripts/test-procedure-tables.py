@@ -60,6 +60,8 @@ inp_cols = ['Rndrng_Prvdr_CCN', 'Rndrng_Prvdr_Org_Name', 'Rndrng_Prvdr_City', 'R
 with open(P('MUP_INP_RY26_P03_V10_DY24_PrvSvc.CSV'), 'w', newline='') as f:
     c = csv.writer(f); c.writerow(inp_cols)
     c.writerow(['440001', 'Memphis General', 'Memphis', '1 Main', '47', '38017', 'TN', '1', 'Metro', '003', 'ECMO OR TRACHEOSTOMY, WITH MV', '11', '738478.63', '103236.27', '91218.18'])
+with open(P('centroids.csv'), 'w', newline='') as f:
+    c = csv.writer(f); c.writerow(['zip', 'lat', 'lon']); c.writerow(['38017', '35.04', '-89.66'])
 with open(P('geo.csv'), 'w', newline='') as f:
     c = csv.writer(f); c.writerow(['Rndrng_Prvdr_Geo_Lvl', 'HCPCS_Cd', 'HCPCS_Desc'])
     c.writerow(['National', '99213', 'Established patient office or other outpatient visit'])
@@ -68,7 +70,7 @@ with open(P('geo.csv'), 'w', newline='') as f:
 r = subprocess.run([sys.executable, 'scripts/build-procedure-tables.py', '--mode', 'dry_run', '--out', P('out'), '--work', P('work'),
                     '--medicaid', P('m.parquet'), '--outpatient', P('MUP_OUT_RY26_P04_V10_DY24_Prov_Svc.csv'),
                     '--inpatient', P('MUP_INP_RY26_P03_V10_DY24_PrvSvc.CSV'), '--physician-geo', P('geo.csv'), '--hcpcs-l2', '',
-                    '--directory', P('dir.csv'), '--taxonomy-map', P('tmap.csv')], capture_output=True, text=True)
+                    '--directory', P('dir.csv'), '--taxonomy-map', P('tmap.csv'), '--centroids', P('centroids.csv')], capture_output=True, text=True)
 ok(r.returncode == 0, 'dry run succeeds' + ('' if r.returncode == 0 else ': ' + r.stdout[-800:] + r.stderr[-800:]))
 if r.returncode:
     print(f'\n{passed} passed, {failed} failed'); sys.exit(1)
@@ -99,12 +101,14 @@ ok(len(o) == 1 and o[0]['code'] == '5072' and o[0]['patients'] == '175' and floa
 ok(len(i) == 1 and i[0]['code'] == '003' and i[0]['patients'] == '11' and i[0]['services'] == '', 'inpatient DRG keeps its leading zero; discharges as patients; no services')
 ok(i and i[0]['description'] == 'ECMO OR TRACHEOSTOMY, WITH MV' and i[0]['year'] == '2024', 'quoted description with a comma survives; data year from the file name')
 ok({c['code'] for c in codes} == {'99213', '99214'}, 'descriptions only for codes the Medicaid table uses (T1019 has none in the fixture)')
+hs = read('hospitals_out.csv')
+ok(len(hs) == 1 and hs[0]['ccn'] == '440001' and hs[0]['zip'] == '38017' and float(hs[0]['lat']) == 35.04, 'one row per hospital, placed at its ZIP centre')
 ok('Dry run: nothing written' in summary, 'dry run writes nothing')
 
 r = subprocess.run([sys.executable, 'scripts/build-procedure-tables.py', '--mode', 'apply', '--disk-free-gb', '0', '--out', P('out2'), '--work', P('work2'),
                     '--medicaid', P('m.parquet'), '--outpatient', P('MUP_OUT_RY26_P04_V10_DY24_Prov_Svc.csv'),
                     '--inpatient', P('MUP_INP_RY26_P03_V10_DY24_PrvSvc.CSV'), '--physician-geo', P('geo.csv'), '--hcpcs-l2', '',
-                    '--directory', P('dir.csv'), '--taxonomy-map', P('tmap.csv')], capture_output=True, text=True)
+                    '--directory', P('dir.csv'), '--taxonomy-map', P('tmap.csv'), '--centroids', P('centroids.csv')], capture_output=True, text=True)
 ok(r.returncode != 0 and 'apply needs --disk-free-gb' in r.stdout, 'apply refuses without enough disk')
 
 print(f'\n{passed} passed, {failed} failed')

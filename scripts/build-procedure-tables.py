@@ -49,7 +49,7 @@ ap.add_argument('--out', default='supabase/reference/procedure-sources')
 ap.add_argument('--work', default=os.path.join(os.environ.get('RUNNER_TEMP', '/tmp'), 'proc'))
 ap.add_argument('--medicaid'); ap.add_argument('--outpatient'); ap.add_argument('--inpatient')
 ap.add_argument('--physician-geo'); ap.add_argument('--hcpcs-l2')
-ap.add_argument('--directory'); ap.add_argument('--taxonomy-map', default='supabase/reference/taxonomy_map.csv')
+ap.add_argument('--directory'); ap.add_argument('--centroids'); ap.add_argument('--taxonomy-map', default='supabase/reference/taxonomy_map.csv')
 args = ap.parse_args()
 os.makedirs(args.out, exist_ok=True); os.makedirs(args.work, exist_ok=True)
 
@@ -148,6 +148,18 @@ else:
     if r.returncode: fail('reading the directory: ' + r.stderr.strip()[-300:])
     say(f'- directory: {os.path.getsize(directory)/1e6:,.0f} MB in {time.time()-t:.0f}s')
 
+# ZIP centres (CDC PLACES ZCTA centroids), to place each hospital for the
+# panel's "hospitals within 25 miles" list (migration 037).
+if args.centroids is not None:
+    centroids = args.centroids
+else:
+    centroids = os.path.join(args.work, 'centroids.csv')
+    sql = ("\\copy (select zip::text as zip, lat, lon from public.cdc_places where measureid = 'DENTAL' "
+           "and lat is not null and lon is not null) to '" + centroids + "' with (format csv, header true)")
+    r = subprocess.run(['psql', os.environ['SUPABASE_DB_URL'], '-v', 'ON_ERROR_STOP=1', '-q', '-X', '-c', 'set default_transaction_read_only = on;', '-c', sql],
+                       capture_output=True, text=True)
+    if r.returncode: fail('reading ZIP centroids: ' + r.stderr.strip()[-300:])
+
 con = duckdb.connect(os.path.join(args.work, 'build.duckdb'))
 con.execute("SET preserve_insertion_order = false")
 def one(sql): return con.execute(sql).fetchone()
@@ -220,8 +232,17 @@ con.execute(f"""CREATE OR REPLACE TABLE hospital_out AS SELECT *, {hy} AS year F
   QUALIFY row_number() OVER (PARTITION BY setting, ccn, code ORDER BY patients DESC) = 1""")
 for r in con.execute("SELECT setting, count(*), count(DISTINCT ccn), sum(patients) FROM hospital_out GROUP BY 1 ORDER BY 1").fetchall():
     say(f'- {r[0]}: {r[1]:,} rows, {r[2]:,} hospitals, {r[3]:,} {"discharges" if r[0] == "inpatient" else "patients"} ({hy})')
-skipped = one("SELECT count(*) FROM hosp_out") [0] - one("SELECT count(*) FROM hospital_out")[0]
+skipped = one("SELECT count(*) FROM hosp_out")[0] - one("SELECT count(*) FROM hospital_out")[0]
 say(f'- skipped (suppressed counts, missing ZIP or duplicates): {skipped:,}')
+con.execute(f"""CREATE OR REPLACE TABLE hospitals_out AS
+  SELECT h.ccn, any_value(h.hospital) AS hospital, any_value(h.zip) AS zip,
+         any_value(c.lat) AS lat, any_value(c.lon) AS lon, any_value(h.year) AS year
+  FROM hospital_out h
+  LEFT JOIN (SELECT lpad(zip, 5, '0') AS zip, any_value(TRY_CAST(lat AS DOUBLE)) AS lat, any_value(TRY_CAST(lon AS DOUBLE)) AS lon
+             FROM read_csv({lit(centroids)}, header=true, all_varchar=true) GROUP BY 1) c USING (zip)
+  GROUP BY h.ccn""")
+hz = one('SELECT count(*), count(lat) FROM hospitals_out')
+say(f'- {hz[0]:,} hospitals; {hz[1]:,} placed at their ZIP centre, {hz[0]-hz[1]:,} matched by exact ZIP only')
 
 # ---------------------------------------------------------------- codes ----
 say('\n## Code descriptions\n')
@@ -266,7 +287,8 @@ say(f'- {one("SELECT count(*) FROM codes_out")[0]:,} Medicaid codes described, c
 files = {}
 for t, cols in [('medicaid_out', 'zip, specialty, code, claims, patient_months, paid, providers, year'),
                 ('hospital_out', 'setting, ccn, hospital, zip, code, description, patients, services, avg_charge, avg_allowed, avg_paid, year'),
-                ('codes_out', 'code, description, source')]:
+                ('codes_out', 'code, description, source'),
+                ('hospitals_out', 'ccn, hospital, zip, lat, lon, year')]:
     p = os.path.join(args.work, t + '.csv')
     con.execute(f"COPY (SELECT {cols} FROM {t}) TO {lit(p)} (HEADER, DELIMITER ',')")
     files[t] = p
@@ -285,29 +307,33 @@ db = os.environ.get('SUPABASE_DB_URL')
 if not db: fail('SUPABASE_DB_URL is not set')
 script = f"""
 \\set ON_ERROR_STOP on
-drop table if exists public.proc_stage_medicaid, public.proc_stage_hospital, public.proc_stage_codes;
+drop table if exists public.proc_stage_medicaid, public.proc_stage_hospital, public.proc_stage_codes, public.proc_stage_hospitals;
 create unlogged table public.proc_stage_medicaid (like public.medicaid_procedures);
 create unlogged table public.proc_stage_hospital (like public.medicare_hospital_procedures);
 create unlogged table public.proc_stage_codes (like public.procedure_codes);
+create unlogged table public.proc_stage_hospitals (like public.medicare_hospitals);
 \\copy public.proc_stage_medicaid from '{files['medicaid_out']}' with (format csv, header true)
 \\copy public.proc_stage_hospital from '{files['hospital_out']}' with (format csv, header true)
 \\copy public.proc_stage_codes from '{files['codes_out']}' with (format csv, header true)
+\\copy public.proc_stage_hospitals from '{files['hospitals_out']}' with (format csv, header true)
 begin;
-truncate public.medicaid_procedures, public.medicare_hospital_procedures, public.procedure_codes;
+truncate public.medicaid_procedures, public.medicare_hospital_procedures, public.procedure_codes, public.medicare_hospitals;
 insert into public.medicaid_procedures select * from public.proc_stage_medicaid;
 insert into public.medicare_hospital_procedures select * from public.proc_stage_hospital;
 insert into public.procedure_codes select * from public.proc_stage_codes;
+insert into public.medicare_hospitals select * from public.proc_stage_hospitals;
 commit;
-drop table public.proc_stage_medicaid, public.proc_stage_hospital, public.proc_stage_codes;
-analyze public.medicaid_procedures; analyze public.medicare_hospital_procedures; analyze public.procedure_codes;
+drop table public.proc_stage_medicaid, public.proc_stage_hospital, public.proc_stage_codes, public.proc_stage_hospitals;
+analyze public.medicaid_procedures; analyze public.medicare_hospital_procedures; analyze public.procedure_codes; analyze public.medicare_hospitals;
 select 'medicaid_procedures', count(*) from public.medicaid_procedures
 union all select 'medicare_hospital_procedures', count(*) from public.medicare_hospital_procedures
-union all select 'procedure_codes', count(*) from public.procedure_codes;
+union all select 'procedure_codes', count(*) from public.procedure_codes
+union all select 'medicare_hospitals', count(*) from public.medicare_hospitals;
 """
 t = time.time()
 r = subprocess.run(['psql', db, '-X', '-q', '-At', '-F', ': '], input=script, capture_output=True, text=True)
 if r.returncode:
-    subprocess.run(['psql', db, '-X', '-q', '-c', 'drop table if exists public.proc_stage_medicaid, public.proc_stage_hospital, public.proc_stage_codes;'])
+    subprocess.run(['psql', db, '-X', '-q', '-c', 'drop table if exists public.proc_stage_medicaid, public.proc_stage_hospital, public.proc_stage_codes, public.proc_stage_hospitals;'])
     fail('load: ' + r.stderr.strip()[-400:])
 for line in r.stdout.strip().splitlines(): say(f'- {line}')
 say(f'- loaded in {time.time()-t:.0f}s')

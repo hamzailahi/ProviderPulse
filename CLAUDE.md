@@ -716,7 +716,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `037` (`medicare_hospitals`, one row per hospital at its ZIP's ZCTA centroid, for the panel's nearest-hospitals list) written 2026-10-12, not yet applied. `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
@@ -792,6 +792,17 @@ Tables:
   none. Medicare hospitals are the Outpatient (APC) and Inpatient (DRG)
   Hospitals by Provider and Service files, newest year, one row per
   hospital and code; CMS blanks counts under 11 and those rows are skipped.
+  **Hospitals are listed by distance, not exact ZIP** (2026-10-12): each
+  hospital appears only at the address it bills Medicare under, often a
+  system's parent campus (Baptist's Collierville hospital is not separate),
+  so exact-ZIP matching found nothing for 38017 and only three hospitals in
+  the whole 380 area. `medicare_hospitals` (037, built with the others from
+  `cdc_places` DENTAL centroids) lets `nearbyHospitals()` average the loaded
+  ZIPs' centroids, box-query hospitals, keep the 15 nearest within 25 miles
+  (else 50), and fetch their rows by `ccn`; hospitals with no centroid match
+  by exact ZIP only. `procedure-tables-check.yml` (manual, read only) prints
+  what the panel gets for a ZIP through the public key beside direct counts
+  and the tables' policies.
   The panel toggle (`procSource`, `pp.dash.procSource` in localStorage)
   leaves the Medicare Part B path untouched; the other sources render with
   `escHtml`. Private insurance has no public volume data (Transparency in
@@ -1409,7 +1420,7 @@ node scripts/test-density-benchmark.mjs   # 13: the state density comparison is 
 node scripts/test-market-benchmarks.mjs   # 7: the benchmark builder end to end, specialty rates by code
 node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
-python3 scripts/test-procedure-tables.py   # 19: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
+python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 ```
 

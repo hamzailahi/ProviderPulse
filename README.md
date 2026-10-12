@@ -452,7 +452,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`036_procedure_sources.sql`; 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
+`037_medicare_hospitals.sql`; 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
 
 ## Environment variables
 
@@ -578,8 +578,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-12
 
-- **A check for the Procedures panel's data.** A manual, read-only job shows
-  what the panel receives for a ZIP, to diagnose an empty result.
+- **Hospital procedures now show the nearest hospitals.** The Medicare
+  hospital outpatient and inpatient views came up empty for most ZIPs
+  (Collierville, 38017, had none), because each hospital is listed only at
+  the address it bills Medicare under, often a system's main campus. They
+  now list hospitals within 25 miles of the area in view (50 if none),
+  closest first, each with its distance. Needs migration 037 and a rerun
+  of the "Procedure tables" job. A new read-only check job shows what the
+  panel receives for any ZIP.
 
 ### 2026-10-11
 

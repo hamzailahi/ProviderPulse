@@ -3679,10 +3679,45 @@
             return all;
         }
 
+        let hospitalRadius = null;       // miles searched for the hospital sources
+        let groupOrder = {};             // hospital group name -> distance, for nearest-first order
+
+        // Hospitals near the loaded ZIPs: the ZIPs' ZCTA centroids (CDC PLACES)
+        // averaged to one centre, then medicare_hospitals (migration 037) within
+        // a box, kept by true distance. Hospitals with no centroid still match by
+        // exact ZIP. At most the 15 nearest.
+        async function nearbyHospitals(zips) {
+            const pad = zips.map(z => String(z).padStart(5, '0'));
+            const pts = [];
+            for (let i = 0; i < pad.length; i += 150) {
+                (await procPaged(`cdc_places?measureid=eq.DENTAL&zip=in.(${pad.slice(i, i + 150).join(',')})&select=zip,lat,lon`))
+                    .forEach(r => { if (r.lat != null && r.lon != null) pts.push([+r.lat, +r.lon]); });
+            }
+            const exact = await procPaged(`medicare_hospitals?zip=in.(${pad.slice(0, 300).join(',')})&select=ccn,hospital,zip,lat,lon`);
+            if (!pts.length) return { radius: null, hospitals: exact.map(h => ({ ...h, miles: null })).slice(0, 15) };
+            const lat = pts.reduce((a, p) => a + p[0], 0) / pts.length, lon = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+            const miles = (aLat, aLon, bLat, bLon) => {
+                const R = 3958.8, r = Math.PI / 180, dLat = (bLat - aLat) * r, dLon = (bLon - aLon) * r;
+                const x = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * r) * Math.cos(bLat * r) * Math.sin(dLon / 2) ** 2;
+                return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+            };
+            const dLat = 50 / 69, dLon = 50 / (69 * Math.max(0.2, Math.cos(lat * Math.PI / 180)));
+            const box = await procPaged(`medicare_hospitals?lat=gte.${(lat - dLat).toFixed(4)}&lat=lte.${(lat + dLat).toFixed(4)}&lon=gte.${(lon - dLon).toFixed(4)}&lon=lte.${(lon + dLon).toFixed(4)}&select=ccn,hospital,zip,lat,lon`);
+            const all = {};
+            box.forEach(h => { all[h.ccn] = { ...h, miles: miles(lat, lon, +h.lat, +h.lon) }; });
+            exact.forEach(h => { if (!all[h.ccn]) all[h.ccn] = { ...h, miles: h.lat != null ? miles(lat, lon, +h.lat, +h.lon) : null }; });
+            const list = Object.values(all).sort((a, b) => (a.miles ?? -1) - (b.miles ?? -1));
+            for (const radius of [25, 50]) {
+                const inR = list.filter(h => h.miles == null || h.miles <= radius);
+                if (inR.length) return { radius, hospitals: inR.slice(0, 15) };
+            }
+            return { radius: 50, hospitals: [] };
+        }
+
         async function fetchOtherProcedures() {
             const src = procSource, cfg = PROC_SOURCES[src];
             const el = document.getElementById('proceduresContent');
-            otherProcData = null;
+            otherProcData = null; groupOrder = {}; hospitalRadius = null;
             if (!procZips.length) { el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">No ZIPs loaded.</em>'; return; }
             el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">⏳ Loading ${escHtml(cfg.label)} procedure data...</em>`;
             const zipList = procZips.map(z => String(z).padStart(5, '0')).join(',');
@@ -3706,11 +3741,25 @@
                     });
                     Object.values(by).forEach(p => { p.per_claim = p.claims ? p.paid / p.claims : null; (groups[p.group] = groups[p.group] || []).push(p); });
                 } else {
-                    const rows = await procPaged(`medicare_hospital_procedures?zip=in.(${zipList})&setting=eq.${src}&select=hospital,code,description,patients,services,avg_charge,avg_allowed,avg_paid,year&order=hospital,code`);
-                    rows.forEach(r => { year = r.year; (groups[r.hospital] = groups[r.hospital] || []).push({ ...r, group: r.hospital }); });
+                    // Hospitals bill under one address per hospital (often a system's
+                    // parent campus), so most ZIPs hold none: list the nearest within
+                    // 25 miles of the area's centre (50 if none), not exact ZIP matches.
+                    const near = await nearbyHospitals(procZips);
+                    hospitalRadius = near.radius;
+                    if (near.hospitals.length) {
+                        const byCcn = {}; near.hospitals.forEach(h => { byCcn[h.ccn] = h; });
+                        const rows = await procPaged(`medicare_hospital_procedures?ccn=in.(${near.hospitals.map(h => encodeURIComponent(h.ccn)).join(',')})&setting=eq.${src}&select=ccn,hospital,code,description,patients,services,avg_charge,avg_allowed,avg_paid,year&order=ccn,code`);
+                        rows.forEach(r => {
+                            year = r.year;
+                            const h = byCcn[r.ccn], d = h && h.miles != null ? h.miles : null;
+                            const name = r.hospital + (d == null ? ' · in this ZIP' : ' · ' + (d < 1 ? 'under 1' : Math.round(d)) + ' mi');
+                            (groups[name] = groups[name] || []).push({ ...r, group: name });
+                            groupOrder[name] = d == null ? -1 : d;
+                        });
+                    }
                 }
                 if (!Object.keys(groups).length) {
-                    el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">No ${escHtml(cfg.label)} procedure data for these ZIPs.</em>`;
+                    el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">No ${escHtml(cfg.label)} procedure data ${src === 'medicaid' ? 'for these ZIPs' : 'for hospitals within 50 miles'}.</em>`;
                     return;
                 }
                 otherProcData = { source: src, groups, year };
@@ -3732,8 +3781,10 @@
             const fmtD0 = v => v != null ? '$' + Math.round(v).toLocaleString() : '—';
             const cell = (t, v) => t === '$' ? fmtD(v) : t === '$0' ? fmtD0(v) : fmtN(v);
             let html = '', shown = 0;
-            const names = Object.keys(otherProcData.groups).sort((a, b) =>
-                otherProcData.groups[b].reduce((s, p) => s + (p[sortKey] || 0), 0) - otherProcData.groups[a].reduce((s, p) => s + (p[sortKey] || 0), 0));
+            const names = cfg.group === 'hospital'
+                ? Object.keys(otherProcData.groups).sort((a, b) => (groupOrder[a] ?? 999) - (groupOrder[b] ?? 999))
+                : Object.keys(otherProcData.groups).sort((a, b) =>
+                    otherProcData.groups[b].reduce((s, p) => s + (p[sortKey] || 0), 0) - otherProcData.groups[a].reduce((s, p) => s + (p[sortKey] || 0), 0));
             names.forEach(name => {
                 const groupMatch = !filter || name.toLowerCase().includes(filter);
                 const procs = otherProcData.groups[name]
@@ -3765,7 +3816,7 @@
             const groupWord = cfg.group === 'hospital' ? 'hospitals' : 'specialties';
             const summary = filter
                 ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${shown} results for "${escHtml(filter)}" — <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div>`
-                : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">${shown.toLocaleString()} code${shown !== 1 ? 's' : ''} across ${names.length} ${names.length !== 1 ? groupWord : groupWord.replace(/ies$/, 'y').replace(/s$/, '')} · ${escHtml(otherProcData.year || '')} ${escHtml(cfg.unitNote)}</div>`;
+                : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">${cfg.group === 'hospital' && hospitalRadius ? `Nearest hospitals within ${hospitalRadius} miles, closest first (distance from the centre of the area in view; a hospital is listed at the address it bills Medicare under). ` : ''}${shown.toLocaleString()} code${shown !== 1 ? 's' : ''} across ${names.length} ${names.length !== 1 ? groupWord : groupWord.replace(/ies$/, 'y').replace(/s$/, '')} · ${escHtml(otherProcData.year || '')} ${escHtml(cfg.unitNote)}</div>`;
             el.innerHTML = summary + html + `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;">${escHtml(cfg.foot)}</div>`;
         }
 
