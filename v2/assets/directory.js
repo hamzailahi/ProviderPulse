@@ -65,17 +65,25 @@ function zipOr(zips) {
 // real, but it lives in market-score.js's scan of the whole `clinics` table,
 // not here).
 var CLINICS_PAGE_CAP = 6000;
+// A failed page (a statement timeout, 57014, is a 500) is NOT an empty
+// answer: the result carries .failed so callers can say "couldn't load"
+// instead of "none found". Until 2026-10-13 a timeout read as zero providers.
 function tableQuery(table, select, filter) {
   var base = SB_URL + '/rest/v1/' + table + '?' + filter + '&select=' + select;
   function page(offset, acc) {
     return fetch(base + '&limit=1000&offset=' + offset, { headers: { apikey: SB_KEY, Accept: 'application/json' } })
-      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (r) {
+        if (!r.ok) { acc.failed = true; return null; }
+        return r.json();
+      })
       .then(function (rows) {
+        if (rows === null) return acc;
         var next = acc.concat(rows || []);
+        next.failed = acc.failed;
         if (!rows || rows.length < 1000 || next.length >= CLINICS_PAGE_CAP) return next;
         return page(offset + 1000, next);
       })
-      .catch(function () { return acc; });
+      .catch(function () { acc.failed = true; return acc; });
   }
   return page(0, []);
 }
@@ -107,6 +115,7 @@ function providerRowsQuery(filter) {
     // Any table that hit the page cap means the answer is a sample, and the
     // results list says so instead of presenting it as complete.
     all.truncated = results.some(function (r) { return (r || []).length >= CLINICS_PAGE_CAP; });
+    all.failed = results.some(function (r) { return r && r.failed; });
     return all;
   });
 }

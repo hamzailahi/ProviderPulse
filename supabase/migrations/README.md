@@ -75,6 +75,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 035 | `035_insurance_payers_cleanup.sql` | after 034: "Banner|Aetna" renamed, 4 non-plan names removed, 2 unclear names spelled out, 5 same-state duplicates merged; saved choices follow; safe to re-run | applied 2026-10-11 |
 | 036 | `036_procedure_sources.sql` | `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes` for the Procedures panel toggle; public read; filled by `procedure-tables.yml` | applied 2026-10-11, loaded the same day |
 | 037 | `037_medicare_hospitals.sql` | `medicare_hospitals`: one row per hospital at its ZIP centre, so the Procedures panel lists hospitals within 25 miles; filled by `procedure-tables.yml` | applied and loaded 2026-10-12 |
+| 038 | `038_geo_indexes.sql` | location indexes on `clinics` and `provider_individuals` (the map-box searches timed out without them); concurrent, run with `concurrent-indexes.yml` | written, **run with the workflow** |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

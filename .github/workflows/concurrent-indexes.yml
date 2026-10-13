@@ -1,0 +1,48 @@
+name: Concurrent indexes
+
+# Manual. Builds the indexes in one CREATE INDEX CONCURRENTLY migration
+# through psql (the SQL editor cannot), dropping invalid leftovers first and
+# failing unless every index ends valid. scripts/build-indexes.sh.
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: Migration to run
+        type: choice
+        options: [038_geo_indexes.sql]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: concurrent-indexes
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "::error::Add the repository secret SUPABASE_DB_URL."; exit 1; fi
+
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/build-indexes.sh "supabase/migrations/${{ inputs.migration }}"

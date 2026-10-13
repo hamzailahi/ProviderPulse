@@ -120,6 +120,22 @@ Anything bigger than the budget does not belong in a function. The LEIE
 import, the Medicare imports and the market benchmarks all run in GitHub
 Actions for that reason.
 
+## A failed query is not an empty answer
+
+The public role has a **3-second statement timeout**. A query that times out
+returns HTTP 500 with code `57014`, and until 2026-10-13 `tableQuery` turned
+every non-2xx into `[]`, so a timeout read as "no providers": the portal's
+Competition tab showed no primary care within any distance of 38017. The
+cause was the map-box query (`latitude`/`longitude` ranges plus
+`taxonomy_code=in.(...)`) on `clinics` and `provider_individuals`, which had
+no location index (only `clinic_secondary_locations` did, and it answered in
+0.6s while the other two timed out at 3.2 to 3.4s). Migration 038 adds the
+indexes. `tableQuery` now marks a failed page (`.failed`), `providerRowsQuery`
+carries it, and patient search and Competition say "could not load" or
+"incomplete" instead of "none". Never cache a failed lookup.
+`public-query-check.yml` runs one query as the browser does and prints status,
+time and rows: use it before trusting an empty page.
+
 ## PostgREST returns at most 1,000 rows
 
 Every response is capped at 1,000 rows no matter what `limit` says. Any query
@@ -716,7 +732,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `037` (`medicare_hospitals`, one row per hospital at its ZIP's ZCTA centroid, for the panel's nearest-hospitals list) applied and loaded 2026-10-12 (3,084 hospitals, 2,977 with a centroid). `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `038` (location indexes `clinics_geo_idx`, `provider_individuals_geo_idx`, concurrent, via `concurrent-indexes.yml` / `scripts/build-indexes.sh`) written 2026-10-13. `037` (`medicare_hospitals`, one row per hospital at its ZIP's ZCTA centroid, for the panel's nearest-hospitals list) applied and loaded 2026-10-12 (3,084 hospitals, 2,977 with a centroid). `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`

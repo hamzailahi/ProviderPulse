@@ -452,7 +452,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`037_medicare_hospitals.sql`; 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
+`038_geo_indexes.sql` (run through the "Concurrent indexes" job); 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
 
 ## Environment variables
 
@@ -496,6 +496,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `taxonomy-indexes.yml` | manual only | builds the `taxonomy_code` indexes (migration 030) without locking the tables, then checks all three are valid |
 | `procedure-sources.yml` | manual, read only | describes the Medicaid provider spending file (HHS) and the Medicare hospital outpatient and inpatient files (CMS) the Procedures panel's extra sources are built from |
 | `procedure-tables.yml` | manual, yearly once HHS and CMS publish a new year | builds the Procedures panel's Medicaid table (per ZIP, specialty and procedure code) and the Medicare hospital tables (per hospital and payment group) from those files; `dry_run` writes nothing and reports what was dropped and how big it is; `apply` refuses unless the free disk entered covers the load |
+| `concurrent-indexes.yml` | manual | builds a migration's indexes without locking the tables (038, location indexes), dropping failed leftovers first and failing unless every index ends valid |
 | `public-query-check.yml` | manual, read only | runs one directory query exactly as the browser does (publishable key) and prints status, time and rows, to tell an empty result from a failed one |
 | `procedure-tables-check.yml` | manual, read only | shows what the Procedures panel gets for one ZIP through the public key, beside direct counts and the tables' policies |
 | `nppes-terms-check.yml` | manual, read only | sends every specialty's registry search term to NPPES and records what comes back |
@@ -579,6 +580,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-13
 
+- **Competition and patient search no longer show "none nearby" by
+  mistake.** Searching an area for a specialty asked the database for every
+  listing in a map box, and with no location index on the two main provider
+  tables that query ran past the database's 3-second limit. The page read
+  the failure as zero results, so the portal's Competition tab showed no
+  primary care doctors within any distance of 38017. Migration 038 adds the
+  missing location indexes, and both pages now say when the directory did
+  not answer instead of claiming there is nobody there.
 - **A check for directory queries.** A manual, read-only job runs one query
   as the browser does and shows whether it returned nothing or failed.
 

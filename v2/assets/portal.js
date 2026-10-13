@@ -301,6 +301,7 @@ VIEWS.overview = function () {
   loadCompetition(10).then(function (c) {
     if (!c) { areaNote.textContent = 'Add a practice ZIP in My listing to see your area.'; return; }
     var ver = c.list.filter(function (x) { return x.registered; }).length;
+    if (c.failed && !c.list.length) { areaNote.textContent = 'Could not load your area just now. Reload to try again.'; return; }
     areaNote.textContent = c.list.length + ' other ' + c.spec.label.toLowerCase() + ' provider' + (c.list.length === 1 ? '' : 's') +
       ' within 10 mi · ' + ver + ' verified on ProviderPulse';
     drawCompMap(mapEl, c, { interactive: false });
@@ -767,8 +768,8 @@ function loadCompetition(miles, specOverride) {
           accepting: reg ? reg.accepting_new_patients : undefined, telehealth: reg ? reg.telehealth : undefined };
       });
       var list = Object.keys(byNpi).map(function (k) { return byNpi[k]; }).sort(function (a, b) { return a.miles - b.miles; });
-      var out = { center: c, miles: miles, spec: spec, list: list, truncated: !!res[0].truncated };
-      compCache[key] = out;
+      var out = { center: c, miles: miles, spec: spec, list: list, truncated: !!res[0].truncated, failed: !!res[0].failed };
+      if (!out.failed) compCache[key] = out;     // never cache a failed lookup
       return out;
     });
   });
@@ -825,7 +826,8 @@ VIEWS.competition = function () {
       stat(String(ver.length), 'Verified on ProviderPulse', ver.length ? acc.length + ' accepting new patients' : 'You can stand out', '#/competition', ver.length ? '' : 'hot'),
       stat(near ? near.miles.toFixed(1) + ' mi' : '—', 'Nearest competitor', near ? near.name : 'None in range', '#/competition'),
       stat(dem == null ? '—' : dem.toLocaleString(), 'Patient searches', dem == null ? 'Too few to show yet' : 'For this specialty in ' + d.zip, '#/competition')));
-    if (c.truncated) body.appendChild(h('div', { class: 'banner warn' }, 'This area has more listings than we can load at once, so counts are a floor. Try a shorter distance.'));
+    if (c.failed) body.appendChild(h('div', { class: 'banner warn' }, 'Part of the directory did not answer in time, so these counts are incomplete. Reload to try again, or try a shorter distance.'));
+    else if (c.truncated) body.appendChild(h('div', { class: 'banner warn' }, 'This area has more listings than we can load at once, so counts are a floor. Try a shorter distance.'));
     var mapEl = h('div', { class: 'minimap tall' });
     var rows = h('div', { class: 'comp-list' });
     c.list.slice(0, 60).forEach(function (x) {
@@ -838,7 +840,9 @@ VIEWS.competition = function () {
         h('span', { class: 'cdist' }, x.miles.toFixed(1) + ' mi')));
     });
     if (c.list.length > 60) rows.appendChild(h('p', { class: 'muted small pad' }, '+ ' + (c.list.length - 60) + ' more farther out'));
-    if (!c.list.length) rows.appendChild(h('p', { class: 'muted pad' }, 'No other ' + c.spec.label.toLowerCase() + ' providers within ' + c.miles + ' miles.'));
+    if (!c.list.length) rows.appendChild(h('p', { class: 'muted pad' }, c.failed
+      ? 'We could not load providers for this area just now. Reload to try again.'
+      : 'No other ' + c.spec.label.toLowerCase() + ' providers within ' + c.miles + ' miles.'));
     body.appendChild(h('div', { class: 'split even' },
       h('div', { class: 'card flush' }, h('div', { class: 'card-h pad' }, h('h2', {}, 'Nearest first')), rows),
       h('div', { class: 'card flush' }, mapEl,

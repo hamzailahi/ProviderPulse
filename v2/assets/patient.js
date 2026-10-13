@@ -395,6 +395,9 @@ function runProviderSearch() {
       if (seq !== s.seq) return;
       s.truncated = !!rows.truncated;
       s.all = buildResults(rows, s);
+      // Part of the directory did not answer: never present that as "none here".
+      if (rows.failed && !s.all.length) { s.loading = false; s.error = 'Search is unavailable right now. Please try again, or try a smaller distance.'; paintFind(); return; }
+      s.partial = !!rows.failed;
       s.loading = false;
       paintFind(true);
       logSearch(s);
@@ -607,7 +610,8 @@ function paintFind(refit) {
       h('b', {}, list.length.toLocaleString() + ' ' + (s.label || 'providers')),
       ' within ' + s.miles + ' mi of ' + s.zip,
       filtered ? h('span', { class: 'muted' }, ' · ' + (s.all.length - list.length) + ' hidden by filters') : null));
-    if (s.truncated) r.appendChild(h('div', { class: 'note' }, 'This area has more listings than we can show at once, so these are a sample. Try a shorter distance.'));
+    if (s.partial) r.appendChild(h('div', { class: 'note' }, 'Part of the directory did not answer in time, so some providers may be missing. Try again in a moment.'));
+    else if (s.truncated) r.appendChild(h('div', { class: 'note' }, 'This area has more listings than we can show at once, so these are a sample. Try a shorter distance.'));
     if (!list.length) {
       r.appendChild(h('div', { class: 'empty' },
         h('h3', {}, s.all.length ? 'No matches with these filters' : 'No ' + (s.label || 'providers') + ' within ' + s.miles + ' miles'),
