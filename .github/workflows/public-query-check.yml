@@ -1,0 +1,38 @@
+name: Public query check
+
+# Manual, read only. Runs one PostgREST query exactly as the browser does
+# (publishable key, public data only) against clinics, provider_individuals
+# and clinic_secondary_locations, and prints the HTTP status, timing, row
+# count and any error body to the run summary. For diagnosing a page that
+# shows "nothing found" when a query actually failed or timed out.
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: "Query string after the table name, e.g. latitude=gte.35&latitude=lte.35.1&select=npi"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Query
+        env:
+          Q: ${{ inputs.query }}
+        run: |
+          U="https://khkmdultmrggpfvkbfzj.supabase.co/rest/v1"
+          K="sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ"
+          {
+            for t in clinics provider_individuals clinic_secondary_locations; do
+              q="$Q"; [ "$t" = clinic_secondary_locations ] && q="${Q/select=npi,/select=npi:parent_npi,}"
+              out=$(curl -s -o /tmp/body -w '%{http_code} %{time_total}' "$U/$t?$q&limit=1000&offset=0" -H "apikey: $K")
+              n=$(python3 -c "import json;d=json.load(open('/tmp/body'));print(len(d) if isinstance(d,list) else 'error')" 2>/dev/null || echo 'not json')
+              echo "- $t: HTTP/time $out, rows $n"
+              [ "$n" = error ] || [ "$n" = "not json" ] && { echo '```'; head -c 600 /tmp/body; echo; echo '```'; }
+            done
+          } | tee -a "$GITHUB_STEP_SUMMARY"
