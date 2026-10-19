@@ -1543,6 +1543,13 @@ CREATE INDEX clinic_secondary_locations_zip_idx ON public.clinic_secondary_locat
 
 
 --
+-- Name: clinics_geo_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX clinics_geo_idx ON public.clinics USING btree (latitude, longitude) WHERE ((latitude IS NOT NULL) AND (longitude IS NOT NULL));
+
+
+--
 -- Name: clinics_taxonomy_code_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1708,6 +1715,13 @@ CREATE INDEX provider_hours_idx ON public.provider_profiles USING btree (((offic
 --
 
 CREATE INDEX provider_individuals_affiliated_clinic_idx ON public.provider_individuals USING btree (affiliated_clinic_npi) WHERE (affiliated_clinic_npi IS NOT NULL);
+
+
+--
+-- Name: provider_individuals_geo_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX provider_individuals_geo_idx ON public.provider_individuals USING btree (latitude, longitude) WHERE ((latitude IS NOT NULL) AND (longitude IS NOT NULL));
 
 
 --
