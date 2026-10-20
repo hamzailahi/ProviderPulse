@@ -132,6 +132,8 @@ try {
   const yearOf = d => { const t = String(d.temporal || '').match(/(20\d\d)/g) || String(d.title || '').match(/(20\d\d)/g) || []; return t.length ? Number(t[t.length - 1]) : 0; };
   const apis = dists.map(d => ({ url: d.accessURL, year: yearOf(d), title: d.title, temporal: d.temporal })).sort((a, b) => b.year - a.year);
   log('', `## CMS source (${ds ? ds.title : 'dataset not found'})`, '');
+  log('Catalog entries with this title: ' + sets.filter(d => /by Provider and Service/i.test(d.title || '') && /Physician/i.test(d.title || '')).map(d => d.title + ' [' + JSON.stringify(d.temporal) + ']').join(' | '));
+  (ds && ds.distribution || []).slice(0, 8).forEach(d => log('- raw distribution: ' + JSON.stringify(d).slice(0, 400)));
   apis.slice(0, 4).forEach(a => log(`- distribution: ${a.title} | temporal ${a.temporal || '-'} | ${a.url}`));
   const ours = {}; direct.forEach(r => { ours[r.npi] = (ours[r.npi] || 0) + 1; });
   const sample = Object.keys(ours).slice(0, 8);

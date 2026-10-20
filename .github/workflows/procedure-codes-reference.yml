@@ -1,0 +1,31 @@
+name: Procedure codes reference
+
+# Manual. Reads procedure_codes through the publishable key and commits it to
+# supabase/reference/procedure-codes.csv, the real CMS wording the procedures
+# panel's word aliases are tested against (scripts/test-procedure-search.mjs).
+# Rerun after the Procedure tables job loads a new year.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/live/procedure-codes-dump.mjs
+      - name: Commit
+        run: |
+          git add supabase/reference/procedure-codes.csv
+          if git diff --cached --quiet; then echo "No change"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Procedure codes reference $(date -u +%F) [skip netlify]"
+          git push origin HEAD:main
