@@ -499,6 +499,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `concurrent-indexes.yml` | manual | builds a migration's indexes without locking the tables (038, location indexes), dropping failed leftovers first and failing unless every index ends valid |
 | `live-dashboard-audit.yml` | manual, read only | drives the live dashboard in a headless browser (ZIP, city, state, several ZIPs, specialty filter, neighbors, every tab, and a provider's home with a mocked profile) and reports every failed or slow request, console error and screenshot |
 | `procedures-panel-check.yml` | manual, read only | replays the dashboard's Medicare procedures requests for one city and compares what loads with direct queries for one specialty and a list of codes |
+| `medicaid-code-probe.yml` | manual, read only | looks codes up in HHS's raw Medicaid file: every year, by state, what one state bills instead, and the suppression threshold |
 | `procedure-codes-reference.yml` | manual | saves CMS's plain-language procedure descriptions to `supabase/reference/procedure-codes.csv`, the text the panel's word search is tested against |
 | `public-query-check.yml` | manual, read only | runs one directory query exactly as the browser does (publishable key) and prints status, time and rows, to tell an empty result from a failed one |
 | `procedure-tables-check.yml` | manual, read only | shows what the Procedures panel gets for one ZIP through the public key, beside direct counts and the tables' policies |

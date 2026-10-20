@@ -1,0 +1,61 @@
+name: Medicaid code probe
+
+# Manual, read only. Looks a list of codes up in HHS's raw Medicaid Provider
+# Spending file (scripts/probe-medicaid-codes.py): every year, by state, what
+# one state bills in the same range instead, and HHS's suppression threshold.
+# For questions like "why do deliveries (59400) not show for Fort Worth?".
+# Commits supabase/reference/procedure-sources/code-probe.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      codes:
+        description: Comma-separated codes
+        default: 59400,59409,59410,59510,59514,59515,59610,59612,59614,59618,59620,59622
+      state:
+        description: Two-letter state to look at closely
+        default: TX
+      range:
+        description: Code prefix for "what this state bills instead"
+        default: "59"
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install duckdb==1.1.3
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Probe
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          CODES: ${{ inputs.codes }}
+          STATE: ${{ inputs.state }}
+          RANGE: ${{ inputs.range }}
+        run: python3 scripts/probe-medicaid-codes.py --codes "$CODES" --state "$STATE" --range "$RANGE"
+      - name: Summary and commit
+        if: always()
+        run: |
+          [ -f supabase/reference/procedure-sources/code-probe.md ] || exit 0
+          cat supabase/reference/procedure-sources/code-probe.md >> "$GITHUB_STEP_SUMMARY"
+          git add supabase/reference/procedure-sources/code-probe.md
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Medicaid code probe $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main && git push origin HEAD:main
