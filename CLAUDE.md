@@ -1369,7 +1369,7 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   **Procedure tables** (`procedure-tables.yml`, manual, `dry_run` / `apply`
   with `disk_free_gb`): see the 036 tables under Supabase schema. Run the
   tables job yearly after HHS and CMS publish a new year.
-- **Procedures panel check** (`procedures-panel-check.yml`, manual, read only, `scripts/live/procedures-check.mjs`): the panel's Medicare loader replayed for one city, page by page, beside direct queries for one specialty and a list of codes.
+- **Procedures panel check** (`procedures-panel-check.yml`, manual, read only, `scripts/live/procedures-check.mjs`): the panel's Medicare loader replayed for one city, page by page, beside direct queries for one specialty and a list of codes, the same codes in the Medicaid table, and CMS's own file through its data API.
 - **Live dashboard audit** (`live-dashboard-audit.yml`, manual, read only): see "A failed query is not an empty answer". It also opens a provider's home with a mocked `profile` response (38017, Family Medicine), searches away, reloads, goes home and presses Back. Rerun after any change to the dashboard's loaders or its home flow.
 - **Tests** (`tests.yml`): every pull request and push to main.
 

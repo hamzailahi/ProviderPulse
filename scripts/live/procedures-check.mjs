@@ -107,4 +107,46 @@ log('', `Sample of ${SPEC} anywhere: ${st.status} ${Array.isArray(st.body) ? JSO
 const cols = await get('cms_procedures_full?limit=1');
 log(`Columns: ${Array.isArray(cols.body) && cols.body[0] ? Object.keys(cols.body[0]).join(', ') : cols.text}`);
 
+// 6. The other sources the panel can switch to: Medicaid (T-MSIS, HHS).
+if (codes.length) {
+  log('', '## Medicaid (the panel\'s Medicaid source) for the same codes', '');
+  for (const code of codes) {
+    let n = 0, claims = 0, fail = 0;
+    for (const list of batches) {
+      const r = await get(`medicaid_procedures?zip=in.(${list.join(',')})&code=eq.${code}&select=specialty,claims&limit=1000`);
+      if (!Array.isArray(r.body)) { fail++; continue; }
+      r.body.forEach(x => { n++; claims += Number(x.claims) || 0; });
+    }
+    log(`- ${code}: ${n} rows, ${Math.round(claims)} claims${fail ? `, ${fail} batches failed` : ''}`);
+  }
+}
+
+// 7. CMS's own file, through its data API: is our copy complete, and which year?
+try {
+  const cat = await (await fetch('https://data.cms.gov/data.json')).json();
+  const sets = cat.dataset || [];
+  const ds = sets.find(d => /^Medicare Physician & Other Practitioners - by Provider and Service/i.test(d.title || ''));
+  const apis = (ds && ds.distribution || []).filter(d => /data-api/.test(d.accessURL || '') && /(20\d\d)/.test(d.title || ''))
+    .map(d => ({ url: d.accessURL, year: Number((d.title.match(/(20\d\d)/g) || []).pop()) })).sort((a, b) => b.year - a.year);
+  log('', `## CMS source (${ds ? ds.title : 'dataset not found'})`, '', `API years: ${apis.map(a => a.year).join(', ') || 'none'}`);
+  const ourNpis = new Set(direct.map(r => String(r.npi)));
+  for (const a of apis.slice(0, 3)) {
+    const q = new URLSearchParams({ 'filter[Rndrng_Prvdr_City]': CITY.toUpperCase(), 'filter[Rndrng_Prvdr_State_Abrvtn]': STATE, 'filter[Rndrng_Prvdr_Type]': SPEC, size: '5000' });
+    const r = await fetch(a.url + '?' + q);
+    const rowsC = r.ok ? await r.json() : [];
+    const cn = new Set(rowsC.map(x => String(x.Rndrng_NPI)));
+    const both = [...cn].filter(x => ourNpis.has(x)).length;
+    const cc = {}; rowsC.forEach(x => { cc[x.HCPCS_Cd] = (cc[x.HCPCS_Cd] || 0) + 1; });
+    log(`- ${a.year}: HTTP ${r.status}, ${rowsC.length} rows, ${cn.size} clinicians in ${CITY} (by CMS city), ${both} of them in our table's rows; codes asked about: ${codes.map(c => c + ' ' + (cc[c] || 0)).join(', ')}`);
+  }
+  if (apis[0]) {
+    for (const code of codes.slice(0, 6)) {
+      const r = await fetch(apis[0].url + '?' + new URLSearchParams({ 'filter[HCPCS_Cd]': code, size: '5000' }));
+      const all = r.ok ? await r.json() : [];
+      const tx = all.filter(x => x.Rndrng_Prvdr_State_Abrvtn === STATE).length;
+      log(`- ${code} nationally in ${apis[0].year}: ${all.length}${all.length === 5000 ? '+' : ''} rows (${tx} in ${STATE})`);
+    }
+  }
+} catch (e) { log('', `CMS source check failed: ${String(e).slice(0, 200)}`); }
+
 if (process.env.GITHUB_STEP_SUMMARY) (await import('node:fs')).appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join('\n') + '\n');
