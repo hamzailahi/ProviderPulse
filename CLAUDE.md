@@ -1071,11 +1071,26 @@ AI tab in `dashboard-v3.js`.
   `run_scenario` (1 to 5 more clinicians; before/after; capped server-side)
   (call `market-score.js`'s handler in-process, cached 10 min per warm
   instance), `find_providers` (clinics + provider_individuals around a ZIP,
-  word-boundary taxonomy match, distance filter), `query_database` (a plan
+  word-boundary taxonomy match, distance filter), `get_procedures`
+  (`lib/procedures.js`, 2026-10-20: the Procedures panel's four public
+  sources around a ZIP or radius, medicare_clinicians / medicaid /
+  hospital_outpatient / hospital_inpatient, filtered by CMS specialty name
+  (`ilike`, so "Gastroenterology" finds Medicare's "Gastroenterology" and
+  Medicaid's "Physician/Gastroenterology") and by a code or words through
+  `procedure-search.js`; returns top codes with patients, services and
+  service-weighted average allowed and paid, totals, and each source's
+  caveats as `notes`; a failed or capped request sets `incomplete` and
+  "totals are floors", never an empty answer; at most 30 ZIPs, 8 pages per
+  request group, a 14s budget), `query_database` (a plan
   through `lib/query-plan.js`), and two browser effects: `update_map`
   (returned as `actions`) and `create_deliverable` (returned as
   `deliverables`, rendered as a document card). All but `query_database` use
-  `strict: true`.
+  `strict: true`. Before `get_procedures` the assistant (and so every report)
+  told users procedure volumes and reimbursement were not in ProviderPulse;
+  the system prompt now names the tool and only commercial insurance rates
+  as missing, and the Reports brief asks for a "Procedures and
+  reimbursement" section. `scripts/live/procedures-tool-check.mjs` (a step
+  of `procedures-panel-check.yml`) runs the tool against the live database.
 - **Stop reasons:** `refusal` drops the declined question from history;
   `max_tokens` with a cut-off tool call answers it with an error result and
   never runs it; `pause_turn` continues.
@@ -1144,7 +1159,7 @@ Covered by `scripts/test-query-plan.mjs`.
 | Surface | Model | What reaches the prompt |
 |---|---|---|
 | `patient-match.js` navigator | `claude-haiku-4-5-20251001` | the patient's own profile and **only specialty-relevant** providers |
-| `market-assistant.js` | `claude-opus-5-5`, effort `low` | the conversation, the dashboard context, and read-only tool results (market score, directory listings, allowlisted query summaries) |
+| `market-assistant.js` | `claude-opus-5-5`, effort `low` | the conversation, the dashboard context, and read-only tool results (market score, directory listings, public procedure volumes and payments, allowlisted query summaries) |
 | `audit-narrate.js` | `claude-haiku-4-5-20251001` | the `signals` array only |
 | `doc-extract.js` | `claude-sonnet-5` | an uploaded document. **PHI**, BAA-gated, off |
 | `appointment-briefing.js` | `claude-haiku-4-5-20251001` | concern, conditions, and patient-**approved** facts |
@@ -1505,7 +1520,7 @@ node scripts/test-demand-model.mjs        # 45: the learned demand model, traine
 node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick
 node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 18: the what-if re-score changes supply only; no six-group breakdown, clinicians by code section, shortage per specialty
-node scripts/test-market-assistant.mjs    # 59: the assistant, figure repair, tracing (needs npm ci in v2/)
+node scripts/test-market-assistant.mjs    # 61: the assistant, figure repair, tracing (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
@@ -1514,6 +1529,7 @@ node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, pri
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
+node scripts/test-procedures-tool.mjs     # 23: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```
 

@@ -169,6 +169,9 @@ about the market on screen, and shows what it is doing as it works
   confidence, caveats), citing the numbers;
 - compare two to four ZIPs for a specialty side by side;
 - count and list nearby providers of a specialty within a radius;
+- report procedure volumes and payments nearby (top CPT/HCPCS codes,
+  patients, services, average Medicare allowed and paid, Medicaid claims
+  and dollars, hospital APC and DRG groups), with each source's limits;
 - answer statewide or cross-market counts through the query-plan allowlist
   described below;
 - move the map and set the specialty filter ("show me dermatologists
@@ -533,6 +536,7 @@ node scripts/test-payers.mjs              # the insurance plan proposal: names, 
 python3 scripts/test-procedure-tables.py  # the Medicaid and Medicare hospital procedure builder, end to end on small files (needs duckdb)
 node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list, specialty coverage
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
+node scripts/test-procedures-tool.mjs     # the assistant's procedures tool on a fake database: averages, word search, failures reported, hospitals
 node scripts/test-procedure-search.mjs    # the procedures search: words like "colonoscopy" find CMS's own wording, checked against real descriptions
 ```
 
@@ -585,6 +589,16 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-20
 
+- **Ask AI and reports can read procedure data.** The assistant used to
+  say ProviderPulse had no procedure volumes or reimbursement. It now has a
+  procedures tool over the same four sources as the Procedures tab (Medicare
+  clinicians, Medicaid, Medicare hospital outpatient and inpatient), so it
+  can answer "what do gastroenterologists bill within 10 miles of 76104 and
+  what does Medicare pay?" with real codes, patients, services and average
+  payments (43239, 2,762 patients, $60.65 average Medicare payment), and it
+  carries each source's limits (traditional Medicare only, small counts
+  withheld). Reports now include a "Procedures and reimbursement" section.
+  Commercial insurance rates are still not available.
 - **Why Fort Worth shows no Medicaid deliveries under 59400.** Texas
   Medicaid does not bill the global delivery codes (59400, 59510, 59610) at
   all. Providers bill the parts separately: 59409 (vaginal delivery only,
