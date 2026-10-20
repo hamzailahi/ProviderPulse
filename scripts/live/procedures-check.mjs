@@ -121,30 +121,35 @@ if (codes.length) {
   }
 }
 
-// 7. CMS's own file, through its data API: for a sample of the specialty's
-// clinicians, how many rows does CMS publish per year, against our table?
+// 7. CMS's own file, through its data API. data.cms.gov lists one catalog
+// entry per data year ("... by Provider and Service : 2024-12-01", temporal
+// endDate 2024-12-31), each with its own API distribution. For a sample of
+// the specialty's clinicians, compare our row count with each recent year's:
+// the year that matches is the year our table holds, and a clinician CMS
+// lists with more rows than ours means rows we are missing.
 try {
   const cat = await (await fetch('https://data.cms.gov/data.json')).json();
-  const sets = cat.dataset || [];
-  const ds = sets.find(d => /^Medicare Physician & Other Practitioners - by Provider and Service/i.test(d.title || ''));
-  const dists = (ds && ds.distribution || []).filter(d => /data-api\/v1\/dataset\//.test(d.accessURL || ''));
-  // The data year is the year the "temporal" range ends, else the newest year in the title.
-  const yearOf = d => { const t = String(d.temporal || '').match(/(20\d\d)/g) || String(d.title || '').match(/(20\d\d)/g) || []; return t.length ? Number(t[t.length - 1]) : 0; };
-  const apis = dists.map(d => ({ url: d.accessURL, year: yearOf(d), title: d.title, temporal: d.temporal })).sort((a, b) => b.year - a.year);
-  log('', `## CMS source (${ds ? ds.title : 'dataset not found'})`, '');
-  log('Catalog entries with this title: ' + sets.filter(d => /by Provider and Service/i.test(d.title || '') && /Physician/i.test(d.title || '')).map(d => d.title + ' [' + JSON.stringify(d.temporal) + ']').join(' | '));
-  (ds && ds.distribution || []).slice(0, 8).forEach(d => log('- raw distribution: ' + JSON.stringify(d).slice(0, 400)));
-  apis.slice(0, 4).forEach(a => log(`- distribution: ${a.title} | temporal ${a.temporal || '-'} | ${a.url}`));
+  const years = (cat.dataset || [])
+    .filter(d => /^Medicare Physician & Other Practitioners - by Provider and Service( :|$)/i.test(d.title || ''))
+    .map(d => {
+      const t = [].concat(d.temporal || []).map(x => typeof x === 'string' ? x : (x && x.endDate) || '').join(' ');
+      const y = Number((t.match(/(20\d\d)/g) || String(d.title).match(/(20\d\d)/g) || [0]).pop());
+      const api = (d.distribution || []).find(x => x.format === 'API' && /data-api\/v1\/dataset\//.test(x.accessURL || ''));
+      return { year: y, url: api && api.accessURL };
+    }).filter(x => x.url).sort((a, b) => b.year - a.year);
+  log('', '## CMS source: Medicare Physician & Other Practitioners by Provider and Service', '', `Years in the catalog: ${years.map(y => y.year).join(', ')}`);
   const ours = {}; direct.forEach(r => { ours[r.npi] = (ours[r.npi] || 0) + 1; });
-  const sample = Object.keys(ours).slice(0, 8);
-  for (const a of apis.slice(0, 3)) {
-    const parts = [];
+  const sample = Object.keys(ours).slice(0, 20);
+  for (const y of years.slice(0, 3)) {
+    let same = 0, cmsMore = 0, oursMore = 0, cmsRows = 0, ourRows = 0; const worst = [];
     for (const npi of sample) {
-      const r = await fetch(a.url + '?' + new URLSearchParams({ 'filter[Rndrng_NPI]': npi, size: '5000' }));
-      const rowsC = r.ok ? await r.json() : null;
-      parts.push(`${npi}: CMS ${Array.isArray(rowsC) ? rowsC.length : 'HTTP ' + r.status} / ours ${ours[npi]}`);
+      const r = await fetch(y.url + '?' + new URLSearchParams({ 'filter[Rndrng_NPI]': npi, size: '5000' }));
+      const b = r.ok ? await r.json() : [];
+      const n = Array.isArray(b) ? b.length : 0;
+      cmsRows += n; ourRows += ours[npi];
+      if (n === ours[npi]) same++; else if (n > ours[npi]) { cmsMore++; worst.push(`${npi} CMS ${n} vs ours ${ours[npi]}`); } else oursMore++;
     }
-    log(`- year ${a.year}: ${parts.join('; ')}`);
+    log(`- ${y.year}: ${same} of ${sample.length} clinicians match exactly; CMS has more rows for ${cmsMore}, we have more for ${oursMore}; rows CMS ${cmsRows} vs ours ${ourRows}${worst.length ? '; e.g. ' + worst.slice(0, 3).join(', ') : ''}`);
   }
 } catch (e) { log('', `CMS source check failed: ${String(e).slice(0, 200)}`); }
 
