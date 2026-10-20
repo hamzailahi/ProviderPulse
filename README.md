@@ -614,9 +614,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 - **ZIP outlines for big states retry once.** Texas's outline file is large
   and its download was seen cutting off, leaving nothing to click; the map
   now tries a second time.
-- **A live audit of the dashboard's Explore mode.** A manual, read-only job
-  drives the deployed dashboard through every kind of search and tab and
-  reports what failed or ran slow.
+- **A live audit of the dashboard.** A manual, read-only job drives the
+  deployed dashboard through every kind of search and tab, plus a
+  provider's home with a stand-in profile, and reports what failed or ran
+  slow.
 
 ### 2026-10-13
 

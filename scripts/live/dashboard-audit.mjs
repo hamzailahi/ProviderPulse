@@ -163,7 +163,7 @@ for (const s of SEARCHES) {
     hash: location.hash.slice(0, 80),
     specialty: (document.getElementById('specialty-select') || {}).value || '',
     homeButton: !!document.getElementById('home-switch') && !document.getElementById('home-switch').hidden,
-    whereYouStand: /Where you stand/.test((document.getElementById('insights-panel') || {}).innerText || ''),
+    whereYouStand: /where you stand/i.test((document.getElementById('insights-panel') || {}).innerText || ''),
     modeSwitch: !!document.getElementById('mode-switch')
   })).catch(e => ({ error: String(e) }));
   try {
