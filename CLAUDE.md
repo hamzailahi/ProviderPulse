@@ -677,6 +677,17 @@ it. Hash forms:
 - `#pin=<lat>,<lng>,<name>`: exact coordinates
 - `#zip=<zip>&tax=<terms>&rec=<npis>&pins=<lat,lng,npi,name|…>`: navigator form
 - `#zip=<zip>&tax=<terms>`: specialty browse (also a provider's home autoload)
+- `#q=<search>&spec=<label>`: the dashboard's own remembered search
+  (2026-10-20). `rememberArea()` in `dashboard-v3.js` writes it after every
+  search (from the `processData` wrapper) and on a specialty change, with
+  `pushState` for a new area and `replaceState` for the same one, so neither
+  fires `hashchange`; Back does, and re-runs the search. After a search, a
+  `#zip=` link for that same ZIP is left in place (it carries `rec=`, `pins=`
+  and a provider's home `tax=`). The handler sets the picker, then calls
+  `omniSearch`. A provider's profile sets the picker to their specialty only
+  when it opens home, never over a reopened link. Neighbor rings are not
+  remembered (they bypass `processData`), so a reload reopens the searched
+  area without them
 
 The area form waits for the async loads (polls `groupedData`, ~21s budget),
 narrows `selectedTaxonomies`, and plots every matching clinic. `rec=` NPIs get
@@ -1358,7 +1369,7 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   **Procedure tables** (`procedure-tables.yml`, manual, `dry_run` / `apply`
   with `disk_free_gb`): see the 036 tables under Supabase schema. Run the
   tables job yearly after HHS and CMS publish a new year.
-- **Live dashboard audit** (`live-dashboard-audit.yml`, manual, read only): see "A failed query is not an empty answer". It also opens a provider's home with a mocked `profile` response (38017, Family Medicine), searches away and comes back. Rerun after any change to the dashboard's loaders or its home flow.
+- **Live dashboard audit** (`live-dashboard-audit.yml`, manual, read only): see "A failed query is not an empty answer". It also opens a provider's home with a mocked `profile` response (38017, Family Medicine), searches away, reloads, goes home and presses Back. Rerun after any change to the dashboard's loaders or its home flow.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is

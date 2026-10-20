@@ -90,12 +90,18 @@ var homeBtn = null;
   // Staff demo accounts have no portal to go back to.
   if (!isProviderAcct && nav) nav.style.display = 'none';
   if (!isProviderAcct) return;
-  // Hidden until the profile names a ZIP. The hash is cleared without an
-  // event first, so going home from home still reloads it.
+  // Hidden until the profile names a ZIP. Setting the hash adds a history
+  // entry, so Back returns to the area searched before. Already home, the
+  // hash is cleared without an event first so the click still reloads it.
   homeBtn = el('button', { type: 'button', id: 'home-switch', hidden: '', title: 'Your ZIP and specialty', onclick: function () {
     if (!homeZip()) return;
     var i = $('addressInput'); if (i) i.value = homeZip();
-    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    var sel = $('specialty-select');
+    if (sel) sel.value = mySpec && Array.prototype.some.call(sel.options, function (o) { return o.value === mySpec.label; }) ? mySpec.label : '';
+    focusSpec = null;
+    if (location.hash === homeHash()) {
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    }
     location.hash = homeHash();
   } }, 'My market');
   if (nav && nav.parentNode) nav.parentNode.insertBefore(homeBtn, nav.nextSibling);
@@ -155,16 +161,43 @@ var homeBtn = null;
     var r = base.apply(this, arguments);
     Promise.resolve(r).then(function () {
       var sel = $('specialty-select');
-      if (sel && sel.value) applySpecialty(sel.value);
+      if (sel && sel.value) applySpecialty(sel.value, true);
+      rememberArea(true);
     });
     return r;
   };
 })();
 
-function applySpecialty(label) {
+// The address follows the search (2026-10-20): after each search, and when
+// the specialty changes, the hash becomes #q=<what was searched>&spec=<label>,
+// which index.html's deep-link handler reopens. A new area is a new history
+// entry, so Back returns to the previous one (its hashchange re-runs the
+// search, which then finds the hash already right); a specialty change
+// replaces the entry. replaceState / pushState fire no hashchange, so writing
+// never triggers a search. After a search, a #zip= link for the same ZIP is
+// left alone: it already reopens this area, with the navigator's pins and a
+// provider's home specialty.
+function rememberArea(afterSearch) {
+  var inp = $('dbSearchInput'), sel = $('specialty-select');
+  var q = inp ? String(inp.value || '').trim() : '';
+  if (!q || q.length > 200) return;
+  var h = location.hash || '';
+  var cur = /^#(q|zip)=/.test(h) ? new URLSearchParams(h.slice(1)) : null;
+  if (afterSearch && h.indexOf('#zip=') === 0 && cur.get('zip') === q) return;
+  var p = new URLSearchParams();
+  p.set('q', q);
+  if (sel && sel.value) p.set('spec', sel.value);
+  var next = '#' + p.toString();
+  if (next === h) return;
+  var sameArea = cur && (cur.get('q') === q || cur.get('zip') === q);
+  try { history[sameArea ? 'replaceState' : 'pushState'](null, '', location.pathname + location.search + next); } catch (e) {}
+}
+
+function applySpecialty(label, quiet) {
   focusSpec = label || null;       // the Insights headline follows the filter
   var sel = $('specialty-select');
   if (sel && sel.value !== label) sel.value = label;
+  if (!quiet && typeof taxonomies !== 'undefined' && taxonomies.size) rememberArea(false);
   var count = $('filters-count');
   if (count) { count.hidden = !label; count.textContent = label ? '1' : ''; }
   if (typeof taxonomies === 'undefined' || !taxonomies.size) return;     // nothing loaded yet
@@ -700,7 +733,8 @@ if (isProviderAcct) {
       // A deep link (#zip=..., #goto=...) wins over home; with neither, the
       // search welcome takes over from "Loading your market".
       // Opening home keeps "Loading your market" up until the map covers it.
-      if (!location.hash && zip) {
+      var openingHome = !location.hash && zip;
+      if (openingHome) {
         var i = $('addressInput'); if (i) i.value = zip;
         location.hash = homeHash();
       } else {
@@ -708,7 +742,8 @@ if (isProviderAcct) {
         paintWelcome();
       }
       paintInsights();
-      if (!profile) return;
+      // Only when opening home: a reopened link (#q=...&spec=...) keeps its own specialty.
+      if (!profile || !openingHome) return;
       var sel = $('specialty-select');
       if (sel && mySpec && Array.prototype.some.call(sel.options, function (o) { return o.value === mySpec.label; })) {
         sel.value = mySpec.label;

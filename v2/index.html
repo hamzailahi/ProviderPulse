@@ -3173,7 +3173,8 @@
         }
 
         // Deep link from care navigator: #goto=<address>, #pin=<lat>,<lng>,<name>,
-        // or #zip=<zip>&tax=<taxonomy,list>&rec=<npi,list> for a whole search area
+        // or #zip=<zip>&tax=<taxonomy,list>&rec=<npi,list> for a whole search area;
+        // #q=<search>&spec=<label> is the dashboard's own remembered search
         // Runs on whichever of DOMContentLoaded / load happens first, and guards
         // against running twice. Binding only to `load` meant a slow or blocked
         // CDN script (Leaflet, Chart.js, TopoJSON are all third-party) could delay
@@ -3189,7 +3190,10 @@
             const isPin = h.indexOf('#pin=') === 0;
             const isGoto = h.indexOf('#goto=') === 0;
             const isArea = h.indexOf('#zip=') === 0;
-            if (!isPin && !isGoto && !isArea) return;
+            // #q=<search>&spec=<label>: what dashboard-v3.js writes after each
+            // search, so a reload, Back or a shared link reopens the same area
+            const isQuery = h.indexOf('#q=') === 0;
+            if (!isPin && !isGoto && !isArea && !isQuery) return;
             console.log('[deeplink] hash detected:', h);
 
             const whenReady = (fn, tries) => {
@@ -3201,6 +3205,24 @@
                 if (tries > 60) { console.warn('[deeplink] map never became ready'); return; }
                 setTimeout(() => whenReady(fn, tries + 1), 150);
             };
+
+            if (isQuery) {
+                const params = new URLSearchParams(h.slice(1));
+                const q = (params.get('q') || '').trim().slice(0, 200);
+                const spec = (params.get('spec') || '').trim();
+                if (!q) return;
+                whenReady(() => {
+                    // The picker's value is re-applied after the load (the
+                    // processData wrapper), so set it before searching. An
+                    // unknown label leaves the picker on All.
+                    const sel = document.getElementById('specialty-select');
+                    if (sel) sel.value = Array.prototype.some.call(sel.options, o => o.value === spec) ? spec : '';
+                    const box = document.getElementById('addressInput');
+                    if (box) box.value = q;
+                    omniSearch(q);
+                });
+                return;
+            }
 
             if (isArea) {
                 const params = new URLSearchParams(h.slice(1));

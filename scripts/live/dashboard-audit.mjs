@@ -182,7 +182,10 @@ for (const s of SEARCHES) {
       await page.screenshot({ path: join(OUT, 'home_' + label.replace(/[^A-Za-z0-9]+/g, '_') + '.png') });
     };
     await step('search Austin, TX', async () => { await page.fill('#addressInput', 'Austin, TX'); await page.press('#addressInput', 'Enter'); });
+    // The address follows the search: a reload reopens Austin with primary care.
+    await step('reload on Austin', () => page.reload({ waitUntil: 'domcontentloaded' }));
     await step('top-bar My market', () => page.click('#home-switch'));
+    await step('browser Back', () => page.goBack({ waitUntil: 'commit' }));
   } catch (e) { r.error = String(e.message || e).slice(0, 300); }
   r.requests = log.requests; r.console = log.console; r.pageErrors = log.pageErrors;
   results.push(r);

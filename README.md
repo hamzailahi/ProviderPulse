@@ -589,6 +589,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   top bar brings them back. A specialty picked in the filters now carries
   over to the next search instead of the map quietly showing everything
   under a filter that still named one specialty.
+- **The dashboard's address follows the search.** After each search the
+  link names the area and specialty, so a refresh, a bookmark or a shared
+  link reopens the same view, and the browser's Back button returns to the
+  previous search. Bordering ZIPs added on top are not part of the link.
 - **Explore searches by city or state show every provider again.** A live
   audit of the dashboard found that searching a city ("Collierville, TN",
   "Memphis") or a state ("RI") loaded organizations only: the individual
