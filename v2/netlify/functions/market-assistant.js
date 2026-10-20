@@ -36,6 +36,7 @@ const Anthropic = AnthropicModule.default || AnthropicModule;
 const { getUser, isProvider } = require('./lib/auth.js');
 const { validatePlan, buildPath, summarise, TABLES, OPS } = require('./lib/query-plan.js');
 const { verifyText } = require('./lib/answer-check.js');
+const { getProcedures, SOURCES: PROC_SOURCES } = require('./lib/procedures.js');
 // Every searchable specialty (find_providers, update_map) and the ones the
 // market model scores (insights, compare, scenario). Membership is by NUCC code.
 const SPECIALTIES = require('../../assets/specialties.js');
@@ -161,11 +162,11 @@ Who you help: healthcare providers deciding where to open, expand or compete, an
 Each user turn starts with a <dashboard> block describing what the user is looking at (mode, ZIP, specialty). Treat "here", "this market" or "my area" as that ZIP and that specialty unless the user names others.
 
 How to answer:
-- Ground every number in a tool result from this conversation. Never estimate, extrapolate or invent figures. State each figure as a tool returned it (rounding is fine). If you compute a difference, ratio or percent change, put the two figures it comes from on the same line. The server checks every figure in your answers and documents against the tool results, and an untraceable one is rejected. If the data does not cover something (rents, salaries, reimbursement rates, referral patterns, patient search volume), say so plainly.
+- Ground every number in a tool result from this conversation. Never estimate, extrapolate or invent figures. State each figure as a tool returned it (rounding is fine). If you compute a difference, ratio or percent change, put the two figures it comes from on the same line. The server checks every figure in your answers and documents against the tool results, and an untraceable one is rejected. If the data does not cover something (rents, salaries, commercial insurance rates, referral patterns, patient search volume), say so plainly.
 - For questions about a market, call get_market_insights first. Explain results in plain language: the archetype and what it means, the factors that drove the score, and the confidence level. Mention a caveat when the tool reports one that affects the answer.
-- For "what if I open here" or "what if another practice opens", call run_scenario and report the before and after with its assumptions; say plainly that only supply changes. To compare places, call compare_markets. To count or list nearby providers of a specialty, call find_providers. For statewide or cross-market counts the other tools cannot answer, call query_database with a plan.
+- For "what if I open here" or "what if another practice opens", call run_scenario and report the before and after with its assumptions; say plainly that only supply changes. To compare places, call compare_markets. To count or list nearby providers of a specialty, call find_providers. For procedures, billing volumes, how often codes are billed and what Medicare or Medicaid pays (CPT and HCPCS codes, hospital APC and DRG groups), call get_procedures: medicare_clinicians for most specialties; medicaid for pregnancy, children's and other Medicaid-heavy care (and whenever Medicare shows little); hospital_outpatient or hospital_inpatient for facility volumes. Pass the CMS specialty name, for example Gastroenterology, and a code or plain words in query. Report patients, services and the average allowed and paid amounts as returned, and carry the tool's notes that change the reading (traditional Medicare only, small counts withheld, a state's own billing codes). Commercial insurance volumes and rates are not available. For statewide or cross-market counts the other tools cannot answer, call query_database with a plan.
 - When the user wants to see something on the map ("show me", "zoom to", "switch to"), call update_map. Say briefly what you changed.
-- When the user asks for a memo, one-pager, summary for a client, pitch or report, gather the numbers first, then call create_deliverable with the full document. Keep the document under 450 words, organized with short headings and bullets, every figure traceable to a tool result, and a short "Data notes" section listing sources and caveats. After creating it, reply with one or two sentences; do not repeat the document.
+- When the user asks for a memo, one-pager, summary for a client, pitch or report, gather the numbers first, then call create_deliverable with the full document. Keep the document under 450 words, organized with short headings and bullets, every figure traceable to a tool result, and a short "Data notes" section listing sources and caveats. When the document is about a specialty's practice, include a short "Procedures and reimbursement" section from get_procedures (the specialty's top codes, volumes and average Medicare payment nearby). After creating it, reply with one or two sentences; do not repeat the document.
 - Independent tool calls can go in the same turn.
 
 The market model, for explaining results:
@@ -242,6 +243,23 @@ const TOOLS = [
         radius_miles: { type: 'integer', description: 'Search radius, 1 to 25 miles' }
       },
       required: ['zip', 'specialty', 'radius_miles'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'get_procedures',
+    description: 'Procedure volumes and payments around a ZIP from public CMS and HHS data (2024): the top codes with patients, services, average allowed and average paid amounts, how many clinicians or hospitals bill them, and totals. Sources: medicare_clinicians (traditional Medicare Part B, CPT/HCPCS codes by clinician specialty), medicaid (Medicaid and CHIP claims and dollars by code), hospital_outpatient (Medicare APC groups at the nearest hospitals) and hospital_inpatient (Medicare DRG groups). Filter by the CMS specialty name or part of it (Gastroenterology, Obstetrics & Gynecology, Cardiology, Family Practice, Internal Medicine, Nurse Practitioner, Orthopedic Surgery, Dermatology, Ophthalmology, Urology...) and by a code (45380) or plain words (colonoscopy, EGD, pregnancy ultrasound, delivery). Results carry notes on what each source leaves out; repeat the ones that matter.',
+    strict: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        zip: zipProp,
+        source: { type: 'string', enum: PROC_SOURCES },
+        specialty: { type: ['string', 'null'], description: 'CMS specialty name or part of it, or null for every specialty (ignored for hospital sources)' },
+        query: { type: ['string', 'null'], description: 'A CPT/HCPCS/APC/DRG code, or words such as "colonoscopy", or null for every code' },
+        radius_miles: { type: 'integer', description: 'ZIPs within this many miles, 0 to 15 (0 = this ZIP only). Hospital sources use the nearest hospitals within this radius, 25 when 0, up to 50.' }
+      },
+      required: ['zip', 'source', 'specialty', 'query', 'radius_miles'],
       additionalProperties: false
     }
   },
@@ -518,6 +536,7 @@ const RUNNERS = {
   compare_markets: compareMarkets,
   run_scenario: runScenario,
   find_providers: findProviders,
+  get_procedures: input => getProcedures(input),
   query_database: queryDatabase,
   update_map: updateMap,
   create_deliverable: createDeliverable
@@ -532,6 +551,7 @@ function stepLabel(name, input) {
     case 'run_scenario': return `Modelling ${i.clinicians || 1} new ${String(i.specialty || '').toLowerCase()} in ${i.zip}`;
     case 'compare_markets': return `Comparing ${(i.zips || []).join(', ')}${spec}`;
     case 'find_providers': return `Finding ${String(i.specialty || 'primary care').toLowerCase()} listings within ${i.radius_miles} mi of ${i.zip}`;
+    case 'get_procedures': return `Reading ${String(i.source || 'procedure').replace(/_/g, ' ')} procedures${i.query ? ' for "' + String(i.query).slice(0, 40) + '"' : ''} around ${i.zip}`;
     case 'query_database': return `Querying ${i.table || 'the database'}`;
     case 'update_map': return 'Updating the map';
     case 'create_deliverable': return `Writing "${String(i.title || 'document').slice(0, 60)}"`;

@@ -1133,6 +1133,10 @@ if (isProviderAcct) {
     if (others.length) brief += ' Compare it with ZIP' + (others.length > 1 ? 's ' : ' ') + others.join(', ') + '.';
     if (kind === 'client_pitch' && who.value.trim()) brief += ' It is prepared for ' + who.value.trim().slice(0, 120) + '.';
     if (focus.value.trim()) brief += ' Make sure it answers: ' + focus.value.trim().slice(0, 400);
+    // Volumes and payments come from get_procedures; without this the reports
+    // said procedure data did not exist (2026-10-20).
+    brief += ' Include a short "Procedures and reimbursement" section: the specialty\'s top procedure codes within 10 miles from Medicare clinicians' +
+      ' (patients, services, average Medicare payment), plus Medicaid where the specialty does much Medicaid work.';
     brief += '\nGather the numbers with your tools first, then deliver it with create_deliverable (kind "' + kind + '").';
     var shown = label + ': ' + spec.value + ' around ' + z + (others.length ? ' vs ' + others.join(', ') : '') + (focus.value.trim() ? '. ' + focus.value.trim() : '');
     note.textContent = '';

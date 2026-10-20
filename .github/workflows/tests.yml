@@ -90,6 +90,9 @@ jobs:
       - name: Procedures panel word search, against CMS's real descriptions
         run: node scripts/test-procedure-search.mjs
 
+      - name: The assistant's get_procedures tool, on a fake database
+        run: node scripts/test-procedures-tool.mjs
+
       - name: Procedure tables builder (Medicaid and Medicare hospital), end to end on fixtures
         run: |
           pip install -q duckdb==1.1.3

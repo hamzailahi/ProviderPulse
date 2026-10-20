@@ -312,6 +312,8 @@ await call({ question: 'hi', context: CTX, cid: 'bad id with spaces!!' });
 check('a malformed chat id is dropped', traces[traces.length - 1].cid === '');
 
 console.log('\n8. Tool schemas');
+check('get_procedures is offered, strict, with the four sources', !!I.TOOLS.find(t => t.name === 'get_procedures' && t.strict && t.input_schema.properties.source.enum.length === 4));
+check('the system prompt no longer says reimbursement is not covered', !/reimbursement rates, referral/.test(I.SYSTEM || '') );
 check('every tool except query_database is strict', I.TOOLS.filter(t => t.name !== 'query_database').every(t => t.strict === true && t.input_schema.additionalProperties === false));
 check('strict schemas list every property as required', I.TOOLS.filter(t => t.strict).every(t => Object.keys(t.input_schema.properties).every(k => t.input_schema.required.includes(k))));
 {
@@ -334,7 +336,7 @@ const origLog = console.log; console.log = () => {};
 r = await call({ question: 'hello', context: CTX });
 console.log = origLog;
 check('a 400 on the request shape retries once, plain', r.body.done && r.body.reply === 'Still here.' && flaky.calls.length === 2);
-check('the retry drops strict and fallbacks but keeps the tools', !flaky.calls[1].fallbacks && flaky.calls[1].tools.length === 7 && flaky.calls[1].tools.every(t => !t.strict));
+check('the retry drops strict and fallbacks but keeps the tools', !flaky.calls[1].fallbacks && flaky.calls[1].tools.length === 8 && flaky.calls[1].tools.every(t => !t.strict));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

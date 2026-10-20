@@ -39,3 +39,6 @@ jobs:
           SPEC: ${{ inputs.specialty }}
           CODES: ${{ inputs.codes }}
         run: node scripts/live/procedures-check.mjs "$CITY" "$STATE" "$SPEC" "$CODES"
+      - name: The assistant's get_procedures tool, live (Fort Worth 76104)
+        if: always()
+        run: node scripts/live/procedures-tool-check.mjs 76104
