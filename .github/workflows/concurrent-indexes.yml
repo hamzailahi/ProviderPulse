@@ -10,7 +10,7 @@ on:
       migration:
         description: Migration to run
         type: choice
-        options: [038_geo_indexes.sql]
+        options: [039_city_state_indexes.sql, 038_geo_indexes.sql]
 
 permissions:
   contents: read

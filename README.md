@@ -452,7 +452,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`038_geo_indexes.sql` (run through the "Concurrent indexes" job); 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
+`039_city_state_indexes.sql` (run through the "Concurrent indexes" job); 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
 
 ## Environment variables
 
@@ -581,6 +581,19 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-20
 
+- **Explore searches by city or state show every provider again.** A live
+  audit of the dashboard found that searching a city ("Collierville, TN",
+  "Memphis") or a state ("RI") loaded organizations only: the individual
+  clinician and secondary-address tables had no city or state index, timed
+  out, and the map said "Loaded" anyway (Collierville showed 221 listings
+  against 988 for its ZIP). Migration 039 adds those indexes. When part of
+  the directory does not answer, a notice on the map now says what is
+  missing, and very large areas stop at 25,000 listings per table with a
+  note instead of paging without end.
+- **The Medicare procedures panel no longer hammers the database on large
+  areas.** For a state it asked for every ZIP at once, timed out, and then
+  retried without end because it read the error as data. It now asks ten
+  ZIPs at a time, stops on an error and says what did not load.
 - **A live audit of the dashboard's Explore mode.** A manual, read-only job
   drives the deployed dashboard through every kind of search and tab and
   reports what failed or ran slow.

@@ -136,6 +136,27 @@ carries it, and patient search and Competition say "could not load" or
 `public-query-check.yml` runs one query as the browser does and prints status,
 time and rows: use it before trusting an empty page.
 
+The dashboard has its own loader (`fetchProviderRows` in `index.html`, not
+`directory.js`), and **the live audit of 2026-10-20**
+(`live-dashboard-audit.yml`, `scripts/live/dashboard-audit.mjs`: Playwright
+against the deployed site with a placeholder provider session, every request's
+status and time, console errors, screenshots) found the same bug class there:
+city and state searches timed out on `provider_individuals` and
+`clinic_secondary_locations` (no city/state index; migration 039 adds
+`(state, city)` and `(city)` on both) while the status line said "Loaded".
+`fetchProviderRows` now returns `.failed` and `.capped` (25,000 rows per
+table, `PROVIDER_SOURCE_CAP`), and `setLoadWarning` / `loadWarningFor` put a
+notice on the map that the filters' status rewrites cannot erase; every
+search clears it. The Medicare procedures loader asked for all of a state's
+ZIPs at once (84 for RI), timed out, and read the error object as a page with
+`length` undefined, so `batch.length < 1000` was false and it looped forever.
+It now sends ten ZIPs per request (four at a time), checks `res.ok` and
+`Array.isArray`, caps pages, orders with tie-breakers
+(`specialty,tot_benes.desc,npi,hcpcs_cd,place_of_service`, 0.4s at offset
+3,000; `order=id` took 2.4s) and reports failed batches. Do not page the
+provider tables with `order=npi`: the planner can walk the npi index and
+filter, which is slow for a rare city.
+
 ## PostgREST returns at most 1,000 rows
 
 Every response is capped at 1,000 rows no matter what `limit` says. Any query
@@ -732,7 +753,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `038` (location indexes `clinics_geo_idx`, `provider_individuals_geo_idx`, concurrent, via `concurrent-indexes.yml` / `scripts/build-indexes.sh`) applied 2026-10-13: clinics 74 MB, individuals 215 MB, both valid. The 38017 primary care box query went from timeouts at 3.2 to 3.4s to 0.9s (clinics, 143 rows) and 1.6s (individuals, 837 rows); a 50-mile box answers its first page in 1.0 to 1.5s. `037` (`medicare_hospitals`, one row per hospital at its ZIP's ZCTA centroid, for the panel's nearest-hospitals list) applied and loaded 2026-10-12 (3,084 hospitals, 2,977 with a centroid). `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `039` (city and state indexes on `provider_individuals` and `clinic_secondary_locations`, concurrent, via `concurrent-indexes.yml`) written 2026-10-20. `038` (location indexes `clinics_geo_idx`, `provider_individuals_geo_idx`, concurrent, via `concurrent-indexes.yml` / `scripts/build-indexes.sh`) applied 2026-10-13: clinics 74 MB, individuals 215 MB, both valid. The 38017 primary care box query went from timeouts at 3.2 to 3.4s to 0.9s (clinics, 143 rows) and 1.6s (individuals, 837 rows); a 50-mile box answers its first page in 1.0 to 1.5s. `037` (`medicare_hospitals`, one row per hospital at its ZIP's ZCTA centroid, for the panel's nearest-hospitals list) applied and loaded 2026-10-12 (3,084 hospitals, 2,977 with a centroid). `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
@@ -1320,6 +1341,7 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   **Procedure tables** (`procedure-tables.yml`, manual, `dry_run` / `apply`
   with `disk_free_gb`): see the 036 tables under Supabase schema. Run the
   tables job yearly after HHS and CMS publish a new year.
+- **Live dashboard audit** (`live-dashboard-audit.yml`, manual, read only): see "A failed query is not an empty answer". Rerun after any change to the dashboard's loaders.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is

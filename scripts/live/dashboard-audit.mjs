@@ -18,6 +18,7 @@ const BASE = process.argv[3] || 'https://providerpulse-v2.netlify.app';
 mkdirSync(OUT, { recursive: true });
 
 const SEARCHES = [
+  { name: 'Large state: TX', q: 'TX' },
   { name: 'ZIP 38017', q: '38017' },
   { name: 'City and state: Collierville, TN', q: 'Collierville, TN' },
   { name: 'Example button: Austin, TX', q: 'Austin, TX' },
@@ -85,7 +86,8 @@ async function snapshot(page) {
       groupedKeys: grouped, groupedRows: rows, visible, zipsWithDemographics: zips,
       mapKey: txt('map-legend').slice(0, 400),
       insights: ((document.getElementById('insights-panel') || {}).innerText || '').replace(/\s+/g, ' ').slice(0, 500),
-      markers: document.querySelectorAll('.leaflet-marker-icon, .leaflet-interactive').length
+      markers: document.querySelectorAll('.leaflet-marker-icon, .leaflet-interactive').length,
+      warning: txt('load-warning')
     };
   }).catch(e => ({ error: String(e) }));
 }
@@ -129,7 +131,12 @@ for (const s of SEARCHES) {
     await step('specialty Primary care', () => page.evaluate(() => { const s = document.getElementById('specialty-select'); s.value = 'Primary care / family doctor'; s.dispatchEvent(new Event('change')); }));
     await step('specialty Cardiology', () => page.evaluate(() => { const s = document.getElementById('specialty-select'); s.value = 'Heart / cardiology'; s.dispatchEvent(new Event('change')); }));
     await step('specialty All', () => page.evaluate(() => { const s = document.getElementById('specialty-select'); s.value = ''; s.dispatchEvent(new Event('change')); }));
-    await step('add neighbors', () => page.evaluate(() => loadNeighboringZips()), 25000);
+    await step('click ZIP 38017 outline', () => page.evaluate(() => {
+      let hit = false;
+      zipGeoJSONLayer.eachLayer(l => { if (String(l.feature.properties.ZCTA5CE10).padStart(5, '0') === '38017' && !hit) { l.fire('click'); hit = true; } });
+      if (!hit) throw new Error('no 38017 outline on the map');
+    }), 3000);
+    await step('add neighbors', () => page.evaluate(() => loadNeighboringZips()), 30000);
     for (const tab of ['insights', 'dashboard', 'health', 'procedures']) await step('tab ' + tab, () => page.evaluate(t => switchTab(t), tab), 6000);
     for (const src of ['outpatient', 'inpatient', 'medicaid', 'medicare']) await step('procedures ' + src, () => page.click(`#procSourceToggle [data-src="${src}"]`), 8000);
     await step('click a ZIP boundary', async () => {
@@ -151,6 +158,7 @@ for (const r of results) {
   md.push(`## ${r.name}`, '');
   if (r.error) md.push(`**Script error:** ${r.error}`, '');
   if (r.after) md.push(`- status line: \`${r.after.status}\` after ${Math.round((r.ms || 0) / 1000)}s`,
+    `- warning shown: ${r.after.warning || 'none'}`,
     `- loaded: ${r.after.groupedRows} rows in ${r.after.groupedKeys} groups; drawn: ${r.after.visible}; ZIPs with demographics: ${r.after.zipsWithDemographics}; welcome still showing: ${r.after.welcomeVisible}`,
     `- map key: ${r.after.mapKey.slice(0, 200)}`, `- insights: ${r.after.insights.slice(0, 300)}`);
   md.push(`- requests: ${r.requests.length}, failed or 4xx/5xx: ${bad.length}, slower than 2.5s: ${slow.length}`);
@@ -159,7 +167,7 @@ for (const r of results) {
   if (r.pageErrors.length) md.push('- page errors:', ...r.pageErrors.slice(0, 10).map(e => '  - ' + e));
   if (r.console.length) md.push('- console:', ...[...new Set(r.console)].slice(0, 12).map(e => '  - ' + e));
   (r.steps || []).forEach(st => {
-    md.push(`- step **${st.label}**${st.err ? ' (error: ' + st.err + ')' : ''}: status \`${st.snap.status}\`, drawn ${st.snap.visible}, map key ${st.snap.mapKey.slice(0, 120)}`);
+    md.push(`- step **${st.label}**${st.err ? ' (error: ' + st.err + ')' : ''}: status \`${st.snap.status}\`${st.snap.warning ? ', warning: ' + st.snap.warning : ''}, drawn ${st.snap.visible}, map key ${st.snap.mapKey.slice(0, 120)}`);
     st.newRequests.filter(x => !/^2\d\d/.test(x) || / (2[5-9]\d\d|[3-9]\d{3}|\d{5,})ms /.test(x)).slice(0, 8).forEach(x => md.push('    - ' + x));
   });
   md.push('');

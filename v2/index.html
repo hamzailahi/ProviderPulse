@@ -695,6 +695,7 @@
             const statusEl = document.getElementById('dbStatus');
             if (!searchTerm) { statusEl.textContent = 'Enter ZIP, State, or City'; return; }
             statusEl.textContent = '🔄 Searching...';
+            setLoadWarning('');
 
             // Check for comma-separated ZIPs like "38017, 38654"
             const commaParts = searchTerm.split(',').map(s => s.trim()).filter(Boolean);
@@ -732,7 +733,11 @@
                     n => statusEl.textContent = '🔄 Loaded ' + n + ' providers...'
                 );
 
-                if (clinicData.length === 0) { statusEl.textContent = '❌ No clinics found'; return; }
+                if (clinicData.length === 0) {
+                    statusEl.textContent = clinicData.failed.length ? '❌ The directory did not answer in time. Try again, or search a ZIP.' : '❌ No providers found';
+                    return;
+                }
+                setLoadWarning(loadWarningFor(clinicData));
 
                 // Fetch demographics for these ZIPs from demographics_raw table in batches
                 const zips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
@@ -777,7 +782,7 @@
                     };
                 });
 
-                statusEl.textContent = '\u2705 Loaded ' + clinicData.length + ' clinics';
+                statusEl.textContent = (clinicData.failed.length ? '\u26a0\ufe0f' : '\u2705') + ' Loaded ' + clinicData.length.toLocaleString() + ' providers';
                 document.getElementById('welcome-overlay').style.opacity = '0';
                 setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
                 processData(converted);
@@ -827,14 +832,25 @@
             // Each source still paginates sequentially within itself (that part is a
             // real dependency, page 2 needs page 1's offset), but the three sources run
             // concurrently.
+            //
+            // A failed page (the public role's 3-second statement timeout answers
+            // 500 / 57014) is recorded in .failed, never read as "no more rows":
+            // until 2026-10-20 a city or state search silently showed clinics only,
+            // because provider_individuals and clinic_secondary_locations timed out
+            // (no city/state index; migration 039). A source stops at
+            // PROVIDER_SOURCE_CAP rows and is listed in .capped, so a state search
+            // cannot page forever or draw more pins than a browser can hold.
             let total = 0;
+            const failed = [], capped = [];
             const perSource = await Promise.all(PROVIDER_SOURCES.map(async (src) => {
                 const rows = [];
                 let offset = 0;
                 while (true) {
                     const url = `${SUPABASE_URL}/rest/v1/${src.table}?${filterFn()}&select=${src.select}&limit=1000&offset=${offset}`;
-                    const res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
-                    if (!res.ok) break;
+                    let res;
+                    try { res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }); }
+                    catch (e) { failed.push(src.table); break; }
+                    if (!res.ok) { failed.push(src.table); break; }
                     const batch = await res.json();
                     if (!batch || batch.length === 0) break;
                     // _src tags where a row came from -- no stored affiliation link exists
@@ -847,16 +863,45 @@
                     total += batch.length;
                     if (onProgress) onProgress(total);
                     if (batch.length < 1000) break;
+                    if (rows.length >= PROVIDER_SOURCE_CAP) { capped.push(src.table); break; }
                     offset += 1000;
                 }
                 return rows;
             }));
-            return perSource.flat();
+            const all = perSource.flat();
+            all.failed = failed; all.capped = capped;
+            return all;
+        }
+
+        const PROVIDER_SOURCE_CAP = 25000;
+        const SOURCE_WORDS = { clinics: 'organizations', provider_individuals: 'individual clinicians', clinic_secondary_locations: 'secondary practice addresses' };
+        // A notice on the map that stays until the next search: the status line is
+        // rewritten by the filters right after a load, so a warning there vanished.
+        function setLoadWarning(msg) {
+            let w = document.getElementById('load-warning');
+            if (!w) {
+                w = document.createElement('div');
+                w.id = 'load-warning';
+                w.setAttribute('role', 'status');
+                w.style.cssText = 'position:absolute;top:46px;left:50%;transform:translateX(-50%);z-index:800;max-width:min(580px,92%);background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font:500 12px/1.4 "DM Sans",sans-serif;padding:7px 11px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);';
+                (document.getElementById('map-container') || document.body).appendChild(w);
+            }
+            w.textContent = msg || '';
+            w.hidden = !msg;
+        }
+        function loadWarningFor(rows) {
+            const parts = [];
+            const f = [...new Set(rows.failed || [])].map(t => SOURCE_WORDS[t] || t);
+            const c = [...new Set(rows.capped || [])].map(t => SOURCE_WORDS[t] || t);
+            if (f.length) parts.push('Some listings did not load in time (' + f.join(', ') + '), so the map and counts are incomplete. Try again, or search a ZIP.');
+            if (c.length) parts.push('This area has more ' + c.join(' and ') + ' than the map can hold, so it shows the first ' + PROVIDER_SOURCE_CAP.toLocaleString() + ' of each. Search a city or ZIP for full coverage.');
+            return parts.join(' ');
         }
 
         async function searchMultipleZips(zips) {
             const statusEl = document.getElementById('dbStatus');
             statusEl.textContent = `🔄 Loading ${zips.length} ZIPs...`;
+            setLoadWarning('');
             requestZipEnrichment(zips);
             try {
                 // Try both padded and stripped formats
@@ -866,7 +911,8 @@
                     n => statusEl.textContent = `🔄 Loaded ${n} providers...`
                 );
 
-                if (!clinicData.length) { statusEl.textContent = '❌ No clinics found'; return; }
+                if (!clinicData.length) { statusEl.textContent = clinicData.failed.length ? '❌ The directory did not answer in time. Try again.' : '❌ No providers found'; return; }
+                setLoadWarning(loadWarningFor(clinicData));
 
                 // Fetch demographics in batches of 50, all batches in flight together --
                 // same reasoning as fetchProviderRows: nothing here depends on another
@@ -911,6 +957,7 @@
         async function searchMultipleCities(cityStateList) {
             const statusEl = document.getElementById('dbStatus');
             statusEl.textContent = `🔄 Loading ${cityStateList.length} cities...`;
+            setLoadWarning('');
             try {
                 // Same fix as fetchProviderRows: one city's fetch doesn't depend on
                 // another's, so run them concurrently instead of waiting on each in turn.
@@ -930,7 +977,10 @@
                     );
                 }));
                 const clinicData = perCity.flat();
-                if (!clinicData.length) { statusEl.textContent = '❌ No clinics found'; return; }
+                clinicData.failed = perCity.flatMap(r => r.failed || []);
+                clinicData.capped = perCity.flatMap(r => r.capped || []);
+                if (!clinicData.length) { statusEl.textContent = clinicData.failed.length ? '❌ The directory did not answer in time. Try again.' : '❌ No providers found'; return; }
+                setLoadWarning(loadWarningFor(clinicData));
 
                 const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
                 const demByZip = {};
@@ -2064,6 +2114,7 @@
                 // Try both padded and stripped ZIP formats
                 const zipVariants = [...new Set(neighborZipList.flatMap(z => [z, String(parseInt(z, 10))]))];
                 const clinicData = await fetchProviderRows(() => `zip=in.(${zipVariants.join(',')})`);
+                setLoadWarning(loadWarningFor(clinicData));
 
                 // Fetch demographics for neighbor ZIPs
                 const demRes = await fetch(
@@ -3457,6 +3508,7 @@
             if (e.key === 'Enter') goToAddress(document.getElementById('addressInput').value);
         });
         let proceduresRawData = {}; // store for search filtering
+        let procPartial = '';       // set when some ZIP batches failed
 
         function filterProcedures(query) {
             if (procSource !== 'medicare') { renderOtherProcedures(query.trim().toLowerCase()); return; }
@@ -3553,7 +3605,8 @@
 
             const summary = filter
                 ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${totalShown} results for "${filter}" — <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div>`
-                : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">${totalShown.toLocaleString()} procedures across ${Object.keys(bySpec).length} specialties · 2024 Medicare FFS Part B</div>`;
+                : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">${totalShown.toLocaleString()} procedures across ${Object.keys(bySpec).length} specialties · 2024 Medicare FFS Part B</div>` +
+                  (procPartial ? `<div style="font-size:10px;color:var(--orange);margin-bottom:10px;">${escHtml(procPartial)}</div>` : '');
 
             el.innerHTML = summary + html +
                 `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;">
@@ -3566,6 +3619,7 @@
             const searchEl = document.getElementById('proceduresSearch');
             if (searchEl) searchEl.value = '';
             proceduresRawData = {};
+            procPartial = '';
             procZips = zips || [];
             if (procSource !== 'medicare') return fetchOtherProcedures();
 
@@ -3576,26 +3630,39 @@
             el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">⏳ Loading Medicare procedure data...</em>';
 
             try {
-                const zipList = zips.map(z => String(z).padStart(5,'0')).join(',');
-
-                let allRows = [];
-                let offset = 0;
-                while (true) {
-                    const res = await fetch(
-                        `${SUPABASE_URL}/rest/v1/cms_procedures_full?zip=in.(${zipList})&select=specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_sbmtd_chrg,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt&order=specialty,tot_benes.desc&limit=1000&offset=${offset}`,
-                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }
-                    );
-                    const batch = await res.json();
-                    if (!batch || batch.length === 0) break;
-                    allRows = allRows.concat(batch);
-                    if (batch.length < 1000) break;
-                    offset += 1000;
-                }
+                // Ten ZIPs per request: one request for a whole state (84 ZIPs for RI)
+                // timed out (57014), and the old loop read the error body as a page of
+                // rows whose length was undefined, so it re-asked the database without
+                // end (2026-10-20). Errors now stop that batch and are reported; the
+                // order carries tie-breakers so offset paging cannot skip or repeat.
+                const padded = [...new Set(zips.map(z => String(z).padStart(5, '0')))];
+                const batches = [];
+                for (let i = 0; i < padded.length; i += 10) batches.push(padded.slice(i, i + 10));
+                let allRows = [], failedBatches = 0;
+                const runBatch = async (list) => {
+                    for (let offset = 0, pages = 0; pages < 50; offset += 1000, pages++) {
+                        let res;
+                        try {
+                            res = await fetch(
+                                `${SUPABASE_URL}/rest/v1/cms_procedures_full?zip=in.(${list.join(',')})&select=specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_sbmtd_chrg,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt&order=specialty,tot_benes.desc,npi,hcpcs_cd,place_of_service&limit=1000&offset=${offset}`,
+                                { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                        } catch (e) { failedBatches++; return; }
+                        if (!res.ok) { failedBatches++; return; }
+                        const batch = await res.json();
+                        if (!Array.isArray(batch)) { failedBatches++; return; }
+                        allRows = allRows.concat(batch);
+                        if (batch.length < 1000) return;
+                    }
+                };
+                for (let i = 0; i < batches.length; i += 4) await Promise.all(batches.slice(i, i + 4).map(runBatch));
 
                 if (!allRows.length) {
-                    el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">No Medicare procedure data found for these ZIPs.</em>';
+                    el.innerHTML = failedBatches
+                        ? '<em style="color:var(--orange);font-size:12px;">Medicare procedure data did not load in time. Try again, or select fewer ZIPs.</em>'
+                        : '<em style="color:var(--text-muted);font-size:12px;">No Medicare procedure data found for these ZIPs.</em>';
                     return;
                 }
+                procPartial = failedBatches ? failedBatches + ' of ' + batches.length + ' ZIP batches did not load in time, so totals are incomplete.' : '';
 
                 const bySpec = {};
                 allRows.forEach(row => {
