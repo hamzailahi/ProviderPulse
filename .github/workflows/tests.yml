@@ -87,6 +87,9 @@ jobs:
       - name: Insurance plan proposal logic
         run: node scripts/test-payers.mjs
 
+      - name: Procedures panel word search, against CMS's real descriptions
+        run: node scripts/test-procedure-search.mjs
+
       - name: Procedure tables builder (Medicaid and Medicare hospital), end to end on fixtures
         run: |
           pip install -q duckdb==1.1.3

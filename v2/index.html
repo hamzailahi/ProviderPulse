@@ -51,6 +51,7 @@
     <link rel="stylesheet" href="assets/dashboard-v3.css">
     <script src="assets/taxonomy-map.js"></script>
     <script src="assets/specialties.js"></script>
+    <script src="assets/procedure-search.js"></script>
 </head>
 <body>
     <h2>Provider Market Strategy Dashboard</h2>
@@ -3569,6 +3570,9 @@
 
             const sortedSpecs = Object.keys(bySpec).sort();
 
+            // Typed words reach CMS's own wording through procedure-search.js
+            // ("colonoscopy" finds "large bowel using an endoscope").
+            const matches = ProcedureSearch.match(filter);
             sortedSpecs.forEach(specialty => {
                 // Filter by specialty name or procedure
                 const specMatch = !filter || specialty.toLowerCase().includes(filter);
@@ -3582,8 +3586,7 @@
                     .filter(p => {
                         if (!filter) return true;
                         if (specMatch) return true;
-                        return p.hcpcs_cd.toLowerCase().includes(filter) ||
-                               (p.hcpcs_desc || '').toLowerCase().includes(filter);
+                        return matches(p.hcpcs_cd, p.hcpcs_desc);
                     })
                     .sort((a, b) => b.tot_benes - a.tot_benes);
 
@@ -3598,7 +3601,7 @@
                     <div style="font-size:11px;font-weight:600;color:${color};text-transform:uppercase;
                         letter-spacing:0.05em;margin-bottom:6px;padding-bottom:4px;
                         border-bottom:1px solid ${color}44;display:flex;justify-content:space-between;align-items:center;">
-                        <span>${specialty}</span>
+                        <span>${escHtml(specialty)}</span>
                         <span style="font-weight:400;font-size:10px;color:var(--text-muted);">${procs.length} procedure${procs.length !== 1 ? 's' : ''}</span>
                     </div>
                     <div style="overflow-x:auto;">
@@ -3621,8 +3624,8 @@
                                 ? `background:rgba(88,166,255,0.15);border-radius:2px;` : '';
                             return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg-elevated)'" onmouseout="this.style.background=''">
                                 <td style="padding:5px 4px;max-width:180px;">
-                                    <div style="color:var(--text-muted);font-size:9px;${cdHighlight}">${p.hcpcs_cd}</div>
-                                    <div style="color:var(--text-secondary);line-height:1.3;">${p.hcpcs_desc || '—'}</div>
+                                    <div style="color:var(--text-muted);font-size:9px;${cdHighlight}">${escHtml(p.hcpcs_cd)}</div>
+                                    <div style="color:var(--text-secondary);line-height:1.3;">${p.hcpcs_desc ? escHtml(p.hcpcs_desc) : '—'}</div>
                                     <div style="background:var(--bg-elevated);border-radius:2px;height:2px;margin-top:3px;overflow:hidden;">
                                         <div style="width:${barW}%;height:100%;background:${color};border-radius:2px;"></div>
                                     </div>
@@ -3641,12 +3644,14 @@
             });
 
             if (!html) {
-                el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">No results for "${filter}".</em>`;
+                el.innerHTML = procEmptyHtml('medicare', filter);
+                paintCross(filter);
                 return;
             }
 
             const summary = filter
-                ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${totalShown} results for "${filter}" — <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div>`
+                ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${totalShown} results for "${escHtml(filter)}" — <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div>` +
+                  procNoteFor('medicare', filter) + '<div id="procCross"></div>'
                 : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">${totalShown.toLocaleString()} procedures across ${Object.keys(bySpec).length} specialties · 2024 Medicare FFS Part B</div>` +
                   (procPartial ? `<div style="font-size:10px;color:var(--orange);margin-bottom:10px;">${escHtml(procPartial)}</div>` : '');
 
@@ -3655,11 +3660,12 @@
                     Pts = unique Medicare patients · Svcs = total services · Avg Billed = avg submitted charge ·
                     Avg Allowed = avg Medicare allowed amount · Avg Paid = avg Medicare payment
                 </div>`;
+            if (filter) paintCross(filter);
         }
         async function fetchProceduresData(zips) {
             const el = document.getElementById('proceduresContent');
             const searchEl = document.getElementById('proceduresSearch');
-            if (searchEl) searchEl.value = '';
+            if (searchEl) searchEl.value = procPendingFilter;
             proceduresRawData = {};
             procPartial = '';
             procZips = zips || [];
@@ -3670,70 +3676,72 @@
                 return;
             }
             el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">⏳ Loading Medicare procedure data...</em>';
-
-            try {
-                // Ten ZIPs per request: one request for a whole state (84 ZIPs for RI)
-                // timed out (57014), and the old loop read the error body as a page of
-                // rows whose length was undefined, so it re-asked the database without
-                // end (2026-10-20). Errors now stop that batch and are reported; the
-                // order carries tie-breakers so offset paging cannot skip or repeat.
-                const padded = [...new Set(zips.map(z => String(z).padStart(5, '0')))];
-                const batches = [];
-                for (let i = 0; i < padded.length; i += 10) batches.push(padded.slice(i, i + 10));
-                let allRows = [], failedBatches = 0;
-                const runBatch = async (list) => {
-                    for (let offset = 0, pages = 0; pages < 50; offset += 1000, pages++) {
-                        let res;
-                        try {
-                            res = await fetch(
-                                `${SUPABASE_URL}/rest/v1/cms_procedures_full?zip=in.(${list.join(',')})&select=specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_sbmtd_chrg,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt&order=specialty,tot_benes.desc,npi,hcpcs_cd,place_of_service&limit=1000&offset=${offset}`,
-                                { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
-                        } catch (e) { failedBatches++; return; }
-                        if (!res.ok) { failedBatches++; return; }
-                        const batch = await res.json();
-                        if (!Array.isArray(batch)) { failedBatches++; return; }
-                        allRows = allRows.concat(batch);
-                        if (batch.length < 1000) return;
-                    }
-                };
-                for (let i = 0; i < batches.length; i += 4) await Promise.all(batches.slice(i, i + 4).map(runBatch));
-
-                if (!allRows.length) {
-                    el.innerHTML = failedBatches
-                        ? '<em style="color:var(--orange);font-size:12px;">Medicare procedure data did not load in time. Try again, or select fewer ZIPs.</em>'
-                        : '<em style="color:var(--text-muted);font-size:12px;">No Medicare procedure data found for these ZIPs.</em>';
-                    return;
-                }
-                procPartial = failedBatches ? failedBatches + ' of ' + batches.length + ' ZIP batches did not load in time, so totals are incomplete.' : '';
-
-                const bySpec = {};
-                allRows.forEach(row => {
-                    const sp = row.specialty || 'Unknown';
-                    if (!bySpec[sp]) bySpec[sp] = {};
-                    const cd = row.hcpcs_cd;
-                    if (!bySpec[sp][cd]) {
-                        bySpec[sp][cd] = {
-                            hcpcs_cd: cd, hcpcs_desc: row.hcpcs_desc,
-                            tot_benes: 0, tot_srvcs: 0,
-                            avg_sbmtd_chrg: 0, avg_mdcr_alowd_amt: 0,
-                            avg_mdcr_pymt_amt: 0, count: 0
-                        };
-                    }
-                    const p = bySpec[sp][cd];
-                    p.tot_benes          += parseFloat(row.tot_benes || 0);
-                    p.tot_srvcs          += parseFloat(row.tot_srvcs || 0);
-                    p.avg_sbmtd_chrg     += parseFloat(row.avg_sbmtd_chrg || 0);
-                    p.avg_mdcr_alowd_amt += parseFloat(row.avg_mdcr_alowd_amt || 0);
-                    p.avg_mdcr_pymt_amt  += parseFloat(row.avg_mdcr_pymt_amt || 0);
-                    p.count += 1;
-                });
-
-                proceduresRawData = bySpec;
-                renderProceduresHTML(bySpec, '');
-
-            } catch(e) {
-                el.innerHTML = `<em style="color:var(--orange);font-size:12px;">Error: ${e.message}</em>`;
+            const r = await procLoad('medicare');
+            if (procSource !== 'medicare') return;          // switched while loading
+            if (r.error) { el.innerHTML = `<em style="color:var(--orange);font-size:12px;">Error: ${escHtml(r.error)}</em>`; return; }
+            if (!Object.keys(r.bySpec).length) {
+                el.innerHTML = r.failedBatches
+                    ? '<em style="color:var(--orange);font-size:12px;">Medicare procedure data did not load in time. Try again, or select fewer ZIPs.</em>'
+                    : '<em style="color:var(--text-muted);font-size:12px;">No Medicare procedure data found for these ZIPs.</em>';
+                return;
             }
+            procPartial = r.partial;
+            proceduresRawData = r.bySpec;
+            renderProceduresHTML(r.bySpec, takePendingFilter());
+        }
+
+        // Ten ZIPs per request: one request for a whole state (84 ZIPs for RI)
+        // timed out (57014), and the old loop read the error body as a page of
+        // rows whose length was undefined, so it re-asked the database without
+        // end (2026-10-20). Errors now stop that batch and are reported; the
+        // order carries tie-breakers so offset paging cannot skip or repeat.
+        async function loadMedicareProcedures(zips) {
+            const padded = [...new Set(zips.map(z => String(z).padStart(5, '0')))];
+            const batches = [];
+            for (let i = 0; i < padded.length; i += 10) batches.push(padded.slice(i, i + 10));
+            let allRows = [], failedBatches = 0;
+            const runBatch = async (list) => {
+                for (let offset = 0, pages = 0; pages < 50; offset += 1000, pages++) {
+                    let res;
+                    try {
+                        res = await fetch(
+                            `${SUPABASE_URL}/rest/v1/cms_procedures_full?zip=in.(${list.join(',')})&select=specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_sbmtd_chrg,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt&order=specialty,tot_benes.desc,npi,hcpcs_cd,place_of_service&limit=1000&offset=${offset}`,
+                            { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                    } catch (e) { failedBatches++; return; }
+                    if (!res.ok) { failedBatches++; return; }
+                    const batch = await res.json();
+                    if (!Array.isArray(batch)) { failedBatches++; return; }
+                    allRows = allRows.concat(batch);
+                    if (batch.length < 1000) return;
+                }
+            };
+            for (let i = 0; i < batches.length; i += 4) await Promise.all(batches.slice(i, i + 4).map(runBatch));
+
+            const bySpec = {};
+            allRows.forEach(row => {
+                const sp = row.specialty || 'Unknown';
+                if (!bySpec[sp]) bySpec[sp] = {};
+                const cd = row.hcpcs_cd;
+                if (!bySpec[sp][cd]) {
+                    bySpec[sp][cd] = {
+                        hcpcs_cd: cd, hcpcs_desc: row.hcpcs_desc,
+                        tot_benes: 0, tot_srvcs: 0,
+                        avg_sbmtd_chrg: 0, avg_mdcr_alowd_amt: 0,
+                        avg_mdcr_pymt_amt: 0, count: 0
+                    };
+                }
+                const p = bySpec[sp][cd];
+                p.tot_benes          += parseFloat(row.tot_benes || 0);
+                p.tot_srvcs          += parseFloat(row.tot_srvcs || 0);
+                p.avg_sbmtd_chrg     += parseFloat(row.avg_sbmtd_chrg || 0);
+                p.avg_mdcr_alowd_amt += parseFloat(row.avg_mdcr_alowd_amt || 0);
+                p.avg_mdcr_pymt_amt  += parseFloat(row.avg_mdcr_pymt_amt || 0);
+                p.count += 1;
+            });
+            return {
+                bySpec, failedBatches,
+                partial: failedBatches ? failedBatches + ' of ' + batches.length + ' ZIP batches did not load in time, so totals are incomplete.' : ''
+            };
         }
 
         /* ---- Procedures: Medicaid and Medicare hospital sources (migration 036) ----
@@ -3743,6 +3751,87 @@
         try { const v = localStorage.getItem('pp.dash.procSource'); if (['medicare', 'outpatient', 'inpatient', 'medicaid'].includes(v)) procSource = v; } catch (e) {}
         let procZips = [];
         let otherProcData = null;        // { source, groups: {name: [rows]}, year }
+        // Every source loaded for the area in view, so one search can say where
+        // else a code appears without reloading (2026-10-20). Keyed by the ZIP
+        // list; a failed load is dropped, never cached (it would read as "none").
+        let procCache = { key: '', data: {}, failed: {} };
+        let procPendingFilter = '';      // a search carried into another source
+        const PROC_ALL = ['medicare', 'outpatient', 'inpatient', 'medicaid'];
+        const PROC_CROSS_MAX_ZIPS = 100; // above this, other sources load only when picked
+        function procKey() { return procZips.map(z => String(z).padStart(5, '0')).sort().join(','); }
+        function procLabel(src) { return src === 'medicare' ? 'Medicare clinicians' : PROC_SOURCES[src].label; }
+        function takePendingFilter() { const f = procPendingFilter.trim().toLowerCase(); procPendingFilter = ''; return f; }
+        // A load that failed, even in part, is returned once and not kept: the
+        // next pick of that source asks again. `failed` stops the "also in"
+        // line from re-asking on every keystroke.
+        function procLoad(src) {
+            if (procCache.key !== procKey()) procCache = { key: procKey(), data: {}, failed: {} };
+            const { data, failed } = procCache;
+            if (!data[src]) {
+                const entry = data[src] = {};
+                const drop = () => { if (data[src] === entry) delete data[src]; failed[src] = true; };
+                entry.promise = (src === 'medicare' ? loadMedicareProcedures(procZips) : loadOtherProcedures(src, procZips))
+                    .then(v => { if (v && v.failedBatches) drop(); else { entry.value = v; delete failed[src]; } return v; },
+                          e => { drop(); return { error: (e && e.message) || String(e) }; });
+            }
+            return data[src].promise;
+        }
+        // {group, code, description} for every row a loaded source holds.
+        function procItems(src, v) {
+            const out = [];
+            if (src === 'medicare') Object.keys(v.bySpec).forEach(g => Object.values(v.bySpec[g]).forEach(p => out.push({ group: g, code: p.hcpcs_cd, description: p.hcpcs_desc })));
+            else Object.keys(v.groups).forEach(g => v.groups[g].forEach(p => out.push({ group: g, code: p.code, description: p.description })));
+            return out;
+        }
+        // Why a source can be empty for a search. Shown with every empty result.
+        const PROC_WHY = {
+            medicare: "Traditional Medicare covers people 65 and older and some younger people with disabilities, and CMS leaves out any code a clinician billed for fewer than 11 Medicare patients in the year, so pregnancy, newborn and most children's care barely appear. Each row sits at the address the clinician bills Medicare from, often a group's main office rather than every clinic.",
+            medicaid: "HHS withholds any provider, code and month with fewer than 12 patients, and each row sits at the provider's listed ZIP.",
+            hospital: 'Hospital data lists payment groups (APC for outpatient, DRG for inpatient), not CPT or HCPCS codes, and covers the nearest hospitals only. Search a word to compare.'
+        };
+        function procWhy(src) { return src === 'medicare' || src === 'medicaid' ? PROC_WHY[src] : PROC_WHY.hospital; }
+        function procEmptyHtml(src, filter) {
+            return `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">Nothing in ${escHtml(procLabel(src))} matches "${escHtml(filter)}" in this area.</div>` +
+                `<div style="font-size:11px;color:var(--text-muted);line-height:1.45;margin-bottom:10px;">${escHtml(procWhy(src))}</div><div id="procCross"></div>`;
+        }
+        // Pregnancy searches on Medicare get the reason up front, results or not.
+        function procNoteFor(src, filter) {
+            const preg = ['pregnancy', 'prenatal', 'obstetric', 'ob', 'delivery', 'c section', 'c-section', 'cesarean'];
+            if (src !== 'medicare' || !ProcedureSearch.aliasesIn(filter).some(k => preg.includes(k))) return '';
+            return `<div style="font-size:10px;color:var(--text-muted);line-height:1.45;margin-bottom:8px;">${escHtml(PROC_WHY.medicare)} Medicaid carries most pregnancy care.</div>`;
+        }
+        // "Also in other sources": how many codes match the search in each other
+        // source for this area, as buttons that switch source and keep the search.
+        function paintCross(filter) {
+            const box = document.getElementById('procCross');
+            if (!box || !filter || !procZips.length) return;
+            const matches = ProcedureSearch.match(filter);
+            const parts = [];
+            PROC_ALL.filter(src => src !== procSource).forEach(src => {
+                const c = procCache.key === procKey() ? procCache.data[src] : null;
+                const label = escHtml(procLabel(src));
+                if (c && c.value) {
+                    const codes = new Set(procItems(src, c.value).filter(it => matches(it.code, it.description) || String(it.group).toLowerCase().includes(filter)).map(it => it.code));
+                    parts.push(codes.size
+                        ? `<button type="button" class="proc-src proc-cross" data-src="${src}">${label}: ${codes.size} code${codes.size !== 1 ? 's' : ''}</button>`
+                        : `<span>${label}: none</span>`);
+                } else if (procCache.key === procKey() && procCache.failed[src]) {
+                    parts.push(`<button type="button" class="proc-src proc-cross" data-src="${src}">${label}: did not load, try there</button>`);
+                } else if (procZips.length <= PROC_CROSS_MAX_ZIPS) {
+                    parts.push(`<span>${label}: checking…</span>`);
+                    procLoad(src).then(() => {
+                        const now = (document.getElementById('proceduresSearch') || {}).value || '';
+                        if (now.trim().toLowerCase() === filter) paintCross(filter);
+                    });
+                } else {
+                    parts.push(`<button type="button" class="proc-src proc-cross" data-src="${src}">${label}: search there</button>`);
+                }
+            });
+            const codeLike = /^[a-z]?\d{4,5}[a-z]?$/i.test(filter);
+            box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:10px;color:var(--text-muted);margin-bottom:10px;">Also in other sources: ${parts.join(' ')}</div>` +
+                (codeLike && procSource !== 'outpatient' && procSource !== 'inpatient' ? '<div style="font-size:10px;color:var(--text-muted);margin:-4px 0 10px;">Hospital sources list payment groups (APC, DRG), not CPT or HCPCS codes, so a code search finds nothing there.</div>' : '');
+            box.querySelectorAll('.proc-cross').forEach(b => b.addEventListener('click', () => setProcSource(b.dataset.src, filter)));
+        }
         const PROC_SOURCES = {
             outpatient: { label: 'Medicare hospital outpatient', group: 'hospital', unitNote: 'Hospital outpatient services billed to traditional Medicare, by payment group (APC)',
                 cols: [['patients', 'Pts', 'n'], ['services', 'Svcs', 'n'], ['avg_charge', 'Avg Billed', '$'], ['avg_allowed', 'Avg Allowed', '$'], ['avg_paid', 'Avg Paid', '$']],
@@ -3755,13 +3844,14 @@
                 foot: 'Claims = claim lines · Pt-months = monthly unique patients added across months (a patient seen in three months counts three times, so it is not a head count) · Total Paid = Medicaid paid · Paid/Claim = Total Paid ÷ Claims. HHS withholds any provider-code-month with fewer than 12 patients, so small practices undercount. State data quality varies.' }
         };
 
-        function setProcSource(src) {
+        function setProcSource(src, keepFilter) {
             procSource = src;
+            procPendingFilter = keepFilter || '';
             try { localStorage.setItem('pp.dash.procSource', src); } catch (e) {}
             document.querySelectorAll('#procSourceToggle .proc-src').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.src === src)));
             const searchEl = document.getElementById('proceduresSearch');
             if (searchEl) {
-                searchEl.value = '';
+                searchEl.value = procPendingFilter;
                 searchEl.placeholder = src === 'medicare' ? 'Search by HCPCS code, description, or specialty...'
                     : src === 'medicaid' ? 'Search by code, description, or specialty...' : 'Search by code, description, or hospital...';
             }
@@ -3770,7 +3860,7 @@
                 `<em style="color:var(--text-muted);font-size:12px;">Click a ZIP boundary or search a ZIP to load ${escHtml(src === 'medicare' ? 'Medicare' : PROC_SOURCES[src].label)} procedure data.</em>`;
         }
         document.querySelectorAll('#procSourceToggle .proc-src').forEach(b => {
-            b.addEventListener('click', () => setProcSource(b.dataset.src));
+            b.addEventListener('click', () => setProcSource(b.dataset.src, (document.getElementById('proceduresSearch') || {}).value || ''));
             b.setAttribute('aria-pressed', String(b.dataset.src === procSource));
         });
 
@@ -3829,55 +3919,74 @@
             otherProcData = null; groupOrder = {}; hospitalRadius = null;
             if (!procZips.length) { el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">No ZIPs loaded.</em>'; return; }
             el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">⏳ Loading ${escHtml(cfg.label)} procedure data...</em>`;
-            const zipList = procZips.map(z => String(z).padStart(5, '0')).join(',');
-            try {
-                const groups = {}; let year = null;
-                if (src === 'medicaid') {
-                    const rows = await procPaged(`medicaid_procedures?zip=in.(${zipList})&select=specialty,code,claims,patient_months,paid,providers,year&order=specialty,code`);
-                    const codes = [...new Set(rows.map(r => r.code))];
-                    const desc = {};
-                    for (let i = 0; i < codes.length; i += 150) {
-                        const chunk = codes.slice(i, i + 150).map(c => encodeURIComponent(c)).join(',');
-                        (await procPaged(`procedure_codes?code=in.(${chunk})&select=code,description`)).forEach(d => { desc[d.code] = d.description; });
-                    }
-                    const by = {};
+            const r = await procLoad(src);
+            if (procSource !== src) return;                   // switched while loading
+            if (r.error) {
+                el.innerHTML = r.error === 'not loaded yet'
+                    ? `<em style="color:var(--text-muted);font-size:12px;">${escHtml(cfg.label)} procedure data has not been loaded yet.</em>`
+                    : `<em style="color:var(--orange);font-size:12px;">Error: ${escHtml(r.error)}</em>`;
+                return;
+            }
+            if (!Object.keys(r.groups).length) {
+                el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">No ${escHtml(cfg.label)} procedure data ${src === 'medicaid' ? 'for these ZIPs' : 'for hospitals within 50 miles'}.</em>`;
+                return;
+            }
+            groupOrder = r.groupOrder; hospitalRadius = r.radius;
+            otherProcData = { source: src, groups: r.groups, year: r.year };
+            renderOtherProcedures(takePendingFilter());
+        }
+
+        // Loads one non-Part-B source for the ZIPs, without touching the page.
+        async function loadOtherProcedures(src, zips) {
+            const pad = [...new Set(zips.map(z => String(z).padStart(5, '0')))];
+            const groups = {}, order = {}; let year = null, radius = null;
+            if (src === 'medicaid') {
+                // 50 ZIPs per request, four at a time: one request naming every
+                // ZIP in a state is a URL too long to send and a query too slow.
+                const chunks = [];
+                for (let i = 0; i < pad.length; i += 50) chunks.push(pad.slice(i, i + 50));
+                let rows = [];
+                for (let i = 0; i < chunks.length; i += 4) {
+                    (await Promise.all(chunks.slice(i, i + 4).map(c => procPaged(`medicaid_procedures?zip=in.(${c.join(',')})&select=specialty,code,claims,patient_months,paid,providers,year&order=specialty,code`))))
+                        .forEach(r => { rows = rows.concat(r); });
+                }
+                const codes = [...new Set(rows.map(r => r.code))];
+                const desc = {};
+                for (let i = 0; i < codes.length; i += 150) {
+                    const chunk = codes.slice(i, i + 150).map(c => encodeURIComponent(c)).join(',');
+                    (await procPaged(`procedure_codes?code=in.(${chunk})&select=code,description`)).forEach(d => { desc[d.code] = d.description; });
+                }
+                const by = {};
+                rows.forEach(r => {
+                    year = r.year;
+                    const k = r.specialty + '\u0000' + r.code;
+                    const p = by[k] || (by[k] = { group: r.specialty, code: r.code, description: desc[r.code] || null, claims: 0, patient_months: 0, paid: 0, providers: 0 });
+                    p.claims += Number(r.claims) || 0; p.patient_months += Number(r.patient_months) || 0;
+                    p.paid += Number(r.paid) || 0; p.providers += Number(r.providers) || 0;
+                });
+                Object.values(by).forEach(p => { p.per_claim = p.claims ? p.paid / p.claims : null; (groups[p.group] = groups[p.group] || []).push(p); });
+            } else {
+                // Hospitals bill under one address per hospital (often a system's
+                // parent campus), so most ZIPs hold none: list the nearest within
+                // 25 miles of the area's centre (50 if none), not exact ZIP matches.
+                // Outpatient and inpatient share one lookup per area.
+                const data = procCache.data;
+                if (!data.__near) data.__near = nearbyHospitals(zips).catch(e => { delete data.__near; throw e; });
+                const near = await data.__near;
+                radius = near.radius;
+                if (near.hospitals.length) {
+                    const byCcn = {}; near.hospitals.forEach(h => { byCcn[h.ccn] = h; });
+                    const rows = await procPaged(`medicare_hospital_procedures?ccn=in.(${near.hospitals.map(h => encodeURIComponent(h.ccn)).join(',')})&setting=eq.${src}&select=ccn,hospital,code,description,patients,services,avg_charge,avg_allowed,avg_paid,year&order=ccn,code`);
                     rows.forEach(r => {
                         year = r.year;
-                        const k = r.specialty + '\u0000' + r.code;
-                        const p = by[k] || (by[k] = { group: r.specialty, code: r.code, description: desc[r.code] || null, claims: 0, patient_months: 0, paid: 0, providers: 0 });
-                        p.claims += Number(r.claims) || 0; p.patient_months += Number(r.patient_months) || 0;
-                        p.paid += Number(r.paid) || 0; p.providers += Number(r.providers) || 0;
+                        const h = byCcn[r.ccn], d = h && h.miles != null ? h.miles : null;
+                        const name = r.hospital + (d == null ? ' · in this ZIP' : ' · ' + (d < 1 ? 'under 1' : Math.round(d)) + ' mi');
+                        (groups[name] = groups[name] || []).push({ ...r, group: name });
+                        order[name] = d == null ? -1 : d;
                     });
-                    Object.values(by).forEach(p => { p.per_claim = p.claims ? p.paid / p.claims : null; (groups[p.group] = groups[p.group] || []).push(p); });
-                } else {
-                    // Hospitals bill under one address per hospital (often a system's
-                    // parent campus), so most ZIPs hold none: list the nearest within
-                    // 25 miles of the area's centre (50 if none), not exact ZIP matches.
-                    const near = await nearbyHospitals(procZips);
-                    hospitalRadius = near.radius;
-                    if (near.hospitals.length) {
-                        const byCcn = {}; near.hospitals.forEach(h => { byCcn[h.ccn] = h; });
-                        const rows = await procPaged(`medicare_hospital_procedures?ccn=in.(${near.hospitals.map(h => encodeURIComponent(h.ccn)).join(',')})&setting=eq.${src}&select=ccn,hospital,code,description,patients,services,avg_charge,avg_allowed,avg_paid,year&order=ccn,code`);
-                        rows.forEach(r => {
-                            year = r.year;
-                            const h = byCcn[r.ccn], d = h && h.miles != null ? h.miles : null;
-                            const name = r.hospital + (d == null ? ' · in this ZIP' : ' · ' + (d < 1 ? 'under 1' : Math.round(d)) + ' mi');
-                            (groups[name] = groups[name] || []).push({ ...r, group: name });
-                            groupOrder[name] = d == null ? -1 : d;
-                        });
-                    }
                 }
-                if (!Object.keys(groups).length) {
-                    el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">No ${escHtml(cfg.label)} procedure data ${src === 'medicaid' ? 'for these ZIPs' : 'for hospitals within 50 miles'}.</em>`;
-                    return;
-                }
-                otherProcData = { source: src, groups, year };
-                renderOtherProcedures('');
-            } catch (e) {
-                el.innerHTML = e.message === 'not loaded yet'
-                    ? `<em style="color:var(--text-muted);font-size:12px;">${escHtml(cfg.label)} procedure data has not been loaded yet.</em>`
-                    : `<em style="color:var(--orange);font-size:12px;">Error: ${escHtml(e.message)}</em>`;
             }
+            return { groups, year, radius, groupOrder: order };
         }
 
         function renderOtherProcedures(filter) {
@@ -3894,10 +4003,11 @@
                 ? Object.keys(otherProcData.groups).sort((a, b) => (groupOrder[a] ?? 999) - (groupOrder[b] ?? 999))
                 : Object.keys(otherProcData.groups).sort((a, b) =>
                     otherProcData.groups[b].reduce((s, p) => s + (p[sortKey] || 0), 0) - otherProcData.groups[a].reduce((s, p) => s + (p[sortKey] || 0), 0));
+            const matches = ProcedureSearch.match(filter);
             names.forEach(name => {
                 const groupMatch = !filter || name.toLowerCase().includes(filter);
                 const procs = otherProcData.groups[name]
-                    .filter(p => groupMatch || String(p.code).toLowerCase().includes(filter) || (p.description || '').toLowerCase().includes(filter))
+                    .filter(p => groupMatch || matches(p.code, p.description))
                     .sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0));
                 if (!procs.length) return;
                 shown += procs.length;
@@ -3921,12 +4031,13 @@
                     </tr>`).join('')}
                     </tbody></table></div></div>`;
             });
-            if (!html) { el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">No results for "${escHtml(filter)}".</em>`; return; }
+            if (!html) { el.innerHTML = procEmptyHtml(otherProcData.source, filter); paintCross(filter); return; }
             const groupWord = cfg.group === 'hospital' ? 'hospitals' : 'specialties';
             const summary = filter
-                ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${shown} results for "${escHtml(filter)}" — <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div>`
+                ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${shown} results for "${escHtml(filter)}" — <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div><div id="procCross"></div>`
                 : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">${cfg.group === 'hospital' && hospitalRadius ? `Nearest hospitals within ${hospitalRadius} miles, closest first (distance from the centre of the area in view; a hospital is listed at the address it bills Medicare under). ` : ''}${shown.toLocaleString()} code${shown !== 1 ? 's' : ''} across ${names.length} ${names.length !== 1 ? groupWord : groupWord.replace(/ies$/, 'y').replace(/s$/, '')} · ${escHtml(otherProcData.year || '')} ${escHtml(cfg.unitNote)}</div>`;
             el.innerHTML = summary + html + `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;">${escHtml(cfg.foot)}</div>`;
+            if (filter) paintCross(filter);
         }
 
         function getSpecColor(specialty) {

@@ -532,6 +532,7 @@ node scripts/test-payers.mjs              # the insurance plan proposal: names, 
 python3 scripts/test-procedure-tables.py  # the Medicaid and Medicare hospital procedure builder, end to end on small files (needs duckdb)
 node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list, specialty coverage
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
+node scripts/test-procedure-search.mjs    # the procedures search: words like "colonoscopy" find CMS's own wording, checked against real descriptions
 ```
 
 The frontends are checked by driving them in a headless browser against
@@ -591,9 +592,30 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   top bar brings them back. A specialty picked in the filters now carries
   over to the next search instead of the map quietly showing everything
   under a filter that still named one specialty.
+- **The procedures search understands the words clinicians use.** CMS
+  writes its own plain-language descriptions, so a colonoscopy reads
+  "Biopsy of large bowel using a flexible endoscope" and searching
+  "colonoscopy" found almost nothing, although Fort Worth gastroenterologists
+  bill thousands of them to Medicare. Common words (colonoscopy, EGD, ERCP,
+  Pap smear, mammogram, pregnancy ultrasound, delivery, echo, EKG, knee
+  replacement and others) now reach CMS's wording, and every one is tested
+  against CMS's real descriptions.
+- **One search covers every procedure source.** Searching in any source now
+  adds a line saying how many matching codes the other sources hold for the
+  same area (Medicare clinicians, hospital outpatient, hospital inpatient,
+  Medicaid), and one click switches source with the search kept. Medicaid
+  now loads 50 ZIPs per request, so a state search no longer fails.
+- **An empty search says why.** Traditional Medicare covers people 65 and
+  older, and CMS drops any code a clinician billed for fewer than 11
+  Medicare patients, so pregnancy care barely appears there: Fort Worth has
+  no Medicare rows for deliveries or pregnancy ultrasounds, while Medicaid
+  holds thousands of ultrasound claims. The panel now says this, and notes
+  that hospital sources list payment groups rather than CPT codes.
 - **A check for missing procedure data.** A manual, read-only job replays
   the Medicare procedures panel for a city and compares what it loads with
-  the table itself, to find where rows go missing.
+  the table itself and with CMS's own file. For Fort Worth the panel loaded
+  every row the table holds (266 OB-GYN rows from 57 clinicians, all the GI
+  codes), and the table matches CMS's 2024 release exactly.
 - **The dashboard's address follows the search.** After each search the
   link names the area and specialty, so a refresh, a bookmark or a shared
   link reopens the same view, and the browser's Back button returns to the

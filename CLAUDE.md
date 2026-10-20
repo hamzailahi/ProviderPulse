@@ -78,6 +78,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code`), `milesBetween`, MapTiler key, ZIP centroid lookup |
 | `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (40: all but `NOT_SCORED`: Hospital-based clinicians, Other health services, Nursing (RN, LPN) and Physician assistant) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
 | `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
+| `procedure-search.js` | the dashboard Procedures panel's search: common words ("colonoscopy", "EGD") to CMS's own description wording, tested against real descriptions; browser + `require` |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
 | `demand-model.js` | the learned demand model (ridge regression per specialty, state-held-out validation, `addAcs`/`addPlaces` area builders shared by trainer and scorer); browser + `require` |
 
@@ -869,8 +870,30 @@ Tables:
   what the panel gets for a ZIP through the public key beside direct counts
   and the tables' policies.
   The panel toggle (`procSource`, `pp.dash.procSource` in localStorage)
-  leaves the Medicare Part B path untouched; the other sources render with
-  `escHtml`. Private insurance has no public volume data (Transparency in
+  switches source; every source renders with `escHtml` (the Part B renderer
+  did not escape until 2026-10-20). **Searching (2026-10-20):** a doctor
+  shown Fort Worth gastroenterology found nothing for "colonoscopy" while
+  45380/45385 held thousands of patients, because CMS's descriptions use
+  their own words ("large bowel using an endoscope"). `assets/procedure-search.js`
+  (`ALIASES`, `match`) maps common words to CMS phrases, each checked
+  against `supabase/reference/procedure-codes.csv` (dumped from
+  `procedure_codes` by `procedure-codes-reference.yml`) in
+  `scripts/test-procedure-search.mjs`; never add a phrase the test cannot
+  find. Every source loads through `procLoad(src)`, cached per ZIP list in
+  `procCache` (a failed or partial load is never kept; `failed` stops
+  retries from the "also in" line), and a search adds
+  `paintCross(filter)`: matching codes per other source, loading them in
+  the background when the area has at most 100 ZIPs, as buttons that call
+  `setProcSource(src, filter)` and keep the search. Empty results say why
+  (`PROC_WHY`: Medicare is 65+ and drops codes under 11 patients, so
+  pregnancy care barely appears; Medicaid withholds under 12; hospital
+  sources list APC/DRG groups, not CPT codes). Medicaid loads 50 ZIPs per
+  request. `procedures-panel-check.yml` replays the Part B loader for a city
+  and compares it with direct queries, the Medicaid table and CMS's own file
+  per data year; for Fort Worth (58 ZIPs) the panel loaded every row the
+  table holds, and the table matched CMS's **2024** file exactly for 20 of
+  20 sampled gastroenterologists (231 rows each side; 2023 and 2022 did
+  not), so `cms_procedures_full` is the complete 2024 release. Private insurance has no public volume data (Transparency in
   Coverage files are prices without volumes; state APCDs are restricted).
 - `insurance_payers`: national + per-state plans, public read.
 - `leie_exclusions`: `id` primary key (**not** NPI: most rows have none, and
@@ -1489,6 +1512,7 @@ node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, pri
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
+node scripts/test-procedure-search.mjs    # 156: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```
 
 Frontends are verified in headless Chromium (Playwright) against mocked
