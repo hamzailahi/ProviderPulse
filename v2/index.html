@@ -229,11 +229,13 @@
                     </div>
                     <div class="kpi-box">
                         <div class="kpi-val" id="kpi-rate" style="color:var(--green)">--</div>
-                        <div class="kpi-label">Insured Rate</div>
+                        <div class="kpi-label">Insured</div>
+                        <div class="kpi-sub" id="kpi-rate-sub"></div>
                     </div>
                     <div class="kpi-box">
                         <div class="kpi-val" id="kpi-uninsured" style="color:var(--red)">--</div>
-                        <div class="kpi-label">Uninsured Pop</div>
+                        <div class="kpi-label">Uninsured</div>
+                        <div class="kpi-sub" id="kpi-uninsured-sub"></div>
                     </div>
                     <div class="kpi-box">
                         <div class="kpi-val" id="kpi-hh" style="color:var(--cyan)">--</div>
@@ -242,12 +244,12 @@
                 </div>
 
                                                 <div class="chart-card">
-                    <h4>Insurance Rate by Age Group</h4>
+                    <h4>Insured and Uninsured People by Age</h4>
                     <div class="chart-wrapper"><canvas id="ageChart"></canvas></div>
                 </div>
 
                 <div class="chart-card">
-                    <h4>Insurance Rate by Household Income</h4>
+                    <h4>Insured and Uninsured People by Household Income</h4>
                     <div class="chart-wrapper"><canvas id="incomeChart"></canvas></div>
                 </div>
 
@@ -263,7 +265,7 @@
                         <div id="acs-note" style="font-size:10.5px;color:var(--text-muted);line-height:1.45;"></div>
                     </div>
                     <div class="chart-card">
-                        <h4>Household Income, Detailed</h4>
+                        <h4>Households by Income, Detailed</h4>
                         <div class="chart-wrapper" style="height: 170px;"><canvas id="acsIncomeChart"></canvas></div>
                     </div>
                     <div class="chart-card">
@@ -271,11 +273,11 @@
                         <div class="chart-wrapper" style="height: 200px;"><canvas id="acsAgeChart"></canvas></div>
                     </div>
                     <div class="chart-card">
-                        <h4>Race and Ethnicity (share of population)</h4>
+                        <h4>Race and Ethnicity (people)</h4>
                         <div class="chart-wrapper" style="height: 200px;"><canvas id="acsRaceChart"></canvas></div>
                     </div>
                     <div class="chart-card">
-                        <h4>Education, Adults 25 and Over</h4>
+                        <h4>Education, Adults 25 and Over (people)</h4>
                         <div class="chart-wrapper" style="height: 170px;"><canvas id="acsEduChart"></canvas></div>
                     </div>
                 </div>
@@ -2672,12 +2674,30 @@
         };
 
         // --- UNIVERSAL CHART DRAWING LOGIC ---
+        // A count as people read it: full digits up to a million, then 1.2M.
+        function fmtCount(n) {
+            if (n == null || !isFinite(n)) return '--';
+            n = Math.round(n);
+            return Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n.toLocaleString();
+        }
+        // Chart tooltips: the count, then its share of the bar or of a total.
+        function countTip(totalOf) {
+            return c => {
+                const v = Number(c.raw) || 0;
+                const tot = totalOf ? totalOf(c) : c.chart.data.datasets.reduce((a, d) => a + (Number(d.data[c.dataIndex]) || 0), 0);
+                return c.dataset.label + ': ' + Math.round(v).toLocaleString() + (tot ? ' (' + (v / tot * 100).toFixed(1) + '%)' : '');
+            };
+        }
+        const countTicks = v => Math.abs(v) >= 1e6 ? (v / 1e6) + 'M' : Math.abs(v) >= 1e3 ? (v / 1e3) + 'k' : v;
+
         function renderDashboard(r) {
             if (!r || Object.keys(r).length === 0 || (r['Total Population'] || 0) === 0) {
                 document.getElementById('kpi-pop').textContent = '--'; 
                 document.getElementById('kpi-rate').textContent = '--'; 
                 document.getElementById('kpi-uninsured').textContent = '--';
                 document.getElementById('kpi-hh').textContent = '--';
+                document.getElementById('kpi-rate-sub').textContent = '';
+                document.getElementById('kpi-uninsured-sub').textContent = '';
                 if(dashCharts.age) dashCharts.age.destroy(); 
                 if(dashCharts.inc) dashCharts.inc.destroy(); 
                 if(dashCharts.race) dashCharts.race.destroy();
@@ -2693,10 +2713,13 @@
             const insuredRate = ((totalInsured / totalPop) * 100).toFixed(1);
             const totalHH = getV('Total: HH Income Pop');
 
-            document.getElementById('kpi-pop').textContent = totalPop >= 10000 ? (totalPop/1000).toFixed(1)+'k' : totalPop.toLocaleString();
-            document.getElementById('kpi-rate').textContent = `${insuredRate}%`;
-            document.getElementById('kpi-uninsured').textContent = uninsuredPop >= 10000 ? (uninsuredPop/1000).toFixed(1)+'k' : uninsuredPop.toLocaleString();
-            document.getElementById('kpi-hh').textContent = totalHH >= 10000 ? (totalHH/1000).toFixed(1)+'k' : totalHH.toLocaleString();
+            // Numbers first, the share small underneath (the user's call, 2026-10-20).
+            document.getElementById('kpi-pop').textContent = fmtCount(totalPop);
+            document.getElementById('kpi-rate').textContent = fmtCount(totalInsured);
+            document.getElementById('kpi-rate-sub').textContent = insuredRate + '% of residents';
+            document.getElementById('kpi-uninsured').textContent = fmtCount(uninsuredPop);
+            document.getElementById('kpi-uninsured-sub').textContent = (100 - insuredRate).toFixed(1) + '% of residents';
+            document.getElementById('kpi-hh').textContent = fmtCount(totalHH);
 
             dashCharts = drawDashboardCharts(r, 'ageChart', 'incomeChart', 'raceChart', dashCharts);
             renderAcsDetail();
@@ -2756,12 +2779,12 @@
             const now = rows.reduce((a, r) => a + N(r.pop_total), 0), then = rows.reduce((a, r) => a + N(r.pop_prior), 0);
             if (rows.every(r => r.pop_prior != null && r.pop_total != null) && then > 0) {
                 const ch = (now - then) / then * 100;
-                if (Math.abs(ch) <= 50) out.push(['Population change since ' + rows[0].pop_prior_year, (ch >= 0 ? '+' : '') + ch.toFixed(1) + '%']);
+                if (Math.abs(ch) <= 50) out.push(['Population change since ' + rows[0].pop_prior_year, (now >= then ? '+' : '') + fmtCount(now - then), (ch >= 0 ? '+' : '') + ch.toFixed(1) + '%']);
             }
             SIGNAL_BOXES.forEach(([k, label]) => {
                 if (!rows.every(r => r.signals && r.signals[k] && r.signals[k].n != null && r.signals[k].of > 0)) return;
                 const n = rows.reduce((a, r) => a + N(r.signals[k].n), 0), of = rows.reduce((a, r) => a + N(r.signals[k].of), 0);
-                out.push([label, (of ? (n / of * 100).toFixed(1) : '--') + '%']);
+                out.push([label, fmtCount(n), (of ? (n / of * 100).toFixed(1) : '--') + '% of ' + fmtCount(of)]);
             });
             return out;
         }
@@ -2797,48 +2820,51 @@
             const insMd = hasMd ? rows.reduce((a, r) => a + N(r.ins_medicaid), 0) : null;
             // The top boxes use the Census's own uninsured count when it covers the whole view.
             if (hasIns && insU > 0 && rows.length === asked) {
-                const k = v => v >= 10000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v).toLocaleString();
-                document.getElementById('kpi-uninsured').textContent = k(insNo);
-                document.getElementById('kpi-rate').textContent = ((1 - insNo / insU) * 100).toFixed(1) + '%';
+                document.getElementById('kpi-uninsured').textContent = fmtCount(insNo);
+                document.getElementById('kpi-uninsured-sub').textContent = (insNo / insU * 100).toFixed(1) + '% of residents';
+                document.getElementById('kpi-rate').textContent = fmtCount(insU - insNo);
+                document.getElementById('kpi-rate-sub').textContent = ((1 - insNo / insU) * 100).toFixed(1) + '% of residents';
             }
 
             document.getElementById('acs-title').textContent = 'Census detail' + (single ? ' · ZIP ' + rows[0].zip : ' · ' + rows.length + ' ZIPs') +
                 ' (ACS ' + (rows[0].acs_year || '') + ' 5-year)';
             const kp = document.getElementById('acs-kpis');
             while (kp.firstChild) kp.removeChild(kp.firstChild);
+            const share = (a, b, of) => b ? fmtPct(pct(a, b)) + ' ' + of : '';
             [[single ? 'Median household income' : 'Median income (avg. of ZIPs)', acsFmtMoney(median)],
-             ['Below poverty line', fmtPct(pct(povB, povU))],
-             ['Households $100k+', fmtPct(pct(high100, hh))],
-             ['Households $200k+', fmtPct(pct(high200, hh))],
-             ["Bachelor's or higher", fmtPct(pct(bachPlus, N(edu.universe)))],
-             ...(hasIns ? [['Uninsured', Math.round(insNo).toLocaleString() + ' · ' + fmtPct(pct(insNo, insU))]] : []),
-             ...(insMc != null && insU ? [['On Medicare', Math.round(insMc).toLocaleString() + ' · ' + fmtPct(pct(insMc, insU))]] : []),
-             ...(insMd != null && insU ? [['On Medicaid', Math.round(insMd).toLocaleString() + ' · ' + fmtPct(pct(insMd, insU))]] : []),
+             ['Below poverty line', povU ? fmtCount(povB) : '--', share(povB, povU, 'of residents')],
+             ['Households $100k+', hh ? fmtCount(high100) : '--', share(high100, hh, 'of households')],
+             ['Households $200k+', hh ? fmtCount(high200) : '--', share(high200, hh, 'of households')],
+             ["Bachelor's or higher", N(edu.universe) ? fmtCount(bachPlus) : '--', share(bachPlus, N(edu.universe), 'of adults 25+')],
+             ...(hasIns ? [['Uninsured', fmtCount(insNo), share(insNo, insU, 'of residents')]] : []),
+             ...(insMc != null && insU ? [['On Medicare', fmtCount(insMc), share(insMc, insU, 'of residents')]] : []),
+             ...(insMd != null && insU ? [['On Medicaid', fmtCount(insMd), share(insMd, insU, 'of residents')]] : []),
              ...signalBoxes(rows, asked),
              ['Median age band', (() => { const t = male.map((v, i) => v + female[i]), tot = t.reduce((a, b) => a + b, 0); let c = 0; for (let i = 0; i < t.length; i++) { c += t[i]; if (c >= tot / 2) return tot ? ACS_AGE[i] : '--'; } return '--'; })()]]
-                .forEach(([label, val]) => {
+                .forEach(([label, val, sub]) => {
                     const b = document.createElement('div'); b.className = 'kpi-box';
                     const v = document.createElement('div'); v.className = 'kpi-val'; v.textContent = val;
                     const l = document.createElement('div'); l.className = 'kpi-label'; l.textContent = label;
-                    b.appendChild(v); b.appendChild(l); kp.appendChild(b);
+                    b.appendChild(v); b.appendChild(l);
+                    if (sub) { const sm = document.createElement('div'); sm.className = 'kpi-sub'; sm.textContent = sub; b.appendChild(sm); }
+                    kp.appendChild(b);
                 });
             document.getElementById('acs-note').textContent =
                 'American Community Survey 5-year estimates. The Census does not publish ZIP-level household income above $200,000.' +
                 (asked > rows.length ? ' ' + (asked - rows.length) + ' of ' + asked + ' ZIPs in view have no ACS row yet and are left out.' : '') +
-                (rows.some(r => r.signals) ? ' Insurance types overlap (people can have more than one), so the shares do not add up to 100%.' : '') +
-                (hasIns ? ' Insurance counts cover the civilian non-institutionalized population. Medicare and Medicaid overlap (people with both are in each), so do not add them. The Uninsured and Insured Rate boxes above use these Census counts.' : '') +
+                (rows.some(r => r.signals) ? ' Insurance types overlap (people can have more than one), so the counts do not add up to the population.' : '') +
+                (hasIns ? ' Insurance counts cover the civilian non-institutionalized population. Medicare and Medicaid overlap (people with both are in each), so do not add them. The Insured and Uninsured boxes above use these Census counts.' : '') +
                 (single ? '' : ' Area medians are household-weighted averages of ZIP medians, not true medians.');
 
             card.hidden = false;
             acsDestroy();
             const axis = { grid: { color: 'rgba(100,116,139,.2)' }, ticks: { font: { size: 9 } } };
             const noGrid = { grid: { display: false }, ticks: { font: { size: 9 } } };
-            const asPct = (a, tot) => a.map(v => tot ? Math.round(v / tot * 1000) / 10 : 0);
             const incGroups = ACS_INCOME_GROUPS.map(g => income.slice(g[1], g[2] + 1).reduce((a, b) => a + b, 0));
             acsCharts.income = new Chart(document.getElementById('acsIncomeChart'), {
                 type: 'bar',
-                data: { labels: ACS_INCOME_GROUPS.map(g => g[0]), datasets: [{ label: '% of households', data: asPct(incGroups, hh), backgroundColor: CHART.good, borderRadius: 3 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y + '% (' + incGroups[c.dataIndex].toLocaleString() + ' households)' } } }, scales: { x: noGrid, y: axis } }
+                data: { labels: ACS_INCOME_GROUPS.map(g => g[0]), datasets: [{ label: 'Households', data: incGroups, backgroundColor: CHART.good, borderRadius: 3 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: countTip(() => hh) } } }, scales: { x: noGrid, y: { ...axis, ticks: { ...axis.ticks, callback: countTicks } } } }
             });
             acsCharts.age = new Chart(document.getElementById('acsAgeChart'), {
                 type: 'bar',
@@ -2848,13 +2874,13 @@
             const raceData = ACS_RACE.map(r => ({ l: r[0], v: N(race[r[1]]) })).sort((a, b) => b.v - a.v);
             acsCharts.race = new Chart(document.getElementById('acsRaceChart'), {
                 type: 'bar',
-                data: { labels: raceData.map(r => r.l), datasets: [{ label: '% of population', data: raceData.map(r => race.total ? Math.round(r.v / race.total * 1000) / 10 : 0), backgroundColor: CHART.a1, borderRadius: 3 }] },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: axis, y: noGrid } }
+                data: { labels: raceData.map(r => r.l), datasets: [{ label: 'People', data: raceData.map(r => r.v), backgroundColor: CHART.a1, borderRadius: 3 }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: countTip(() => N(race.total)) } } }, scales: { x: { ...axis, ticks: { ...axis.ticks, callback: countTicks } }, y: noGrid } }
             });
             acsCharts.edu = new Chart(document.getElementById('acsEduChart'), {
                 type: 'bar',
-                data: { labels: ACS_EDU.map(e => e[0]), datasets: [{ label: '% of adults 25+', data: ACS_EDU.map(e => edu.universe ? Math.round(N(edu[e[1]]) / edu.universe * 1000) / 10 : 0), backgroundColor: CHART.a2, borderRadius: 3 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: noGrid, y: axis } }
+                data: { labels: ACS_EDU.map(e => e[0]), datasets: [{ label: 'Adults 25+', data: ACS_EDU.map(e => N(edu[e[1]])), backgroundColor: CHART.a2, borderRadius: 3 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: countTip(() => N(edu.universe)) } } }, scales: { x: noGrid, y: { ...axis, ticks: { ...axis.ticks, callback: countTicks } } } }
             });
         }
 
@@ -2865,16 +2891,18 @@
 
             const getV = (key) => safeParseNum(r[key]);
 
+            // People insured and uninsured in each band (counts; the share of the
+            // band is in the tooltip). i_pct / u_pct keep their names but hold people.
             const calcStacked = (t_key, i_key) => {
-                const t = getV(t_key), i = getV(i_key);
-                return t === 0 ? { i_pct: 0, u_pct: 0 } : { i_pct: (i/t)*100, u_pct: 100 - ((i/t)*100) };
+                const t = getV(t_key), i = Math.min(getV(i_key), t);
+                return { i_pct: i, u_pct: Math.max(0, t - i) };
             };
             const buildAggStacked = (t_keys, i_keys) => {
-                const t = t_keys.reduce((s,k)=>s+getV(k),0), i = i_keys.reduce((s,k)=>s+getV(k),0);
-                return t === 0 ? { i_pct: 0, u_pct: 0 } : { i_pct: (i/t)*100, u_pct: 100 - ((i/t)*100) };
+                const t = t_keys.reduce((s,k)=>s+getV(k),0), i = Math.min(i_keys.reduce((s,k)=>s+getV(k),0), t);
+                return { i_pct: i, u_pct: Math.max(0, t - i) };
             };
 
-            const defaultOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: {size: 9} } }, tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + Math.round(c.raw) + '%'; } } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: {font: {size: 9}} }, y: { stacked: true, max: 100, grid: { color: '#1e2836' }, ticks: { callback: v => v + '%', font: {size: 9} } } } };
+            const defaultOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: {size: 9} } }, tooltip: { callbacks: { label: countTip() } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: {font: {size: 9}} }, y: { stacked: true, grid: { color: '#1e2836' }, ticks: { callback: countTicks, font: {size: 9} } } } };
 
             const ageBuckets = [
                 { l: '<6', d: calcStacked('Total: Under 6 years', 'Insured: Under 6 years'), keys_t: ['Total: Under 6 years'] },

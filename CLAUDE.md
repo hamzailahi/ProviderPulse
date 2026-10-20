@@ -984,6 +984,7 @@ search behavior.
   (`BRIEFING_FIELDS`), `market-score.js` (aggregate public data only), and
   `market-assistant.js` (`TOOLS`: anything a tool returns reaches the model
   and then the user).
+- **The demographics tab leads with counts** (the user's choice, 2026-10-20): every box shows a number (`fmtCount`: full digits, then 1.2M) with its share in a small `.kpi-sub` line, and the charts plot people or households with the share in the tooltip (`countTip`). Do not turn a box back into a bare percentage.
 - All API values placed in the DOM go through `textContent` (the `h()` / `el()`
   builders), never `innerHTML`. Where the dashboard still builds HTML strings,
   values must be escaped.

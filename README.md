@@ -585,6 +585,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-20
 
+- **The demographics tab leads with numbers.** Every box now shows a count
+  first (52,966 insured, 3,490 uninsured, 13,050 households at $100k or
+  more, 20,000 adults with a bachelor's degree) with its share in small
+  type underneath, and the charts count people and households instead of
+  percentages; hovering a bar shows its share.
 - **One market dashboard instead of two modes.** The My market / Explore
   switch is gone. A provider's dashboard opens on their own ZIP and
   specialty as before, and searching anywhere else now happens on the same

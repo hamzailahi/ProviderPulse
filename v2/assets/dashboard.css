@@ -332,6 +332,8 @@ input[type="file"]::-webkit-file-upload-button {
   font-size: 9.5px; text-transform: uppercase; letter-spacing: .07em;
   color: var(--muted); margin-top: 5px;
 }
+/* The share under a count ("6.2% of residents"): numbers lead, percentages follow. */
+.kpi-sub { font-size: 10px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
 .chart-card {
   background: var(--surface); border: 1px solid var(--hairline);
