@@ -537,6 +537,8 @@ function paintInsights() {
       return el('li', { class: tone(f[0]) }, el('i', { 'aria-hidden': 'true' }), el('div', {}, el('b', {}, f[1]), el('p', {}, f[2])));
     }))));
 
+  p.appendChild(procCard(M));
+
   p.appendChild(el('div', { class: 'ins-card' },
     el('div', { class: 'ins-eyebrow' }, 'Go deeper'),
     el('div', { class: 'ins-actions' },
@@ -548,6 +550,132 @@ function paintInsights() {
       el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('demographics'); } }, 'Demographics'),
       el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('health'); } }, 'Health data')),
     el('p', { class: 'ins-src' }, visibleCount() ? fmtN(visibleCount()) + ' providers visible on the map. ' : '', 'Sources: ', (d.sources || []).join(' · '))));
+}
+
+/* ---------- 5a. Procedures and reimbursement (2026-10-20) -------------------
+   What the headline specialty's clinicians on the map bill traditional
+   Medicare (codes, services, average payment) and, where it has rows, what
+   Medicaid pays that specialty here. It reuses the Procedures tab's per-area
+   loads (procLoad in index.html), so it costs no extra request when that tab
+   has already loaded, and computes once per area and specialty.
+   Medicare: a clinician counts when their own NUCC code is in the specialty
+   (TaxonomyMap.codesFor), matched to Medicare rows by NPI, the same
+   definition as the map and the model. Medicaid rows carry only the CMS
+   specialty name, so a name counts when every code carrying it belongs to the
+   specialty ("Nurse Practitioner" spans several, so it never counts). */
+var procCardCache = { key: '', data: null, pending: '' };
+var PROC_CARD_MAX_ZIPS = 100;     // above this, only data the Procedures tab already loaded
+function clip(t, n) { t = String(t || ''); return t.length > n ? t.slice(0, n - 1).replace(/[\s,;]+\S*$/, '') + '\u2026' : t; }
+function money(v) { return v >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : v >= 1e4 ? '$' + Math.round(v / 1000) + 'k' : '$' + Math.round(v).toLocaleString(); }
+function medicaidNamesFor(label) {
+  var all = {}, inLabel = {};
+  window.TaxonomyMap.codes().forEach(function (code) {
+    var e = window.TaxonomyMap.get(code);
+    if (!e || !e.showOnMap) return;
+    var name = e.cmsSpecialty || e.classification;
+    if (!name) return;
+    all[name] = (all[name] || 0) + 1;
+    if (e.patientSpecialties.indexOf(label) !== -1) inLabel[name] = (inLabel[name] || 0) + 1;
+  });
+  return Object.keys(inLabel).filter(function (n) { return inLabel[n] === all[n]; });
+}
+function procSummary(label, med, mcd) {
+  var out = { label: label, medicare: null, medicaid: null };
+  // A load that failed outright is "did not load", never "nobody billed".
+  if (med && !med.error && med.flat && !(med.failedBatches && !med.flat.length)) {
+    var codes = {}; window.TaxonomyMap.codesFor(label).forEach(function (c) { codes[c] = 1; });
+    var npis = {};
+    var gd = (typeof groupedData !== 'undefined' && groupedData) || {};
+    Object.keys(gd).forEach(function (a) { (gd[a].practices || []).forEach(function (r) { if (codes[r['Taxonomy Code']] && r['NPI']) npis[String(r['NPI'])] = 1; }); });
+    var by = {}, who = {}, services = 0, paid = 0;
+    med.flat.forEach(function (r) {
+      if (!npis[r[0]]) return;
+      var c = by[r[1]] || (by[r[1]] = { code: r[1], desc: r[2], patients: 0, services: 0, paid: 0, npis: {} });
+      c.patients += r[3]; c.services += r[4]; c.paid += r[6] * r[4]; c.npis[r[0]] = 1;
+      who[r[0]] = 1; services += r[4]; paid += r[6] * r[4];
+    });
+    var list = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b.patients - a.patients; });
+    out.medicare = { clinicians: Object.keys(who).length, onMap: Object.keys(npis).length, codes: list.length, services: services, paid: paid,
+      top: list.slice(0, 5), partial: !!med.partial };
+  }
+  if (mcd && !mcd.error && mcd.groups) {
+    var names = medicaidNamesFor(label), claims = 0, mpaid = 0, mby = {};
+    names.forEach(function (n) {
+      (mcd.groups[n] || []).forEach(function (r) {
+        claims += r.claims || 0; mpaid += r.paid || 0;
+        var c = mby[r.code] || (mby[r.code] = { code: r.code, desc: r.description, claims: 0, paid: 0 });
+        c.claims += r.claims || 0; c.paid += r.paid || 0;
+      });
+    });
+    var ml = Object.keys(mby).map(function (k) { return mby[k]; }).sort(function (a, b) { return b.claims - a.claims; });
+    out.medicaid = { names: names, claims: claims, paid: mpaid, top: ml.slice(0, 3) };
+  }
+  return out;
+}
+function procCard(M) {
+  var sel = $('specialty-select');
+  var label = (M && pickHeadline(M) && pickHeadline(M).specialty) || focusSpec || (sel && sel.value) || (mySpec && mySpec.label) || null;
+  var card = el('div', { class: 'ins-card', id: 'ins-proc' }, el('div', { class: 'ins-eyebrow' }, 'Procedures and reimbursement' + (label ? ' · ' + label : '')));
+  var canLoad = typeof procLoad === 'function' && typeof procZips !== 'undefined';
+  if (!label || !canLoad || !window.TaxonomyMap) {
+    card.appendChild(el('p', {}, label ? 'Procedure data loads with the map. Search an area first.' : 'Pick a specialty to see what it bills Medicare and Medicaid here.'));
+    return card;
+  }
+  if (!procZips.length) { card.appendChild(el('p', {}, 'Procedure data loads with the map. Search an area first.')); return card; }
+  var key = procKey() + '|' + label;
+  if (procCardCache.key === key && procCardCache.data) { drawProc(card, procCardCache.data); return card; }
+  var have = procCache.key === procKey() ? procCache.data : {};
+  if (procZips.length > PROC_CARD_MAX_ZIPS && !(have.medicare && have.medicare.value)) {
+    card.appendChild(el('p', {}, 'This area covers ' + procZips.length.toLocaleString() + ' ZIPs. Open the Procedures tab to load its billing data, or search a city or ZIP.'));
+    card.appendChild(el('div', { class: 'ins-actions' }, el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('procedures'); } }, 'Open Procedures')));
+    return card;
+  }
+  card.appendChild(el('p', { class: 'ins-src' }, el('span', { class: 'ins-spin' }), ' Reading Medicare and Medicaid billing for this area…'));
+  if (procCardCache.pending !== key) {
+    procCardCache.pending = key;
+    var big = procZips.length > PROC_CARD_MAX_ZIPS;
+    Promise.all([procLoad('medicare'), big ? Promise.resolve(null) : procLoad('medicaid')]).then(function (res) {
+      if (procCardCache.pending !== key) return;              // a newer area or specialty won
+      procCardCache = { key: key, data: procSummary(label, res[0], res[1]), pending: '', error: res[0] && res[0].error };
+      if ($('ins-proc')) paintInsights();
+    });
+  }
+  return card;
+}
+function drawProc(card, s) {
+  var m = s.medicare, lower = s.label.toLowerCase();
+  if (!m) {
+    card.appendChild(el('p', {}, 'Medicare billing data did not load for this area.'));
+    card.appendChild(el('div', { class: 'ins-actions' }, el('button', { type: 'button', class: 'ins-btn', onclick: function () {
+      procCardCache = { key: '', data: null, pending: '' }; paintInsights();
+    } }, 'Try again')));
+    return;
+  }
+  if (!m.clinicians) {
+    card.appendChild(el('p', {}, 'None of the ' + fmtN(m.onMap) + ' ' + lower + ' listings on the map billed traditional Medicare for any code in 2024. ' +
+      'CMS leaves out codes a clinician billed for fewer than 11 Medicare patients, and specialties that treat few people over 65 rarely appear.'));
+  } else {
+    card.appendChild(el('p', {}, el('b', {}, fmtN(m.clinicians)), ' of the ' + fmtN(m.onMap) + ' ' + lower + ' listings on the map billed traditional Medicare in 2024: ',
+      el('b', {}, fmtN(Math.round(m.services))), ' services across ', el('b', {}, fmtN(m.codes)), ' codes, and Medicare paid about ', el('b', {}, money(m.paid)), '.'));
+    card.appendChild(el('ul', { class: 'ins-proc-list' }, m.top.map(function (c) {
+      return el('li', {}, el('b', {}, c.code), ' ', clip(c.desc, 72),
+        el('span', { class: 'ins-proc-num' }, fmtN(Math.round(c.patients)) + ' patients · avg Medicare paid $' + (c.services ? (c.paid / c.services).toFixed(2) : '--')));
+    })));
+  }
+  var d = s.medicaid;
+  if (d && d.claims > 0) {
+    card.appendChild(el('p', {}, 'Medicaid: ', el('b', {}, fmtN(Math.round(d.claims))), ' claim lines and ', el('b', {}, money(d.paid)), ' paid here' +
+      (d.top.length ? '; most often ' + d.top.map(function (c) { return c.code + (c.desc ? ' ' + clip(c.desc, 44) : '') + ' (' + fmtN(Math.round(c.claims)) + ')'; }).join(', ') : '') + '.'));
+  }
+  card.appendChild(el('p', { class: 'ins-src' }, 'CMS Medicare Physician & Other Practitioners 2024 (traditional Medicare only; codes under 11 patients left out) and HHS Medicaid Provider Spending 2024 (provider-months under 12 patients withheld, so Medicaid counts are floors). ' +
+    'Patients are summed across clinicians.' + (m && m.partial ? ' Some ZIP batches did not load, so totals are incomplete.' : '') +
+    (typeof loadWarningFor === 'function' && document.getElementById('load-warning') && document.getElementById('load-warning').textContent ? ' The map holds only part of this area’s listings, so these are floors.' : '')));
+  card.appendChild(el('div', { class: 'ins-actions' },
+    el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('procedures'); } }, 'See every procedure'),
+    el('button', { type: 'button', class: 'ins-btn', onclick: function () {
+      switchTab('ai');
+      if (window.PPAssistant) window.PPAssistant.ask('What do ' + lower + ' clinicians here bill Medicare and Medicaid, and what do they get paid?');
+    } }, '✦ Ask AI about these')));
 }
 
 /* ---------- 5b. Market model: archetype, factors, ranked specialties ------ */

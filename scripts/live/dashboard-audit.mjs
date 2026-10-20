@@ -164,7 +164,8 @@ for (const s of SEARCHES) {
     specialty: (document.getElementById('specialty-select') || {}).value || '',
     homeButton: !!document.getElementById('home-switch') && !document.getElementById('home-switch').hidden,
     whereYouStand: /where you stand/i.test((document.getElementById('insights-panel') || {}).innerText || ''),
-    modeSwitch: !!document.getElementById('mode-switch')
+    modeSwitch: !!document.getElementById('mode-switch'),
+    procCard: ((document.getElementById('ins-proc') || {}).innerText || 'none').replace(/\s+/g, ' ').slice(0, 260)
   })).catch(e => ({ error: String(e) }));
   try {
     await page.goto(BASE + '/dashboard', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -212,7 +213,7 @@ for (const r of results) {
   if (r.console.length) md.push('- console:', ...[...new Set(r.console)].slice(0, 12).map(e => '  - ' + e));
   (r.steps || []).forEach(st => {
     md.push(`- step **${st.label}**${st.err ? ' (error: ' + st.err + ')' : ''}: status \`${st.snap.status}\`${st.snap.warning ? ', warning: ' + st.snap.warning : ''}, drawn ${st.snap.visible}, map key ${String(st.snap.mapKey || '').slice(0, 120)}` +
-      ('hash' in st.snap ? `; hash \`${st.snap.hash}\`, specialty \`${st.snap.specialty}\`, home button ${st.snap.homeButton}, where you stand ${st.snap.whereYouStand}, old mode switch ${st.snap.modeSwitch}; insights ${String(st.snap.insights || '').slice(0, 160)}` : ''));
+      ('hash' in st.snap ? `; hash \`${st.snap.hash}\`, specialty \`${st.snap.specialty}\`, home button ${st.snap.homeButton}, where you stand ${st.snap.whereYouStand}, old mode switch ${st.snap.modeSwitch}; procedures card: ${st.snap.procCard}; insights ${String(st.snap.insights || '').slice(0, 160)}` : ''));
     st.newRequests.filter(x => !/^2\d\d/.test(x) || / (2[5-9]\d\d|[3-9]\d{3}|\d{5,})ms /.test(x)).slice(0, 8).forEach(x => md.push('    - ' + x));
   });
   md.push('');

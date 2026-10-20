@@ -589,6 +589,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-20
 
+- **Procedures on the Market tab.** The Insights view that the portal's
+  Market tab opens on now has a "Procedures and reimbursement" card for the
+  specialty in focus: how many of its clinicians on the map billed
+  traditional Medicare, their services, about what Medicare paid, the top
+  five codes with patients and average payment, and a Medicaid line where
+  Medicaid pays that specialty here, with links to the full Procedures tab
+  and to Ask AI. Clinicians are matched by their own NPI and specialty code,
+  the same definition the map and the scores use.
 - **Ask AI and reports can read procedure data.** The assistant used to
   say ProviderPulse had no procedure volumes or reimbursement. It now has a
   procedures tool over the same four sources as the Procedures tab (Medicare

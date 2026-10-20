@@ -3733,7 +3733,7 @@
                     let res;
                     try {
                         res = await fetch(
-                            `${SUPABASE_URL}/rest/v1/cms_procedures_full?zip=in.(${list.join(',')})&select=specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_sbmtd_chrg,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt&order=specialty,tot_benes.desc,npi,hcpcs_cd,place_of_service&limit=1000&offset=${offset}`,
+                            `${SUPABASE_URL}/rest/v1/cms_procedures_full?zip=in.(${list.join(',')})&select=npi,specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_sbmtd_chrg,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt&order=specialty,tot_benes.desc,npi,hcpcs_cd,place_of_service&limit=1000&offset=${offset}`,
                             { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
                     } catch (e) { failedBatches++; return; }
                     if (!res.ok) { failedBatches++; return; }
@@ -3745,8 +3745,12 @@
             };
             for (let i = 0; i < batches.length; i += 4) await Promise.all(batches.slice(i, i + 4).map(runBatch));
 
-            const bySpec = {};
+            // `flat` keeps each row's NPI for the Insights procedures card, which
+            // picks a specialty's clinicians by their own NUCC code (2026-10-20).
+            const bySpec = {}, flat = [];
             allRows.forEach(row => {
+                flat.push([String(row.npi || ''), row.hcpcs_cd, row.hcpcs_desc, Number(row.tot_benes) || 0, Number(row.tot_srvcs) || 0,
+                    Number(row.avg_mdcr_alowd_amt) || 0, Number(row.avg_mdcr_pymt_amt) || 0]);
                 const sp = row.specialty || 'Unknown';
                 if (!bySpec[sp]) bySpec[sp] = {};
                 const cd = row.hcpcs_cd;
@@ -3767,7 +3771,7 @@
                 p.count += 1;
             });
             return {
-                bySpec, failedBatches,
+                bySpec, flat, failedBatches,
                 partial: failedBatches ? failedBatches + ' of ' + batches.length + ' ZIP batches did not load in time, so totals are incomplete.' : ''
             };
         }

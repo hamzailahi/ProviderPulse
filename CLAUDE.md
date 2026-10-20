@@ -646,7 +646,21 @@ picker never names one specialty over a map showing all of them (neighbor
 rings bypass `processData` and keep their selection). The assistant's
 context says `mode: 'mine'` only while the scored ZIP is the provider's own.
 Filters collapse off the map; a specialty select
-drives `applyNavigatorTaxonomyFilter`. **Insights** is the first tab. The
+drives `applyNavigatorTaxonomyFilter`. **Insights** is the first tab. Its
+**Procedures and reimbursement** card (`procCard` in `dashboard-v3.js`,
+2026-10-20; the portal's Market tab opens here) reads the Procedures tab's
+per-area loads through `procLoad` (no extra request once that tab has
+loaded; skipped above 100 ZIPs unless already loaded) and shows what the
+headline specialty billed traditional Medicare: clinicians are the map's
+listings whose own NUCC code is in the specialty, matched to Medicare rows
+by **NPI** (the Medicare loader keeps `flat` rows with NPI for this), then
+services, codes, Medicare paid (average paid x services) and the top five
+codes. Medicaid rows carry only the CMS specialty name, so a name counts only
+when every visible code carrying it belongs to the specialty
+(`medicaidNamesFor`; "Nurse Practitioner" spans several and never counts);
+`taxonomy-map.js` carries each code's first CMS name (`cmsSpecialty`) for
+this. A failed load shows "did not load" with Try again, never "nobody
+billed". The
 dashboard loads **every** adjacent ZIP on demand for market sizing; the patient
 side deliberately does not. Keep those separate.
 
