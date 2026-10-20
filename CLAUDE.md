@@ -1079,8 +1079,12 @@ AI tab in `dashboard-v3.js`.
   Only `user`/`assistant` roles are accepted from the client; a new question
   is refused (409) while an assistant turn still has unanswered tool calls.
 - **The system prompt is the server's.** Per-turn context (mode, ZIP,
-  specialty) rides in a `<dashboard>` text block at the start of the user
-  turn, so the cached prefix (tools + system) never changes.
+  specialty, and `area_zips`: the ZIPs loaded on the map, from `procZips`
+  else `zipDemographics`, validated, at most 120 listed) rides in a
+  `<dashboard>` text block at the start of the user turn, so the cached
+  prefix (tools + system) never changes. Tools read the newest block back
+  from `ctx.messages` (`mapZips()` in `lib/area-profile.js`), so
+  continuation steps see it too.
 - **Tools** (all read-only): `get_market_insights`, `compare_markets` and
   `run_scenario` (1 to 5 more clinicians; before/after; capped server-side)
   (call `market-score.js`'s handler in-process, cached 10 min per warm
@@ -1095,7 +1099,25 @@ AI tab in `dashboard-v3.js`.
   service-weighted average allowed and paid, totals, and each source's
   caveats as `notes`; a failed or capped request sets `incomplete` and
   "totals are floors", never an empty answer; at most 30 ZIPs, 8 pages per
-  request group, a 14s budget), `query_database` (a plan
+  request group, a 14s budget; `use_map_area` searches the map's ZIPs
+  instead of a radius and adds `by_zip`, where a ZIP in a failed group
+  reads `unknown`, never 0), `get_area_profile` (`lib/area-profile.js`,
+  2026-10-20, the user's choice of "what's on the map" and "totals plus
+  each ZIP": every map ZIP, topped up to 8 with the nearest by PLACES
+  centroid and named in `notes`, cut to the nearest 40; a ZIP not on the
+  map gets its own neighbors; `census_acs_zcta` as counts with shares
+  (median income is a household-weighted average of ZIP medians and says
+  so; Medicare and Medicaid overlap), every PLACES measure weighted by
+  adults with estimated adults, per-ZIP lines with the dashboard
+  specialty's `PROFILES` measures, and Medicare and Medicaid procedures
+  for one CMS specialty name over the nearest 30 through `getProcedures`'
+  `opts.zips`; with no specialty a busy area's Medicare rows hit the page
+  cap, and because pages are ordered by specialty the codes would rank the
+  alphabet's first specialties (live, Fort Worth: radiology "led"), so a
+  capped all-specialty read keeps only floor totals and asks for a
+  specialty; 13s budget, live 0.6 to 1.9s; the system prompt calls it with
+  `get_market_insights` and for every report, which gains an "Area
+  profile" section), `query_database` (a plan
   through `lib/query-plan.js`), and two browser effects: `update_map`
   (returned as `actions`) and `create_deliverable` (returned as
   `deliverables`, rendered as a document card). All but `query_database` use
@@ -1173,7 +1195,7 @@ Covered by `scripts/test-query-plan.mjs`.
 | Surface | Model | What reaches the prompt |
 |---|---|---|
 | `patient-match.js` navigator | `claude-haiku-4-5-20251001` | the patient's own profile and **only specialty-relevant** providers |
-| `market-assistant.js` | `claude-opus-5-5`, effort `low` | the conversation, the dashboard context, and read-only tool results (market score, directory listings, public procedure volumes and payments, allowlisted query summaries) |
+| `market-assistant.js` | `claude-opus-5-5`, effort `low` | the conversation, the dashboard context (including the map's ZIPs), and read-only tool results (market score, directory listings, public procedure volumes and payments, the area's Census and CDC PLACES aggregates, allowlisted query summaries) |
 | `audit-narrate.js` | `claude-haiku-4-5-20251001` | the `signals` array only |
 | `doc-extract.js` | `claude-sonnet-5` | an uploaded document. **PHI**, BAA-gated, off |
 | `appointment-briefing.js` | `claude-haiku-4-5-20251001` | concern, conditions, and patient-**approved** facts |
@@ -1543,6 +1565,7 @@ node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, pri
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
+node scripts/test-area-profile.mjs        # 41: the assistant's get_area_profile on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
 node scripts/test-procedures-tool.mjs     # 23: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```

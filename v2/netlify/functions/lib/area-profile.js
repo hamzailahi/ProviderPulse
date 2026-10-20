@@ -203,8 +203,17 @@ async function getAreaProfile(input, opts) {
   });
 
   // ---- procedures (all specialties; get_procedures narrows to one)
-  const slim = (r, n) => (r && !r.error ? { totals: r.totals, top_codes: (r.top_codes || []).slice(0, n), by_specialty: r.by_specialty, by_zip: r.by_zip,
-    incomplete: r.incomplete, incomplete_reason: r.incomplete_reason } : { error: (r && r.error) || 'did not answer' });
+  // Pages are ordered by specialty, so a capped all-specialty read holds the
+  // first specialties alphabetically: its rankings would mislead (live,
+  // 2026-10-20: radiology codes "led" Fort Worth). Keep only floor totals.
+  const slim = (r, n) => {
+    if (!r || r.error) return { error: (r && r.error) || 'did not answer' };
+    const skewed = !specialty && r.incomplete && /capped/.test(r.incomplete_reason || '');
+    return skewed
+      ? { totals: r.totals, incomplete: true, incomplete_reason: r.incomplete_reason,
+        note: 'Too many rows for every specialty at once, so only floor totals are given. Call again with a CMS specialty name, or get_procedures, for codes and per-ZIP figures.' }
+      : { totals: r.totals, top_codes: (r.top_codes || []).slice(0, n), by_specialty: r.by_specialty, by_zip: r.by_zip, incomplete: r.incomplete, incomplete_reason: r.incomplete_reason };
+  };
   const procedures = {
     specialty: specialty || 'all specialties',
     medicare_clinicians: slim(med, 8), medicaid: slim(mcd, 5),

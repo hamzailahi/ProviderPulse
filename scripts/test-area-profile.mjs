@@ -127,6 +127,12 @@ const dash = (zips, spec) => [{ role: 'user', content: [{ type: 'text', text: _i
     { fetch: fakeDb([[/cms_procedures_full/, u => (++n === 1 ? [{ zip: '76104', npi: '1', specialty: 'X', hcpcs_cd: '99213', tot_benes: 20, tot_srvcs: 20, avg_mdcr_pymt_amt: 50 }] : { message: 'timeout' })]]), env, zips: GEO.map(g => g.zip) });
   check('get_procedures on the map area: a ZIP in a failed group reads unknown, not zero', r2.by_zip.find(z => z.zip === '76115') && r2.by_zip.find(z => z.zip === '76115').unknown === true && r2.incomplete === true, JSON.stringify(r2.by_zip && r2.by_zip.slice(-1)));
   check('get_procedures on the map area searches those ZIPs, no centroid lookup', r2.area.map_area === true && r2.area.zips_searched === 12);
+  const full = Array.from({ length: 1000 }, (_, i) => ({ zip: '76104', npi: 'n' + i, specialty: 'Anesthesiology', hcpcs_cd: '0' + (1000 + i), tot_benes: 20, tot_srvcs: 20, avg_mdcr_pymt_amt: 50 }));
+  const r4 = await getAreaProfile({ zip: '76104', area: 'map', specialty: null }, { fetch: fakeDb([...geo, acs, places, [/cms_procedures_full/, full], mcd]), env, messages: dash(['76104']) });
+  const m4 = r4.procedures.medicare_clinicians;
+  check('a capped all-specialty Medicare read keeps floor totals but no rankings or per-ZIP zeros', m4.incomplete === true && !m4.top_codes && !m4.by_zip && /specialty name/.test(m4.note) && m4.totals.rows === 8000, JSON.stringify(m4).slice(0, 300));
+  const r5 = await getProcedures({ zip: '76104', source: 'medicare_clinicians', specialty: 'X', query: null, radius_miles: 0 }, { fetch: fakeDb([[/cms_procedures_full/, full]]), env, zips: ['76104', '76105'] });
+  check('get_procedures: a capped map read marks unreached ZIPs unknown, not zero', r5.by_zip[1].unknown === true);
   const r3 = await getAreaProfile({ zip: '7610', area: 'map', specialty: null }, { fetch: fakeDb([]), env });
   check('a malformed ZIP is refused', !!r3.error);
 }

@@ -167,6 +167,10 @@ about the market on screen, and shows what it is doing as it works
 
 - explain a market with the opportunity model (archetype, factors,
   confidence, caveats), citing the numbers;
+- profile the whole area on the map: every loaded ZIP (at least 8; the
+  nearest are added when the map holds fewer), with Census demographics,
+  the CDC health survey measures from the Health tab and Medicare and
+  Medicaid procedures, as area totals plus a line per ZIP;
 - compare two to four ZIPs for a specialty side by side;
 - count and list nearby providers of a specialty within a radius;
 - report procedure volumes and payments nearby (top CPT/HCPCS codes,
@@ -537,6 +541,7 @@ python3 scripts/test-procedure-tables.py  # the Medicaid and Medicare hospital p
 node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list, specialty coverage
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 node scripts/test-procedures-tool.mjs     # the assistant's procedures tool on a fake database: averages, word search, failures reported, hospitals
+node scripts/test-area-profile.mjs        # the assistant's area profile: the map's ZIPs, topped up to 8, counts add up, health weighted by adults, failures never zero
 node scripts/test-procedure-search.mjs    # the procedures search: words like "colonoscopy" find CMS's own wording, checked against real descriptions
 ```
 
@@ -589,6 +594,18 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-20
 
+- **Ask AI and reports look at the whole area, not one ZIP.** A new
+  area profile reads every ZIP loaded on the map (the search plus any
+  neighbor rings). When the map holds fewer than 8, the nearest ZIPs are
+  added and named. It returns people, households, income, poverty, age,
+  insurance coverage, education and population change; every CDC PLACES
+  health survey measure as a share of adults and an estimated count; and
+  Medicare and Medicaid procedure totals and top codes. Each comes as
+  area totals plus a line per ZIP, so an answer can say which neighbor is
+  oldest, least insured or busiest. Market questions and every report now
+  use it, and reports gain an "Area profile" section. A failed read is
+  reported as incomplete, never as zero. The procedures tool can also
+  search the map's ZIPs instead of a radius.
 - **Procedures on the Market tab.** The Insights view that the portal's
   Market tab opens on now has a "Procedures and reimbursement" card for the
   specialty in focus: how many of its clinicians on the map billed

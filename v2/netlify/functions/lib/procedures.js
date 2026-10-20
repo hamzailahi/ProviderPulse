@@ -171,7 +171,7 @@ async function getProcedures(input, opts) {
       by_specialty: specialty ? undefined : Object.values(specs).sort((a, b) => b.patients - a.patients).slice(0, 8)
         .map(s => ({ specialty: s.specialty, clinicians: s.npis.size, patients_summed: int(s.patients) })),
       by_zip: zips.length > 1 ? zips.map(z => zs[z] ? { zip: z, clinicians: zs[z].npis.size, patients_summed: int(zs[z].patients), services: int(zs[z].services), medicare_paid: int(zs[z].paid) }
-        : failed ? { zip: z, unknown: true } : { zip: z, clinicians: 0, patients_summed: 0, services: 0, medicare_paid: 0 }) : undefined
+        : failed || capped ? { zip: z, unknown: true } : { zip: z, clinicians: 0, patients_summed: 0, services: 0, medicare_paid: 0 }) : undefined
     }, NOTES.medicare_clinicians);
   }
 
@@ -207,7 +207,7 @@ async function getProcedures(input, opts) {
         total_paid: int(c.paid), paid_per_claim: c.claims ? r2(c.paid / c.claims) : null, provider_count_summed: int(c.providers) })),
       by_specialty: specialty ? undefined : Object.values(specs).sort((a, b) => b.claims - a.claims).slice(0, 8)
         .map(s => ({ specialty: s.specialty, claim_lines: int(s.claims), total_paid: int(s.paid) })),
-      by_zip: zips.length > 1 ? zips.map(z => (zs[z] || !failed ? { zip: z, claim_lines: int(zs[z] ? zs[z].claims : 0), total_paid: int(zs[z] ? zs[z].paid : 0) } : { zip: z, unknown: true })) : undefined
+      by_zip: zips.length > 1 ? zips.map(z => (zs[z] || !(failed || capped) ? { zip: z, claim_lines: int(zs[z] ? zs[z].claims : 0), total_paid: int(zs[z] ? zs[z].paid : 0) } : { zip: z, unknown: true })) : undefined
     }, NOTES.medicaid);
   }
 
