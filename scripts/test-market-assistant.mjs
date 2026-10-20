@@ -336,7 +336,7 @@ const origLog = console.log; console.log = () => {};
 r = await call({ question: 'hello', context: CTX });
 console.log = origLog;
 check('a 400 on the request shape retries once, plain', r.body.done && r.body.reply === 'Still here.' && flaky.calls.length === 2);
-check('the retry drops strict and fallbacks but keeps the tools', !flaky.calls[1].fallbacks && flaky.calls[1].tools.length === 8 && flaky.calls[1].tools.every(t => !t.strict));
+check('the retry drops strict and fallbacks but keeps the tools', !flaky.calls[1].fallbacks && flaky.calls[1].tools.length === 9 && flaky.calls[1].tools.every(t => !t.strict));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

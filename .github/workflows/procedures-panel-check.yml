@@ -42,3 +42,6 @@ jobs:
       - name: The assistant's get_procedures tool, live (Fort Worth 76104)
         if: always()
         run: node scripts/live/procedures-tool-check.mjs 76104
+      - name: The assistant's get_area_profile tool, live (Fort Worth 76104)
+        if: always()
+        run: node scripts/live/area-profile-check.mjs 76104

@@ -66,11 +66,15 @@ async function getProcedures(input, opts) {
   const specialty = typeof input.specialty === 'string' && input.specialty.trim() ? input.specialty.trim().slice(0, 80) : null;
   const query = typeof input.query === 'string' && input.query.trim() ? input.query.trim().slice(0, 80) : null;
   const askedRadius = Math.max(0, Math.min(hospital ? 50 : 15, int(input.radius_miles)));
+  // opts.zips: an explicit area (the ZIPs on the user's map), used instead of
+  // a radius by get_area_profile and by get_procedures' use_map_area.
+  const given = !hospital && Array.isArray(o.zips) ? [...new Set([zip].concat(o.zips.filter(z => typeof z === 'string' && /^\d{5}$/.test(z))))] : null;
+  const budgetMs = Number(o.budgetMs) > 0 ? Math.min(BUDGET_MS, Number(o.budgetMs)) : BUDGET_MS;
 
   const H = { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`, Accept: 'application/json' };
   let failed = 0, capped = false, outOfTime = false;
   const get = async (path, ms) => {
-    if (Date.now() - started > BUDGET_MS) { outOfTime = true; return null; }
+    if (Date.now() - started > budgetMs) { outOfTime = true; return null; }
     try {
       const r = await doFetch(`${env.SUPABASE_URL}/rest/v1/${path}`, { headers: H, signal: AbortSignal.timeout(ms || 7000) });
       if (!r.ok) { failed++; return null; }
@@ -100,12 +104,13 @@ async function getProcedures(input, opts) {
   };
 
   // ---- the area: this ZIP, or every ZIP whose centre is within the radius
-  const home = await get(`cdc_places?zip=eq.${zip}&measureid=eq.${GEO_MEASURE}&select=zip,lat,lon&limit=1`, 5000);
+  const home = given ? null : await get(`cdc_places?zip=eq.${zip}&measureid=eq.${GEO_MEASURE}&select=zip,lat,lon&limit=1`, 5000);
   const centre = home && home[0] && home[0].lat != null ? { lat: +home[0].lat, lon: +home[0].lon } : null;
   if (hospital && !centre) return { zip, source, error: home ? 'No location data for this ZIP, so nearby hospitals cannot be found' : 'The location lookup did not answer. Try again.' };
-  let zips = [zip];
-  const radius = hospital ? (askedRadius || 25) : askedRadius;
-  if (!hospital && radius > 0 && centre) {
+  let zips = given || [zip];
+  const radius = given ? null : hospital ? (askedRadius || 25) : askedRadius;
+  if (given && zips.length > MAX_ZIPS) { zips = zips.slice(0, MAX_ZIPS); capped = true; }
+  if (!given && !hospital && radius > 0 && centre) {
     const dLat = radius / 69, dLon = radius / Math.max(1, 69 * Math.cos(centre.lat * Math.PI / 180));
     const box = await get(`cdc_places?measureid=eq.${GEO_MEASURE}&lat=gte.${(centre.lat - dLat).toFixed(4)}&lat=lte.${(centre.lat + dLat).toFixed(4)}` +
       `&lon=gte.${(centre.lon - dLon).toFixed(4)}&lon=lte.${(centre.lon + dLon).toFixed(4)}&select=zip,lat,lon&limit=1000`, 6000);
@@ -123,7 +128,7 @@ async function getProcedures(input, opts) {
 
   const base = {
     source, data_year: 2024,
-    area: { zip, radius_miles: radius, zips_searched: zips.length },
+    area: given ? { zip, map_area: true, zips_searched: zips.length, zips: zips } : { zip, radius_miles: radius, zips_searched: zips.length },
     filters: { specialty: hospital ? null : specialty, query, matched_terms: needles.length ? needles : (codeLike ? [codeLike] : []) }
   };
   const finish = (out, notes) => {
@@ -138,13 +143,16 @@ async function getProcedures(input, opts) {
 
   // ---- Medicare clinicians (Part B)
   if (source === 'medicare_clinicians') {
-    const sel = 'npi,specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt';
+    const sel = 'zip,npi,specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt';
     const codeF = codeLike ? `&hcpcs_cd=eq.${encodeURIComponent(codeLike)}` : descFilter('hcpcs_desc');
     const parts = await inGroups(zips, 10, 3, list => paged(`cms_procedures_full?zip=in.(${list.join(',')})${specFilter}${codeF}&select=${sel}&order=specialty,tot_benes.desc,npi,hcpcs_cd,place_of_service`));
     const rows = parts.flatMap(p => p.rows);
     if (!rows.length && failed) return { zip, source, error: 'The Medicare procedure table did not answer in time. Try a smaller radius or a specialty.' };
-    const by = {}, specs = {}, npis = new Set();
+    const by = {}, specs = {}, npis = new Set(), zs = {};
     for (const r of rows) {
+      const z = zs[r.zip] || (zs[r.zip] = { zip: r.zip, npis: new Set(), patients: 0, services: 0, paid: 0 });
+      z.npis.add(r.npi); z.patients += Number(r.tot_benes) || 0; z.services += Number(r.tot_srvcs) || 0;
+      z.paid += (Number(r.avg_mdcr_pymt_amt) || 0) * (Number(r.tot_srvcs) || 0);
       const c = by[r.hcpcs_cd] || (by[r.hcpcs_cd] = { code: r.hcpcs_cd, description: r.hcpcs_desc, patients: 0, services: 0, allowed: 0, paid: 0, npis: new Set() });
       const s = Number(r.tot_srvcs) || 0;
       c.patients += Number(r.tot_benes) || 0; c.services += s;
@@ -155,12 +163,15 @@ async function getProcedures(input, opts) {
     }
     const codes = Object.values(by).sort((a, b) => b.patients - a.patients);
     return finish({
-      totals: { rows: rows.length, codes: codes.length, clinicians: npis.size, patients_summed: int(codes.reduce((a, c) => a + c.patients, 0)), services: int(codes.reduce((a, c) => a + c.services, 0)) },
+      totals: { rows: rows.length, codes: codes.length, clinicians: npis.size, patients_summed: int(codes.reduce((a, c) => a + c.patients, 0)), services: int(codes.reduce((a, c) => a + c.services, 0)),
+        medicare_paid: int(codes.reduce((a, c) => a + c.paid, 0)) },
       top_codes: codes.slice(0, TOP).map(c => ({ code: c.code, description: c.description, clinicians: c.npis.size, patients: int(c.patients), services: int(c.services),
         avg_allowed: c.services ? r2(c.allowed / c.services) : null, avg_medicare_paid: c.services ? r2(c.paid / c.services) : null,
         services_per_patient: c.patients ? r2(c.services / c.patients) : null })),
       by_specialty: specialty ? undefined : Object.values(specs).sort((a, b) => b.patients - a.patients).slice(0, 8)
-        .map(s => ({ specialty: s.specialty, clinicians: s.npis.size, patients_summed: int(s.patients) }))
+        .map(s => ({ specialty: s.specialty, clinicians: s.npis.size, patients_summed: int(s.patients) })),
+      by_zip: zips.length > 1 ? zips.map(z => zs[z] ? { zip: z, clinicians: zs[z].npis.size, patients_summed: int(zs[z].patients), services: int(zs[z].services), medicare_paid: int(zs[z].paid) }
+        : failed ? { zip: z, unknown: true } : { zip: z, clinicians: 0, patients_summed: 0, services: 0, medicare_paid: 0 }) : undefined
     }, NOTES.medicare_clinicians);
   }
 
@@ -174,11 +185,13 @@ async function getProcedures(input, opts) {
       if (!hits.length) return finish({ totals: { rows: 0, codes: 0 }, top_codes: [] }, NOTES.medicaid.concat(['No code description matches "' + query + '". Try a CPT or HCPCS code.']));
       codeF = `&code=in.(${hits.map(h => encodeURIComponent(h.code)).join(',')})`;
     }
-    const parts = await inGroups(zips, 50, 3, list => paged(`medicaid_procedures?zip=in.(${list.join(',')})${specFilter}${codeF}&select=specialty,code,claims,patient_months,paid,providers&order=zip,specialty,code`));
+    const parts = await inGroups(zips, 50, 3, list => paged(`medicaid_procedures?zip=in.(${list.join(',')})${specFilter}${codeF}&select=zip,specialty,code,claims,patient_months,paid,providers&order=zip,specialty,code`));
     const rows = parts.flatMap(p => p.rows);
     if (!rows.length && failed) return { zip, source, error: 'The Medicaid procedure table did not answer in time. Try a smaller radius or a specialty.' };
-    const by = {}, specs = {};
+    const by = {}, specs = {}, zs = {};
     for (const r of rows) {
+      const z = zs[r.zip] || (zs[r.zip] = { zip: r.zip, claims: 0, paid: 0 });
+      z.claims += Number(r.claims) || 0; z.paid += Number(r.paid) || 0;
       const c = by[r.code] || (by[r.code] = { code: r.code, claims: 0, patient_months: 0, paid: 0, providers: 0 });
       c.claims += Number(r.claims) || 0; c.patient_months += Number(r.patient_months) || 0; c.paid += Number(r.paid) || 0; c.providers += Number(r.providers) || 0;
       const sp = specs[r.specialty] || (specs[r.specialty] = { specialty: r.specialty, claims: 0, paid: 0 });
@@ -193,7 +206,8 @@ async function getProcedures(input, opts) {
       top_codes: top.map(c => ({ code: c.code, description: desc[c.code] || null, claim_lines: int(c.claims), patient_months: int(c.patient_months),
         total_paid: int(c.paid), paid_per_claim: c.claims ? r2(c.paid / c.claims) : null, provider_count_summed: int(c.providers) })),
       by_specialty: specialty ? undefined : Object.values(specs).sort((a, b) => b.claims - a.claims).slice(0, 8)
-        .map(s => ({ specialty: s.specialty, claim_lines: int(s.claims), total_paid: int(s.paid) }))
+        .map(s => ({ specialty: s.specialty, claim_lines: int(s.claims), total_paid: int(s.paid) })),
+      by_zip: zips.length > 1 ? zips.map(z => (zs[z] || !failed ? { zip: z, claim_lines: int(zs[z] ? zs[z].claims : 0), total_paid: int(zs[z] ? zs[z].paid : 0) } : { zip: z, unknown: true })) : undefined
     }, NOTES.medicaid);
   }
 

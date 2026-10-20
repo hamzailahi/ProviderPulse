@@ -928,7 +928,16 @@ if (isProviderAcct) {
     // 'mine' tells the assistant this is the provider's own area, which is
     // true only while their home ZIP is the one scored.
     var home = homeZip() && lastZip === homeZip();
-    return { mode: home ? 'mine' : 'explore', zip: lastZip || null, specialty: currentSpec(), place: a ? a.value : '' };
+    return { mode: home ? 'mine' : 'explore', zip: lastZip || null, specialty: currentSpec(), place: a ? a.value : '', area_zips: mapZips() };
+  }
+  // Every ZIP loaded on the map (the search plus any neighbor rings), for the
+  // assistant's get_area_profile: the Procedures tab's list, else the ZIPs
+  // with demographics.
+  function mapZips() {
+    var z = [];
+    try { if (typeof procZips !== 'undefined' && procZips && procZips.length) z = procZips.slice(); } catch (e) {}
+    if (!z.length && typeof zipDemographics !== 'undefined' && zipDemographics) z = Object.keys(zipDemographics);
+    return z.map(function (x) { return String(x).padStart(5, '0'); }).filter(function (x) { return /^\d{5}$/.test(x); }).slice(0, 300);
   }
 
   function suggestions() {
@@ -1265,6 +1274,9 @@ if (isProviderAcct) {
     // said procedure data did not exist (2026-10-20).
     brief += ' Include a short "Procedures and reimbursement" section: the specialty\'s top procedure codes within 10 miles from Medicare clinicians' +
       ' (patients, services, average Medicare payment), plus Medicaid where the specialty does much Medicaid work.';
+    // The area around the ZIP, not just the ZIP: every ZIP on the map, at
+    // least 8 (2026-10-20, the user's choice).
+    brief += ' Include an "Area profile" section from get_area_profile (area "map" if ZIP ' + z + ' is on the map, else "nearest"): the area\'s people, income, insurance and health survey measures as totals, then a compact row per ZIP, naming the neighbors that stand out.';
     brief += '\nGather the numbers with your tools first, then deliver it with create_deliverable (kind "' + kind + '").';
     var shown = label + ': ' + spec.value + ' around ' + z + (others.length ? ' vs ' + others.join(', ') : '') + (focus.value.trim() ? '. ' + focus.value.trim() : '');
     note.textContent = '';

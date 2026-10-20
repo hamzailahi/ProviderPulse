@@ -93,6 +93,9 @@ jobs:
       - name: The assistant's get_procedures tool, on a fake database
         run: node scripts/test-procedures-tool.mjs
 
+      - name: The assistant's get_area_profile tool (every ZIP on the map), on a fake database
+        run: node scripts/test-area-profile.mjs
+
       - name: Procedure tables builder (Medicaid and Medicare hospital), end to end on fixtures
         run: |
           pip install -q duckdb==1.1.3
