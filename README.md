@@ -498,6 +498,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `procedure-tables.yml` | manual, yearly once HHS and CMS publish a new year | builds the Procedures panel's Medicaid table (per ZIP, specialty and procedure code) and the Medicare hospital tables (per hospital and payment group) from those files; `dry_run` writes nothing and reports what was dropped and how big it is; `apply` refuses unless the free disk entered covers the load |
 | `concurrent-indexes.yml` | manual | builds a migration's indexes without locking the tables (038, location indexes), dropping failed leftovers first and failing unless every index ends valid |
 | `live-dashboard-audit.yml` | manual, read only | drives the live dashboard in a headless browser (ZIP, city, state, several ZIPs, specialty filter, neighbors, every tab, and a provider's home with a mocked profile) and reports every failed or slow request, console error and screenshot |
+| `procedures-panel-check.yml` | manual, read only | replays the dashboard's Medicare procedures requests for one city and compares what loads with direct queries for one specialty and a list of codes |
 | `public-query-check.yml` | manual, read only | runs one directory query exactly as the browser does (publishable key) and prints status, time and rows, to tell an empty result from a failed one |
 | `procedure-tables-check.yml` | manual, read only | shows what the Procedures panel gets for one ZIP through the public key, beside direct counts and the tables' policies |
 | `nppes-terms-check.yml` | manual, read only | sends every specialty's registry search term to NPPES and records what comes back |
@@ -589,6 +590,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   top bar brings them back. A specialty picked in the filters now carries
   over to the next search instead of the map quietly showing everything
   under a filter that still named one specialty.
+- **A check for missing procedure data.** A manual, read-only job replays
+  the Medicare procedures panel for a city and compares what it loads with
+  the table itself, to find where rows go missing.
 - **The dashboard's address follows the search.** After each search the
   link names the area and specialty, so a refresh, a bookmark or a shared
   link reopens the same view, and the browser's Back button returns to the

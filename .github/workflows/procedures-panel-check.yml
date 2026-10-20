@@ -1,0 +1,41 @@
+name: Procedures panel check
+
+# Manual, read only. Replays the dashboard's Medicare procedures requests for
+# one city through the publishable key and compares them with direct queries
+# for one specialty and a list of codes (scripts/live/procedures-check.mjs).
+
+on:
+  workflow_dispatch:
+    inputs:
+      city:
+        description: City as the dashboard searches it
+        default: Fort Worth
+      state:
+        description: Two-letter state
+        default: TX
+      specialty:
+        description: CMS specialty name, exactly
+        default: Obstetrics & Gynecology
+      codes:
+        description: Comma-separated HCPCS/CPT codes to look for
+        default: 59400,59510,59025,76805,76815,76817,76830,58558,57454,58300,99213,99214,G0101,Q0091
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check
+        env:
+          CITY: ${{ inputs.city }}
+          STATE: ${{ inputs.state }}
+          SPEC: ${{ inputs.specialty }}
+          CODES: ${{ inputs.codes }}
+        run: node scripts/live/procedures-check.mjs "$CITY" "$STATE" "$SPEC" "$CODES"
