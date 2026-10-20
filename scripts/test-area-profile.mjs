@@ -90,11 +90,19 @@ const dash = (zips, spec) => [{ role: 'user', content: [{ type: 'text', text: _i
   // PLACES: DIABETES 10% of 1,000 adults + 20% of 7 x 3,000 = 100 + 4,200 = 4,300 of 22,000.
   const dia = r.health.measures.find(m => m.id === 'DIABETES');
   check('health measures are weighted by adults, with estimated adults', dia && dia.est_adults === 4300 && dia.pct_of_adults === 19.5 && dia.measure === 'Diabetes', JSON.stringify(dia));
+  check('the report\'s key measures: the general set when no specialty measures are given', r.health.key_measures.map(m => m.id).join(',') === 'DIABETES,OBESITY' && r.health.key_measures[0].est_adults === 4300 && r.health.key_measures[0].for_specialty === false);
+  check('the health source names CDC PLACES and the year', /CDC PLACES 2023/.test(r.health.source));
   check('each ZIP line carries the specialty\'s health measures', r.per_zip[1].health_pct_of_adults && r.per_zip[1].health_pct_of_adults.DIABETES === 20);
   check('procedures cover the same ZIPs, with a line per ZIP', r.procedures.medicare_clinicians.by_zip.length === 8 && r.procedures.medicare_clinicians.by_zip[0].services === 200, JSON.stringify(r.procedures.medicare_clinicians.by_zip && r.procedures.medicare_clinicians.by_zip[0]));
   check('Medicare totals include what Medicare paid', r.procedures.medicare_clinicians.totals.medicare_paid === 40000);
   check('the procedures specialty is passed through', f.urls.some(u => u.includes('cms_procedures_full') && u.includes('specialty=ilike.*Family Practice*')) && r.procedures.specialty === 'Family Practice');
   check('a complete read says so', r.incomplete === false, r.incomplete_reason);
+}
+
+// 2b. With the specialty's measures, those come first in the report section
+{
+  const r = await getAreaProfile({ zip: '76104', area: 'map', specialty: null }, { fetch: fakeDb([...geo, acs, places, med, mcd]), env, messages: dash(['76104']), keyMeasures: ['OBESITY', 'NOTREAL'] });
+  check('specialty measures lead the report section and are marked, unknown ids are dropped', r.health.key_measures.map(m => m.id + ':' + m.for_specialty).join(',') === 'OBESITY:true,DIABETES:false');
 }
 
 // 3. A map with 10 ZIPs is used as is (no top-up); over 40 keeps the nearest 40
@@ -143,6 +151,7 @@ const dash = (zips, spec) => [{ role: 'user', content: [{ type: 'text', text: _i
   check('get_area_profile is a strict tool with every property required', t && t.strict === true && t.input_schema.required.join(',') === 'zip,area,specialty');
   const gp = _internals.TOOLS.find(x => x.name === 'get_procedures');
   check('get_procedures requires use_map_area', gp.input_schema.required.includes('use_map_area') && gp.input_schema.properties.use_map_area.type === 'boolean');
+  check('reports get a "Health of the area" section from the key measures', /"Health of the area" section listing get_area_profile's health.key_measures/.test(_internals.SYSTEM));
   check('the system prompt sends market questions and reports to get_area_profile', /get_area_profile with area "map"/.test(_internals.SYSTEM) && /always including get_area_profile/.test(_internals.SYSTEM));
   check('the step label says what is being read', /every ZIP on the map/.test(_internals.stepLabel('get_area_profile', { zip: '76104', area: 'map' })));
 }

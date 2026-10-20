@@ -182,7 +182,9 @@ about the market on screen, and shows what it is doing as it works
   near 38138");
 - write a market memo, expansion one-pager or pitch summary for a
   prospective client, as a card that can be copied, downloaded or printed
-  to PDF.
+  to PDF. Reports from the Reports tab run to about 1,200 words, written
+  in two or three parts that join into one document, with an area
+  profile, a "Health of the area" section and procedures.
 
 ## The market opportunity model
 
@@ -594,6 +596,16 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-20
 
+- **Longer reports, with a health section.** Reports now run to about
+  1,200 words instead of 450. Writing that much at once would hit the
+  server's time limit, so the AI writes a report in two or three parts
+  and they join into one document card (it says "the rest is on its way"
+  until the last part lands). Every report also gets a "Health of the
+  area" section from the CDC health survey on the Health tab: the
+  measures behind the specialty's need score first, then diabetes,
+  obesity, high blood pressure, depression, heart disease and COPD, each
+  as a share of adults and an estimated number of adults for the area.
+  Memos asked for in chat stay short.
 - **Ask AI and reports look at the whole area, not one ZIP.** A new
   area profile reads every ZIP loaded on the map (the search plus any
   neighbor rings). When the map holds fewer than 8, the nearest ZIPs are

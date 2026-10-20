@@ -182,7 +182,14 @@ async function getAreaProfile(input, opts) {
     .map(m => ({ id: m.id, measure: m.name, category: m.category, year: m.year, pct_of_adults: r1(m.w / m.adults), est_adults: Math.round(m.est), zips: m.zips }))
     .sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.id.localeCompare(b.id));
   if (!prow.length) notes.push(places.ok ? 'No CDC PLACES rows for these ZIPs.' : 'The health survey table did not answer; health measures are missing.');
-  const keyIds = (Array.isArray(o.keyMeasures) && o.keyMeasures.length ? o.keyMeasures : KEY_MEASURES).slice(0, 8);
+  const specIds = Array.isArray(o.keyMeasures) ? o.keyMeasures.filter(id => typeof id === 'string') : [];
+  const keyIds = (specIds.length ? specIds : KEY_MEASURES).slice(0, 8);
+  // The report's "Health of the area" section (2026-10-20, the user's choice:
+  // key measures, local figures only): the specialty's need measures first,
+  // then the general set, each with its area share and estimated adults.
+  const byId = {}; measures.forEach(m => { byId[m.id] = m; });
+  const keyMeasures = [...new Set(specIds.concat(KEY_MEASURES))].filter(id => byId[id]).slice(0, 10)
+    .map(id => Object.assign({ for_specialty: specIds.includes(id) }, byId[id]));
 
   // ---- one line per ZIP
   const byZipAcs = {}; rows.forEach(r => { byZipAcs[r.zip] = r; });
@@ -226,7 +233,7 @@ async function getAreaProfile(input, opts) {
   const incomplete = failed > 0 || outOfTime || !!places.capped || !!(med && (med.incomplete || med.error)) || !!(mcd && (mcd.incomplete || mcd.error));
   return {
     area: { centre_zip: zip, zips: zips.length, from_map: useMap ? onMap.length : 0, zip_list: zips },
-    demographics, health: { source: 'CDC PLACES, model-based estimates of adults (BRFSS)', measures, key_measures_per_zip: keyIds },
+    demographics, health: { source: `CDC PLACES${measures[0] && measures[0].year ? ' ' + measures[0].year : ''}, model-based estimates for adults 18+ from the BRFSS survey`, key_measures: keyMeasures, measures, key_measures_per_zip: keyIds },
     procedures, per_zip: perZip,
     incomplete, incomplete_reason: incomplete ? 'Some requests failed, timed out or were capped, so some figures are floors.' : null,
     notes, ms: Date.now() - started

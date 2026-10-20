@@ -1066,7 +1066,8 @@ AI tab in `dashboard-v3.js`.
   calls once fewer than 18s remain (`MODEL_MIN_BUDGET_MS`, so past ~5.5s in)
   and tool runs after 16s; every model call and tool races a 23.5s deadline.
   It then returns `done:false` with the conversation, and the browser posts
-  `{continue:true, messages}` until `done:true` (up to 8 hops). Pending
+  `{continue:true, messages}` until `done:true` (up to 12 hops, 8 until
+  2026-10-20; a three-part report needs about seven). Pending
   `tool_use` blocks carry across steps. **A model call that writes a
   document needs 15 to 20s, so it must never start late.** Until 2026-09-30 a
   call could start at 12s with the leftover ~11s, and every one-pager that
@@ -1120,7 +1121,18 @@ AI tab in `dashboard-v3.js`.
   profile" section), `query_database` (a plan
   through `lib/query-plan.js`), and two browser effects: `update_map`
   (returned as `actions`) and `create_deliverable` (returned as
-  `deliverables`, rendered as a document card). All but `query_database` use
+  `deliverables`, rendered as a document card). **Reports are written in
+  parts** (2026-10-20, the user's choice of about 1,200 words): one model
+  call writing ~450 words already takes 15 to 20s, so `PART_WORDS` 450 and
+  `MAX_DOC_PARTS` 3; a later part passes `continues` (the first part's id,
+  checked against the history's tool results) and `more_parts`; the part
+  number is the higher of the history's count and this step's, never the
+  sum (both hold a part while its round is being recorded); the browser's
+  `addDoc` joins parts by id into one card. Chat memos stay one part.
+  Reports carry an "Area profile", a "Health of the area" section
+  (`health.key_measures`: the specialty's PLACES measures, then diabetes,
+  obesity, blood pressure, depression, heart disease, COPD, local figures
+  only, the user's choice) and "Procedures and reimbursement". All but `query_database` use
   `strict: true`. Before `get_procedures` the assistant (and so every report)
   told users procedure volumes and reimbursement were not in ProviderPulse;
   the system prompt now names the tool and only commercial insurance rates
@@ -1152,7 +1164,7 @@ limit). Error results are never a source.
   treat that turn as part of the same question. If it still fails, the answer
   ships with `verification.unverified` and the browser shows an amber note.
 - **Documents:** refused at the tool call (is_error, figures named) up to twice
-  per question; the third attempt is issued with `doc.unverified`, shown on its
+  per part (an issued part resets the count); the third attempt is issued with `doc.unverified`, shown on its
   card. Clean answers cost no extra model call.
 - The browser shows "N figures checked against the data" from `verification`.
 
@@ -1556,7 +1568,7 @@ node scripts/test-demand-model.mjs        # 45: the learned demand model, traine
 node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick
 node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 18: the what-if re-score changes supply only; no six-group breakdown, clinicians by code section, shortage per specialty
-node scripts/test-market-assistant.mjs    # 61: the assistant, figure repair, tracing (needs npm ci in v2/)
+node scripts/test-market-assistant.mjs    # 67: the assistant, figure repair, tracing, reports in parts (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
@@ -1565,7 +1577,7 @@ node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, pri
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
-node scripts/test-area-profile.mjs        # 41: the assistant's get_area_profile on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
+node scripts/test-area-profile.mjs        # 45: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
 node scripts/test-procedures-tool.mjs     # 23: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```

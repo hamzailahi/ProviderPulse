@@ -1060,6 +1060,7 @@ if (isProviderAcct) {
     var card = el('div', { class: 'as-doc collapsed' },
       el('div', { class: 'as-doc-head' }, el('span', { class: 'as-doc-kind' }, KIND[d.kind] || 'Document'), el('b', {}, d.title)),
       d.unverified && d.unverified.length ? el('div', { class: 'as-check warn' }, 'Could not trace to the data: ' + d.unverified.join(', ') + '. Check these before sharing.') : null,
+      d.more ? el('div', { class: 'as-check' }, 'Part ' + d.part + ' written; the rest is on its way.') : null,
       body);
     var toggle = el('button', { type: 'button', class: 'as-doc-btn', onclick: function () {
       card.classList.toggle('collapsed'); toggle.textContent = card.classList.contains('collapsed') ? 'Expand' : 'Collapse';
@@ -1129,19 +1130,37 @@ if (isProviderAcct) {
     });
   }
 
+  // A long report arrives in parts sharing one id (part 2 and 3 continue
+  // part 1); they join into one document, wherever part 1 landed.
+  function addDoc(slot, x) {
+    var prev = null;
+    if (x.part > 1) {
+      [slot].concat(chat.ui.slice().reverse()).some(function (m) {
+        prev = (m.docs || []).filter(function (d) { return d.id === x.id; })[0] || null;
+        return !!prev;
+      });
+    }
+    if (!prev) { slot.docs.push(x); return; }
+    prev.body = prev.body.replace(/\s+$/, '') + '\n\n' + x.body;
+    prev.part = x.part; prev.more = x.more;
+    if (x.unverified && x.unverified.length) prev.unverified = (prev.unverified || []).concat(x.unverified);
+  }
+
   async function run(first) {
     var slot = { role: 'assistant', pending: true, steps: [], actions: [], docs: [] };
     chat.ui.push(slot); draw();
     busy = true; send.disabled = true;
     var body = first, resumable = false;
     try {
-      for (var hop = 0; hop < 8; hop++) {
+      // 12 steps: a three-part report needs about seven (lookups, each
+      // part in its own model call, the closing reply).
+      for (var hop = 0; hop < 12; hop++) {
         var d = await post(body);
         chat.api = d.messages || chat.api;
         resumable = !d.done;
         (d.steps || []).forEach(function (s) { slot.steps.push(s.label); });
         (d.actions || []).forEach(function (a) { slot.actions.push(a); });
-        (d.deliverables || []).forEach(function (x) { slot.docs.push(x); });
+        (d.deliverables || []).forEach(function (x) { addDoc(slot, x); });
         applyActions(d.actions);
         save(); draw();
         if (d.done) { slot.text = d.reply || ''; slot.verification = d.verification || null; break; }
@@ -1276,7 +1295,13 @@ if (isProviderAcct) {
       ' (patients, services, average Medicare payment), plus Medicaid where the specialty does much Medicaid work.';
     // The area around the ZIP, not just the ZIP: every ZIP on the map, at
     // least 8 (2026-10-20, the user's choice).
-    brief += ' Include an "Area profile" section from get_area_profile (area "map" if ZIP ' + z + ' is on the map, else "nearest"): the area\'s people, income, insurance and health survey measures as totals, then a compact row per ZIP, naming the neighbors that stand out.';
+    brief += ' Include an "Area profile" section from get_area_profile (area "map" if ZIP ' + z + ' is on the map, else "nearest"): the area\'s people, income and insurance as totals, then a compact row per ZIP, naming the neighbors that stand out.';
+    // Health survey data gets its own section (2026-10-20, the user's choice:
+    // key measures, local figures only, no national comparison).
+    brief += ' Include a "Health of the area" section from the profile\'s health.key_measures (the CDC PLACES survey): each measure as the share of adults and the estimated number of adults, the specialty\'s own measures first, then one sentence on what they mean for this practice.';
+    // About 1,200 words in two or three parts (2026-10-20): one model call
+    // cannot write that much inside the function time limit.
+    brief += ' Make it a full report of about 1,200 words, written in two or three parts with create_deliverable (continues and more_parts).';
     brief += '\nGather the numbers with your tools first, then deliver it with create_deliverable (kind "' + kind + '").';
     var shown = label + ': ' + spec.value + ' around ' + z + (others.length ? ' vs ' + others.join(', ') : '') + (focus.value.trim() ? '. ' + focus.value.trim() : '');
     note.textContent = '';

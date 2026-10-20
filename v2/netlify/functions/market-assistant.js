@@ -47,6 +47,12 @@ const TaxonomyMap = require('../../assets/taxonomy-map.js');
 const marketScore = require('./market-score.js');
 
 const MODEL = 'claude-opus-5-5';
+// Reports run to about 1,200 words (2026-10-20, the user's choice), but one
+// model call writing ~450 words already takes 15 to 20s of the 26s ceiling,
+// so a long document is written in parts, each in its own model call, and
+// joined by id in the browser.
+const PART_WORDS = 450;
+const MAX_DOC_PARTS = 3;
 // A model call that writes a document (~900 tokens) needs 15 to 20 seconds, so
 // it must never start late in an invocation. It is only started while at least
 // MODEL_MIN_BUDGET_MS remain before HARD_BUDGET_MS; otherwise the step is handed
@@ -131,13 +137,32 @@ function figureList(check) { return [...new Set(check.unverified.map(u => u.raw)
 function alreadyRepaired(messages) {
   return sinceQuestion(messages).some(m => m.role === 'user' && blocksOf(m).some(b => b.type === 'text' && String(b.text).startsWith(SYNTHETIC)));
 }
+// Rejections of the part being written: a document part that was issued
+// resets the count, so each part of a long report gets its own two tries.
 function documentRejections(messages) {
   let n = 0;
   for (const m of sinceQuestion(messages)) {
     if (m.role !== 'user') continue;
-    for (const b of blocksOf(m)) if (b.type === 'tool_result' && b.is_error && String(b.content).includes('Not created: these figures')) n++;
+    for (const b of blocksOf(m)) {
+      if (b.type !== 'tool_result') continue;
+      if (b.is_error && String(b.content).includes('Not created: these figures')) n++;
+      else if (!b.is_error && String(b.content).includes('"shown_to_user":true')) n = 0;
+    }
   }
   return n;
+}
+// The parts of document `id` already issued in this conversation (0 if the
+// id was never issued), read from the tool results.
+function documentParts(messages, id) {
+  let parts = 0;
+  for (const m of messages || []) {
+    if (m.role !== 'user') continue;
+    for (const b of blocksOf(m)) {
+      if (b.type !== 'tool_result' || b.is_error || !String(b.content).includes('"shown_to_user":true')) continue;
+      try { const r = JSON.parse(b.content); if (r.id === id) parts = Math.max(parts, Number(r.part) || 1); } catch (e) { /* not ours */ }
+    }
+  }
+  return parts;
 }
 function traceCheck(tr, where, check, repaired) {
   if (!tr) return;
@@ -168,7 +193,7 @@ How to answer:
 - For questions about a market, call get_market_insights first, and alongside it get_area_profile with area "map", so the answer covers every ZIP on the map (at least 8; the tool adds the nearest when the map holds fewer): Census demographics, the CDC PLACES health survey measures and Medicare and Medicaid procedures, as area totals plus a line per ZIP. Pass the CMS specialty name for procedures. Name the neighboring ZIPs that stand out (largest, oldest, least insured, sickest, busiest). Use area "nearest" for a ZIP that is not on the map. Explain results in plain language: the archetype and what it means, the factors that drove the score, and the confidence level. Mention a caveat when the tool reports one that affects the answer.
 - For "what if I open here" or "what if another practice opens", call run_scenario and report the before and after with its assumptions; say plainly that only supply changes. To compare places, call compare_markets. To count or list nearby providers of a specialty, call find_providers. For procedures, billing volumes, how often codes are billed and what Medicare or Medicaid pays (CPT and HCPCS codes, hospital APC and DRG groups), call get_procedures: medicare_clinicians for most specialties; medicaid for pregnancy, children's and other Medicaid-heavy care (and whenever Medicare shows little); hospital_outpatient or hospital_inpatient for facility volumes. Pass the CMS specialty name, for example Gastroenterology, and a code or plain words in query. Report patients, services and the average allowed and paid amounts as returned, and carry the tool's notes that change the reading (traditional Medicare only, small counts withheld, a state's own billing codes). Commercial insurance volumes and rates are not available. For statewide or cross-market counts the other tools cannot answer, call query_database with a plan.
 - When the user wants to see something on the map ("show me", "zoom to", "switch to"), call update_map. Say briefly what you changed.
-- When the user asks for a memo, one-pager, summary for a client, pitch or report, gather the numbers first (always including get_area_profile for the area), then call create_deliverable with the full document. Keep the document under 450 words, organized with short headings and bullets, every figure traceable to a tool result, an "Area profile" section with the area's people, income, insurance and health measures and a compact line or table row per ZIP, and a short "Data notes" section listing sources and caveats. When the document is about a specialty's practice, include a short "Procedures and reimbursement" section from get_procedures (the specialty's top codes, volumes and average Medicare payment nearby). After creating it, reply with one or two sentences; do not repeat the document.
+- When the user asks for a memo, one-pager, summary for a client, pitch or report, gather the numbers first (always including get_area_profile for the area), then call create_deliverable. A memo or one-pager asked for in chat is one part under ${PART_WORDS} words. A report from the Reports tab runs to about 1,200 words in two or three parts of at most ${PART_WORDS} words, each its own create_deliverable call (continues and more_parts join them): plan the sections first, put the summary and market verdict in part 1, and end the last part with the Data notes. Organize it with short headings and bullets, every figure traceable to a tool result, an "Area profile" section with the area's people, income and insurance and a compact line or table row per ZIP, a "Health of the area" section listing get_area_profile's health.key_measures (the specialty's measures first), each as the share of adults and the estimated number of adults, local figures only, with one sentence on what they mean for the specialty and the note that these are CDC PLACES survey-based estimates, and a short "Data notes" section listing sources and caveats. When the document is about a specialty's practice, include a short "Procedures and reimbursement" section from get_procedures (the specialty's top codes, volumes and average Medicare payment nearby). After the last part, reply with one or two sentences; do not repeat the document.
 - Independent tool calls can go in the same turn.
 
 The market model, for explaining results:
@@ -332,16 +357,18 @@ const TOOLS = [
   },
   {
     name: 'create_deliverable',
-    description: 'Hands the user a finished document (market memo, expansion one-pager, or pitch summary for a prospective client) as a card they can copy, download or print. body_markdown is the complete document in markdown.',
+    description: 'Hands the user a document (market memo, expansion one-pager, or pitch summary for a prospective client) as a card they can copy, download or print. A long report is written in up to ' + MAX_DOC_PARTS + ' parts of at most ' + PART_WORDS + ' words each: the first part with continues null and more_parts true, then each next part with continues set to the id the first part returned, the last with more_parts false. The parts join into one document; start each later part at its next heading and do not repeat the title.',
     strict: true,
     input_schema: {
       type: 'object',
       properties: {
         kind: { type: 'string', enum: ['market_memo', 'expansion_one_pager', 'client_pitch'] },
         title: { type: 'string' },
-        body_markdown: { type: 'string' }
+        body_markdown: { type: 'string', description: 'This part of the document in markdown' },
+        continues: { type: ['string', 'null'], description: 'null for a new document; the id the first part returned for a later part' },
+        more_parts: { type: 'boolean', description: 'true if another part of this document follows' }
       },
-      required: ['kind', 'title', 'body_markdown'],
+      required: ['kind', 'title', 'body_markdown', 'continues', 'more_parts'],
       additionalProperties: false
     }
   }
@@ -530,9 +557,20 @@ function updateMap({ zip, specialty }, ctx) {
   return { ok: true, applied: action };
 }
 
-function createDeliverable({ kind, title, body_markdown }, ctx) {
+function createDeliverable({ kind, title, body_markdown, continues, more_parts }, ctx) {
   const body = String(body_markdown || '').slice(0, 20000);
   if (!body.trim()) return { error: 'body_markdown is empty' };
+  let id = null, part = 1;
+  if (continues != null && continues !== '') {
+    id = String(continues);
+    // Earlier parts are in the history once their round is recorded, and in
+    // this step's deliverables meanwhile: take the higher, never the sum.
+    const done = Math.max(documentParts(ctx.messages || [], id),
+      ...ctx.deliverables.filter(d => d.id === id).map(d => d.part || 1), 0);
+    if (!done) return { error: 'No document with id ' + id.slice(0, 40) + ' was created in this conversation. Start a new one with continues null.' };
+    part = done + 1;
+    if (part > MAX_DOC_PARTS) return { error: 'That document already has ' + MAX_DOC_PARTS + ' parts, the most allowed. Finish it with a short reply instead.' };
+  }
   // A document gets forwarded, so it is held to the same rule as an answer:
   // every figure traced. Rejected up to twice, with the offending figures named
   // so the model can fix them; after that it is issued with the figures marked.
@@ -543,10 +581,13 @@ function createDeliverable({ kind, title, body_markdown }, ctx) {
     return { error: 'Not created: these figures do not appear in any tool result from this conversation: ' + figureList(check).join(', ') +
       '. Remove them, or call a tool that returns them, then call create_deliverable again. State each figure exactly as a tool returned it, and show any figure you derive (a difference, ratio or percent change) on the same line as the two figures it comes from.' };
   }
-  const doc = { id: 'd' + Date.now().toString(36) + ctx.deliverables.length, kind, title: String(title || 'Market memo').slice(0, 200), body };
+  const last = !more_parts || part >= MAX_DOC_PARTS;
+  const doc = { id: id || 'd' + Date.now().toString(36) + ctx.deliverables.length, kind, title: String(title || 'Market memo').slice(0, 200), body, part, more: !last };
   if (check.unverified.length) doc.unverified = figureList(check);
   ctx.deliverables.push(doc);
-  return { ok: true, id: doc.id, shown_to_user: true };
+  const out = { ok: true, id: doc.id, part, shown_to_user: true };
+  if (!last) out.next = 'Write part ' + (part + 1) + ' with continues "' + doc.id + '"' + (part + 1 === MAX_DOC_PARTS ? ' and more_parts false (it is the last allowed).' : '.');
+  return out;
 }
 
 const RUNNERS = {

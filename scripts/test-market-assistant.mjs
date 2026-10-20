@@ -74,6 +74,7 @@ function fakeClient(script) {
       if (!next) throw new Error('fake client ran out of scripted responses');
       if (next.delay) await new Promise(r => setTimeout(r, next.delay));
       if (next.throw) throw next.throw;
+      if (next.fn) return next.fn(params);
       return next.res;
     } } }
   };
@@ -289,6 +290,26 @@ fn._setClient(fake);
 r = await call({ question: 'write a memo', context: CTX });
 check('after two rejections the document is issued with its figures marked', r.body.deliverables.length === 1
   && r.body.deliverables[0].unverified && r.body.deliverables[0].unverified.includes('34%'));
+
+// A long report in parts: each later part continues the first one's id.
+const lastResult = p => JSON.parse(p.messages[p.messages.length - 1].content[0].content);
+const part = (n, more, body) => ({ fn: p => ({ stop_reason: 'tool_use', content: [toolUse('p' + n, 'create_deliverable',
+  { kind: 'market_memo', title: 'Report', body_markdown: body, continues: n === 1 ? null : lastResult(p).id, more_parts: more })] }) });
+fake = fakeClient([turn('tool_use', [insightsCall]), part(1, true, '# Report\n## Summary\n- Score 72'), part(2, true, '## Area\n- Score 72'), part(3, true, '## Data notes\n- CMS'),
+  turn('end_turn', [{ type: 'text', text: 'The report is ready.' }])]);
+fn._setClient(fake);
+r = await call({ question: 'write a report', context: CTX });
+const ds = r.body.deliverables;
+check('a three-part report comes back as three parts of one document', ds.length === 3 && ds.every(d => d.id === ds[0].id) && ds.map(d => d.part).join() === '1,2,3', JSON.stringify(ds.map(d => [d.id, d.part])));
+check('only the last part is marked complete, even if the model asks for more', ds[0].more === true && ds[1].more === true && ds[2].more === false);
+const r1 = lastResult(fake.calls[2]);
+check('the first part tells the model how to continue', r1.part === 1 && new RegExp('continues "' + r1.id + '"').test(r1.next));
+const p4 = I.createDeliverable({ kind: 'market_memo', title: 'R', body_markdown: 'x', continues: 'dnope', more_parts: false }, { messages: [], deliverables: [] });
+check('a part that continues an unknown id is refused', /No document with id dnope/.test(p4.error));
+const msgs = r.body.messages;
+const p5 = I.createDeliverable({ kind: 'market_memo', title: 'R', body_markdown: 'x', continues: ds[0].id, more_parts: false }, { messages: msgs, deliverables: [] });
+check('a fourth part is refused', /already has 3 parts/.test(p5.error || ''), JSON.stringify(p5));
+check('the system prompt asks for reports in parts and one-part chat memos', /two or three parts of at most 450 words/.test(I.SYSTEM) && /one part under 450 words/.test(I.SYSTEM));
 
 console.log('\n7c. Tracing records what happened, never what was said');
 fake = fakeClient([
