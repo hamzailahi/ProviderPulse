@@ -12,6 +12,9 @@ on:
       query:
         description: "Query string after the table name, e.g. latitude=gte.35&latitude=lte.35.1&select=npi"
         required: true
+      tables:
+        description: Space-separated tables to query
+        default: clinics provider_individuals clinic_secondary_locations
 
 permissions:
   contents: read
@@ -24,11 +27,12 @@ jobs:
       - name: Query
         env:
           Q: ${{ inputs.query }}
+          T: ${{ inputs.tables }}
         run: |
           U="https://khkmdultmrggpfvkbfzj.supabase.co/rest/v1"
           K="sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ"
           {
-            for t in clinics provider_individuals clinic_secondary_locations; do
+            for t in $T; do
               q="$Q"; [ "$t" = clinic_secondary_locations ] && q="${Q/select=npi,/select=npi:parent_npi,}"
               out=$(curl -s -o /tmp/body -w '%{http_code} %{time_total}' "$U/$t?$q&limit=1000&offset=0" -H "apikey: $K")
               n=$(python3 -c "import json;d=json.load(open('/tmp/body'));print(len(d) if isinstance(d,list) else 'error')" 2>/dev/null || echo 'not json')
