@@ -153,7 +153,10 @@ ZIPs at once (84 for RI), timed out, and read the error object as a page with
 It now sends ten ZIPs per request (four at a time), checks `res.ok` and
 `Array.isArray`, caps pages, orders with tie-breakers
 (`specialty,tot_benes.desc,npi,hcpcs_cd,place_of_service`, 0.4s at offset
-3,000; `order=id` took 2.4s) and reports failed batches. Do not page the
+3,000; `order=id` took 2.4s) and reports failed batches. `fetchPLACESData` (the Health tab, CDC's Socrata API) had the same shape: one
+`locationid='…' OR …` clause for every ZIP (1,381 for TX) made a URL the
+browser refused; it now sends `locationid in(…)` 100 ZIPs at a time, four in
+flight, and reports failed groups. Do not page the
 provider tables with `order=npi`: the planner can walk the npi index and
 filter, which is slow for a rare city.
 

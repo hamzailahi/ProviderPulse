@@ -43,7 +43,7 @@ async function fresh() {
   page.on('request', r => started.set(r, Date.now()));
   page.on('requestfinished', async r => {
     const u = r.url();
-    if (!/supabase\.co\/rest|\.netlify\/functions\//.test(u)) return;
+    if (!/supabase\.co\/rest|\.netlify\/functions\/|data\.cdc\.gov/.test(u)) return;
     const res = await r.response();
     const st = res ? res.status() : 0;
     let code = '';
@@ -52,7 +52,7 @@ async function fresh() {
   });
   page.on('requestfailed', r => {
     const u = r.url();
-    if (/supabase\.co\/rest|\.netlify\/functions\//.test(u)) log.requests.push({ url: u.replace(/^https:\/\/[^/]+/, ''), status: 'FAILED', ms: Date.now() - (started.get(r) || Date.now()), err: (r.failure() || {}).errorText || '' });
+    if (/supabase\.co\/rest|\.netlify\/functions\/|data\.cdc\.gov/.test(u)) log.requests.push({ url: u.replace(/^https:\/\/[^/]+/, ''), status: 'FAILED', ms: Date.now() - (started.get(r) || Date.now()), err: (r.failure() || {}).errorText || '' });
   });
   page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') log.console.push(m.type() + ': ' + m.text().slice(0, 300)); });
   page.on('pageerror', e => log.pageErrors.push(String(e.message || e).slice(0, 300)));

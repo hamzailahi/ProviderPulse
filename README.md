@@ -594,6 +594,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   areas.** For a state it asked for every ZIP at once, timed out, and then
   retried without end because it read the error as data. It now asks ten
   ZIPs at a time, stops on an error and says what did not load.
+- **Health measures load for large areas.** The Health tab asked CDC for a
+  whole state's ZIPs in one request (1,381 for Texas), which the browser
+  refused. It now asks 100 ZIPs at a time and notes any group that did not
+  answer.
 - **A live audit of the dashboard's Explore mode.** A manual, read-only job
   drives the deployed dashboard through every kind of search and tab and
   reports what failed or ran slow.

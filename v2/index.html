@@ -894,7 +894,8 @@
             const f = [...new Set(rows.failed || [])].map(t => SOURCE_WORDS[t] || t);
             const c = [...new Set(rows.capped || [])].map(t => SOURCE_WORDS[t] || t);
             if (f.length) parts.push('Some listings did not load in time (' + f.join(', ') + '), so the map and counts are incomplete. Try again, or search a ZIP.');
-            if (c.length) parts.push('This area has more ' + c.join(' and ') + ' than the map can hold, so it shows the first ' + PROVIDER_SOURCE_CAP.toLocaleString() + ' of each. Search a city or ZIP for full coverage.');
+            const list = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+            if (c.length) parts.push('This area has more ' + list(c) + ' than the map can hold, so it shows the first ' + PROVIDER_SOURCE_CAP.toLocaleString() + (c.length > 1 ? ' of each' : '') + '. Search a city or ZIP for full coverage.');
             return parts.join(' ');
         }
 
@@ -2250,11 +2251,25 @@
             document.getElementById('placesMetrics').innerHTML = '<em style="color: var(--text-muted);">Loading health data...</em>';
 
             try {
-                const whereClause = zips.map(z => `locationid='${z}'`).join(' OR ');
-                const url = `https://data.cdc.gov/resource/qnzd-25i4.json?$where=${encodeURIComponent(whereClause)}&$limit=50000`;
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const rows = await response.json();
+                // 100 ZIPs per request with SoQL in(): one OR clause for a whole
+                // state (1,381 ZIPs for TX) made a URL the browser refused
+                // (ERR_FAILED, 2026-10-20 live audit). Failed groups are counted
+                // and shown, never read as "no data".
+                const ids = [...new Set(zips.map(z => String(z).padStart(5, '0')))];
+                const groups = [];
+                for (let i = 0; i < ids.length; i += 100) groups.push(ids.slice(i, i + 100));
+                let rows = [], placesFailed = 0;
+                const runGroup = async (g) => {
+                    try {
+                        const where = 'locationid in(' + g.map(z => `'${z}'`).join(',') + ')';
+                        const response = await fetch(`https://data.cdc.gov/resource/qnzd-25i4.json?$where=${encodeURIComponent(where)}&$limit=50000`);
+                        if (!response.ok) { placesFailed++; return; }
+                        const part = await response.json();
+                        if (Array.isArray(part)) rows = rows.concat(part); else placesFailed++;
+                    } catch (e) { placesFailed++; }
+                };
+                for (let i = 0; i < groups.length; i += 4) await Promise.all(groups.slice(i, i + 4).map(runGroup));
+                if (!rows.length && placesFailed) throw new Error('CDC PLACES did not answer for ' + placesFailed + ' of ' + groups.length + ' ZIP groups');
 
                 if (!rows || rows.length === 0) {
                     document.getElementById('placesMetrics').innerHTML = '<em style="color: var(--text-muted);">No PLACES data found for these ZIPs.</em>';
@@ -2369,7 +2384,7 @@
                     });
                 });
 
-                document.getElementById('placesMetrics').innerHTML = html;
+                document.getElementById('placesMetrics').innerHTML = (placesFailed ? `<div style="font-size:11px;color:var(--orange);margin-bottom:8px;">${placesFailed} of ${groups.length} ZIP groups did not load from CDC PLACES, so these averages leave some ZIPs out.</div>` : '') + html;
 
             } catch (err) {
                 console.warn('PLACES fetch error:', err);
