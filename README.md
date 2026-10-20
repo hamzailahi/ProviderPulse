@@ -590,7 +590,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   all. Providers bill the parts separately: 59409 (vaginal delivery only,
   28,202 claim lines statewide in 2024), 59514 (cesarean delivery only),
   59430 (postpartum care) and 59025 (fetal non-stress test). Search those
-  codes, or "delivery", to see Texas deliveries. A new read-only probe job
+  codes, or "delivery" or "postpartum" (now understood too), to see Texas
+  deliveries. A new read-only probe job
   looks codes up in HHS's raw file.
 - **The demographics tab leads with numbers.** Every box now shows a count
   first (52,966 insured, 3,490 uninsured, 13,050 households at $100k or

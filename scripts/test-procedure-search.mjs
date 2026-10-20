@@ -44,6 +44,8 @@ const expect = {
   'pregnancy ultrasound': ['76805', '76815', '76817'],
   'delivery': ['59400', '59510'],
   'c-section': ['59510'],
+  'postpartum': ['59430'],
+  'vaginal delivery': ['59409', '59400'],
   'mammogram': ['77067'],
   'dexa': ['77080'],
   'ekg': ['93000'],
