@@ -1183,8 +1183,13 @@
                     });
             }
 
-            return fetch(`${BASE_URL}${filename}_zip_codes_geo.min.json`)
-                .then(r => r.json())
+            // One retry: Texas's file is tens of megabytes and the 2026-10-20
+            // audit saw its download cut off mid-stream (ERR_HTTP2_PROTOCOL_ERROR),
+            // which left the state with no ZIP outlines to click.
+            const url = `${BASE_URL}${filename}_zip_codes_geo.min.json`;
+            const getJson = () => fetch(url).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+            return getJson()
+                .catch(() => new Promise(res => setTimeout(res, 1500)).then(getJson))
                 .then(data => { 
                     zipGeoJSONLayer.addData(data); 
                 })

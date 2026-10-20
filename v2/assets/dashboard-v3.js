@@ -286,11 +286,29 @@ window.renderVerdict = function (zip) {
   var demo = (typeof zipDemographics !== 'undefined' && zipDemographics) || {};
   var have = function (z) { return demo[z] || demo[String(parseInt(z, 10))]; };
   if (!/^\d{5}$/.test(zip) || zip === '00000' || !have(zip)) {
-    var best = null, bestPop = -1;
-    Object.keys(demo).forEach(function (z) {
-      var pop = Number((demo[z] || {})['Total Population']) || 0;
-      if (pop > bestPop) { bestPop = pop; best = String(z).padStart(5, '0'); }
+    // A city search also picks up stray rows filed under the same city name
+    // elsewhere ("Memphis" brought in a listing in 37066, Gallatin, which then
+    // outranked every Memphis ZIP), so only ZIPs holding at least 1% of the
+    // loaded listings compete; with none, every ZIP does.
+    var per = {}, total = 0;
+    var gd = (typeof groupedData !== 'undefined' && groupedData) || {};
+    Object.keys(gd).forEach(function (a) {
+      (gd[a].practices || []).forEach(function (r) {
+        var z = String(r['ZIP Code'] || r['Zipcode'] || '').trim().split('-')[0].padStart(5, '0');
+        per[z] = (per[z] || 0) + 1; total++;
+      });
     });
+    var pick = function (minShare) {
+      var b = null, bPop = -1;
+      Object.keys(demo).forEach(function (z) {
+        var key = String(z).padStart(5, '0');
+        if ((per[key] || 0) < total * minShare) return;
+        var pop = Number((demo[z] || {})['Total Population']) || 0;
+        if (pop > bPop) { bPop = pop; b = key; }
+      });
+      return b;
+    };
+    var best = pick(0.01) || pick(0);
     if (!best) { lastScore = null; lastZip = null; paintInsights(); return; }
     anchorNote = 'Scored on ' + best + ', the most populous ZIP in this area. Click any ZIP on the map to score it instead.';
     zip = best;

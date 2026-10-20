@@ -598,6 +598,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   whole state's ZIPs in one request (1,381 for Texas), which the browser
   refused. It now asks 100 ZIPs at a time and notes any group that did not
   answer.
+- **City scores anchor on the city itself.** A city search also picks up
+  listings filed under the same city name elsewhere, and the score could
+  land on one of those ZIPs ("Memphis" was scored on 37066, Gallatin). The
+  anchor is now the most populous ZIP among those holding at least 1% of
+  the listings on the map.
+- **ZIP outlines for big states retry once.** Texas's outline file is large
+  and its download was seen cutting off, leaving nothing to click; the map
+  now tries a second time.
 - **A live audit of the dashboard's Explore mode.** A manual, read-only job
   drives the deployed dashboard through every kind of search and tab and
   reports what failed or ran slow.

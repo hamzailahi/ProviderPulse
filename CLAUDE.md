@@ -142,7 +142,7 @@ The dashboard has its own loader (`fetchProviderRows` in `index.html`, not
 against the deployed site with a placeholder provider session, every request's
 status and time, console errors, screenshots) found the same bug class there:
 city and state searches timed out on `provider_individuals` and
-`clinic_secondary_locations` (no city/state index; migration 039 adds
+`clinic_secondary_locations` (no city/state index; migration 039, applied the same day, adds
 `(state, city)` and `(city)` on both) while the status line said "Loaded".
 `fetchProviderRows` now returns `.failed` and `.capped` (25,000 rows per
 table, `PROVIDER_SOURCE_CAP`), and `setLoadWarning` / `loadWarningFor` put a
@@ -650,7 +650,9 @@ list after new taxonomies arrive.
 
 `dashboard-v3.js` overrides `window.renderVerdict`. For a city or county
 search there is no single ZIP, so it anchors the score on the most populous
-loaded ZIP and says so.
+loaded ZIP that holds at least 1% of the loaded listings (a city-name search
+picks up stray rows elsewhere: "Memphis" once anchored on 37066, Gallatin)
+and says so.
 
 ### Deep links into `index.html`
 
@@ -756,7 +758,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `039` (city and state indexes on `provider_individuals` and `clinic_secondary_locations`, concurrent, via `concurrent-indexes.yml`) written 2026-10-20. `038` (location indexes `clinics_geo_idx`, `provider_individuals_geo_idx`, concurrent, via `concurrent-indexes.yml` / `scripts/build-indexes.sh`) applied 2026-10-13: clinics 74 MB, individuals 215 MB, both valid. The 38017 primary care box query went from timeouts at 3.2 to 3.4s to 0.9s (clinics, 143 rows) and 1.6s (individuals, 837 rows); a 50-mile box answers its first page in 1.0 to 1.5s. `037` (`medicare_hospitals`, one row per hospital at its ZIP's ZCTA centroid, for the panel's nearest-hospitals list) applied and loaded 2026-10-12 (3,084 hospitals, 2,977 with a centroid). `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
+Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `039` (city and state indexes on `provider_individuals` and `clinic_secondary_locations`, concurrent, via `concurrent-indexes.yml`) applied 2026-10-20, all four valid (individuals 50 and 49 MB, secondary about 8 MB each); the next audit loaded Collierville, TN at 982 listings and RI at 36,823 with no failed request. `038` (location indexes `clinics_geo_idx`, `provider_individuals_geo_idx`, concurrent, via `concurrent-indexes.yml` / `scripts/build-indexes.sh`) applied 2026-10-13: clinics 74 MB, individuals 215 MB, both valid. The 38017 primary care box query went from timeouts at 3.2 to 3.4s to 0.9s (clinics, 143 rows) and 1.6s (individuals, 837 rows); a 50-mile box answers its first page in 1.0 to 1.5s. `037` (`medicare_hospitals`, one row per hospital at its ZIP's ZCTA centroid, for the panel's nearest-hospitals list) applied and loaded 2026-10-12 (3,084 hospitals, 2,977 with a centroid). `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
 confirmed by the next snapshot (policies and anon/authenticated grants gone). Held back: `002`
