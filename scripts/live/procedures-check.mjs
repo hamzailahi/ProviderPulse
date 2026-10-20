@@ -121,31 +121,28 @@ if (codes.length) {
   }
 }
 
-// 7. CMS's own file, through its data API: is our copy complete, and which year?
+// 7. CMS's own file, through its data API: for a sample of the specialty's
+// clinicians, how many rows does CMS publish per year, against our table?
 try {
   const cat = await (await fetch('https://data.cms.gov/data.json')).json();
   const sets = cat.dataset || [];
   const ds = sets.find(d => /^Medicare Physician & Other Practitioners - by Provider and Service/i.test(d.title || ''));
-  const apis = (ds && ds.distribution || []).filter(d => /data-api/.test(d.accessURL || '') && /(20\d\d)/.test(d.title || ''))
-    .map(d => ({ url: d.accessURL, year: Number((d.title.match(/(20\d\d)/g) || []).pop()) })).sort((a, b) => b.year - a.year);
-  log('', `## CMS source (${ds ? ds.title : 'dataset not found'})`, '', `API years: ${apis.map(a => a.year).join(', ') || 'none'}`);
-  const ourNpis = new Set(direct.map(r => String(r.npi)));
+  const dists = (ds && ds.distribution || []).filter(d => /data-api\/v1\/dataset\//.test(d.accessURL || ''));
+  // The data year is the year the "temporal" range ends, else the newest year in the title.
+  const yearOf = d => { const t = String(d.temporal || '').match(/(20\d\d)/g) || String(d.title || '').match(/(20\d\d)/g) || []; return t.length ? Number(t[t.length - 1]) : 0; };
+  const apis = dists.map(d => ({ url: d.accessURL, year: yearOf(d), title: d.title, temporal: d.temporal })).sort((a, b) => b.year - a.year);
+  log('', `## CMS source (${ds ? ds.title : 'dataset not found'})`, '');
+  apis.slice(0, 4).forEach(a => log(`- distribution: ${a.title} | temporal ${a.temporal || '-'} | ${a.url}`));
+  const ours = {}; direct.forEach(r => { ours[r.npi] = (ours[r.npi] || 0) + 1; });
+  const sample = Object.keys(ours).slice(0, 8);
   for (const a of apis.slice(0, 3)) {
-    const q = new URLSearchParams({ 'filter[Rndrng_Prvdr_City]': CITY.toUpperCase(), 'filter[Rndrng_Prvdr_State_Abrvtn]': STATE, 'filter[Rndrng_Prvdr_Type]': SPEC, size: '5000' });
-    const r = await fetch(a.url + '?' + q);
-    const rowsC = r.ok ? await r.json() : [];
-    const cn = new Set(rowsC.map(x => String(x.Rndrng_NPI)));
-    const both = [...cn].filter(x => ourNpis.has(x)).length;
-    const cc = {}; rowsC.forEach(x => { cc[x.HCPCS_Cd] = (cc[x.HCPCS_Cd] || 0) + 1; });
-    log(`- ${a.year}: HTTP ${r.status}, ${rowsC.length} rows, ${cn.size} clinicians in ${CITY} (by CMS city), ${both} of them in our table's rows; codes asked about: ${codes.map(c => c + ' ' + (cc[c] || 0)).join(', ')}`);
-  }
-  if (apis[0]) {
-    for (const code of codes.slice(0, 6)) {
-      const r = await fetch(apis[0].url + '?' + new URLSearchParams({ 'filter[HCPCS_Cd]': code, size: '5000' }));
-      const all = r.ok ? await r.json() : [];
-      const tx = all.filter(x => x.Rndrng_Prvdr_State_Abrvtn === STATE).length;
-      log(`- ${code} nationally in ${apis[0].year}: ${all.length}${all.length === 5000 ? '+' : ''} rows (${tx} in ${STATE})`);
+    const parts = [];
+    for (const npi of sample) {
+      const r = await fetch(a.url + '?' + new URLSearchParams({ 'filter[Rndrng_NPI]': npi, size: '5000' }));
+      const rowsC = r.ok ? await r.json() : null;
+      parts.push(`${npi}: CMS ${Array.isArray(rowsC) ? rowsC.length : 'HTTP ' + r.status} / ours ${ours[npi]}`);
     }
+    log(`- year ${a.year}: ${parts.join('; ')}`);
   }
 } catch (e) { log('', `CMS source check failed: ${String(e).slice(0, 200)}`); }
 
