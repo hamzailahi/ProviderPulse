@@ -138,12 +138,12 @@ feed a written rationale generated separately from the scoring pass, so a
 single audit can't be read two different ways depending on which model
 wrote which part.
 
-**Market dashboard (`/dashboard`).** A map plus an insight panel, in two
-modes:
-
-- *My market* opens on the signed-in provider's ZIP and specialty.
-- *Explore* lets a provider, or staff running a demo for a prospective
-  client, look at any ZIP, city or state.
+**Market dashboard (`/dashboard`).** A map plus an insight panel. For a
+provider it opens on their own ZIP and specialty, and they can search any
+ZIP, city or state from the same screen; the panel keeps reading the area
+against their specialty, and a *My market* button goes back home. Staff
+running a demo for a prospective client get the same dashboard without the
+personal parts.
 
 Filters stay off the map until asked for, and a specialty picker replaces
 hundreds of raw taxonomy codes (the codes are still there under "Exact
@@ -497,7 +497,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `procedure-sources.yml` | manual, read only | describes the Medicaid provider spending file (HHS) and the Medicare hospital outpatient and inpatient files (CMS) the Procedures panel's extra sources are built from |
 | `procedure-tables.yml` | manual, yearly once HHS and CMS publish a new year | builds the Procedures panel's Medicaid table (per ZIP, specialty and procedure code) and the Medicare hospital tables (per hospital and payment group) from those files; `dry_run` writes nothing and reports what was dropped and how big it is; `apply` refuses unless the free disk entered covers the load |
 | `concurrent-indexes.yml` | manual | builds a migration's indexes without locking the tables (038, location indexes), dropping failed leftovers first and failing unless every index ends valid |
-| `live-dashboard-audit.yml` | manual, read only | drives the live dashboard's Explore mode in a headless browser (ZIP, city, state, several ZIPs, specialty filter, neighbors, every tab) and reports every failed or slow request, console error and screenshot |
+| `live-dashboard-audit.yml` | manual, read only | drives the live dashboard in a headless browser (ZIP, city, state, several ZIPs, specialty filter, neighbors, every tab, and a provider's home with a mocked profile) and reports every failed or slow request, console error and screenshot |
 | `public-query-check.yml` | manual, read only | runs one directory query exactly as the browser does (publishable key) and prints status, time and rows, to tell an empty result from a failed one |
 | `procedure-tables-check.yml` | manual, read only | shows what the Procedures panel gets for one ZIP through the public key, beside direct counts and the tables' policies |
 | `nppes-terms-check.yml` | manual, read only | sends every specialty's registry search term to NPPES and records what comes back |
@@ -581,6 +581,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-20
 
+- **One market dashboard instead of two modes.** The My market / Explore
+  switch is gone. A provider's dashboard opens on their own ZIP and
+  specialty as before, and searching anywhere else now happens on the same
+  screen: the Insights tab keeps showing where they stand in their
+  specialty for whatever area is scored, and a *My market* button in the
+  top bar brings them back. A specialty picked in the filters now carries
+  over to the next search instead of the map quietly showing everything
+  under a filter that still named one specialty.
 - **Explore searches by city or state show every provider again.** A live
   audit of the dashboard found that searching a city ("Collierville, TN",
   "Memphis") or a state ("RI") loaded organizations only: the individual

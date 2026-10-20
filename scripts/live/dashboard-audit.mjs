@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Live audit of the dashboard's Explore mode, run in GitHub Actions against
+// Live audit of the dashboard (searches, interactions, a provider's home), run in GitHub Actions against
 // the deployed site (the dev container cannot reach it). Read only: it uses a
 // placeholder provider session (the map reads public tables with the
 // publishable key; signed-in functions answer 401 and are recorded as such),
@@ -35,7 +35,7 @@ async function fresh() {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await ctx.addInitScript(() => {
     const s = { access_token: 'audit', refresh_token: 'audit', role: 'provider', staff: false, expiresAt: Date.now() + 3600e3 };
-    try { sessionStorage.setItem('pp.session.v1', JSON.stringify(s)); localStorage.setItem('pp.dash.mode', 'explore'); } catch (e) {}
+    try { sessionStorage.setItem('pp.session.v1', JSON.stringify(s)); } catch (e) {}
   });
   const page = await ctx.newPage();
   const log = { requests: [], console: [], pageErrors: [] };
@@ -149,10 +149,49 @@ for (const s of SEARCHES) {
   results.push(r);
   await ctx.close();
 }
+// A provider's dashboard (2026-10-20, one dashboard instead of My market /
+// Explore): the profile call is answered with a made-up Family Medicine
+// listing in 38017, nothing else is mocked. It should open on 38017 with
+// primary care selected and "Where you stand", keep that specialty when
+// another area is searched, and go back home from the top-bar button.
+{
+  const { ctx, page, log } = await fresh();
+  await page.route('**/.netlify/functions/profile', route => route.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ role: 'provider', profile: { zip: '38017', taxonomy_desc: 'Family Medicine', npi: '0000000000' } }) }));
+  const r = { name: 'Provider home (mocked profile, 38017 Family Medicine)', q: '(home)', steps: [] };
+  const look = () => page.evaluate(() => ({
+    hash: location.hash.slice(0, 80),
+    specialty: (document.getElementById('specialty-select') || {}).value || '',
+    homeButton: !!document.getElementById('home-switch') && !document.getElementById('home-switch').hidden,
+    whereYouStand: /Where you stand/.test((document.getElementById('insights-panel') || {}).innerText || ''),
+    modeSwitch: !!document.getElementById('mode-switch')
+  })).catch(e => ({ error: String(e) }));
+  try {
+    await page.goto(BASE + '/dashboard', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForFunction(() => document.getElementById('addressInput'), null, { timeout: 30000 });
+    r.ms = await settle(page);
+    await page.waitForTimeout(6000);                      // market-score for Insights
+    r.after = await snapshot(page);
+    r.steps.push({ label: 'opened home', err: null, snap: { ...r.after, ...(await look()) }, newRequests: [] });
+    await page.screenshot({ path: join(OUT, 'home_opened.png') });
+    const step = async (label, fn) => {
+      let err = null;
+      try { await fn(); } catch (e) { err = String(e.message || e).slice(0, 200); }
+      await settle(page); await page.waitForTimeout(6000);
+      r.steps.push({ label, err, snap: { ...(await snapshot(page)), ...(await look()) }, newRequests: [] });
+      await page.screenshot({ path: join(OUT, 'home_' + label.replace(/[^A-Za-z0-9]+/g, '_') + '.png') });
+    };
+    await step('search Austin, TX', async () => { await page.fill('#addressInput', 'Austin, TX'); await page.press('#addressInput', 'Enter'); });
+    await step('top-bar My market', () => page.click('#home-switch'));
+  } catch (e) { r.error = String(e.message || e).slice(0, 300); }
+  r.requests = log.requests; r.console = log.console; r.pageErrors = log.pageErrors;
+  results.push(r);
+  await ctx.close();
+}
 await browser.close();
 
 // ---- report ----
-const md = ['# Dashboard Explore audit', '', `Site: ${BASE}. Run ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC.`, ''];
+const md = ['# Dashboard audit', '', `Site: ${BASE}. Run ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC.`, ''];
 for (const r of results) {
   const bad = r.requests.filter(x => x.status === 'FAILED' || x.status >= 400);
   const slow = r.requests.filter(x => x.ms > 2500);
@@ -169,7 +208,8 @@ for (const r of results) {
   if (r.pageErrors.length) md.push('- page errors:', ...r.pageErrors.slice(0, 10).map(e => '  - ' + e));
   if (r.console.length) md.push('- console:', ...[...new Set(r.console)].slice(0, 12).map(e => '  - ' + e));
   (r.steps || []).forEach(st => {
-    md.push(`- step **${st.label}**${st.err ? ' (error: ' + st.err + ')' : ''}: status \`${st.snap.status}\`${st.snap.warning ? ', warning: ' + st.snap.warning : ''}, drawn ${st.snap.visible}, map key ${st.snap.mapKey.slice(0, 120)}`);
+    md.push(`- step **${st.label}**${st.err ? ' (error: ' + st.err + ')' : ''}: status \`${st.snap.status}\`${st.snap.warning ? ', warning: ' + st.snap.warning : ''}, drawn ${st.snap.visible}, map key ${String(st.snap.mapKey || '').slice(0, 120)}` +
+      ('hash' in st.snap ? `; hash \`${st.snap.hash}\`, specialty \`${st.snap.specialty}\`, home button ${st.snap.homeButton}, where you stand ${st.snap.whereYouStand}, old mode switch ${st.snap.modeSwitch}; insights ${String(st.snap.insights || '').slice(0, 160)}` : ''));
     st.newRequests.filter(x => !/^2\d\d/.test(x) || / (2[5-9]\d\d|[3-9]\d{3}|\d{5,})ms /.test(x)).slice(0, 8).forEach(x => md.push('    - ' + x));
   });
   md.push('');

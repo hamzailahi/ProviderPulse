@@ -630,9 +630,21 @@ only when directions are built in-app.
 
 ### Dashboard (`index.html` + `dashboard-v3.js`)
 
-Two modes, remembered in `localStorage` (`pp.dash.mode`): **My market** opens on
-the signed-in provider's ZIP and specialty via `#zip=…&tax=…`; **Explore** is
-any ZIP, city or state. Filters collapse off the map; a specialty select
+**One dashboard** (the My market / Explore switch and `pp.dash.mode` were
+merged away 2026-10-20, the user's choice). A provider's dashboard opens on
+their ZIP and specialty via `#zip=…&tax=…` (unless a deep link is already in
+the hash), any ZIP, city or state can be searched from it, "Where you stand"
+reads their specialty against whatever area is scored, and a top-bar **My
+market** button (`#home-switch`, shown once the profile names a ZIP) goes
+back home. An account with no provider profile (staff demos, or a failed
+profile call) gets the search welcome and no personal parts; "Loading your
+market" shows only while `homePending`. The Insights headline is the map's
+specialty filter first, then the provider's own. A wrapper around
+`processData` re-applies the specialty filter after every new search, so the
+picker never names one specialty over a map showing all of them (neighbor
+rings bypass `processData` and keep their selection). The assistant's
+context says `mode: 'mine'` only while the scored ZIP is the provider's own.
+Filters collapse off the map; a specialty select
 drives `applyNavigatorTaxonomyFilter`. **Insights** is the first tab. The
 dashboard loads **every** adjacent ZIP on demand for market sizing; the patient
 side deliberately does not. Keep those separate.
@@ -664,7 +676,7 @@ it. Hash forms:
 - `#goto=<address>`: geocode and drop a pin
 - `#pin=<lat>,<lng>,<name>`: exact coordinates
 - `#zip=<zip>&tax=<terms>&rec=<npis>&pins=<lat,lng,npi,name|…>`: navigator form
-- `#zip=<zip>&tax=<terms>`: specialty browse (also My market's autoload)
+- `#zip=<zip>&tax=<terms>`: specialty browse (also a provider's home autoload)
 
 The area form waits for the async loads (polls `groupedData`, ~21s budget),
 narrows `selectedTaxonomies`, and plots every matching clinic. `rec=` NPIs get
@@ -1346,7 +1358,7 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   **Procedure tables** (`procedure-tables.yml`, manual, `dry_run` / `apply`
   with `disk_free_gb`): see the 036 tables under Supabase schema. Run the
   tables job yearly after HHS and CMS publish a new year.
-- **Live dashboard audit** (`live-dashboard-audit.yml`, manual, read only): see "A failed query is not an empty answer". Rerun after any change to the dashboard's loaders.
+- **Live dashboard audit** (`live-dashboard-audit.yml`, manual, read only): see "A failed query is not an empty answer". It also opens a provider's home with a mocked `profile` response (38017, Family Medicine), searches away and comes back. Rerun after any change to the dashboard's loaders or its home flow.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is

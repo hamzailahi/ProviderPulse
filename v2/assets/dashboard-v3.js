@@ -7,12 +7,15 @@
    switchTab, applyNavigatorTaxonomyFilter, authHeaders ...).
    It adds, rather than rewrites:
 
-     - Two modes. "My market" (providers): opens on the provider's own ZIP and
-       specialty and reads every finding against them. "Explore" (providers
-       and STAFF_EMAILS accounts, for client demos): any area, any specialty.
+     - One dashboard (the My market / Explore switch was merged 2026-10-20).
+       A provider's dashboard opens on their own ZIP and specialty, any area
+       can be searched from it, and every finding is read against them
+       wherever they look; "My market" in the top bar goes back home.
+       Accounts with no provider listing (STAFF_EMAILS, for client demos)
+       get the same dashboard without the personal parts.
      - An Insights tab that leads the panel: the opportunity score, plain-
-       English findings, the per-specialty breakdown and, in My market, where
-       the provider stands. The raw charts stay in the other tabs.
+       English findings, the per-specialty breakdown and, for a provider,
+       where they stand. The raw charts stay in the other tabs.
      - A readable map: a legend for the 6 specialty-group colours, a specialty
        picker instead of hundreds of raw taxonomy codes (which remain under
        "Exact taxonomies"), filters that collapse off the map, zoom controls
@@ -53,15 +56,18 @@ function taxMatches(stored, terms) {
 }
 function fmtN(n) { return n == null ? '—' : Number(n).toLocaleString(); }
 
-/* ---------- session + mode ------------------------------------------------ */
+/* ---------- session ------------------------------------------------------- */
 var session = null;
 try { session = JSON.parse(sessionStorage.getItem('pp.session.v1') || localStorage.getItem('pp.session.v1') || 'null'); } catch (e) {}
 var isProviderAcct = !!(session && session.role === 'provider');
-var MODE_KEY = 'pp.dash.mode';
-var mode = 'explore';
-try { mode = isProviderAcct ? (localStorage.getItem(MODE_KEY) || 'mine') : 'explore'; } catch (e) { mode = isProviderAcct ? 'mine' : 'explore'; }
-var profile = null;           // provider_profiles row, My market only
+try { localStorage.removeItem('pp.dash.mode'); } catch (e) {}   // the retired mode switch's memory
+var profile = null;           // provider_profiles row, once loaded (providers only)
 var mySpec = null;            // {label, terms}
+// True while a provider's profile is loading and the dashboard is about to
+// open on their ZIP; the welcome and the empty Insights tab say so.
+var homePending = isProviderAcct;
+function homeZip() { var z = String((profile && profile.zip) || ''); return /^\d{5}$/.test(z) ? z : null; }
+function homeHash() { return '#zip=' + homeZip() + (mySpec ? '&tax=' + encodeURIComponent(mySpec.terms.join(',')) : ''); }
 
 function specFor(desc) {
   desc = String(desc || '').trim();
@@ -75,27 +81,24 @@ function specFor(desc) {
   return { label: desc, terms: [head] };
 }
 
-/* ---------- 1. top bar: mode switch --------------------------------------- */
-(function modeSwitch() {
+/* ---------- 1. top bar: back to my market --------------------------------- */
+var homeBtn = null;
+(function homeButton() {
   var bar = $('topbar-v2');
   if (!bar) return;
   var nav = $('surface-switch');
-  var sw = el('div', { id: 'mode-switch', role: 'tablist', 'aria-label': 'Dashboard mode' });
-  function btn(key, label, title) {
-    return el('button', { type: 'button', role: 'tab', class: mode === key ? 'on' : '', 'aria-selected': mode === key ? 'true' : 'false', title: title,
-      onclick: function () {
-        if (mode === key) return;
-        try { localStorage.setItem(MODE_KEY, key); } catch (e) {}
-        // A clean reload is the honest way to switch: every panel, filter and
-        // layer is rebuilt for the new question instead of half-carried over.
-        location.href = '/dashboard';
-      } }, label);
-  }
-  if (isProviderAcct) sw.appendChild(btn('mine', 'My market', 'Your ZIP and specialty, read against you'));
-  sw.appendChild(btn('explore', 'Explore', 'Any area, any specialty'));
-  if (nav && nav.parentNode) nav.parentNode.insertBefore(sw, nav.nextSibling);
   // Staff demo accounts have no portal to go back to.
   if (!isProviderAcct && nav) nav.style.display = 'none';
+  if (!isProviderAcct) return;
+  // Hidden until the profile names a ZIP. The hash is cleared without an
+  // event first, so going home from home still reloads it.
+  homeBtn = el('button', { type: 'button', id: 'home-switch', hidden: '', title: 'Your ZIP and specialty', onclick: function () {
+    if (!homeZip()) return;
+    var i = $('addressInput'); if (i) i.value = homeZip();
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    location.hash = homeHash();
+  } }, 'My market');
+  if (nav && nav.parentNode) nav.parentNode.insertBefore(homeBtn, nav.nextSibling);
 })();
 
 /* ---------- 2. filters: collapsible, specialty-first ----------------------- */
@@ -138,6 +141,24 @@ function specFor(desc) {
   // the map: visible where the result appears, without crowding the top bar.
   var status = $('dbStatus');
   if (status) { status.classList.add('omni-status'); mapBox.appendChild(status); }
+})();
+
+// Every new search rebuilds the map with every taxonomy selected, which left
+// the specialty picker naming one specialty over a map showing all of them.
+// Re-apply the picker after each load, so a provider's own specialty (or any
+// specialty chosen) follows them from area to area. Neighbor rings do not go
+// through processData and keep their selection as before.
+(function keepSpecialty() {
+  var base = window.processData;
+  if (typeof base !== 'function') return;
+  window.processData = function () {
+    var r = base.apply(this, arguments);
+    Promise.resolve(r).then(function () {
+      var sel = $('specialty-select');
+      if (sel && sel.value) applySpecialty(sel.value);
+    });
+    return r;
+  };
 })();
 
 function applySpecialty(label) {
@@ -228,11 +249,13 @@ function applySpecialty(label) {
 })();
 
 /* ---------- 4. welcome ---------------------------------------------------- */
-(function welcome() {
+// Painted again once a provider's profile has loaded: if it gives no ZIP to
+// open (or the profile is missing), the search welcome replaces "Loading".
+function paintWelcome() {
   var w = $('welcome-overlay');
   if (!w) return;
   while (w.firstChild) w.removeChild(w.firstChild);
-  if (mode === 'mine') {
+  if (homePending) {
     w.appendChild(el('h1', {}, 'Loading your market…'));
     w.appendChild(el('p', {}, 'Your ZIP, your specialty, and how the area around you is served.'));
     return;
@@ -247,7 +270,8 @@ function applySpecialty(label) {
     } }, q));
   });
   w.appendChild(ex);
-})();
+}
+paintWelcome();
 
 /* ---------- 5. insights tab ------------------------------------------------ */
 var insightsPanel = null, lastScore = null, lastZip = null, anchorNote = '';
@@ -283,6 +307,7 @@ var insightsPanel = null, lastScore = null, lastZip = null, anchorNote = '';
 window.renderVerdict = function (zip) {
   zip = String(zip || '');
   anchorNote = '';
+  homePending = false;              // an area has loaded, home or not
   var demo = (typeof zipDemographics !== 'undefined' && zipDemographics) || {};
   var have = function (z) { return demo[z] || demo[String(parseInt(z, 10))]; };
   if (!/^\d{5}$/.test(zip) || zip === '00000' || !have(zip)) {
@@ -357,8 +382,8 @@ function paintInsights() {
 
   if (!d) {
     p.appendChild(el('div', { class: 'ins-empty' },
-      el('h3', {}, mode === 'mine' ? 'Loading your market' : 'Pick a market to analyze'),
-      el('p', {}, mode === 'mine' ? 'We are opening your practice ZIP.' : 'Search a ZIP, city or state above. Insights appear here: an opportunity score, what it means, and which specialties are underserved.')));
+      el('h3', {}, homePending ? 'Loading your market' : 'Pick a market to analyze'),
+      el('p', {}, homePending ? 'We are opening your practice ZIP.' : 'Search a ZIP, city or state above. Insights appear here: an opportunity score, what it means, and which specialties are underserved.')));
     return;
   }
   if (d === 'loading') {
@@ -388,9 +413,10 @@ function paintInsights() {
       el('p', {}, meaning))));
   if (anchorNote) p.appendChild(el('p', { class: 'ins-note' }, anchorNote));
 
-  // Where you stand (My market): the provider's own specialty in the model.
+  // Where you stand: the provider's own specialty in the model, in whatever
+  // area is on screen.
   var specs = (d.model && d.model.specialties) || [];
-  if (mode === 'mine' && profile) {
+  if (profile) {
     var myLabel = mySpec && mySpec.label;
     var g = specs.filter(function (x) { return x.specialty === myLabel; })[0];
     var comp = competitors(myLabel);
@@ -536,7 +562,9 @@ function evidenceLine(k, e) {
 function pickHeadline(M) {
   var by = {}; M.specialties.forEach(function (x) { by[x.specialty] = x; });
   var sel = $('specialty-select');
-  var want = focusSpec || (mode === 'mine' && mySpec && mySpec.label) || (sel && sel.value) || null;
+  // The map's specialty filter outranks the provider's own specialty, so
+  // picking Cardiology anywhere reads Cardiology; "All" falls back to theirs.
+  var want = focusSpec || (sel && sel.value) || (mySpec && mySpec.label) || null;
   if (want && by[want]) return by[want];
   return rankSpecs(M)[0];
 }
@@ -660,27 +688,34 @@ function whatIfCard(d, h) {
 
 function titleWord(s) { return String(s || '').toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
 
-/* ---------- 6. My market: open on the provider's own area ------------------ */
-if (mode === 'mine') {
+/* ---------- 6. a provider's dashboard opens on their own area ------------- */
+if (isProviderAcct) {
   fetch('/.netlify/functions/profile', { headers: authHeadersSync() })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) {
       profile = d && d.role === 'provider' ? d.profile : null;
-      if (!profile) return;
-      mySpec = specFor(profile.taxonomy_desc);
-      paintInsights();
-      var zip = String(profile.zip || '');
-      if (!location.hash && /^\d{5}$/.test(zip)) {
+      if (profile) mySpec = specFor(profile.taxonomy_desc);
+      var zip = homeZip();
+      if (homeBtn && zip) homeBtn.hidden = false;
+      // A deep link (#zip=..., #goto=...) wins over home; with neither, the
+      // search welcome takes over from "Loading your market".
+      // Opening home keeps "Loading your market" up until the map covers it.
+      if (!location.hash && zip) {
         var i = $('addressInput'); if (i) i.value = zip;
-        location.hash = '#zip=' + zip + (mySpec ? '&tax=' + encodeURIComponent(mySpec.terms.join(',')) : '');
+        location.hash = homeHash();
+      } else {
+        homePending = false;
+        paintWelcome();
       }
+      paintInsights();
+      if (!profile) return;
       var sel = $('specialty-select');
       if (sel && mySpec && Array.prototype.some.call(sel.options, function (o) { return o.value === mySpec.label; })) {
         sel.value = mySpec.label;
         var c = $('filters-count'); if (c) { c.hidden = false; c.textContent = '1'; }
       }
     })
-    .catch(function () {});
+    .catch(function () { homePending = false; paintWelcome(); paintInsights(); });
 }
 
 /* ---------- 7. Ask AI: the market assistant ---------------------------------
@@ -722,13 +757,15 @@ if (mode === 'mine') {
 
   function currentSpec() {
     if (focusSpec) return focusSpec;
-    if (mode === 'mine' && mySpec) return mySpec.label;
     var s = $('specialty-select');
-    return (s && s.value) || null;
+    return (s && s.value) || (mySpec && mySpec.label) || null;
   }
   function context() {
     var a = $('addressInput');
-    return { mode: mode, zip: lastZip || null, specialty: currentSpec(), place: a ? a.value : '' };
+    // 'mine' tells the assistant this is the provider's own area, which is
+    // true only while their home ZIP is the one scored.
+    var home = homeZip() && lastZip === homeZip();
+    return { mode: home ? 'mine' : 'explore', zip: lastZip || null, specialty: currentSpec(), place: a ? a.value : '' };
   }
 
   function suggestions() {
