@@ -1,0 +1,43 @@
+name: Live dashboard audit
+
+# Manual, read only. Drives the deployed dashboard's Explore mode in headless
+# Chromium (scripts/live/dashboard-audit.mjs): ZIP, city, state and multi-ZIP
+# searches, the specialty filter, neighbors, every tab and procedure source.
+# Records every request's status and time, console errors and screenshots.
+# Results in the run summary and as an artifact; nothing is committed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Site to audit
+        default: https://providerpulse-v2.netlify.app
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install Playwright
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw" && npm init -y >/dev/null && npm i -s playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Audit
+        run: cp scripts/live/dashboard-audit.mjs "$RUNNER_TEMP/pw/" && cd "$RUNNER_TEMP/pw" && node dashboard-audit.mjs "$GITHUB_WORKSPACE/audit-out" "${{ inputs.base_url }}"
+      - name: Summary
+        if: always()
+        run: cat audit-out/audit.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dashboard-audit
+          path: audit-out
