@@ -589,7 +589,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   Medicaid does not bill the global delivery codes (59400, 59510, 59610) at
   all. Providers bill the parts separately: 59409 (vaginal delivery only,
   28,202 claim lines statewide in 2024), 59514 (cesarean delivery only),
-  59430 (postpartum care) and 59025 (fetal non-stress test). Search those
+  59430 (postpartum care) and 59025 (fetal non-stress test). In Fort Worth's 58
+  ZIPs that is 627 claim lines for 59409, 70 for 59514 and 1,273 for 59430.
+  Those are floors: HHS withholds any provider, code and month with fewer
+  than 12 patients, and most obstetricians deliver fewer than 12 Medicaid
+  babies a month, so much of the volume never reaches the public file.
+  Nationally only 32 states bill 59400 at all (15,083 claim lines in 2024). Search those
   codes, or "delivery" or "postpartum" (now understood too), to see Texas
   deliveries. A new read-only probe job
   looks codes up in HHS's raw file.
