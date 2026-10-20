@@ -585,6 +585,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-20
 
+- **Why Fort Worth shows no Medicaid deliveries under 59400.** Texas
+  Medicaid does not bill the global delivery codes (59400, 59510, 59610) at
+  all. Providers bill the parts separately: 59409 (vaginal delivery only,
+  28,202 claim lines statewide in 2024), 59514 (cesarean delivery only),
+  59430 (postpartum care) and 59025 (fetal non-stress test). Search those
+  codes, or "delivery", to see Texas deliveries. A new read-only probe job
+  looks codes up in HHS's raw file.
 - **The demographics tab leads with numbers.** Every box now shows a count
   first (52,966 insured, 3,490 uninsured, 13,050 households at $100k or
   more, 20,000 adults with a bachelor's degree) with its share in small

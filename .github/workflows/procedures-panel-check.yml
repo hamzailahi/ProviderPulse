@@ -18,7 +18,7 @@ on:
         default: Obstetrics & Gynecology
       codes:
         description: Comma-separated HCPCS/CPT codes to look for
-        default: 59400,59510,59025,76805,76815,76817,76830,58558,57454,58300,99213,99214,G0101,Q0091
+        default: "59400,59510,59025,76805,76815,76817,76830,58558,57454,58300,99213,99214,G0101,Q0091"
 
 permissions:
   contents: read

@@ -11,7 +11,7 @@ on:
     inputs:
       codes:
         description: Comma-separated codes
-        default: 59400,59409,59410,59510,59514,59515,59610,59612,59614,59618,59620,59622
+        default: "59400,59409,59410,59510,59514,59515,59610,59612,59614,59618,59620,59622"
       state:
         description: Two-letter state to look at closely
         default: TX
