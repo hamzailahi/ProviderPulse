@@ -99,6 +99,7 @@ for (const s of SEARCHES) {
     await page.goto(BASE + '/dashboard', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForFunction(() => typeof window.omniSearch === 'function' || document.getElementById('addressInput'), null, { timeout: 30000 });
     r.landed = page.url();
+    r.buildHasFixes = await page.evaluate(() => typeof setLoadWarning === 'function').catch(() => false);
     await page.fill('#addressInput', s.q);
     await page.press('#addressInput', 'Enter');
     r.ms = await settle(page);
@@ -157,6 +158,7 @@ for (const r of results) {
   const slow = r.requests.filter(x => x.ms > 2500);
   md.push(`## ${r.name}`, '');
   if (r.error) md.push(`**Script error:** ${r.error}`, '');
+  if ('buildHasFixes' in r) md.push(`- deployed build has the 2026-10-20 loader fixes: ${r.buildHasFixes}`);
   if (r.after) md.push(`- status line: \`${r.after.status}\` after ${Math.round((r.ms || 0) / 1000)}s`,
     `- warning shown: ${r.after.warning || 'none'}`,
     `- loaded: ${r.after.groupedRows} rows in ${r.after.groupedKeys} groups; drawn: ${r.after.visible}; ZIPs with demographics: ${r.after.zipsWithDemographics}; welcome still showing: ${r.after.welcomeVisible}`,
