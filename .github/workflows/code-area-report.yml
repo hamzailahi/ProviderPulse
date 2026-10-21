@@ -18,9 +18,12 @@ on:
       codes:
         description: Comma-separated CPT/HCPCS codes
         default: "43235,43239,45378,45380,45385"
+      push_branch:
+        description: "Optional: also push the CSVs to this throwaway branch (must start with tmp/), for a session that cannot download artifacts. Delete it afterwards."
+        default: ""
 
 permissions:
-  contents: read
+  contents: write   # only used by the optional tmp/ branch push
 
 jobs:
   report:
@@ -42,3 +45,16 @@ jobs:
           name: code-area-report
           path: out/
           retention-days: 7
+      - name: Push the CSVs to a throwaway branch
+        if: inputs.push_branch != ''
+        env:
+          BRANCH: ${{ inputs.push_branch }}
+        run: |
+          case "$BRANCH" in tmp/*) ;; *) echo "push_branch must start with tmp/"; exit 1;; esac
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan "$BRANCH"
+          git rm -rq --cached .
+          git add -f out/
+          git commit -qm "Code area report data (temporary branch; delete after use) [skip netlify]"
+          git push -f origin "HEAD:refs/heads/$BRANCH"
