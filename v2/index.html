@@ -3981,7 +3981,7 @@
             ]);
             const desc = {};
             descRows.forEach(d => { desc[String(d.code).toUpperCase()] = d.description; });
-            const value = { summary: CodeList.summarize(codes, med, mcd, desc), zips: padded.length, failed, capped };
+            const value = { summary: CodeList.summarize(codes, med, mcd, desc), med, mcd, zips: padded.length, failed, capped };
             if (!failed && !capped) codeListCache = { key, value };
             return value;
         }
@@ -4025,7 +4025,9 @@
                 (bad ? `<div style="font-size:11px;color:var(--orange);margin-bottom:8px;">Some requests ${r.failed ? 'failed or timed out' : 'hit the page limit'}, so these totals are incomplete (floors). <span id="codeListRetry" style="cursor:pointer;text-decoration:underline;">Try again</span></div>` : '') +
                 `<div role="group" aria-label="Code list view" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">` +
                 Object.keys(views).map(v => `<button type="button" class="proc-src code-list-view" data-view="${v}" aria-pressed="${codeListView === v}">${views[v]}</button>`).join('') +
-                `<button type="button" class="proc-src" id="codeListCopy">Copy as CSV</button></div>`;
+                `<button type="button" class="proc-src" id="codeListCopy">Copy as CSV</button>` +
+                `<button type="button" class="proc-src" id="codeListDownload" title="One Excel file: Medicare by code, clinician and row, Medicaid, by ZIP, and the matching hospital groups">Download all (Excel)</button></div>`;
+            if (procSource === 'outpatient' || procSource === 'inpatient') html += `<div style="font-size:11px;color:var(--text-secondary);line-height:1.45;margin-bottom:8px;">Hospitals report payment groups (${procSource === 'outpatient' ? 'APC' : 'DRG'}), not CPT codes, so a code list shows Medicare clinicians and Medicaid here. Download all adds the hospital groups that match your codes' topics.</div>`;
             if (codeListView === 'code') {
                 html += table(thL('Code') + thL('Description') + th('Billers') + th('Patients') + th('Services') + th('Office / facility') + th('Avg allowed') + th('Avg paid') + th('Est. Medicare paid') + th('Medicaid claims') + th('Medicaid paid'),
                     s.codes.map(c => '<tr>' + tdL(`<b>${escHtml(c.code)}</b>`) + tdL(escHtml(c.description || ''), 180) + td(n(c.billers)) + td(n(c.patients)) + td(n(c.services)) +
@@ -4045,6 +4047,8 @@
             html += `<div style="font-size:10px;color:var(--text-muted);line-height:1.5;">Medicare is traditional Medicare only (65+ and some disabled), at the address each clinician bills from. Patients are summed across billers. One procedure can appear under several billers (the physician, the surgery center, anesthesia, pathology), so do not add services across codes as a count of procedures. Office / facility splits Medicare services by place of service. Est. Medicare paid = services × average paid. Medicaid is the state's Medicaid and CHIP claims at the provider's ZIP, without clinician names; HHS withholds small counts, so these are floors. Hospital payment groups (APC, DRG) are on the hospital toggles.</div>`;
             el.innerHTML = html;
             el.querySelectorAll('.code-list-view').forEach(b => b.addEventListener('click', () => { codeListView = b.dataset.view; renderCodeList(list, r); }));
+            const dl = document.getElementById('codeListDownload');
+            if (dl) dl.addEventListener('click', () => downloadCodeList(list, r, dl));
             const retry = document.getElementById('codeListRetry');
             if (retry) retry.addEventListener('click', () => runCodeList(list, true));
             const copy = document.getElementById('codeListCopy');
@@ -4058,6 +4062,56 @@
                 const text = CodeList.toCsv(rows, cols);
                 (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => { copy.textContent = 'Copied'; }, () => { copy.textContent = 'Copy failed'; });
             });
+        }
+
+        // Download all (2026-10-21): one Excel file with every view, the raw
+        // rows and the hospital groups matched by topic (CodeList.workbook).
+        // SheetJS loads only on the first click. Hospital sources load through
+        // procLoad (cached per area); a failed load is written as a failed
+        // load, never as "no hospital groups".
+        let xlsxLib = null;
+        function loadXlsx() {
+            if (window.XLSX) return Promise.resolve(window.XLSX);
+            if (!xlsxLib) xlsxLib = new Promise((resolve, reject) => {
+                const js = document.createElement('script');
+                js.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+                js.onload = () => window.XLSX ? resolve(window.XLSX) : reject(new Error('spreadsheet library missing'));
+                js.onerror = () => { xlsxLib = null; reject(new Error('the spreadsheet library did not load')); };
+                document.head.appendChild(js);
+            });
+            return xlsxLib;
+        }
+        async function downloadCodeList(list, r, btn) {
+            const label = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Preparing…';
+            try {
+                const hospital = async src => {
+                    const v = await procLoad(src);
+                    if (!v || v.error || v.failedBatches) return { rows: [], failed: true };
+                    const rows = [];
+                    Object.keys(v.groups).forEach(g => v.groups[g].forEach(row => rows.push({ ...row, miles: v.groupOrder && v.groupOrder[g] >= 0 ? v.groupOrder[g] : null })));
+                    return { rows, failed: false };
+                };
+                const [XLSX, outpatient, inpatient] = await Promise.all([loadXlsx(), hospital('outpatient'), hospital('inpatient')]);
+                const place = ((document.getElementById('addressInput') || {}).value || '').trim();
+                const sheets = CodeList.workbook({ place, zips: r.zips, year: 2024, codes: list.codes, summary: r.summary, med: r.med, mcd: r.mcd,
+                    outpatient, inpatient, incomplete: !!(r.failed || r.capped) });
+                const wb = XLSX.utils.book_new();
+                sheets.forEach(sh => {
+                    const ws = XLSX.utils.aoa_to_sheet(sh.rows);
+                    const widths = (sh.rows[0] || []).map((_, i) => ({ wch: Math.min(48, Math.max(8, ...sh.rows.slice(0, 200).map(row => String(row[i] == null ? '' : row[i]).length))) }));
+                    ws['!cols'] = sh.name === 'Notes' ? [{ wch: 110 }, { wch: 50 }] : widths;
+                    XLSX.utils.book_append_sheet(wb, ws, sh.name);
+                });
+                const slug = (place || 'area').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'area';
+                XLSX.writeFile(wb, `procedure-codes-${slug}-2024.xlsx`);
+                btn.textContent = 'Downloaded';
+            } catch (e) {
+                btn.textContent = 'Download failed, try again';
+                console.error('code list download', e);
+            }
+            btn.disabled = false;
+            setTimeout(() => { btn.textContent = label; }, 4000);
         }
 
         function setProcSource(src, keepFilter) {

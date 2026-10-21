@@ -79,7 +79,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (40: all but `NOT_SCORED`: Hospital-based clinicians, Other health services, Nursing (RN, LPN) and Physician assistant) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
 | `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `area-zips.js` | `strayZips(rows, {centroids})`: the ZIPs a city search leaves out (2026-10-21): under 1% of the listings **and** more than 25 miles from every ZIP holding 1% or more (nearest core ZIP, so multi-city and sprawling searches stay whole); a ZIP's position is its official centre when known, else its listings' middle; unknown is kept. `pinsFar` = strays whose listings themselves sit far away; browser + `require` |
-| `code-list.js` | the Procedures panel's pasted code list (2026-10-21): `parse` (two or more 5-character codes and nothing else; up to 100) and `summarize` (by code, by clinician, by ZIP from Medicare and Medicaid rows), `toCsv`; browser + `require` |
+| `code-list.js` | the Procedures panel's pasted code list (2026-10-21): `parse` (two or more 5-character codes and nothing else; up to 100) and `summarize` (by code, by clinician, by ZIP from Medicare and Medicaid rows), `toCsv`, and for Download all `TOPICS` / `topicFor` / `hospitalTopics` (hospital APC and DRG groups matched to a code list by topic) and `workbook` (the sheets); browser + `require` |
 | `procedure-search.js` | the dashboard Procedures panel's search: common words ("colonoscopy", "EGD") to CMS's own description wording, tested against real descriptions; browser + `require` |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
 | `demand-model.js` | the learned demand model (ridge regression per specialty, state-held-out validation, `addAcs`/`addPlaces` area builders shared by trainer and scorer); browser + `require` |
@@ -923,7 +923,20 @@ Tables:
   The list survives a source toggle and a new area; clearing it reloads the
   source (`codeListShown`). Views and "Copy as CSV" come from
   `CodeList.summarize` / `toCsv`; every value goes through `escHtml`. Checked
-  against the 2026-10-21 Haltom City pull: identical totals.
+  against the 2026-10-21 Haltom City pull: identical totals. Copy as CSV
+  copies the view on screen only. **Download all (Excel)** (`downloadCodeList`,
+  the user's choice, 2026-10-21) writes one file through SheetJS
+  (`xlsx` 0.18.5 from cdnjs, loaded on first click): Notes (area, codes,
+  each code's topic, caveats, INCOMPLETE when any request failed), Medicare
+  by code / by clinician (all) / rows, Medicaid by code / rows, By ZIP, and
+  Hospital outpatient and inpatient: the nearby hospitals' groups (through
+  `procLoad`, cached) whose description matches a topic of the list's codes
+  (**by topic**, the user's choice: CPT range first, else the code's
+  description; GI reaches Upper, Lower and Complex GI and the GI DRGs, not
+  airway endoscopy; anesthesia has no hospital group). Inpatient rows are
+  stays, so their estimate is stays x average paid. A failed hospital load is
+  written as failed, never as "none". With a code list in the box the
+  hospital toggles say why the list shows Medicare clinicians and Medicaid.
   Every source loads through `procLoad(src)`, cached per ZIP list in
   `procCache` (a failed or partial load is never kept; `failed` stops
   retries from the "also in" line), and a search adds
@@ -1612,7 +1625,7 @@ node scripts/test-patient-query.mjs       # 92: typed words to specialties (whol
 node scripts/test-area-profile.mjs        # 45: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
 node scripts/test-procedures-tool.mjs     # 23: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
-node scripts/test-code-list.mjs           # 30: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, CSV
+node scripts/test-code-list.mjs           # 47: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, hospital topics, the Download all sheets, CSV
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```
 

@@ -64,7 +64,40 @@ check('rows for codes not in the list are ignored', CodeList.summarize(['43239']
 check('codes match whatever the case in the rows', CodeList.summarize(['C9777'], [Object.assign({}, MED[0], { hcpcs_cd: 'c9777' })], []).codes[0].services === 110);
 check('nothing loaded still summarizes, every code missing', CodeList.summarize(['45385', '43239'], [], []).missing.length === 2);
 
-console.log('\n3. CSV');
+console.log('\n3. Hospital groups by topic');
+const T = CodeList.topicsFor(['45385', '43239', '88305', '00811', '93000', 'C9777', '76700'], {});
+check('GI codes are Digestive (GI), pathology, heart and imaging by CPT range', T.byCode['45385'] === 'Digestive (GI)' && T.byCode['43239'] === 'Digestive (GI)' && T.byCode['88305'] === 'Pathology' && T.byCode['93000'] === 'Heart' && T.byCode['76700'] === 'Imaging');
+check('anesthesia codes are Anesthesia, which has no hospital group', T.byCode['00811'] === 'Anesthesia' && CodeList.hospitalTopics('Anesthesia services', T.topics.filter(t => t.id === 'anesthesia')).length === 0);
+check('a letter code with no description has no topic', T.byCode.C9777 === null);
+check('a letter code takes its topic from its description', CodeList.topicFor('G0105', 'Colorectal cancer screening; colonoscopy on individual at high risk').label === 'Digestive (GI)');
+const gi = T.topics.filter(t => t.id === 'gi');
+check('GI reaches Upper, Lower and Complex GI and the GI DRGs', ['Level 2 Upper GI Procedures', 'Level 3 Lower GI Procedures', 'Complex GI Procedures', 'G.I. HEMORRHAGE WITH MCC', 'MAJOR SMALL AND LARGE BOWEL PROCEDURES WITH CC'].every(d => CodeList.hospitalTopics(d, gi).length === 1));
+check('GI does not reach airway endoscopy, sepsis or musculoskeletal groups', ['Level 4 Airway Endoscopy', 'SEPTICEMIA OR SEVERE SEPSIS', 'Level 5 Musculoskeletal Procedures'].every(d => CodeList.hospitalTopics(d, gi).length === 0));
+check('every topic range is well formed', CodeList.TOPICS.every(t => t.ranges.every(r => r[0] <= r[1])));
+
+console.log('\n4. Download all workbook');
+const hospRows = [
+  { hospital: 'Jps Health Network', ccn: '450039', miles: 6, code: '5302', description: 'Level 2 Upper GI Procedures', patients: 25, services: 32, avg_charge: 11758.4, avg_allowed: 1717.86, avg_paid: 1367.09 },
+  { hospital: 'Jps Health Network', ccn: '450039', miles: 6, code: '5154', description: 'Level 4 Airway Endoscopy', patients: 19, services: 27, avg_charge: 21481, avg_allowed: 3380, avg_paid: 2693 }
+];
+const wb = CodeList.workbook({ place: 'Fort Worth, TX', zips: 3, year: 2024, codes: ['45385', '43239', '45388'], summary: s, med: MED, mcd: MCD,
+  outpatient: { rows: hospRows, failed: false }, inpatient: { rows: [], failed: true }, incomplete: false });
+const sheet = n => wb.find(x => x.name === n);
+check('one sheet per view, rows, source and hospital setting', wb.map(x => x.name).join('|') === 'Notes|Medicare by code|Medicare by clinician|Medicare rows|Medicaid by code|Medicaid rows|By ZIP|Hospital outpatient|Hospital inpatient');
+check('Medicare by code matches the panel summary', sheet('Medicare by code').rows[1][0] === '45385' && sheet('Medicare by code').rows[1][4] === 430 && sheet('Medicare by code').rows.length === 4);
+check('every clinician and every raw row is in the file', sheet('Medicare by clinician').rows.length === 3 && sheet('Medicare rows').rows.length === 5);
+check('Medicaid sheets hold only codes and rows with Medicaid data', sheet('Medicaid by code').rows.length === 2 && sheet('Medicaid rows').rows.length === 3);
+const op = sheet('Hospital outpatient').rows;
+check('hospital outpatient keeps the GI group and drops airway endoscopy', op.length === 2 && op[1][0] === 'Digestive (GI)' && op[1][1] === '5302' && op[1][11] === Math.round(32 * 1367.09));
+check('a failed hospital load says it failed, never "none"', /did not load/.test(sheet('Hospital inpatient').rows[0][0]));
+const ip = CodeList.workbook({ codes: ['45385'], summary: s, zips: 1, inpatient: { failed: false, rows: [{ hospital: 'Jps', ccn: '1', miles: 6, code: '378', description: 'G.I. HEMORRHAGE WITH CC', patients: 40, services: null, avg_charge: 50000, avg_allowed: 9000, avg_paid: 7800 }, { hospital: 'Jps', ccn: '1', miles: 6, code: '871', description: 'SEPTICEMIA OR SEVERE SEPSIS', patients: 90, avg_paid: 13000 }] } }).find(x => x.name === 'Hospital inpatient').rows;
+check('inpatient: stays x average paid, no services column, sepsis left out', ip.length === 2 && ip[0].length === 11 && ip[1][1] === '378' && ip[1][10] === 40 * 7800);
+const notes = sheet('Notes').rows.map(r => r.join(' ')).join('\n');
+check('notes list each code\'s topic and the codes with no rows', /45385 Digestive \(GI\)/.test(notes) && /no Medicare or Medicaid rows in this area: 45388/.test(notes));
+check('an incomplete pull is marked in the notes', /INCOMPLETE/.test(CodeList.workbook({ codes: ['45385'], summary: s, zips: 1, incomplete: true }).find(x => x.name === 'Notes').rows.map(r => r.join(' ')).join(' ')));
+check('a hospital source not loaded at all says so', /Not loaded/.test(CodeList.workbook({ codes: ['45385'], summary: s, zips: 1 }).find(x => x.name === 'Hospital outpatient').rows[0][0]));
+
+console.log('\n5. CSV');
 const csv = CodeList.toCsv([{ a: 'x, "y"', b: 1.23456, c: 7 }], [['A', 'a'], ['B', 'b'], ['C', 'c']]);
 check('values with commas and quotes are quoted, decimals rounded to cents', csv === 'A,B,C\n"x, ""y""",1.23,7', JSON.stringify(csv));
 

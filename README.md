@@ -600,6 +600,17 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-21
 
+- **Download all for a code list.** With codes pasted into the Procedures
+  tab, a Download all (Excel) button saves one spreadsheet: notes, Medicare
+  by code, by clinician (everyone, not just the top 200) and every raw row,
+  Medicaid by code and by row, totals by ZIP, and the hospital outpatient and
+  inpatient payment groups at the nearest hospitals that match your codes'
+  topics (GI codes bring the Upper, Lower and Complex GI groups and the GI
+  inpatient groups, for example). Hospitals report payment groups rather
+  than CPT codes, so the hospital toggles now say why a code list shows
+  Medicare clinicians and Medicaid. Copy as CSV still copies the view on
+  screen.
+
 - **City searches no longer pull in far-off ZIPs.** A few mis-addressed
   listings used to drag distant ZIPs onto the map: "Fort Worth, TX" brought
   in an Austin ZIP, one in West Virginia and Stephenville, and they flowed
