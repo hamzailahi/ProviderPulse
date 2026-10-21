@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-20. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-21. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -507,6 +507,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `procedure-tables.yml` | manual, yearly once HHS and CMS publish a new year | builds the Procedures panel's Medicaid table (per ZIP, specialty and procedure code) and the Medicare hospital tables (per hospital and payment group) from those files; `dry_run` writes nothing and reports what was dropped and how big it is; `apply` refuses unless the free disk entered covers the load |
 | `concurrent-indexes.yml` | manual | builds a migration's indexes without locking the tables (038, location indexes), dropping failed leftovers first and failing unless every index ends valid |
 | `live-dashboard-audit.yml` | manual, read only | drives the live dashboard in a headless browser (ZIP, city, state, several ZIPs, specialty filter, neighbors, every tab, and a provider's home with a mocked profile) and reports every failed or slow request, console error and screenshot |
+| `code-area-report.yml` | manual, read only | pulls a list of procedure codes within a radius of one ZIP (Medicare by clinician, Medicaid by ZIP and specialty, Medicare hospital outpatient GI and endoscopy groups) and uploads the CSVs as a run artifact for a spreadsheet |
 | `procedures-panel-check.yml` | manual, read only | replays the dashboard's Medicare procedures requests for one city and compares what loads with direct queries for one specialty and a list of codes |
 | `medicaid-code-probe.yml` | manual, read only | looks codes up in HHS's raw Medicaid file: every year, by state, what one state bills instead, and the suppression threshold |
 | `procedure-codes-reference.yml` | manual | saves CMS's plain-language procedure descriptions to `supabase/reference/procedure-codes.csv`, the text the panel's word search is tested against |
@@ -593,6 +594,16 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-10-21
+
+- **Procedure codes around a ZIP, as a spreadsheet.** A new manual job
+  pulls any list of CPT or HCPCS codes within a chosen radius of a ZIP:
+  traditional Medicare by clinician (patients, services, average allowed
+  and paid, office or facility), Medicaid by ZIP and specialty, and the
+  gastrointestinal and endoscopy payment groups at nearby hospitals. It
+  reads only and leaves its CSVs on the run. First used for a GI code set
+  around Haltom City and Fort Worth.
 
 ### 2026-10-20
 

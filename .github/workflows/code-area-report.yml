@@ -1,0 +1,44 @@
+name: Procedure codes around a ZIP
+
+# Manual, read only. Pulls a list of procedure codes within a radius of one
+# ZIP from the public procedure tables (Medicare by clinician, Medicaid by ZIP
+# and specialty, Medicare hospital outpatient groups) through the publishable
+# key and uploads the CSVs as an artifact (scripts/live/code-area-report.mjs).
+# Nothing is written to the database or committed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip:
+        description: Centre ZIP
+        default: "76117"
+      radius:
+        description: Radius in miles (1 to 50)
+        default: "20"
+      codes:
+        description: Comma-separated CPT/HCPCS codes
+        default: "43235,43239,45378,45380,45385"
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pull the codes
+        env:
+          ZIP: ${{ inputs.zip }}
+          RADIUS: ${{ inputs.radius }}
+          CODES: ${{ inputs.codes }}
+        run: node scripts/live/code-area-report.mjs "$ZIP" "$RADIUS" "$CODES" out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: code-area-report
+          path: out/
+          retention-days: 7
