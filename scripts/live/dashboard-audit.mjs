@@ -192,6 +192,42 @@ for (const s of SEARCHES) {
   results.push(r);
   await ctx.close();
 }
+// A pasted code list on the Procedures tab (2026-10-21): Fort Worth's ZIPs and
+// a GI practice's codes, as a doctor would paste them from a spreadsheet.
+{
+  const { ctx, page, log } = await fresh();
+  const CODES = '43235\n43236\n43239\n43246\n43247\n43249\n43250\n43251\n43252\n43255\n43499\n43762\n44361\n44388\n44389\n45330\n45331\n45332\n45334\n45338\n45378\n45380\n45381\n45382\n45384\n45385\n45388\n46221\n51784\n76700\n76981\n88300\n88305\n88312\n88313\n88342\n91110\n91120\n91122\n93000\n95921\n00731\n00811\n00812\n00813\nC9777';
+  const r = { name: 'Procedures code list (Fort Worth, TX; 46 GI codes)', q: 'Fort Worth, TX', steps: [] };
+  const panel = () => page.evaluate(() => ({ codeList: ((document.getElementById('proceduresContent') || {}).innerText || '').replace(/\s+/g, ' ').slice(0, 700) })).catch(e => ({ codeList: String(e) }));
+  try {
+    await page.goto(BASE + '/dashboard', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForFunction(() => document.getElementById('addressInput'), null, { timeout: 30000 });
+    await page.fill('#addressInput', 'Fort Worth, TX'); await page.press('#addressInput', 'Enter');
+    r.ms = await settle(page);
+    r.after = await snapshot(page);
+    const step = async (label, fn, until) => {
+      const before = log.requests.length, t0 = Date.now();
+      let err = null;
+      try { await fn(); } catch (e) { err = String(e.message || e).slice(0, 200); }
+      if (until) await page.waitForFunction(until, null, { timeout: 90000 }).catch(e => { err = (err ? err + '; ' : '') + 'never finished'; });
+      await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+      const reqs = log.requests.slice(before);
+      r.steps.push({ label: label + ` (${((Date.now() - t0) / 1000).toFixed(1)}s, ${reqs.length} requests, ${reqs.filter(x => x.status === 'FAILED' || x.status >= 400).length} failed)`, err,
+        snap: { ...(await snapshot(page)), ...(await panel()) }, newRequests: reqs.map(x => `${x.status} ${x.ms}ms ${x.url.slice(0, 120)}${x.err ? ' ' + x.err : ''}`) });
+      await page.screenshot({ path: join(OUT, 'codelist_' + label.replace(/[^A-Za-z0-9]+/g, '_') + '.png') });
+    };
+    await step('open Procedures', () => page.evaluate(() => switchTab('procedures')), () => !/Loading/.test(document.getElementById('proceduresContent').innerText));
+    await step('paste 46 codes', async () => { await page.fill('#proceduresSearch', CODES); await page.evaluate(() => filterProcedures(document.getElementById('proceduresSearch').value)); },
+      () => /codes across|did not load/.test(document.getElementById('proceduresContent').innerText));
+    await step('by clinician', () => page.click('.code-list-view[data-view=clinician]'));
+    await step('by ZIP', () => page.click('.code-list-view[data-view=zip]'));
+    await step('clear the box', async () => { await page.fill('#proceduresSearch', ''); await page.evaluate(() => filterProcedures('')); },
+      () => !/codes across|Loading/.test(document.getElementById('proceduresContent').innerText));
+  } catch (e) { r.error = String(e.message || e).slice(0, 300); }
+  r.requests = log.requests; r.console = log.console; r.pageErrors = log.pageErrors;
+  results.push(r);
+  await ctx.close();
+}
 await browser.close();
 
 // ---- report ----
@@ -213,6 +249,7 @@ for (const r of results) {
   if (r.console.length) md.push('- console:', ...[...new Set(r.console)].slice(0, 12).map(e => '  - ' + e));
   (r.steps || []).forEach(st => {
     md.push(`- step **${st.label}**${st.err ? ' (error: ' + st.err + ')' : ''}: status \`${st.snap.status}\`${st.snap.warning ? ', warning: ' + st.snap.warning : ''}, drawn ${st.snap.visible}, map key ${String(st.snap.mapKey || '').slice(0, 120)}` +
+      ('codeList' in st.snap ? `; panel: ${st.snap.codeList}` : '') +
       ('hash' in st.snap ? `; hash \`${st.snap.hash}\`, specialty \`${st.snap.specialty}\`, home button ${st.snap.homeButton}, where you stand ${st.snap.whereYouStand}, old mode switch ${st.snap.modeSwitch}; procedures card: ${st.snap.procCard}; insights ${String(st.snap.insights || '').slice(0, 160)}` : ''));
     st.newRequests.filter(x => !/^2\d\d/.test(x) || / (2[5-9]\d\d|[3-9]\d{3}|\d{5,})ms /.test(x)).slice(0, 8).forEach(x => md.push('    - ' + x));
   });
