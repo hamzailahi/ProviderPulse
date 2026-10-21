@@ -609,6 +609,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   with no rows are named with the reason. It loads only those codes, so it is
   quicker than the full procedures load. A single code or a word works as
   before.
+- **The live dashboard audit now tries a code list.** It searches Fort
+  Worth, pastes a GI practice's 46 codes into the Procedures tab and records
+  each view, its timing and every request.
 
 - **Procedure codes around a ZIP, as a spreadsheet.** A new manual job
   pulls any list of CPT or HCPCS codes within a chosen radius of a ZIP:
