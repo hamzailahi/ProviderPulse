@@ -53,6 +53,7 @@
     <script src="assets/specialties.js"></script>
     <script src="assets/procedure-search.js"></script>
     <script src="assets/code-list.js"></script>
+    <script src="assets/area-zips.js"></script>
 </head>
 <body>
     <h2>Provider Market Strategy Dashboard</h2>
@@ -732,7 +733,7 @@
 
                 // Fetch clinics + physicians (provider_individuals) + secondary
                 // locations (clinic_secondary_locations), paginated per table.
-                const clinicData = await fetchProviderRows(
+                let clinicData = await fetchProviderRows(
                     () => filter,
                     n => statusEl.textContent = '🔄 Loaded ' + n + ' providers...'
                 );
@@ -741,7 +742,9 @@
                     statusEl.textContent = clinicData.failed.length ? '❌ The directory did not answer in time. Try again, or search a ZIP.' : '❌ No providers found';
                     return;
                 }
-                setLoadWarning(loadWarningFor(clinicData));
+                let strayNote = '';
+                if (filter.startsWith('or=(city.')) ({ rows: clinicData, note: strayNote } = dropStrayZips(clinicData));
+                setLoadWarning([loadWarningFor(clinicData), strayNote].filter(Boolean).join(' '));
 
                 // Fetch demographics for these ZIPs from demographics_raw table in batches
                 const zips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
@@ -903,6 +906,21 @@
             return parts.join(' ');
         }
 
+        // A city search keeps only the listings in its own area (2026-10-21):
+        // mis-addressed rows dragged far-off ZIPs onto the map ("Fort Worth, TX"
+        // brought in Austin's 78705), and every map ZIP feeds Demographics,
+        // Health and Procedures. AreaZips.strayZips decides; the map says what
+        // was left out. ZIP and state searches are never trimmed.
+        function dropStrayZips(rows) {
+            const { stray, listings } = AreaZips.strayZips(rows);
+            if (!stray.length) return { rows, note: '' };
+            const drop = new Set(stray);
+            const kept = rows.filter(r => !drop.has(String(r.zip || '').split('-')[0].trim()));
+            kept.failed = rows.failed; kept.capped = rows.capped;
+            const shown = stray.slice(0, 6).join(', ') + (stray.length > 6 ? ' and ' + (stray.length - 6) + ' more' : '');
+            return { rows: kept, note: `Left out ${listings.toLocaleString()} listing${listings === 1 ? '' : 's'} whose address puts ${stray.length === 1 ? 'it' : 'them'} far from the rest of this city (ZIP ${shown}).` };
+        }
+
         async function searchMultipleZips(zips) {
             const statusEl = document.getElementById('dbStatus');
             statusEl.textContent = `🔄 Loading ${zips.length} ZIPs...`;
@@ -981,11 +999,13 @@
                         }
                     );
                 }));
-                const clinicData = perCity.flat();
+                let clinicData = perCity.flat();
                 clinicData.failed = perCity.flatMap(r => r.failed || []);
                 clinicData.capped = perCity.flatMap(r => r.capped || []);
                 if (!clinicData.length) { statusEl.textContent = clinicData.failed.length ? '❌ The directory did not answer in time. Try again.' : '❌ No providers found'; return; }
-                setLoadWarning(loadWarningFor(clinicData));
+                const trimmed = dropStrayZips(clinicData);
+                clinicData = trimmed.rows;
+                setLoadWarning([loadWarningFor(clinicData), trimmed.note].filter(Boolean).join(' '));
 
                 const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
                 const demByZip = {};

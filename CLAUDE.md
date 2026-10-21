@@ -78,6 +78,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code`), `milesBetween`, MapTiler key, ZIP centroid lookup |
 | `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (40: all but `NOT_SCORED`: Hospital-based clinicians, Other health services, Nursing (RN, LPN) and Physician assistant) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
 | `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
+| `area-zips.js` | `strayZips(rows)`: the ZIPs a city search leaves out (2026-10-21): under 1% of the listings **and** more than 25 miles from every ZIP holding 1% or more (nearest core ZIP, so multi-city and sprawling searches stay whole; no coordinates means kept); browser + `require` |
 | `code-list.js` | the Procedures panel's pasted code list (2026-10-21): `parse` (two or more 5-character codes and nothing else; up to 100) and `summarize` (by code, by clinician, by ZIP from Medicare and Medicaid rows), `toCsv`; browser + `require` |
 | `procedure-search.js` | the dashboard Procedures panel's search: common words ("colonoscopy", "EGD") to CMS's own description wording, tested against real descriptions; browser + `require` |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
@@ -675,6 +676,14 @@ must **not** reset `selectedTaxonomies`: an unfiltered map stays unfiltered,
 a filtered one keeps its selection, and a first-seen taxonomy joins only if it
 matches the active specialty (`activeSpecialtyTerms()`). Rebuild the checkbox
 list after new taxonomies arrive.
+
+**Stray ZIPs (2026-10-21, the user's choice).** A city search (single or
+multi-city, never a ZIP or state search) drops listings in stray ZIPs
+before demographics load (`dropStrayZips` in `index.html`, rule in
+`assets/area-zips.js`), because every map ZIP feeds Demographics, Health,
+Procedures and the assistant's area: "Fort Worth, TX" pulled in 78705
+(Austin), 26109 (West Virginia) and 76401 (Stephenville), and 78705 came
+third in a Fort Worth code list. The map's notice names what was left out.
 
 `dashboard-v3.js` overrides `window.renderVerdict`. For a city or county
 search there is no single ZIP, so it anchors the score on the most populous
@@ -1594,6 +1603,7 @@ python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital 
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 node scripts/test-area-profile.mjs        # 45: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
 node scripts/test-procedures-tool.mjs     # 23: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals
+node scripts/test-area-zips.mjs           # 12: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 30: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, CSV
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```
