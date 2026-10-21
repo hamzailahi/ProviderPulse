@@ -52,6 +52,7 @@
     <script src="assets/taxonomy-map.js"></script>
     <script src="assets/specialties.js"></script>
     <script src="assets/procedure-search.js"></script>
+    <script src="assets/code-list.js"></script>
 </head>
 <body>
     <h2>Provider Market Strategy Dashboard</h2>
@@ -318,7 +319,7 @@
                         .proc-src:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
                         @media (max-width:640px){.proc-src{font-size:12px;padding:7px 10px;}}
                     </style>
-                    <input id="proceduresSearch" type="text" placeholder="Search by HCPCS code, description, or specialty..." 
+                    <input id="proceduresSearch" type="text" placeholder="Search a code, word or specialty, or paste a list of codes..." 
                         style="width:100%;box-sizing:border-box;padding:7px 10px;font-size:11px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'DM Sans',sans-serif;outline:none;"
                         oninput="filterProcedures(this.value)">
                 </div>
@@ -3582,6 +3583,13 @@
         let procPartial = '';       // set when some ZIP batches failed
 
         function filterProcedures(query) {
+            const list = CodeList.parse(query);
+            if (list.isList) { runCodeList(list); return; }
+            if (codeListTimer) { clearTimeout(codeListTimer); codeListTimer = null; }
+            codeListSeq++;
+            // Leaving a code list: the panel's own load was skipped for it, so
+            // load (or reuse) the source and apply what is now in the box.
+            if (codeListShown) { codeListShown = false; if (procZips.length) { procPendingFilter = query; fetchProceduresData(procZips); return; } }
             if (procSource !== 'medicare') { renderOtherProcedures(query.trim().toLowerCase()); return; }
             if (!proceduresRawData || Object.keys(proceduresRawData).length === 0) return;
             const q = query.trim().toLowerCase();
@@ -3589,6 +3597,7 @@
         }
 
         function renderProceduresHTML(bySpec, filter) {
+            if (filter && CodeList.parse(filter).isList) { runCodeList(CodeList.parse(filter), true); return; }
             const el = document.getElementById('proceduresContent');
             const fmt  = v => v != null ? Math.round(v).toLocaleString() : '—';
             const fmtD = v => v != null ? '$' + Number(v).toFixed(2) : '—';
@@ -3693,10 +3702,15 @@
         async function fetchProceduresData(zips) {
             const el = document.getElementById('proceduresContent');
             const searchEl = document.getElementById('proceduresSearch');
+            // A pasted code list stays in the box when the area changes.
+            if (!procPendingFilter && searchEl && CodeList.parse(searchEl.value).isList) procPendingFilter = searchEl.value;
             if (searchEl) searchEl.value = procPendingFilter;
             proceduresRawData = {};
             procPartial = '';
             procZips = zips || [];
+            // A code list needs only its own rows, not the whole area's load.
+            const pendingList = CodeList.parse(procPendingFilter);
+            if (pendingList.isList && procZips.length) { procPendingFilter = ''; runCodeList(pendingList, true); return; }
             if (procSource !== 'medicare') return fetchOtherProcedures();
 
             if (!zips || zips.length === 0) {
@@ -3876,6 +3890,129 @@
                 foot: 'Claims = claim lines · Pt-months = monthly unique patients added across months (a patient seen in three months counts three times, so it is not a head count) · Total Paid = Medicaid paid · Paid/Claim = Total Paid ÷ Claims. HHS withholds any provider-code-month with fewer than 12 patients, so small practices undercount. State data quality varies.' }
         };
 
+        /* ---- Procedures: a pasted list of codes (2026-10-21) ----------------
+           Two or more codes and nothing else in the search box ("43235, 43239,
+           45385", or a column pasted from a spreadsheet) switch the panel to a
+           code list over every ZIP on the map: Medicare clinicians and Medicaid
+           for exactly those codes, by code, by clinician and by ZIP
+           (assets/code-list.js). It asks only for those codes, so it is far
+           lighter than the panel's whole-area load. A failed or capped request
+           marks the result incomplete and is never cached. Hospital sources
+           report APC/DRG groups, not codes, so they are not part of a list. */
+        const CODE_LIST_MAX_ZIPS = 400;
+        let codeListView = 'code';
+        let codeListCache = { key: '', value: null };
+        let codeListTimer = null, codeListSeq = 0, codeListShown = false;
+        async function loadCodeList(codes, zips) {
+            const padded = [...new Set(zips.map(z => String(z).padStart(5, '0')))];
+            const key = padded.slice().sort().join(',') + '|' + codes.slice().sort().join(',');
+            if (codeListCache.key === key && codeListCache.value) return codeListCache.value;
+            const H = { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' };
+            let failed = 0, capped = false;
+            const paged = async (path, maxPages) => {
+                const out = [];
+                for (let p = 0; p < maxPages; p++) {
+                    let res;
+                    try { res = await fetch(`${SUPABASE_URL}/rest/v1/${path}&limit=1000&offset=${p * 1000}`, { headers: H }); } catch (e) { failed++; return out; }
+                    if (!res.ok) { failed++; return out; }
+                    const b = await res.json();
+                    if (!Array.isArray(b)) { failed++; return out; }
+                    out.push(...b);
+                    if (b.length < 1000) return out;
+                }
+                capped = true;
+                return out;
+            };
+            const groups = n => { const g = []; for (let i = 0; i < padded.length; i += n) g.push(padded.slice(i, i + n)); return g; };
+            const inParallel = async (gs, k, fn) => { const out = []; for (let i = 0; i < gs.length; i += k) (await Promise.all(gs.slice(i, i + k).map(fn))).forEach(r => out.push(...r)); return out; };
+            const list = codes.map(encodeURIComponent).join(',');
+            const sel = 'npi,provider_name,first_name,credentials,entity_code,city,zip,specialty,hcpcs_cd,hcpcs_desc,place_of_service,tot_benes,tot_srvcs,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt';
+            const [med, mcd, descRows] = await Promise.all([
+                inParallel(groups(10), 4, g => paged(`cms_procedures_full?zip=in.(${g.join(',')})&hcpcs_cd=in.(${list})&select=${sel}&order=npi,hcpcs_cd,place_of_service,id`, 20)),
+                inParallel(groups(50), 3, g => paged(`medicaid_procedures?zip=in.(${g.join(',')})&code=in.(${list})&select=zip,specialty,code,claims,paid,providers&order=zip,specialty,code`, 20)),
+                paged(`procedure_codes?code=in.(${list})&select=code,description&order=code`, 1)
+            ]);
+            const desc = {};
+            descRows.forEach(d => { desc[String(d.code).toUpperCase()] = d.description; });
+            const value = { summary: CodeList.summarize(codes, med, mcd, desc), zips: padded.length, failed, capped };
+            if (!failed && !capped) codeListCache = { key, value };
+            return value;
+        }
+        function runCodeList(list, immediate) {
+            if (codeListTimer) clearTimeout(codeListTimer);
+            const seq = ++codeListSeq;
+            const go = async () => {
+                codeListTimer = null;
+                const el = document.getElementById('proceduresContent');
+                if (!procZips.length) { el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">Search a ZIP, city or state first; a code list covers every ZIP on the map.</em>'; return; }
+                if (procZips.length > CODE_LIST_MAX_ZIPS) {
+                    el.innerHTML = `<em style="color:var(--orange);font-size:12px;">The map holds ${procZips.length.toLocaleString()} ZIPs; a code list covers up to ${CODE_LIST_MAX_ZIPS}. Search a city or a ZIP and add neighbor rings.</em>`;
+                    return;
+                }
+                el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">⏳ Loading ${list.codes.length} codes across ${procZips.length} ZIP${procZips.length === 1 ? '' : 's'}...</em>`;
+                let r;
+                try { r = await loadCodeList(list.codes, procZips); } catch (e) { r = { error: (e && e.message) || String(e) }; }
+                if (seq !== codeListSeq) return;   // the box changed while loading
+                codeListShown = true;
+                renderCodeList(list, r);
+            };
+            if (immediate) go(); else codeListTimer = setTimeout(go, 350);
+        }
+        function renderCodeList(list, r) {
+            const el = document.getElementById('proceduresContent');
+            if (r.error) { el.innerHTML = `<em style="color:var(--orange);font-size:12px;">The code list did not load: ${escHtml(r.error)}</em>`; return; }
+            const s = r.summary;
+            const n = v => v != null && v !== 0 ? Math.round(v).toLocaleString() : (v === 0 ? '0' : '—');
+            const d0 = v => v ? '$' + Math.round(v).toLocaleString() : '—';
+            const d2 = v => v != null ? '$' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+            const th = t => `<th style="text-align:right;padding:4px 6px;font-weight:600;color:var(--text-secondary);white-space:nowrap;border-bottom:1px solid var(--border);">${t}</th>`;
+            const thL = t => `<th style="text-align:left;padding:4px 6px;font-weight:600;color:var(--text-secondary);white-space:nowrap;border-bottom:1px solid var(--border);">${t}</th>`;
+            const td = v => `<td style="text-align:right;padding:4px 6px;white-space:nowrap;border-bottom:1px solid var(--border);">${v}</td>`;
+            const tdL = (v, w) => `<td style="text-align:left;padding:4px 6px;border-bottom:1px solid var(--border);${w ? 'min-width:' + w + 'px;' : ''}">${v}</td>`;
+            const table = (head, rows) => `<div style="overflow-x:auto;margin-bottom:10px;"><table style="border-collapse:collapse;font-size:11px;width:100%;color:var(--text-primary);"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+            const views = { code: 'By code', clinician: 'By clinician', zip: 'By ZIP' };
+            const bad = r.failed || r.capped;
+            let html = `<div style="font-size:12px;font-weight:600;margin-bottom:4px;">${s.codes.length} codes across ${r.zips} ZIP${r.zips === 1 ? '' : 's'} on the map</div>` +
+                `<div style="font-size:11px;color:var(--text-secondary);line-height:1.5;margin-bottom:8px;">Medicare (2024): ${n(s.totals.billers)} clinicians and organizations, ${n(s.totals.services)} services, about ${d0(s.totals.paid)} paid. Medicaid (2024): ${n(s.totals.mcdClaims)} claim lines, ${d0(s.totals.mcdPaid)} paid.` +
+                (list.ignored ? ` Only the first ${CodeList.MAX_CODES} codes are used.` : '') + `</div>` +
+                (bad ? `<div style="font-size:11px;color:var(--orange);margin-bottom:8px;">Some requests ${r.failed ? 'failed or timed out' : 'hit the page limit'}, so these totals are incomplete (floors). <span id="codeListRetry" style="cursor:pointer;text-decoration:underline;">Try again</span></div>` : '') +
+                `<div role="group" aria-label="Code list view" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">` +
+                Object.keys(views).map(v => `<button type="button" class="proc-src code-list-view" data-view="${v}" aria-pressed="${codeListView === v}">${views[v]}</button>`).join('') +
+                `<button type="button" class="proc-src" id="codeListCopy">Copy as CSV</button></div>`;
+            if (codeListView === 'code') {
+                html += table(thL('Code') + thL('Description') + th('Billers') + th('Patients') + th('Services') + th('Office / facility') + th('Avg allowed') + th('Avg paid') + th('Est. Medicare paid') + th('Medicaid claims') + th('Medicaid paid'),
+                    s.codes.map(c => '<tr>' + tdL(`<b>${escHtml(c.code)}</b>`) + tdL(escHtml(c.description || ''), 180) + td(n(c.billers)) + td(n(c.patients)) + td(n(c.services)) +
+                        td(c.services ? `${n(c.office)} / ${n(c.facility)}` : '—') + td(d2(c.avgAllowed)) + td(d2(c.avgPaid)) + td(d0(c.paid)) + td(c.inMedicaid ? n(c.mcdClaims) : '—') + td(c.inMedicaid ? d0(c.mcdPaid) : '—') + '</tr>').join(''));
+            } else if (codeListView === 'clinician') {
+                const shown = s.clinicians.slice(0, 200);
+                html += (s.clinicians.length > shown.length ? `<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;">Showing the top ${shown.length} of ${s.clinicians.length.toLocaleString()} by estimated Medicare paid. Copy as CSV has them all.</div>` : '') +
+                    table(thL('Clinician or organization') + thL('Specialty') + thL('City') + th('Codes') + thL('Top code') + th('Patients') + th('Services') + th('Est. Medicare paid'),
+                        shown.map(c => '<tr>' + tdL(`${escHtml(c.name)}${c.credentials ? ', ' + escHtml(c.credentials) : ''}<div style="font-size:10px;color:var(--text-muted);">NPI ${escHtml(c.npi)}${c.organization ? ' · organization' : ''}</div>`, 150) +
+                            tdL(escHtml(c.specialty), 110) + tdL(escHtml(c.city) + ' ' + escHtml(c.zip)) + td(n(c.codes)) + tdL(escHtml(c.topCode || '')) + td(n(c.patients)) + td(n(c.services)) + td(d0(c.paid)) + '</tr>').join(''));
+            } else {
+                html += table(thL('ZIP') + th('Medicare billers') + th('Medicare services') + th('Est. Medicare paid') + th('Medicaid claims') + th('Medicaid paid'),
+                    s.zips.map(z => '<tr>' + tdL(`<b>${escHtml(z.zip)}</b>`) + td(n(z.billers)) + td(n(z.services)) + td(d0(z.paid)) + td(n(z.mcdClaims)) + td(d0(z.mcdPaid)) + '</tr>').join('')) +
+                    `<div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;">${s.zips.length} of ${r.zips} ZIPs have rows for these codes; the rest show none in either source.</div>`;
+            }
+            if (s.missing.length) html += `<div style="font-size:11px;color:var(--text-secondary);line-height:1.45;margin-bottom:8px;"><b>No rows in this area:</b> ${s.missing.map(escHtml).join(', ')}. CMS leaves out any code a clinician billed for fewer than 11 Medicare patients, and HHS any provider-code-month under 12 Medicaid patients. Facility codes (such as C codes) are billed by hospitals and surgery centers, which report payment groups instead.</div>`;
+            html += `<div style="font-size:10px;color:var(--text-muted);line-height:1.5;">Medicare is traditional Medicare only (65+ and some disabled), at the address each clinician bills from. Patients are summed across billers. One procedure can appear under several billers (the physician, the surgery center, anesthesia, pathology), so do not add services across codes as a count of procedures. Office / facility splits Medicare services by place of service. Est. Medicare paid = services × average paid. Medicaid is the state's Medicaid and CHIP claims at the provider's ZIP, without clinician names; HHS withholds small counts, so these are floors. Hospital payment groups (APC, DRG) are on the hospital toggles.</div>`;
+            el.innerHTML = html;
+            el.querySelectorAll('.code-list-view').forEach(b => b.addEventListener('click', () => { codeListView = b.dataset.view; renderCodeList(list, r); }));
+            const retry = document.getElementById('codeListRetry');
+            if (retry) retry.addEventListener('click', () => runCodeList(list, true));
+            const copy = document.getElementById('codeListCopy');
+            if (copy) copy.addEventListener('click', () => {
+                const cols = codeListView === 'code'
+                    ? [['Code', 'code'], ['Description', 'description'], ['Medicare billers', 'billers'], ['Medicare patients (summed)', 'patients'], ['Medicare services', 'services'], ['Office services', 'office'], ['Facility services', 'facility'], ['Avg allowed', 'avgAllowed'], ['Avg paid', 'avgPaid'], ['Est. Medicare paid', 'paid'], ['Medicaid claim lines', 'mcdClaims'], ['Medicaid paid', 'mcdPaid']]
+                    : codeListView === 'clinician'
+                        ? [['NPI', 'npi'], ['Name', 'name'], ['Credentials', 'credentials'], ['Specialty', 'specialty'], ['City', 'city'], ['ZIP', 'zip'], ['Codes billed', 'codes'], ['Top code', 'topCode'], ['Medicare patients (summed)', 'patients'], ['Medicare services', 'services'], ['Est. Medicare paid', 'paid']]
+                        : [['ZIP', 'zip'], ['Medicare billers', 'billers'], ['Medicare services', 'services'], ['Est. Medicare paid', 'paid'], ['Medicaid claim lines', 'mcdClaims'], ['Medicaid paid', 'mcdPaid']];
+                const rows = codeListView === 'code' ? s.codes : codeListView === 'clinician' ? s.clinicians : s.zips;
+                const text = CodeList.toCsv(rows, cols);
+                (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => { copy.textContent = 'Copied'; }, () => { copy.textContent = 'Copy failed'; });
+            });
+        }
+
         function setProcSource(src, keepFilter) {
             procSource = src;
             procPendingFilter = keepFilter || '';
@@ -3884,8 +4021,8 @@
             const searchEl = document.getElementById('proceduresSearch');
             if (searchEl) {
                 searchEl.value = procPendingFilter;
-                searchEl.placeholder = src === 'medicare' ? 'Search by HCPCS code, description, or specialty...'
-                    : src === 'medicaid' ? 'Search by code, description, or specialty...' : 'Search by code, description, or hospital...';
+                searchEl.placeholder = src === 'medicare' ? 'Search a code, word or specialty, or paste a list of codes...'
+                    : src === 'medicaid' ? 'Search a code, word or specialty, or paste a list of codes...' : 'Search by code, description, or hospital...';
             }
             if (procZips.length) fetchProceduresData(procZips);
             else document.getElementById('proceduresContent').innerHTML =
@@ -4022,6 +4159,7 @@
         }
 
         function renderOtherProcedures(filter) {
+            if (filter && CodeList.parse(filter).isList) { runCodeList(CodeList.parse(filter), true); return; }
             const el = document.getElementById('proceduresContent');
             if (!otherProcData || otherProcData.source !== procSource) return;
             const cfg = PROC_SOURCES[otherProcData.source];

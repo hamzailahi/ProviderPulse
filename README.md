@@ -545,6 +545,7 @@ python3 scripts/test-procedure-tables.py  # the Medicaid and Medicare hospital p
 node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list, specialty coverage
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 node scripts/test-procedures-tool.mjs     # the assistant's procedures tool on a fake database: averages, word search, failures reported, hospitals
+node scripts/test-code-list.mjs           # Procedures tab code lists: what counts as a list, the by-code, by-clinician and by-ZIP summaries
 node scripts/test-area-profile.mjs        # the assistant's area profile: the map's ZIPs, topped up to 8, counts add up, health weighted by adults, failures never zero
 node scripts/test-procedure-search.mjs    # the procedures search: words like "colonoscopy" find CMS's own wording, checked against real descriptions
 ```
@@ -597,6 +598,17 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-10-21
+
+- **Paste a list of codes into the Procedures tab.** Type or paste two or
+  more CPT or HCPCS codes into the Procedures search box (commas, spaces or a
+  column straight from a spreadsheet) and the tab switches to a code list for
+  every ZIP on the map: by code (Medicare billers, patients, services, office
+  vs facility, average allowed and paid, estimated Medicare paid, then
+  Medicaid claim lines and paid), by clinician (who bills them, ranked by
+  estimated Medicare paid) and by ZIP, each with a Copy as CSV button. Codes
+  with no rows are named with the reason. It loads only those codes, so it is
+  quicker than the full procedures load. A single code or a word works as
+  before.
 
 - **Procedure codes around a ZIP, as a spreadsheet.** A new manual job
   pulls any list of CPT or HCPCS codes within a chosen radius of a ZIP:

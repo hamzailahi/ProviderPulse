@@ -78,6 +78,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code`), `milesBetween`, MapTiler key, ZIP centroid lookup |
 | `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (40: all but `NOT_SCORED`: Hospital-based clinicians, Other health services, Nursing (RN, LPN) and Physician assistant) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
 | `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
+| `code-list.js` | the Procedures panel's pasted code list (2026-10-21): `parse` (two or more 5-character codes and nothing else; up to 100) and `summarize` (by code, by clinician, by ZIP from Medicare and Medicaid rows), `toCsv`; browser + `require` |
 | `procedure-search.js` | the dashboard Procedures panel's search: common words ("colonoscopy", "EGD") to CMS's own description wording, tested against real descriptions; browser + `require` |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
 | `demand-model.js` | the learned demand model (ridge regression per specialty, state-held-out validation, `addAcs`/`addPlaces` area builders shared by trainer and scorer); browser + `require` |
@@ -893,7 +894,20 @@ Tables:
   against `supabase/reference/procedure-codes.csv` (dumped from
   `procedure_codes` by `procedure-codes-reference.yml`) in
   `scripts/test-procedure-search.mjs`; never add a phrase the test cannot
-  find. Every source loads through `procLoad(src)`, cached per ZIP list in
+  find. **Code lists (2026-10-21, the user's choices: same box, the map's
+  ZIPs, by code / clinician / ZIP, no hospital groups):** two or more codes
+  and nothing else in the box (`CodeList.parse`, commas, spaces or a pasted
+  column) switch the panel to `runCodeList` (350 ms debounce): `loadCodeList`
+  asks only for those codes (`hcpcs_cd=in.(...)` 10 ZIPs per request, four
+  at a time, `order=npi,hcpcs_cd,place_of_service,id`; Medicaid 50 ZIPs per
+  request; `procedure_codes` for descriptions), so it never waits on the
+  whole-area load; up to 400 ZIPs; a failed or capped request marks the
+  result incomplete with Try again and is never cached (`codeListCache`).
+  The list survives a source toggle and a new area; clearing it reloads the
+  source (`codeListShown`). Views and "Copy as CSV" come from
+  `CodeList.summarize` / `toCsv`; every value goes through `escHtml`. Checked
+  against the 2026-10-21 Haltom City pull: identical totals.
+  Every source loads through `procLoad(src)`, cached per ZIP list in
   `procCache` (a failed or partial load is never kept; `failed` stops
   retries from the "also in" line), and a search adds
   `paintCross(filter)`: matching codes per other source, loading them in
@@ -1580,6 +1594,7 @@ python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital 
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 node scripts/test-area-profile.mjs        # 45: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
 node scripts/test-procedures-tool.mjs     # 23: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals
+node scripts/test-code-list.mjs           # 30: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, CSV
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```
 
