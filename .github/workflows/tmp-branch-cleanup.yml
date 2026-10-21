@@ -1,0 +1,28 @@
+name: Delete tmp/ branches
+
+# Manual. Deletes every branch whose name starts with tmp/ (throwaway data
+# branches such as code-area-report.yml's push_branch). Nothing else.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Delete tmp/ branches
+        run: |
+          refs=$(git ls-remote --heads origin 'refs/heads/tmp/*' | awk '{print $2}')
+          if [ -z "$refs" ]; then echo "No tmp/ branches."; exit 0; fi
+          for r in $refs; do
+            case "$r" in refs/heads/tmp/*) echo "Deleting $r"; git push origin --delete "${r#refs/heads/}";; esac
+          done
+          left=$(git ls-remote --heads origin 'refs/heads/tmp/*' | wc -l)
+          echo "tmp/ branches left: $left"; [ "$left" -eq 0 ]
