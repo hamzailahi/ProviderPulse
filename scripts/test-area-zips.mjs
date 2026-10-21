@@ -43,6 +43,19 @@ check('a sprawling city keeps its edge ZIPs near any core ZIP', strayZips(sprawl
 const big = [...at('38103', 900, 35.14, -90.05), ...at('37066', 100, 36.39, -86.45)];
 check('a ZIP with at least 1% of listings is kept even far away', strayZips(big).stray.length === 0);
 
+// Mistyped ZIPs: the pins are in Fort Worth, the ZIPs are not (official centres).
+const typo = [...at('76104', 3000, 32.73, -97.32), ...at('76109', 600, 32.70, -97.38), ...at('26109', 2, 32.70, -97.38), ...at('78705', 3, 32.74, -97.29), ...at('76199', 2, 32.74, -97.33)];
+const CEN = { 76104: [32.73, -97.32], 76109: [32.70, -97.38], 26109: [39.0, -80.9], 78705: [30.29, -97.74], 76199: [32.74, -97.33] };
+r = strayZips(typo);
+check('without ZIP centres a mistyped ZIP looks local (its pins are in town)', r.stray.length === 0);
+r = strayZips(typo, { centroids: CEN });
+check('with ZIP centres the mistyped ZIPs are stray', r.stray.join() === '26109,78705' && r.listings === 5, r.stray.join());
+check('their pins are near, so the listings stay on the map', r.pinsFar.length === 0);
+r = strayZips(fw, { centroids: { 76104: [32.73, -97.32], 78705: [30.29, -97.74] } });
+check('pins far away are flagged to leave the map; centres fill in where known', r.pinsFar.join() === '26109,76401,78705' && r.stray.join() === '26109,76401,78705');
+check('a ZIP missing from the centres falls back to its listings', strayZips(typo, { centroids: { 76104: [32.73, -97.32] } }).stray.length === 0);
+check('a bad centre (0,0) is ignored', strayZips(typo, { centroids: Object.assign({}, CEN, { 78705: [0, 0] }) }).stray.join() === '26109');
+
 check('no rows, no strays', strayZips([]).stray.length === 0 && strayZips(null).stray.length === 0);
 check('nothing with coordinates: nothing can be judged far', strayZips([...at('76104', 10, '', ''), ...at('78705', 1, '', '')]).stray.length === 0);
 check('ZIP+4 is read as its five-digit ZIP', strayZips([...at('76104-1234', 500, 32.73, -97.32), ...at('78705-0001', 1, 30.29, -97.74)]).stray.join() === '78705');

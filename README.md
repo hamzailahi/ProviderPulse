@@ -604,10 +604,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   listings used to drag distant ZIPs onto the map: "Fort Worth, TX" brought
   in an Austin ZIP, one in West Virginia and Stephenville, and they flowed
   into Demographics, Health, Procedures and the AI's area (Austin's ZIP was
-  the third busiest in a Fort Worth code list). A ZIP with under 1% of the
-  listings that sits more than 25 miles from every main ZIP of the search is
-  now left out, and the map says which. ZIP and state searches are
-  unchanged, and searches of several cities keep each city whole.
+  the third busiest in a Fort Worth code list). Most were mistyped ZIPs on
+  listings that really are in Fort Worth. A ZIP with under 1% of the
+  listings whose official centre lies more than 25 miles from every main ZIP
+  of the search is now kept out of Demographics, Health, Procedures and the
+  AI's area; the listings stay on the map where their addresses are, and
+  only listings that are themselves far away are removed. The map says
+  which. ZIP and state searches are unchanged, and searches of several
+  cities keep each city whole.
 
 - **Paste a list of codes into the Procedures tab.** Type or paste two or
   more CPT or HCPCS codes into the Procedures search box (commas, spaces or a

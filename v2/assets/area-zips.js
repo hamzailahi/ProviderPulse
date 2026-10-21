@@ -8,11 +8,18 @@
  * code list. strayZips() names the ZIPs to leave out.
  *
  * A ZIP is stray only when both hold: it carries under MIN_SHARE of the
- * listings, and the middle of its listings sits more than MAX_MILES from the
- * middle of every "core" ZIP (one carrying at least MIN_SHARE). Measuring to
- * the nearest core ZIP, not one centre, keeps multi-city searches ("Dallas,
- * Austin") and sprawling cities (Houston's edge ZIPs) whole. A ZIP whose
- * listings have no coordinates is kept: its distance is unknown, not far.
+ * listings, and it sits more than MAX_MILES from every "core" ZIP (one
+ * carrying at least MIN_SHARE). Measuring to the nearest core ZIP, not one
+ * centre, keeps multi-city searches ("Dallas, Austin") and sprawling cities
+ * (Houston's edge ZIPs) whole. Where a ZIP is: its official centre when
+ * opts.centroids has it, else the middle of its listings; unknown is kept,
+ * never called far.
+ *
+ * Two kinds come back. Most Fort Worth strays were mistyped ZIPs (26109 for
+ * 76109, 78705 for 76105): the listing's pin is in Fort Worth but its ZIP is
+ * not, so the ZIP leaves the area while the pin stays. `pinsFar` lists the
+ * ZIPs whose listings themselves sit far away (an Austin address under
+ * "Fort Worth"); those listings leave the map too.
  * Dual-exported: window.AreaZips in the browser, module.exports under Node.
  */
 (function (root) {
@@ -28,9 +35,10 @@
   }
   function median(v) { var s = v.slice().sort(function (a, b) { return a - b; }), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
 
-  // rows: [{ zip, latitude, longitude }]. Returns { stray: [zip], listings: n }.
+  // rows: [{ zip, latitude, longitude }]; opts.centroids: { zip: [lat, lon] }.
+  // Returns { stray: [zip], listings: n, pinsFar: [zip] }.
   function strayZips(rows, opts) {
-    var o = opts || {}, share = o.minShare || MIN_SHARE, far = o.maxMiles || MAX_MILES;
+    var o = opts || {}, share = o.minShare || MIN_SHARE, far = o.maxMiles || MAX_MILES, cen = o.centroids || {};
     var by = {}, total = 0;
     (rows || []).forEach(function (r) {
       var z = String(r.zip || '').split('-')[0].trim();
@@ -42,15 +50,24 @@
       if (isFinite(lat) && isFinite(lon) && (lat !== 0 || lon !== 0)) { g.lat.push(lat); g.lon.push(lon); }
     });
     var zips = Object.keys(by);
-    zips.forEach(function (z) { var g = by[z]; g.mid = g.lat.length ? [median(g.lat), median(g.lon)] : null; });
-    var core = zips.filter(function (z) { return by[z].n >= share * total && by[z].mid; });
-    if (!core.length) return { stray: [], listings: 0 };
+    var ok = function (p) { return p && isFinite(p[0]) && isFinite(p[1]) && (p[0] !== 0 || p[1] !== 0); };
+    zips.forEach(function (z) {
+      var g = by[z];
+      g.mid = g.lat.length ? [median(g.lat), median(g.lon)] : null;
+      g.pos = ok(cen[z]) ? [+cen[z][0], +cen[z][1]] : g.mid;
+    });
+    var core = zips.filter(function (z) { return by[z].n >= share * total && by[z].pos; });
+    if (!core.length) return { stray: [], listings: 0, pinsFar: [] };
+    var farFromCore = function (p) { return core.every(function (c) { return miles(p[0], p[1], by[c].pos[0], by[c].pos[1]) > far; }); };
     var stray = zips.filter(function (z) {
       var g = by[z];
-      if (g.n >= share * total || !g.mid) return false;
-      return core.every(function (c) { return miles(g.mid[0], g.mid[1], by[c].mid[0], by[c].mid[1]) > far; });
+      return g.n < share * total && g.pos && farFromCore(g.pos);
     }).sort();
-    return { stray: stray, listings: stray.reduce(function (a, z) { return a + by[z].n; }, 0) };
+    return {
+      stray: stray,
+      listings: stray.reduce(function (a, z) { return a + by[z].n; }, 0),
+      pinsFar: stray.filter(function (z) { return by[z].mid && farFromCore(by[z].mid); })
+    };
   }
 
   var api = { strayZips: strayZips, MIN_SHARE: MIN_SHARE, MAX_MILES: MAX_MILES };

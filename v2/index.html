@@ -701,6 +701,7 @@
             if (!searchTerm) { statusEl.textContent = 'Enter ZIP, State, or City'; return; }
             statusEl.textContent = '🔄 Searching...';
             setLoadWarning('');
+            strayAreaZips = new Set();
 
             // Check for comma-separated ZIPs like "38017, 38654"
             const commaParts = searchTerm.split(',').map(s => s.trim()).filter(Boolean);
@@ -743,11 +744,11 @@
                     return;
                 }
                 let strayNote = '';
-                if (filter.startsWith('or=(city.')) ({ rows: clinicData, note: strayNote } = dropStrayZips(clinicData));
+                if (filter.startsWith('or=(city.')) ({ rows: clinicData, note: strayNote } = await dropStrayZips(clinicData));
                 setLoadWarning([loadWarningFor(clinicData), strayNote].filter(Boolean).join(' '));
 
                 // Fetch demographics for these ZIPs from demographics_raw table in batches
-                const zips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
+                const zips = [...new Set(clinicData.map(c => c.zip).filter(z => z && !strayAreaZips.has(String(z).split('-')[0].trim())))];
                 statusEl.textContent = '🔄 Loading demographics for ' + zips.length + ' ZIPs...';
 
                 const demByZip = {};
@@ -911,20 +912,46 @@
         // brought in Austin's 78705), and every map ZIP feeds Demographics,
         // Health and Procedures. AreaZips.strayZips decides; the map says what
         // was left out. ZIP and state searches are never trimmed.
-        function dropStrayZips(rows) {
-            const { stray, listings } = AreaZips.strayZips(rows);
+        // Most strays are mistyped ZIPs on listings whose pins are in town
+        // (26109 for 76109), so each ZIP's official centre (the PLACES DENTAL
+        // rows) decides where the ZIP is. A stray ZIP leaves the area lists
+        // (strayAreaZips: demographics, Health, Procedures, the assistant's
+        // area); a listing whose pin is far away leaves the map too. If the
+        // centre lookup fails, listings' own positions decide, as before.
+        let strayAreaZips = new Set();
+        async function dropStrayZips(rows) {
+            const zipOf = r => String(r.zip || '').split('-')[0].trim();
+            const zips = [...new Set(rows.map(zipOf).filter(z => /^\d{5}$/.test(z)))];
+            const centroids = {};
+            for (let i = 0; i < zips.length; i += 100) {
+                try {
+                    const res = await fetch(`${SUPABASE_URL}/rest/v1/cdc_places?measureid=eq.DENTAL&zip=in.(${zips.slice(i, i + 100).join(',')})&select=zip,lat,lon&limit=1000`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' }, signal: AbortSignal.timeout(6000) });
+                    const b = res.ok ? await res.json() : null;
+                    if (Array.isArray(b)) b.forEach(c => { if (c.lat != null && c.lon != null) centroids[c.zip] = [+c.lat, +c.lon]; });
+                } catch (e) { /* listings' own positions decide */ }
+            }
+            const { stray, pinsFar } = AreaZips.strayZips(rows, { centroids });
+            strayAreaZips = new Set(stray);
             if (!stray.length) return { rows, note: '' };
-            const drop = new Set(stray);
-            const kept = rows.filter(r => !drop.has(String(r.zip || '').split('-')[0].trim()));
+            const dropPins = new Set(pinsFar);
+            const kept = dropPins.size ? rows.filter(r => !dropPins.has(zipOf(r))) : rows;
             kept.failed = rows.failed; kept.capped = rows.capped;
-            const shown = stray.slice(0, 6).join(', ') + (stray.length > 6 ? ' and ' + (stray.length - 6) + ' more' : '');
-            return { rows: kept, note: `Left out ${listings.toLocaleString()} listing${listings === 1 ? '' : 's'} whose address puts ${stray.length === 1 ? 'it' : 'them'} far from the rest of this city (ZIP ${shown}).` };
+            const gone = rows.length - kept.length, typed = kept.filter(r => strayAreaZips.has(zipOf(r))).length;
+            const few = stray.slice(0, 6);
+            const shown = stray.length > 6 ? few.join(', ') + ' and ' + (stray.length - 6) + ' more'
+                : few.length > 1 ? few.slice(0, -1).join(', ') + ' and ' + few[few.length - 1] : few[0];
+            const parts = [`ZIP${stray.length === 1 ? '' : 's'} ${shown} ${stray.length === 1 ? 'is' : 'are'} far from the rest of this city, so ${stray.length === 1 ? 'it is' : 'they are'} left out of Demographics, Health and Procedures.`];
+            if (typed) parts.push(`${typed.toLocaleString()} listing${typed === 1 ? '' : 's'} in town carr${typed === 1 ? 'ies' : 'y'} ${stray.length === 1 ? 'that ZIP' : 'one of them'} (often a mistyped ZIP) and stay${typed === 1 ? 's' : ''} on the map.`);
+            if (gone) parts.push(`${gone.toLocaleString()} listing${gone === 1 ? '' : 's'} with an address far away ${gone === 1 ? 'was' : 'were'} removed.`);
+            return { rows: kept, note: parts.join(' ') };
         }
 
         async function searchMultipleZips(zips) {
             const statusEl = document.getElementById('dbStatus');
             statusEl.textContent = `🔄 Loading ${zips.length} ZIPs...`;
             setLoadWarning('');
+            strayAreaZips = new Set();
             requestZipEnrichment(zips);
             try {
                 // Try both padded and stripped formats
@@ -940,7 +967,7 @@
                 // Fetch demographics in batches of 50, all batches in flight together --
                 // same reasoning as fetchProviderRows: nothing here depends on another
                 // batch's result, so there is no reason to make one wait for the last.
-                const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
+                const allZips = [...new Set(clinicData.map(c => c.zip).filter(z => z && !strayAreaZips.has(String(z).split('-')[0].trim())))];
                 const demByZip = {};
                 const demBatches = [];
                 for (let i = 0; i < allZips.length; i += 50) demBatches.push(allZips.slice(i, i + 50));
@@ -1003,11 +1030,11 @@
                 clinicData.failed = perCity.flatMap(r => r.failed || []);
                 clinicData.capped = perCity.flatMap(r => r.capped || []);
                 if (!clinicData.length) { statusEl.textContent = clinicData.failed.length ? '❌ The directory did not answer in time. Try again.' : '❌ No providers found'; return; }
-                const trimmed = dropStrayZips(clinicData);
+                const trimmed = await dropStrayZips(clinicData);
                 clinicData = trimmed.rows;
                 setLoadWarning([loadWarningFor(clinicData), trimmed.note].filter(Boolean).join(' '));
 
-                const allZips = [...new Set(clinicData.map(c => c.zip).filter(Boolean))];
+                const allZips = [...new Set(clinicData.map(c => c.zip).filter(z => z && !strayAreaZips.has(String(z).split('-')[0].trim())))];
                 const demByZip = {};
                 const demBatches = [];
                 for (let i = 0; i < allZips.length; i += 50) demBatches.push(allZips.slice(i, i + 50));
@@ -1080,7 +1107,7 @@
                 let rawZip = String(row['ZIP Code'] || row['Zipcode'] || '').trim();
                 if (rawZip) {
                     let zipStr = rawZip.split('-')[0].padStart(5, '0');
-                    if (zipStr !== '00000') {
+                    if (zipStr !== '00000' && !strayAreaZips.has(zipStr)) {
                         zipsWithClinics.add(zipStr);
                         // Only store if this row actually carries demographic fields (avoid overwriting
                         // a good cached row with a bare clinic record that has no demographics merged in)
@@ -1171,7 +1198,7 @@
             const allLoadedZips = [...new Set(
                 Object.values(groupedData).flatMap(g =>
                     g.practices.map(p => String(p['ZIP Code'] || '').padStart(5, '0'))
-                ).filter(z => z && z !== '00000')
+                ).filter(z => z && z !== '00000' && !strayAreaZips.has(z))
             )];
             if (allLoadedZips.length > 0) {
                 fetchPLACESData(allLoadedZips);
