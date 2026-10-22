@@ -19,7 +19,7 @@ const { getProcedures } = require('./procedures.js');
 
 const GEO_MEASURE = 'DENTAL';
 const MIN_ZIPS = 8;          // the ZIP plus at least 7 around it
-const MAX_ZIPS = 40;
+const MAX_ZIPS = 60;          // two neighbor rings can pass 40 (2026-10-22)
 const KEY_MEASURES = ['DIABETES', 'OBESITY', 'BPHIGH', 'DEPRESSION', 'CHD', 'COPD'];
 const BUDGET_MS = 13000;     // stop starting requests after this
 
@@ -120,11 +120,12 @@ async function getAreaProfile(input, opts) {
   // rows are capped and its totals become floors.
   const specialty = typeof input.specialty === 'string' && input.specialty.trim() ? input.specialty.trim().slice(0, 80) : null;
   const procOpts = { fetch: doFetch, env, zips: zips.slice(0, 30), budgetMs: Math.max(1000, BUDGET_MS - (Date.now() - started)) };
-  const [acs, places, med, mcd] = await Promise.all([
+  const [acs, places, med, mcd, xwalk] = await Promise.all([
     pagedAll(`census_acs_zcta?zip=in.(${list})&select=zip,acs_year,pop_total,households,median_hh_income,poverty_universe,poverty_below,income_bands,age_male,age_female,education,ins_universe,ins_uninsured,ins_medicare,ins_medicaid,pop_prior,pop_prior_year,signals&order=zip`, 1),
     pagedAll(`cdc_places?zip=in.(${list})&select=zip,measureid,short_text,measure,categoryid,value,pop_18plus,data_year&order=zip,measureid,data_year`, 5),
     getProcedures({ zip, source: 'medicare_clinicians', specialty, query: null, radius_miles: 0 }, procOpts),
-    getProcedures({ zip, source: 'medicaid', specialty, query: null, radius_miles: 0 }, procOpts)
+    getProcedures({ zip, source: 'medicaid', specialty, query: null, radius_miles: 0 }, procOpts),
+    pagedAll(`zip_county_crosswalk?zip=in.(${list})&select=zip,fips,res_ratio&order=zip,fips`, 2)
   ]);
 
   // ---- demographics
@@ -156,6 +157,10 @@ async function getAreaProfile(input, opts) {
     households_200k_plus: { households: inc200, share_pct: pct(inc200, hh) },
     age_65_plus: { people: age65, share_pct: pct(age65, pop) },
     under_20: { people: under20, share_pct: pct(under20, pop) },
+    // Medicare eligibility starts at 65 (2026-10-22, asked for in a report):
+    // the five-year bands from 60 (turning 65 within five years) up.
+    medicare_age_bands: [[12, '60-64 (turning 65 within five years)'], [13, '65-69'], [14, '70-74'], [15, '75-79'], [16, '80-84'], [17, '85 and over']]
+      .map(([i, label]) => { const n = rows.reduce((a, r) => a + band(r, 'age_male', i, i) + band(r, 'age_female', i, i), 0); return { ages: label, people: n, share_of_population_pct: pct(n, pop) }; }),
     insurance: allIns ? {
       uninsured: { people: sum('ins_uninsured'), share_pct: pct(sum('ins_uninsured'), insU) },
       medicare: rows.every(r => r.ins_medicare != null) ? { people: sum('ins_medicare'), share_pct: pct(sum('ins_medicare'), insU) } : null,
@@ -168,6 +173,38 @@ async function getAreaProfile(input, opts) {
       ? { since: grown.from_year, people: grown.now - grown.then, pct: pct(grown.now - grown.then, grown.then) } : null
   } : null;
   if (!rows.length) notes.push(acs.ok ? 'No Census ACS rows for these ZIPs.' : 'The Census table did not answer; demographics are missing.');
+
+  // ---- Medicare by county: the Health tab's utilization and enrollment
+  // (2026-10-22). Both are county-wide, so each county carries its share of
+  // the area's residents (HUD residential ratio x ZIP population).
+  const popByZip = {}; rows.forEach(r => { popByZip[r.zip] = N(r.pop_total); });
+  const countyW = {};
+  (xwalk.rows || []).forEach(x => { countyW[x.fips] = (countyW[x.fips] || 0) + N(x.res_ratio) * (popByZip[x.zip] || 0); });
+  const totalW = Object.values(countyW).reduce((a, v) => a + v, 0);
+  const fipsList = Object.keys(countyW).filter(f => /^\d{5}$/.test(f) && countyW[f] / (totalW || 1) >= 0.01)
+    .sort((a, b) => countyW[b] - countyW[a]).slice(0, 6);
+  let medicare = null;
+  if (fipsList.length) {
+    const [util, enroll] = await Promise.all([
+      get(`cms_county_utilization?fips=in.(${fipsList.join(',')})&select=fips,county_name,year,total_beneficiaries,er_visits_per_1000,ip_stays_per_1000,readmission_rate,dialysis_users,snf_users,home_health_users,hospice_users&order=fips,year.desc`, 6000),
+      get(`medicare_county_enrollment?fips=in.(${fipsList.join(',')})&select=fips,county,data_year,data_month,total_benes,original_medicare_benes,ma_and_other_benes,aged_total_benes,disabled_total_benes&order=fips`, 6000)
+    ]);
+    const newest = {}; (util || []).forEach(u => { if (!newest[u.fips]) newest[u.fips] = u; });
+    const en = {}; (enroll || []).forEach(e => { en[e.fips] = e; });
+    medicare = {
+      note: 'County-wide figures for the counties the area sits in, not just these ZIPs; share_of_area_pct is the county\'s share of the area\'s residents. Utilization is traditional Medicare.',
+      counties: fipsList.map(f => {
+        const u = newest[f], e = en[f];
+        return {
+          fips: f, county: (e && e.county) || (u && u.county_name) || null, share_of_area_pct: r1(countyW[f] / totalW * 100),
+          enrollment: e ? { month: e.data_month + ' ' + e.data_year, total: e.total_benes, original_medicare: e.original_medicare_benes, medicare_advantage_and_other: e.ma_and_other_benes,
+            medicare_advantage_share_pct: pct(N(e.ma_and_other_benes), N(e.total_benes)), aged: e.aged_total_benes, disabled: e.disabled_total_benes } : (enroll ? null : 'did not load'),
+          utilization: u ? { year: u.year, beneficiaries: u.total_beneficiaries, er_visits_per_1000: u.er_visits_per_1000, hospital_stays_per_1000: u.ip_stays_per_1000,
+            readmission_rate: u.readmission_rate, dialysis_users: u.dialysis_users, nursing_facility_users: u.snf_users, home_health_users: u.home_health_users, hospice_users: u.hospice_users } : (util ? null : 'did not load')
+        };
+      })
+    };
+  } else if (!xwalk.ok) notes.push('The ZIP-to-county lookup did not answer, so county Medicare figures are missing.');
 
   // ---- health survey (CDC PLACES)
   const prow = places.rows || [];
@@ -233,7 +270,7 @@ async function getAreaProfile(input, opts) {
   const incomplete = failed > 0 || outOfTime || !!places.capped || !!(med && (med.incomplete || med.error)) || !!(mcd && (mcd.incomplete || mcd.error));
   return {
     area: { centre_zip: zip, zips: zips.length, from_map: useMap ? onMap.length : 0, zip_list: zips },
-    demographics, health: { source: `CDC PLACES${measures[0] && measures[0].year ? ' ' + measures[0].year : ''}, model-based estimates for adults 18+ from the BRFSS survey`, key_measures: keyMeasures, measures, key_measures_per_zip: keyIds },
+    demographics, medicare, health: { source: `CDC PLACES${measures[0] && measures[0].year ? ' ' + measures[0].year : ''}, model-based estimates for adults 18+ from the BRFSS survey`, key_measures: keyMeasures, measures, key_measures_per_zip: keyIds },
     procedures, per_zip: perZip,
     incomplete, incomplete_reason: incomplete ? 'Some requests failed, timed out or were capped, so some figures are floors.' : null,
     notes, ms: Date.now() - started

@@ -105,15 +105,33 @@ const dash = (zips, spec) => [{ role: 'user', content: [{ type: 'text', text: _i
   check('specialty measures lead the report section and are marked, unknown ids are dropped', r.health.key_measures.map(m => m.id + ':' + m.for_specialty).join(',') === 'OBESITY:true,DIABETES:false');
 }
 
+// 2c. Medicare-eligible ages and the Health tab's county Medicare data
+{
+  const xw = [/zip_county_crosswalk/, u => inList(u).map((z, i) => ({ zip: z, fips: i === 0 ? '48439' : '48439', res_ratio: 1 })).concat([{ zip: '76104', fips: '48121', res_ratio: 0 }])];
+  const util = [/cms_county_utilization/, [{ fips: '48439', county_name: 'Tarrant', year: '2024', total_beneficiaries: 250000, er_visits_per_1000: 640, ip_stays_per_1000: 230, readmission_rate: 17.5, dialysis_users: 3000, snf_users: 9000, home_health_users: 20000, hospice_users: 7000 },
+    { fips: '48439', county_name: 'Tarrant', year: '2023', total_beneficiaries: 1 }]];
+  const enr = [/medicare_county_enrollment/, [{ fips: '48439', county: 'Tarrant', data_year: 2026, data_month: 'June', total_benes: 300000, original_medicare_benes: 150000, ma_and_other_benes: 150000, aged_total_benes: 260000, disabled_total_benes: 40000 }]];
+  const r = await getAreaProfile({ zip: '76104', area: 'map', specialty: null }, { fetch: fakeDb([...geo, acs, places, med, mcd, xw, util, enr]), env, messages: dash(['76104']) });
+  const b = r.demographics.medicare_age_bands;
+  check('Medicare-eligible age bands run 60-64 to 85 and over', b.length === 6 && /^60-64/.test(b[0].ages) && b[5].ages === '85 and over');
+  check('age bands are summed over the area (both sexes)', b[1].people === 150 && b[5].people === 150 && b[0].people === 0, JSON.stringify(b));
+  const c = r.medicare && r.medicare.counties;
+  check('county Medicare: the newest utilization year, enrollment with the Medicare Advantage share', c && c.length === 1 && c[0].utilization.year === '2024' && c[0].enrollment.medicare_advantage_share_pct === 50 && c[0].share_of_area_pct === 100, JSON.stringify(c));
+  check('a county with a negligible share of residents is left out', !c.some(x => x.fips === '48121'));
+  check('county figures are labelled county-wide', /county-wide/i.test(r.medicare.note));
+  const r2 = await getAreaProfile({ zip: '76104', area: 'map', specialty: null }, { fetch: fakeDb([...geo, acs, places, med, mcd, xw, [/cms_county_utilization/, 500], enr]), env, messages: dash(['76104']) });
+  check('failed utilization reads "did not load" and the profile is incomplete', r2.medicare.counties[0].utilization === 'did not load' && r2.incomplete === true);
+}
+
 // 3. A map with 10 ZIPs is used as is (no top-up); over 40 keeps the nearest 40
 {
   const ten = GEO.slice(0, 10).map(g => g.zip);
   const r = await getAreaProfile({ zip: '76104', area: 'map', specialty: null }, { fetch: fakeDb([...geo, acs, places, med, mcd]), env, messages: dash(ten) });
   check('a map with 10 ZIPs covers exactly those 10', r.area.zips === 10 && r.area.from_map === 10 && !r.notes.some(n => /added/.test(n)));
   check('with no specialty, procedures say "all specialties"', r.procedures.specialty === 'all specialties');
-  const big = Array.from({ length: 60 }, (_, i) => String(76104 + i));
+  const big = Array.from({ length: 80 }, (_, i) => String(76104 + i));
   const r2 = await getAreaProfile({ zip: '76104', area: 'map', specialty: null }, { fetch: fakeDb([...geo, acs, places, med, mcd]), env, messages: dash(big) });
-  check('a very large map is cut to 40 ZIPs and says so', r2.area.zips === 40 && r2.notes.some(n => /60 ZIPs; this covers the 40 nearest/.test(n)) && r2.notes.some(n => /30 nearest/.test(n)));
+  check('a very large map is cut to 60 ZIPs and says so', r2.area.zips === 60 && r2.notes.some(n => /80 ZIPs; this covers the 60 nearest/.test(n)) && r2.notes.some(n => /30 nearest/.test(n)));
 }
 
 // 4. area "nearest", and a ZIP that is not on the map

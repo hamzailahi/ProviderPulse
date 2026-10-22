@@ -600,6 +600,19 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-22
 
+- **Reports cover the whole map and everything you ask.** Four fixes after
+  a Haltom City report came back thin. Clicking one ZIP to see its numbers
+  no longer shrinks the AI's area to that ZIP; the search and every neighbor
+  ring always count, and the Report builder now says "N ZIPs on the map".
+  The Focus box takes 2,000 characters with a counter (it silently kept only
+  the first 400, which dropped half of that request). Procedures are read
+  across the map's ZIPs instead of within 10 miles, and a pasted list of
+  codes is reported code by code, naming the ones with no data. Reports gain
+  a Medicare population section: the Medicare-eligible age bands (60-64, then
+  65-69 up to 85 and over) and the Health tab's county Medicare figures
+  (traditional vs Medicare Advantage enrollment, ER visits, hospital stays,
+  readmissions, nursing facility, home health and hospice use).
+
 - **The live dashboard audit can run one diagnostic on its own.** Its new
   `only: report-context` option searches "haltom city, tx", adds two
   neighbor rings, presses Write it on the Reports tab and records which ZIPs

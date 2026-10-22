@@ -930,14 +930,22 @@ if (isProviderAcct) {
     var home = homeZip() && lastZip === homeZip();
     return { mode: home ? 'mine' : 'explore', zip: lastZip || null, specialty: currentSpec(), place: a ? a.value : '', area_zips: mapZips() };
   }
-  // Every ZIP loaded on the map (the search plus any neighbor rings), for the
-  // assistant's get_area_profile: the Procedures tab's list, else the ZIPs
-  // with demographics.
+  // Every ZIP loaded on the map, for the assistant's get_area_profile: the
+  // search's ZIPs plus every neighbor ring. Not procZips: clicking one ZIP to
+  // see its numbers narrows procZips to that ZIP, and a Haltom City report
+  // then covered 8 ZIPs while the map held dozens (2026-10-22).
   function mapZips() {
-    var z = [];
-    try { if (typeof procZips !== 'undefined' && procZips && procZips.length) z = procZips.slice(); } catch (e) {}
-    if (!z.length && typeof zipDemographics !== 'undefined' && zipDemographics) z = Object.keys(zipDemographics);
-    return z.map(function (x) { return String(x).padStart(5, '0'); }).filter(function (x) { return /^\d{5}$/.test(x); }).slice(0, 300);
+    var set = {};
+    var add = function (x) { var v = String(x || '').split('-')[0].trim().padStart(5, '0'); if (/^\d{5}$/.test(v) && v !== '00000') set[v] = 1; };
+    try { if (typeof zipsWithClinics !== 'undefined' && zipsWithClinics) zipsWithClinics.forEach(add); } catch (e) {}
+    try { if (typeof neighborSeedZip !== 'undefined' && neighborSeedZip) add(neighborSeedZip); } catch (e) {}
+    try { if (typeof neighborZipSet !== 'undefined' && neighborZipSet) neighborZipSet.forEach(add); } catch (e) {}
+    if (!Object.keys(set).length) {
+      try { if (typeof procZips !== 'undefined' && procZips) procZips.forEach(add); } catch (e) {}
+      try { if (typeof zipDemographics !== 'undefined' && zipDemographics) Object.keys(zipDemographics).forEach(add); } catch (e) {}
+    }
+    try { if (typeof strayAreaZips !== 'undefined' && strayAreaZips) strayAreaZips.forEach(function (x) { delete set[x]; }); } catch (e) {}
+    return Object.keys(set).slice(0, 300);
   }
 
   function suggestions() {
@@ -1204,6 +1212,7 @@ if (isProviderAcct) {
     ask: ask,
     isBusy: function () { return busy; },
     currentSpec: currentSpec,
+    areaZips: mapZips,
     documents: function () {
       var out = [];
       chat.ui.forEach(function (m) { (m.docs || []).forEach(function (d) { out.unshift(d); }); });
@@ -1246,7 +1255,12 @@ if (isProviderAcct) {
   var compare = el('input', { class: 'rp-input', placeholder: 'e.g. 38138, 38139', 'aria-label': 'ZIPs to compare with' });
   var who = el('input', { class: 'rp-input', placeholder: 'e.g. Dr. Rivera, Midsouth Dermatology', 'aria-label': 'Prepared for' });
   var forWho = el('label', { class: 'rp-field', hidden: true }, el('span', {}, 'Prepared for'), who);
-  var focus = el('textarea', { class: 'rp-input', rows: '2', placeholder: 'Anything it must answer? e.g. "Is there room for a second location?"', 'aria-label': 'Focus question' });
+  // 2,000 characters, counted as you type (2026-10-22: a 400-character cut
+  // silently dropped half a request, including its code list).
+  var FOCUS_MAX = 2000;
+  var focus = el('textarea', { class: 'rp-input', rows: '3', maxlength: String(FOCUS_MAX), placeholder: 'Anything it must answer? e.g. "Is there room for a second location?" You can paste a list of procedure codes.', 'aria-label': 'Focus question' });
+  var focusCount = el('span', { class: 'rp-note', 'aria-live': 'polite' }, '0 / ' + FOCUS_MAX.toLocaleString());
+  focus.addEventListener('input', function () { focusCount.textContent = focus.value.length.toLocaleString() + ' / ' + FOCUS_MAX.toLocaleString() + (focus.value.length >= FOCUS_MAX ? ' (limit reached)' : ''); });
   var market = el('div', { class: 'rp-market' });
   var note = el('p', { class: 'rp-note', role: 'status' });
   var go = el('button', { type: 'button', class: 'ins-btn primary rp-go', onclick: generate }, '✦ Write it');
@@ -1261,7 +1275,7 @@ if (isProviderAcct) {
       el('label', { class: 'rp-field' }, el('span', {}, 'Specialty'), spec),
       el('label', { class: 'rp-field' }, el('span', {}, 'Compare with (optional)'), compare),
       forWho,
-      el('label', { class: 'rp-field' }, el('span', {}, 'Focus (optional)'), focus),
+      el('label', { class: 'rp-field' }, el('span', {}, 'Focus (optional)'), focus, focusCount),
       go, note),
     el('div', { class: 'ins-card' }, el('div', { class: 'ins-eyebrow' }, 'Documents this session'), library)));
   drawTypes();
@@ -1269,7 +1283,11 @@ if (isProviderAcct) {
   function refresh() {
     var z = lastZip;
     while (market.firstChild) market.removeChild(market.firstChild);
-    market.appendChild(document.createTextNode(z ? 'Market: ZIP ' + z + ' and the area within 25 miles' : 'Search a ZIP, city or state first; the report is written about the market on the map.'));
+    // The report covers every ZIP on the map; the opportunity score is
+    // anchored on one ZIP (2026-10-22: the old label said "within 25 miles").
+    var n = A.areaZips ? A.areaZips().length : 0;
+    market.appendChild(document.createTextNode(!z ? 'Search a ZIP, city or state first; the report is written about the market on the map.'
+      : 'Market: ' + (n > 1 ? n + ' ZIPs on the map' : 'ZIP ' + z + (n === 1 ? ' (the nearest ZIPs are added so the area has at least 8)' : '')) + (n > 1 ? ' · opportunity score anchored on ZIP ' + z : '')));
     if (!spec.dataset.touched) spec.value = A.currentSpec() || 'Primary care / family doctor';
     go.disabled = !z || A.isBusy();
     while (library.firstChild) library.removeChild(library.firstChild);
@@ -1288,11 +1306,15 @@ if (isProviderAcct) {
     var brief = 'Write a ' + label.toLowerCase() + ' about opening or growing a ' + spec.value + ' practice around ZIP ' + z + '.';
     if (others.length) brief += ' Compare it with ZIP' + (others.length > 1 ? 's ' : ' ') + others.join(', ') + '.';
     if (kind === 'client_pitch' && who.value.trim()) brief += ' It is prepared for ' + who.value.trim().slice(0, 120) + '.';
-    if (focus.value.trim()) brief += ' Make sure it answers: ' + focus.value.trim().slice(0, 400);
+    if (focus.value.trim()) brief += ' Make sure it answers: ' + focus.value.trim().slice(0, FOCUS_MAX) +
+      ' (If that lists procedure codes, call get_procedures with all of them as one query, specialty null and use_map_area true, for medicare_clinicians and medicaid, and show every code in a table, naming the codes with no rows.)';
     // Volumes and payments come from get_procedures; without this the reports
-    // said procedure data did not exist (2026-10-20).
-    brief += ' Include a short "Procedures and reimbursement" section: the specialty\'s top procedure codes within 10 miles from Medicare clinicians' +
+    // said procedure data did not exist (2026-10-20). Across the map's ZIPs,
+    // not "within 10 miles" (2026-10-22).
+    brief += ' Include a "Procedures and reimbursement" section: get_procedures with use_map_area true across the ZIPs on the map, the specialty\'s top codes from Medicare clinicians' +
       ' (patients, services, average Medicare payment), plus Medicaid where the specialty does much Medicaid work.';
+    // Medicare-eligible ages and the Health tab's Medicare data (2026-10-22).
+    brief += ' Include a "Medicare population" section from get_area_profile: the Medicare-eligible age bands (60-64 turning 65, then 65-69 up to 85 and over) and the county Medicare enrollment (traditional vs Medicare Advantage) and utilization, saying the county figures are county-wide.';
     // The area around the ZIP, not just the ZIP: every ZIP on the map, at
     // least 8 (2026-10-20, the user's choice).
     brief += ' Include an "Area profile" section from get_area_profile (area "map" if ZIP ' + z + ' is on the map, else "nearest"): the area\'s people, income and insurance as totals, then a compact row per ZIP, naming the neighbors that stand out.';

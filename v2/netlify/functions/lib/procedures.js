@@ -17,6 +17,7 @@
 // "colonoscopy" reaches CMS's "large bowel using an endoscope".
 
 const ProcedureSearch = require('../../../assets/procedure-search.js');
+const CodeList = require('../../../assets/code-list.js');
 
 const SOURCES = ['medicare_clinicians', 'medicaid', 'hospital_outpatient', 'hospital_inpatient'];
 const GEO_MEASURE = 'DENTAL';          // the PLACES rows that carry ZCTA centroids
@@ -24,6 +25,7 @@ const MAX_ZIPS = 30;
 const MAX_PAGES = 8;                   // 1,000-row pages per request group
 const BUDGET_MS = 14000;               // stop starting requests after this
 const TOP = 20;
+const MAX_ZIPS_CODE_LIST = 120;         // a code list asks for few rows per ZIP
 
 const NOTES = {
   medicare_clinicians: [
@@ -109,7 +111,11 @@ async function getProcedures(input, opts) {
   if (hospital && !centre) return { zip, source, error: home ? 'No location data for this ZIP, so nearby hospitals cannot be found' : 'The location lookup did not answer. Try again.' };
   let zips = given || [zip];
   const radius = given ? null : hospital ? (askedRadius || 25) : askedRadius;
-  if (given && zips.length > MAX_ZIPS) { zips = zips.slice(0, MAX_ZIPS); capped = true; }
+  // A list of codes in `query` (2026-10-22): every code is reported, codes
+  // with no rows are named, and the map can be wider since few rows return.
+  const list = query && CodeList.parse(query).isList ? CodeList.parse(query).codes : null;
+  const zipCap = list ? MAX_ZIPS_CODE_LIST : MAX_ZIPS;
+  if (given && zips.length > zipCap) { zips = zips.slice(0, zipCap); capped = true; }
   if (!given && !hospital && radius > 0 && centre) {
     const dLat = radius / 69, dLon = radius / Math.max(1, 69 * Math.cos(centre.lat * Math.PI / 180));
     const box = await get(`cdc_places?measureid=eq.${GEO_MEASURE}&lat=gte.${(centre.lat - dLat).toFixed(4)}&lat=lte.${(centre.lat + dLat).toFixed(4)}` +
@@ -121,15 +127,19 @@ async function getProcedures(input, opts) {
   }
 
   // ---- what to look for
-  const codeLike = query && /^[A-Za-z0-9]{5}$/.test(query) && /\d/.test(query) ? query.toUpperCase() : null;
-  const needles = query && !codeLike ? ProcedureSearch.needles(query).slice(0, 8) : [];
+  const codeLike = !list && query && /^[A-Za-z0-9]{5}$/.test(query) && /\d/.test(query) ? query.toUpperCase() : null;
+  const needles = query && !codeLike && !list ? ProcedureSearch.needles(query).slice(0, 8) : [];
+  const listIn = list ? list.map(encodeURIComponent).join(',') : '';
+  // Codes asked for that came back with no rows: withheld (under 11 or 12
+  // patients) or not billed here; unknown when a request failed.
+  const without = present => (list ? list.filter(c => !present.has(c)) : undefined);
   const descFilter = col => needles.length ? `&or=(${needles.map(n => `${col}.ilike.${pat(n)}`).join(',')})` : '';
   const specFilter = specialty && !hospital ? `&specialty=ilike.${pat(specialty)}` : '';
 
   const base = {
     source, data_year: 2024,
     area: given ? { zip, map_area: true, zips_searched: zips.length, zips: zips } : { zip, radius_miles: radius, zips_searched: zips.length },
-    filters: { specialty: hospital ? null : specialty, query, matched_terms: needles.length ? needles : (codeLike ? [codeLike] : []) }
+    filters: { specialty: hospital ? null : specialty, query, matched_terms: list ? list : needles.length ? needles : (codeLike ? [codeLike] : []) }
   };
   const finish = (out, notes) => {
     const incomplete = failed > 0 || capped || outOfTime;
@@ -144,7 +154,7 @@ async function getProcedures(input, opts) {
   // ---- Medicare clinicians (Part B)
   if (source === 'medicare_clinicians') {
     const sel = 'zip,npi,specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt';
-    const codeF = codeLike ? `&hcpcs_cd=eq.${encodeURIComponent(codeLike)}` : descFilter('hcpcs_desc');
+    const codeF = list ? `&hcpcs_cd=in.(${listIn})` : codeLike ? `&hcpcs_cd=eq.${encodeURIComponent(codeLike)}` : descFilter('hcpcs_desc');
     const parts = await inGroups(zips, 10, 3, list => paged(`cms_procedures_full?zip=in.(${list.join(',')})${specFilter}${codeF}&select=${sel}&order=specialty,tot_benes.desc,npi,hcpcs_cd,place_of_service`));
     const rows = parts.flatMap(p => p.rows);
     if (!rows.length && failed) return { zip, source, error: 'The Medicare procedure table did not answer in time. Try a smaller radius or a specialty.' };
@@ -165,7 +175,8 @@ async function getProcedures(input, opts) {
     return finish({
       totals: { rows: rows.length, codes: codes.length, clinicians: npis.size, patients_summed: int(codes.reduce((a, c) => a + c.patients, 0)), services: int(codes.reduce((a, c) => a + c.services, 0)),
         medicare_paid: int(codes.reduce((a, c) => a + c.paid, 0)) },
-      top_codes: codes.slice(0, TOP).map(c => ({ code: c.code, description: c.description, clinicians: c.npis.size, patients: int(c.patients), services: int(c.services),
+      codes_without_rows: list ? (failed || capped || outOfTime ? 'unknown: some requests did not complete' : without(new Set(codes.map(c => c.code)))) : undefined,
+      top_codes: (list ? codes : codes.slice(0, TOP)).map(c => ({ code: c.code, description: c.description, clinicians: c.npis.size, patients: int(c.patients), services: int(c.services),
         avg_allowed: c.services ? r2(c.allowed / c.services) : null, avg_medicare_paid: c.services ? r2(c.paid / c.services) : null,
         services_per_patient: c.patients ? r2(c.services / c.patients) : null })),
       by_specialty: specialty ? undefined : Object.values(specs).sort((a, b) => b.patients - a.patients).slice(0, 8)
@@ -178,7 +189,8 @@ async function getProcedures(input, opts) {
   // ---- Medicaid
   if (source === 'medicaid') {
     let codeF = '';
-    if (codeLike) codeF = `&code=eq.${encodeURIComponent(codeLike)}`;
+    if (list) codeF = `&code=in.(${listIn})`;
+    else if (codeLike) codeF = `&code=eq.${encodeURIComponent(codeLike)}`;
     else if (needles.length) {
       const hits = await get(`procedure_codes?select=code${descFilter('description')}&limit=500`, 6000);
       if (!hits) return { zip, source, error: 'The code description lookup did not answer. Try again.' };
@@ -198,11 +210,12 @@ async function getProcedures(input, opts) {
       sp.claims += Number(r.claims) || 0; sp.paid += Number(r.paid) || 0;
     }
     const codes = Object.values(by).sort((a, b) => b.claims - a.claims);
-    const top = codes.slice(0, TOP);
+    const top = list ? codes : codes.slice(0, TOP);
     const desc = {};
     if (top.length) (await get(`procedure_codes?code=in.(${top.map(c => encodeURIComponent(c.code)).join(',')})&select=code,description`, 5000) || []).forEach(d => { desc[d.code] = d.description; });
     return finish({
       totals: { rows: rows.length, codes: codes.length, claim_lines: int(codes.reduce((a, c) => a + c.claims, 0)), paid: int(codes.reduce((a, c) => a + c.paid, 0)) },
+      codes_without_rows: list ? (failed || capped || outOfTime ? 'unknown: some requests did not complete' : without(new Set(codes.map(c => String(c.code).toUpperCase())))) : undefined,
       top_codes: top.map(c => ({ code: c.code, description: desc[c.code] || null, claim_lines: int(c.claims), patient_months: int(c.patient_months),
         total_paid: int(c.paid), paid_per_claim: c.claims ? r2(c.paid / c.claims) : null, provider_count_summed: int(c.providers) })),
       by_specialty: specialty ? undefined : Object.values(specs).sort((a, b) => b.claims - a.claims).slice(0, 8)

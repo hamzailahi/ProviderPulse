@@ -102,5 +102,19 @@ const MED = [
   check('Hospitals: the notes say specialty does not apply and codes are APC/DRG', r.notes.some(n => /specialty filter does not apply/.test(n)) && r.notes.some(n => /APC/.test(n)));
 }
 
+// A list of codes: every code reported, missing ones named, a wider map allowed
+{
+  const many = Array.from({ length: 50 }, (_, i) => String(76100 + i));
+  const f = fakeDb([[/cms_procedures_full/, u => (u.includes('offset=0') ? MED : [])], [/medicaid_procedures/, u => (u.includes('offset=0') ? [{ specialty: 'Physician/Gastroenterology', code: '45380', claims: 10, patient_months: 9, paid: 1000, providers: 1 }] : [])], [/procedure_codes/, []]]);
+  const r = await getProcedures({ zip: '76104', source: 'medicare_clinicians', specialty: null, query: '45385, 45380 45388\nC9777', radius_miles: 0 }, { fetch: f, env, zips: many });
+  check('code list: the request filters by every listed code', f.urls.some(u => u.includes('hcpcs_cd=in.(45385,45380,45388,C9777)')));
+  check('code list: every code with rows is returned and the rest are named', r.top_codes.map(c => c.code).join() === '45385,45380' && r.codes_without_rows.join() === '45388,C9777', JSON.stringify([r.top_codes.map(c => c.code), r.codes_without_rows]));
+  check('code list: up to 120 map ZIPs, so 50 are not capped', r.area.zips_searched === 50 && r.incomplete === false);
+  const m = await getProcedures({ zip: '76104', source: 'medicaid', specialty: null, query: '45380 45385', radius_miles: 0 }, { fetch: f, env, zips: ['76104'] });
+  check('code list on Medicaid: by code, the missing code named', f.urls.some(u => u.includes('medicaid_procedures') && u.includes('code=in.(45380,45385)')) && m.codes_without_rows.join() === '45385');
+  const bad = await getProcedures({ zip: '76104', source: 'medicare_clinicians', specialty: null, query: '45385 45380', radius_miles: 0 }, { fetch: fakeDb([[/cms_procedures_full/, 500]]), env, zips: ['76104', '76105'] });
+  check('code list: a failed request never names codes as missing', !!bad.error || /unknown/.test(String(bad.codes_without_rows)));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

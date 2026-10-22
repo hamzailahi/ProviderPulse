@@ -1118,14 +1118,24 @@ AI tab in `dashboard-v3.js`.
   followed tool lookups timed out with "That took too long". If a later call
   in an invocation times out anyway, the step is handed back to retry with a
   fresh clock; a first call that times out returns 504.
+- **Question length:** up to 6,000 characters (2,000 until 2026-10-22: a
+  Reports brief is about 1,200 before the user's Focus, which now takes up to
+  2,000 with a live counter instead of a silent 400-character cut that
+  dropped half a request). The Reports brief asks for procedures with
+  `use_map_area` (it said "within 10 miles"), a pasted code list as one
+  `get_procedures` query, and a "Medicare population" section. The builder's
+  label reads "N ZIPs on the map · opportunity score anchored on ZIP X".
 - **History is append-only and echoed verbatim.** The browser stores the API
   messages exactly as returned (thinking blocks included) and sends them back.
   Never edit or reorder earlier turns: that invalidates preserved thinking.
   Only `user`/`assistant` roles are accepted from the client; a new question
   is refused (409) while an assistant turn still has unanswered tool calls.
 - **The system prompt is the server's.** Per-turn context (mode, ZIP,
-  specialty, and `area_zips`: the ZIPs loaded on the map, from `procZips`
-  else `zipDemographics`, validated, at most 120 listed) rides in a
+  specialty, and `area_zips`: the ZIPs loaded on the map, `mapZips()` in
+  `dashboard-v3.js` = the search's `zipsWithClinics` plus the neighbor seed
+  and rings, minus `strayAreaZips`, never `procZips` (a ZIP click narrows
+  `procZips` to one ZIP, and a Haltom City report then covered 8 ZIPs while
+  the map held dozens, 2026-10-22); validated, at most 120 listed) rides in a
   `<dashboard>` text block at the start of the user turn, so the cached
   prefix (tools + system) never changes. Tools read the newest block back
   from `ctx.messages` (`mapZips()` in `lib/area-profile.js`), so
@@ -1143,13 +1153,21 @@ AI tab in `dashboard-v3.js`.
   `procedure-search.js`; returns top codes with patients, services and
   service-weighted average allowed and paid, totals, and each source's
   caveats as `notes`; a failed or capped request sets `incomplete` and
-  "totals are floors", never an empty answer; at most 30 ZIPs, 8 pages per
+  "totals are floors", never an empty answer; a `query` holding a list of
+  codes (`CodeList.parse`, 2026-10-22) filters `in.(...)`, returns every
+  listed code, names `codes_without_rows` (or "unknown" when a request
+  failed) and allows 120 map ZIPs; at most 30 ZIPs otherwise, 8 pages per
   request group, a 14s budget; `use_map_area` searches the map's ZIPs
   instead of a radius and adds `by_zip`, where a ZIP in a failed group
   reads `unknown`, never 0), `get_area_profile` (`lib/area-profile.js`,
   2026-10-20, the user's choice of "what's on the map" and "totals plus
   each ZIP": every map ZIP, topped up to 8 with the nearest by PLACES
-  centroid and named in `notes`, cut to the nearest 40; a ZIP not on the
+  centroid and named in `notes`, cut to the nearest 60 (40 until
+  2026-10-22); `medicare_age_bands` (60-64 turning 65, 65-69 ... 85+) and
+  `medicare.counties` (the Health tab's county Medicare utilization, newest
+  year, and enrollment with the Medicare Advantage share, for counties holding
+  1%+ of the area's residents by HUD `res_ratio` x ZIP population, labelled
+  county-wide); a ZIP not on the
   map gets its own neighbors; `census_acs_zcta` as counts with shares
   (median income is a household-weighted average of ZIP medians and says
   so; Medicare and Medicaid overlap), every PLACES measure weighted by
@@ -1622,8 +1640,8 @@ node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, pri
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
-node scripts/test-area-profile.mjs        # 45: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
-node scripts/test-procedures-tool.mjs     # 23: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals
+node scripts/test-area-profile.mjs        # 51: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
+node scripts/test-procedures-tool.mjs     # 28: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 47: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, hospital topics, the Download all sheets, CSV
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
