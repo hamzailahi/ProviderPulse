@@ -86,7 +86,12 @@ async function findProviders(input, opts) {
   const pageAll = async table => {
     const rows = [];
     for (let p = 0; p < MAX_PAGES; p++) {
-      const b = await get(`${table}?${where}&select=${SELECT}&order=latitude,longitude,npi&limit=1000&offset=${p * 1000}`, 8000);
+      const path = `${table}?${where}&select=${SELECT}&order=latitude,longitude,npi&limit=1000&offset=${p * 1000}`;
+      // One retry: a wide map box can hit the 3s statement timeout once and
+      // answer the next time (2026-10-22: a 78-ZIP report lost every
+      // organization to one failed request and read as "no practices").
+      let b = await get(path, 8000);
+      if (!b) { b = await get(path, 8000); if (b) failed--; }   // a recovered page is not a failure
       if (!b) return { rows, ok: false };
       rows.push(...b);
       if (b.length < 1000) return { rows, ok: true };
@@ -112,19 +117,25 @@ async function findProviders(input, opts) {
   const byZip = {};
   hits.forEach(h => { byZip[h.zip] = (byZip[h.zip] || 0) + 1; });
   const capped = !!(orgs.capped || people.capped);
+  const orgN = hits.filter(h => h.type === 'organization').length, indN = hits.filter(h => h.type === 'individual').length;
+  // A table whose lookup failed is unknown, never zero.
+  const unknownWhen = (t, n) => (t.ok ? n : n || null);
   const incomplete = failed > 0 || outOfTime || capped;
   return {
     zip, specialty: label,
     area: useMap ? { map_zips: mapZips.length } : { radius_miles: radius },
     total: hits.length,
-    organizations: hits.filter(h => h.type === 'organization').length,
-    individuals: hits.filter(h => h.type === 'individual').length,
+    organizations: unknownWhen(orgs, orgN),
+    individuals: unknownWhen(people, indN),
+    lookups: { organizations: orgs.ok ? (orgs.capped ? 'capped' : 'complete') : 'failed', individuals: people.ok ? (people.capped ? 'capped' : 'complete') : 'failed' },
     nearest_organizations: hits.filter(h => h.type === 'organization').slice(0, LIST),
     nearest_individuals: hits.filter(h => h.type === 'individual').slice(0, LIST),
     by_zip: Object.keys(byZip).map(z => ({ zip: z, listings: byZip[z] })).sort((a, b) => b.listings - a.listings).slice(0, 20),
     count_is_floor: incomplete,
     incomplete,
-    incomplete_reason: incomplete ? [failed ? failed + ' request(s) failed or timed out' : null, capped ? 'more listings than one lookup holds' : null,
+    incomplete_reason: incomplete ? [!orgs.ok ? 'the organization lookup (practices, surgery centers) failed, so their count is unknown, not zero' : null,
+      !people.ok ? 'the individual clinician lookup failed, so their count is unknown, not zero' : null,
+      failed && orgs.ok && people.ok ? failed + ' request(s) failed or timed out' : null, capped ? 'more listings than one lookup holds' : null,
       outOfTime ? 'the time budget ran out' : null].filter(Boolean).join('; ') + '. Counts are floors; do not call the area empty.' : null,
     source: 'NPPES registry listings with coordinates, matched by their own NUCC taxonomy code. Individuals are listed where they register, often a group\'s address; organizations include practices, surgery centers and hospitals carrying the specialty\'s codes.',
     ms: Date.now() - started

@@ -1168,7 +1168,10 @@ AI tab in `dashboard-v3.js`.
   pages (10 per table), a radius or the map's ZIPs (`use_map_area`), lists
   the nearest 25 organizations and 25 individuals separately with counts per
   ZIP, and marks a failed or capped lookup incomplete (both tables failing
-  is an error), never empty), `get_procedures`
+  is an error), never empty; a failed page is retried once, and a table
+  that still fails reads `null` with `lookups.<table>: 'failed'`, never 0:
+  one failed organizations request made a 78-ZIP report say no GI practices
+  existed), `get_procedures`
   (`lib/procedures.js`, 2026-10-20: the Procedures panel's four public
   sources around a ZIP or radius, medicare_clinicians / medicaid /
   hospital_outpatient / hospital_inpatient, filtered by CMS specialty name
@@ -1176,7 +1179,8 @@ AI tab in `dashboard-v3.js`.
   Medicaid's "Physician/Gastroenterology") and by a code or words through
   `procedure-search.js`; returns top codes with patients, services and
   service-weighted average allowed and paid, plus `clinician_fee` (entity I)
-  and `facility_fee` (entity O, mostly surgery centers) because the blend
+  and `facility_fee` (entity O, with `billed_by`: surgery centers for scopes,
+  labs for pathology, imaging centers for ultrasound) because the blend
   mixes the doctor's fee with the center's (45380: $236 blended, about $103
   for the doctor), totals, and each source's
   caveats as `notes`; a failed or capped request sets `incomplete` and
@@ -1330,6 +1334,8 @@ within 25 miles (by centroid). For each of the 40 scored specialties
 | pay | .20 | insured rate (70%) and income (30%) percentiles within the state. Income is ACS median household income (50%), share of households at $100k+ (25%) and low poverty (25%) when `census_acs_zcta` has this ZIP and at least 30 in its state; else the `demographics_raw` share at $75k+. `evidence.pay.income_basis` says which (`acs` or `census75`) |
 | shortage | .10 | HPSA score / 25 for the matching discipline (behavioral → mental, dental → dental, else primary) |
 | competition | .10 | nearest same-specialty listing: ≤1 mi → 30, ≥10 mi → 90, none → 95 |
+
+The catchment is the ZIP plus its **10 nearest** ZCTAs (`CATCHMENT_MAX_NEIGHBORS`), none past 25 miles (`CATCHMENT_MAX_MILES`). In a city the 10 nearest span a few miles, so describe it with `furthest_miles` (Insights' `catchWords`, the assistant's `catchmentText`), never "within 25 miles": a Haltom City report put 9 GI clinicians in "the 25-mile catchment" while 62 sat 6 miles away in 76104 (2026-10-22).
 
 Rules that must hold:
 
@@ -1676,8 +1682,8 @@ node scripts/test-payers.mjs              # 40: insurance plan proposal: covered
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 node scripts/test-area-profile.mjs        # 53: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
-node scripts/test-providers-near.mjs      # 17: the assistant's find_providers: codes in a location box, individuals and organizations, radius or map, failures never "none"
-node scripts/test-procedures-tool.mjs     # 41: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo
+node scripts/test-providers-near.mjs      # 20: the assistant's find_providers: codes in a location box, individuals and organizations, radius or map, failures never "none"
+node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean

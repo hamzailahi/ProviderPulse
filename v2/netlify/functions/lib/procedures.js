@@ -33,7 +33,8 @@ const NOTES = {
     'CMS leaves out any code a clinician billed for fewer than 11 Medicare patients in the year, so small volumes and pregnancy or children\'s care barely appear.',
     'Each row sits at the address the clinician bills Medicare from, often a group\'s main office. Patient counts are summed across clinicians, so one patient seen by two clinicians counts twice.',
     'Average allowed is what Medicare approves per service (its payment plus the patient\'s share); average paid is Medicare\'s own payment. Both are weighted by services here.',
-    'avg_medicare_paid blends every biller of a code: the clinician\'s professional fee and, for procedures done in a surgery center, the center\'s facility fee (billed by an organization). clinician_fee is the clinicians\' own average and facility_fee the organizations\'; quote clinician_fee for what a physician is paid.'
+    'avg_medicare_paid blends every biller of a code: the clinician\'s professional fee and the organization\'s payment. clinician_fee is the clinicians\' own average; quote it for what a physician is paid. facility_fee is what organizations were paid, and billed_by names them: for scopes that is mostly the surgery center\'s facility fee, but for pathology it is labs and for imaging it is imaging centers or groups, so label it by billed_by, never as a surgery center fee by default.',
+    'These are averages of what was actually paid per service, below the fee schedule\'s full rate: Medicare pays 80% of the allowed amount (less 2% sequestration), and a second endoscopy in the same session is paid less (the multiple endoscopy rule), so codes usually done second, such as 45380, 43239 and 45381, run well under their scheduled rate.'
   ],
   medicaid: [
     'HHS Medicaid Provider Spending by HCPCS (T-MSIS), 2024: Medicaid and CHIP, fee-for-service and managed care, placed at each provider\'s listed ZIP.',
@@ -181,12 +182,13 @@ async function getProcedures(input, opts) {
       const z = zs[r.zip] || (zs[r.zip] = { zip: r.zip, npis: new Set(), patients: 0, services: 0, paid: 0 });
       z.npis.add(r.npi); z.patients += Number(r.tot_benes) || 0; z.services += Number(r.tot_srvcs) || 0;
       z.paid += (Number(r.avg_mdcr_pymt_amt) || 0) * (Number(r.tot_srvcs) || 0);
-      const c = by[r.hcpcs_cd] || (by[r.hcpcs_cd] = { code: r.hcpcs_cd, description: r.hcpcs_desc, patients: 0, services: 0, allowed: 0, paid: 0, npis: new Set(), ind: [0, 0], org: [0, 0] });
+      const c = by[r.hcpcs_cd] || (by[r.hcpcs_cd] = { code: r.hcpcs_cd, description: r.hcpcs_desc, patients: 0, services: 0, allowed: 0, paid: 0, npis: new Set(), ind: [0, 0], org: [0, 0], orgBy: {} });
       const s = Number(r.tot_srvcs) || 0;
       c.patients += Number(r.tot_benes) || 0; c.services += s;
       c.allowed += (Number(r.avg_mdcr_alowd_amt) || 0) * s; c.paid += (Number(r.avg_mdcr_pymt_amt) || 0) * s;
       const side = r.entity_code === 'O' ? c.org : c.ind;   // facility fee vs the clinician's own fee
       side[0] += s; side[1] += (Number(r.avg_mdcr_pymt_amt) || 0) * s;
+      if (r.entity_code === 'O' && r.specialty) c.orgBy[r.specialty] = (c.orgBy[r.specialty] || 0) + s;
       c.npis.add(r.npi); npis.add(r.npi);
       const sp = specs[r.specialty] || (specs[r.specialty] = { specialty: r.specialty, patients: 0, npis: new Set() });
       sp.patients += Number(r.tot_benes) || 0; sp.npis.add(r.npi);
@@ -200,7 +202,11 @@ async function getProcedures(input, opts) {
         avg_allowed: c.services ? r2(c.allowed / c.services) : null, avg_medicare_paid: c.services ? r2(c.paid / c.services) : null,
         services_per_patient: c.patients ? r2(c.services / c.patients) : null,
         clinician_fee: { services: int(c.ind[0]), avg_medicare_paid: c.ind[0] ? r2(c.ind[1] / c.ind[0]) : null, medicare_paid: int(c.ind[1]) },
-        facility_fee: { services: int(c.org[0]), avg_medicare_paid: c.org[0] ? r2(c.org[1] / c.org[0]) : null, medicare_paid: int(c.org[1]) } })),
+        // Who the organizations are: surgery centers for scopes, but labs for
+        // pathology and imaging centers for ultrasound (a report called a lab's
+        // 88305 payment a surgery center's "facility fee", 2026-10-22).
+        facility_fee: { services: int(c.org[0]), avg_medicare_paid: c.org[0] ? r2(c.org[1] / c.org[0]) : null, medicare_paid: int(c.org[1]),
+          billed_by: Object.keys(c.orgBy).sort((a, b) => c.orgBy[b] - c.orgBy[a]).slice(0, 3) } })),
       by_specialty: specialty ? undefined : Object.values(specs).sort((a, b) => b.patients - a.patients).slice(0, 8)
         .map(s => ({ specialty: s.specialty, clinicians: s.npis.size, patients_summed: int(s.patients) })),
       by_zip: zips.length > 1 ? zips.map(z => zs[z] ? { zip: z, clinicians: zs[z].npis.size, patients_summed: int(zs[z].patients), services: int(zs[z].services), medicare_paid: int(zs[z].paid) }

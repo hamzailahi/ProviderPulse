@@ -133,6 +133,8 @@ const MED = [
   check('fee split: the clinician fee is the doctor\'s own average', c.clinician_fee.avg_medicare_paid === 103 && c.clinician_fee.services === 100);
   check('fee split: the facility fee is the organization\'s', c.facility_fee.avg_medicare_paid === 369 && c.facility_fee.medicare_paid === 36900);
   check('fee split: the notes tell the model which to quote', r.notes.some(n => /clinician_fee/.test(n)));
+  check('fee split: the facility side names who billed it', c.facility_fee.billed_by.join() === 'Ambulatory Surgical Center');
+  check('the notes say averages run below the fee schedule', r.notes.some(n => /multiple endoscopy rule/.test(n)));
   check('code list echo: every requested code, in one call', r.code_list.requested_count === 47 && r.code_list.requested_codes.length === 47 && r.code_list.requested_codes.includes('45334'));
   check('code list echo: codes with rows and without', r.code_list.codes_with_rows.join() === '45380' && r.code_list.codes_without_rows.length === 46 && !r.code_list.codes_without_rows.includes('45380'));
   check('code list echo: a rule against calling a requested code "not requested"', /requested_codes/.test(r.code_list.rule));

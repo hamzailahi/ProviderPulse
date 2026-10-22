@@ -78,5 +78,23 @@ const page = rows => u => (u.includes('offset=0') ? rows : []);
   check('a malformed ZIP is refused', !!r5.error);
 }
 
+// A failed table is unknown, not zero; one failed page is retried (a
+// 78-ZIP report lost every organization to one failed request, 2026-10-22)
+{
+  const r = await findProviders({ zip: '76117', specialty: 'Digestive / gastroenterology', radius_miles: 25 }, { fetch: fakeDb([centre, [/\/clinics\?/, 500], [/\/provider_individuals\?/, page(PEOPLE)]]), env });
+  check('organizations failed: the count is unknown (null), not 0', r.organizations === null && r.lookups.organizations === 'failed' && r.individuals === 2);
+  check('the reason names the organization lookup', /organization lookup .* unknown, not zero/.test(r.incomplete_reason));
+  let tries = 0;
+  const flaky = async (url) => {
+    const u = decodeURIComponent(String(url));
+    if (/cdc_places/.test(u)) return { ok: true, status: 200, json: async () => centre[1] };
+    if (/\/clinics\?/.test(u) && ++tries === 1) return { ok: false, status: 500, json: async () => ({ code: '57014' }) };
+    if (/\/clinics\?/.test(u)) return { ok: true, status: 200, json: async () => (u.includes('offset=0') ? ORGS : []) };
+    return { ok: true, status: 200, json: async () => (u.includes('offset=0') && /individuals/.test(u) ? PEOPLE : []) };
+  };
+  const r2 = await findProviders({ zip: '76117', specialty: 'Digestive / gastroenterology', radius_miles: 10 }, { fetch: flaky, env });
+  check('a page that fails once is retried and the organizations come back', r2.organizations === 2 && r2.lookups.organizations === 'complete' && r2.incomplete === false);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

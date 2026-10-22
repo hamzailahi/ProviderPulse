@@ -601,6 +601,23 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-22
 
+- **The opportunity score's area is described as it really is.** The market
+  model counts the ZIP and its 10 nearest ZIPs, capped at 25 miles. In a city
+  those 11 ZIPs span only a few miles, yet Insights and Ask AI called it
+  "within 25 miles", so a Haltom City report put 9 GI clinicians in "the
+  25-mile catchment" while listing 62 in Fort Worth's medical district 6 miles
+  away. Insights now says "this ZIP and its 10 nearest (within 4.8 mi)", and
+  the assistant is told to say the same and to mention listings just outside.
+- **Competitor lists no longer read a failed lookup as "no practices".** One
+  failed request for organizations made a report say no GI practices or
+  surgery centers came back. A failed page is now retried once, and if it
+  still fails the organization count is reported as unknown, not zero.
+- **The organization side of a Medicare fee is labelled by who billed it.**
+  For scopes it is the surgery center's facility fee, but for pathology it is
+  labs and for ultrasound imaging centers. The assistant now gets those
+  biller types, plus a note that these averages run below the fee schedule
+  (Medicare pays 80% after sequestration, and a second scope in a session is
+  paid less).
 - **Each report starts a fresh conversation.** The Reports tab used to write
   into whatever Ask AI chat was open, so a new report inherited the old
   chat's tool calls and notes (one repeated an earlier chat's batched code

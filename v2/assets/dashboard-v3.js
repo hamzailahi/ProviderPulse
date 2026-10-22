@@ -458,8 +458,7 @@ function paintInsights() {
     if (g) {
       var acc = (g.evidence && g.evidence.access) || {};
       you.appendChild(el('div', { class: 'ins-big' }, el('span', { class: 'chip ' + (g.score >= 70 ? 'under' : g.score >= 50 ? 'balanced' : 'served') }, g.archetype_name + ' · ' + g.score)));
-      you.appendChild(el('p', {}, fmtN(g.clinicians) + ' ' + myLabel.toLowerCase() + ' listings within ' +
-        ((d.catchment && d.catchment.radius_miles) || 25) + ' miles serve about ' + fmtN(d.catchment && d.catchment.adults_18plus) + ' adults' +
+      you.appendChild(el('p', {}, fmtN(g.clinicians) + ' ' + myLabel.toLowerCase() + ' listings in ' + catchWords(d) + ' serve about ' + fmtN(d.catchment && d.catchment.adults_18plus) + ' adults' +
         (acc.per_1k != null && acc.national_per_1k != null
           ? ' (' + Number(acc.per_1k).toFixed(2) + ' per 1,000 vs ' + Number(acc.national_per_1k).toFixed(2) + ' nationally).' : '.')));
     } else {
@@ -518,18 +517,17 @@ function paintInsights() {
   // From the per-specialty model: the strongest scores among specialties that
   // already have listings here (unserved ones get their own line below), and
   // never "not enough data".
-  var radiusMi = (d.catchment && d.catchment.radius_miles) || 25;
   var ranked = specs.filter(function (x) { return x.clinicians > 0 && x.archetype !== 'insufficient' && typeof x.score === 'number'; })
     .sort(function (a, b) { return b.score - a.score; });
   var unserved = specs.filter(function (x) { return x.clinicians === 0; }).map(function (x) { return x.specialty; });
   if (ranked.length) {
     F.push([ranked[0].score >= 70 ? 'good' : 'neutral', 'Biggest opening',
-      ranked[0].specialty + ' scores ' + ranked[0].score + ' (' + ranked[0].archetype_name.toLowerCase() + ') within ' + radiusMi + ' miles' +
+      ranked[0].specialty + ' scores ' + ranked[0].score + ' (' + ranked[0].archetype_name.toLowerCase() + ') in ' + catchWords(d) +
       (ranked.length > 1 ? '; next are ' + ranked.slice(1, 3).map(function (x) { return x.specialty + ' at ' + x.score; }).join(' and ') : '') + '.']);
   }
   if (unserved.length) {
     F.push(['good', 'No providers at all', unserved.slice(0, 5).join(', ') + (unserved.length > 5 ? ' and ' + (unserved.length - 5) + ' more' : '') +
-      (unserved.length === 1 ? ' has' : ' have') + ' no listings within ' + radiusMi + ' miles.']);
+      (unserved.length === 1 ? ' has' : ' have') + ' no listings in ' + catchWords(d) + '.']);
   }
   p.appendChild(el('div', { class: 'ins-card' },
     el('div', { class: 'ins-eyebrow' }, 'What stands out'),
@@ -678,6 +676,16 @@ function drawProc(card, s) {
     } }, '✦ Ask AI about these')));
 }
 
+// What the market model counted: the ZIP and its 10 nearest ZIPs, capped at
+// 25 miles. In a city that is a few miles across, so "within 25 miles" was
+// wrong (2026-10-22).
+function catchWords(d) {
+  var c = d && d.catchment;
+  if (!c) return 'the area';
+  var n = Math.max(0, (c.zip_count || 1) - 1);
+  return n ? 'this ZIP and its ' + n + ' nearest (within ' + c.furthest_miles + ' mi)' : 'this ZIP alone';
+}
+
 /* ---------- 5b. Market model: archetype, factors, ranked specialties ------ */
 var focusSpec = null, showAllSpecs = false;
 var ARCH_TONE = { prime: 'good', unserved: 'good', safety_net: 'warm', latent: 'warm', balanced: 'neutral',
@@ -785,7 +793,7 @@ function paintModel(p, d, M) {
   var ranked = rankSpecs(M);
   var shown = showAllSpecs ? ranked : ranked.slice(0, 8);
   p.appendChild(el('div', { class: 'ins-card' },
-    el('div', { class: 'ins-eyebrow' }, 'Opportunities by specialty · within ' + ((d.catchment && d.catchment.radius_miles) || 25) + ' miles'),
+    el('div', { class: 'ins-eyebrow' }, 'Opportunities by specialty · ' + catchWords(d)),
     el('ol', { class: 'ins-rank' }, shown.map(function (x) {
       return el('li', {}, el('button', { type: 'button', class: x.specialty === h.specialty ? 'on' : '',
         onclick: function () { focusSpec = x.specialty; paintInsights(); insightsPanel.scrollTop = 0; } },
@@ -1322,7 +1330,7 @@ if (isProviderAcct) {
     // said procedure data did not exist (2026-10-20). Across the map's ZIPs,
     // not "within 10 miles" (2026-10-22).
     brief += ' Include a "Procedures and reimbursement" section: get_procedures with use_map_area true across the ZIPs on the map, the specialty\'s top codes from Medicare clinicians' +
-      ' (patients, services, average Medicare payment, quoting the clinician fee apart from the surgery center\'s facility fee), plus Medicaid where the specialty does much Medicaid work.' +
+      ' (patients, services, average Medicare payment, quoting the clinician fee apart from the organization fee, labelled by who billed it: surgery centers for scopes, labs for pathology), plus Medicaid where the specialty does much Medicaid work.' +
       ' If the Focus lists procedure codes, read them in one get_procedures call per source with the whole list, and check which codes are missing against the result\'s code_list before saying so.';
     // Competitors across the map, organizations and clinicians (2026-10-22).
     brief += ' Include a "Competition" section from find_providers with use_map_area true: the main practices and surgery centers and the individual clinicians, with counts per ZIP.';
