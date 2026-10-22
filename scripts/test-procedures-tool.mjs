@@ -116,6 +116,30 @@ const MED = [
   check('code list: a failed request never names codes as missing', !!bad.error || /unknown/.test(String(bad.codes_without_rows)));
 }
 
+// A code list echoes what was asked, and a surgery center's facility fee is
+// kept apart from the doctor's fee (2026-10-22: 45380 read $236 blended
+// while the doctor's own fee was about $103)
+{
+  const rows = [
+    { npi: '1', entity_code: 'I', specialty: 'Gastroenterology', hcpcs_cd: '45380', hcpcs_desc: 'Biopsy', tot_benes: 100, tot_srvcs: 100, avg_mdcr_alowd_amt: 130, avg_mdcr_pymt_amt: 103 },
+    { npi: '9', entity_code: 'O', specialty: 'Ambulatory Surgical Center', hcpcs_cd: '45380', hcpcs_desc: 'Biopsy', tot_benes: 100, tot_srvcs: 100, avg_mdcr_alowd_amt: 460, avg_mdcr_pymt_amt: 369 }
+  ];
+  const f = fakeDb([[/cms_procedures_full/, u => (u.includes('offset=0') ? rows : [])]]);
+  const codes = Array.from({ length: 46 }, (_, i) => String(45300 + i)).concat(['45380']).join(' ');
+  const r = await getProcedures({ zip: '76104', source: 'medicare_clinicians', specialty: null, query: codes, radius_miles: 0 }, { fetch: f, env, zips: ['76104', '76117'] });
+  const c = r.top_codes.find(x => x.code === '45380');
+  check('fee split: the request selects the billing entity', f.urls.some(u => /select=[^&]*entity_code/.test(u)));
+  check('fee split: the blended average mixes both fees', c.avg_medicare_paid === 236);
+  check('fee split: the clinician fee is the doctor\'s own average', c.clinician_fee.avg_medicare_paid === 103 && c.clinician_fee.services === 100);
+  check('fee split: the facility fee is the organization\'s', c.facility_fee.avg_medicare_paid === 369 && c.facility_fee.medicare_paid === 36900);
+  check('fee split: the notes tell the model which to quote', r.notes.some(n => /clinician_fee/.test(n)));
+  check('code list echo: every requested code, in one call', r.code_list.requested_count === 47 && r.code_list.requested_codes.length === 47 && r.code_list.requested_codes.includes('45334'));
+  check('code list echo: codes with rows and without', r.code_list.codes_with_rows.join() === '45380' && r.code_list.codes_without_rows.length === 46 && !r.code_list.codes_without_rows.includes('45380'));
+  check('code list echo: a rule against calling a requested code "not requested"', /requested_codes/.test(r.code_list.rule));
+  const h = await getProcedures({ zip: '76104', source: 'hospital_outpatient', specialty: null, query: '45380 45385', radius_miles: 0 }, { fetch: fakeDb([centroid]), env });
+  check('a code list on a hospital source says to search with words', /payment groups/.test(h.error || ''));
+}
+
 // Medicaid per claim line checked against Medicare's local average per service
 {
   const f = fakeDb([centroid, box, [/medicaid_procedures/, u => (u.includes('offset=0') ? [{ specialty: 'Cardiology', code: '93000', claims: 100, patient_months: 90, paid: 20576, providers: 3 }, { specialty: 'Physician/Gastroenterology', code: '43239', claims: 10, patient_months: 9, paid: 940, providers: 1 }] : [])],

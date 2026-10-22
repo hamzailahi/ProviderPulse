@@ -1312,7 +1312,8 @@ if (isProviderAcct) {
     // said procedure data did not exist (2026-10-20). Across the map's ZIPs,
     // not "within 10 miles" (2026-10-22).
     brief += ' Include a "Procedures and reimbursement" section: get_procedures with use_map_area true across the ZIPs on the map, the specialty\'s top codes from Medicare clinicians' +
-      ' (patients, services, average Medicare payment), plus Medicaid where the specialty does much Medicaid work.';
+      ' (patients, services, average Medicare payment, quoting the clinician fee apart from the surgery center\'s facility fee), plus Medicaid where the specialty does much Medicaid work.' +
+      ' If the Focus lists procedure codes, read them in one get_procedures call per source with the whole list, and check which codes are missing against the result\'s code_list before saying so.';
     // Competitors across the map, organizations and clinicians (2026-10-22).
     brief += ' Include a "Competition" section from find_providers with use_map_area true: the main practices and surgery centers and the individual clinicians, with counts per ZIP.';
     // Medicare-eligible ages and the Health tab's Medicare data (2026-10-22).

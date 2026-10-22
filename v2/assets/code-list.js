@@ -46,7 +46,7 @@
     var byCode = {}, byNpi = {}, byZip = {};
     codes.forEach(function (c) {
       byCode[c] = { code: c, description: desc[c] || null, billers: {}, patients: 0, services: 0, office: 0, facility: 0,
-        individual: 0, organization: 0, allowed: 0, paid: 0, mcdClaims: 0, mcdPaid: 0, mcdProviders: 0, mcdRows: 0 };
+        individual: 0, organization: 0, indPaid: 0, orgPaid: 0, allowed: 0, paid: 0, mcdClaims: 0, mcdPaid: 0, mcdProviders: 0, mcdRows: 0 };
     });
     med.forEach(function (r) {
       var c = byCode[String(r.hcpcs_cd || '').toUpperCase()];
@@ -56,7 +56,7 @@
       c.billers[npi] = 1; c.patients += b; c.services += s;
       c.allowed += num(r.avg_mdcr_alowd_amt) * s; c.paid += paid;
       if (r.place_of_service === 'O') c.office += s; else if (r.place_of_service === 'F') c.facility += s;
-      if (r.entity_code === 'O') c.organization += s; else c.individual += s;
+      if (r.entity_code === 'O') { c.organization += s; c.orgPaid += paid; } else { c.individual += s; c.indPaid += paid; }
       var p = byNpi[npi] || (byNpi[npi] = { npi: npi, name: r.provider_name || '', first: r.first_name || '', credentials: r.credentials || '',
         organization: r.entity_code === 'O', specialty: r.specialty || '', city: r.city || '', zip: r.zip || '',
         codes: {}, patients: 0, services: 0, paid: 0 });
@@ -77,6 +77,11 @@
       return { code: c.code, description: c.description, billers: n, patients: Math.round(c.patients), services: Math.round(c.services),
         office: Math.round(c.office), facility: Math.round(c.facility), individual: Math.round(c.individual), organization: Math.round(c.organization),
         avgAllowed: c.services ? c.allowed / c.services : null, avgPaid: c.services ? c.paid / c.services : null, paid: c.paid,
+        // The blended average mixes the clinician's fee with the surgery
+        // center's or other organization's (2026-10-22: 45380 read $236 while
+        // the doctor's own fee was about $103), so each side is kept apart.
+        clinicianAvgPaid: c.individual ? c.indPaid / c.individual : null, clinicianPaid: c.indPaid,
+        orgAvgPaid: c.organization ? c.orgPaid / c.organization : null, orgPaid: c.orgPaid,
         mcdClaims: Math.round(c.mcdClaims), mcdPaid: c.mcdPaid, mcdPerClaim: c.mcdClaims ? c.mcdPaid / c.mcdClaims : null,
         // A claim line can carry several units, so a Medicaid amount per
         // claim line far above Medicare's average per service is not a rate
@@ -208,6 +213,7 @@
       [spec.incomplete ? 'INCOMPLETE: some requests failed or hit a page limit, so these totals are floors.' : 'All requests answered.'],
       [''],
       ['Medicare clinicians: traditional Medicare only (65+ and some disabled). CMS leaves out any code a clinician billed for fewer than 11 patients. Patients are summed across billers; one procedure can appear under the physician, the surgery center, anesthesia and pathology, so do not add services across codes. Est. Medicare paid = services x average paid.'],
+      ['Doctor fee vs facility fee: the same code is billed by the clinician (entity I, the professional fee) and by a surgery center or other organization (entity O, the facility fee). The blended average mixes both; quote the clinician columns for what a doctor is paid.'],
       ['Medicaid: the state\'s Medicaid and CHIP claims at the provider\'s ZIP, without clinician names. HHS withholds any provider, code and month under 12 patients, so counts are floors. A claim line can carry several units of a service, so paid per claim line is not a price per service and is not comparable with Medicare\'s average; the Check column flags codes where it runs more than three times Medicare\'s average here.'],
       ['Hospitals: payment groups (APC outpatient, DRG inpatient), not CPT codes, matched to your codes by topic. Approximate: a group can cover procedures outside your list. Anesthesia has no hospital group (it is packaged into the procedure\'s group). CMS withholds hospital counts under 11.'],
       [''],
@@ -215,8 +221,8 @@
     ].concat(spec.codes.map(function (c) { return [c, tp.byCode[c] || (c === 'C9777' || /^[A-Z]/.test(c) ? 'none (a facility or HCPCS code with no topic found)' : 'none found')]; }));
     if (s.missing.length) noteRows.push([''], ['Codes with no Medicare or Medicaid rows in this area: ' + s.missing.join(', ')]);
     sheets.push({ name: 'Notes', rows: noteRows });
-    sheets.push({ name: 'Medicare by code', rows: [['Code', 'Description', 'Billers', 'Patients (summed)', 'Services', 'Office services', 'Facility services', 'Services by individuals', 'Services by organizations', 'Avg allowed', 'Avg paid', 'Est. Medicare paid']]
-      .concat(s.codes.map(function (c) { return [c.code, c.description, c.billers, c.patients, c.services, c.office, c.facility, c.individual, c.organization, r2(c.avgAllowed), r2(c.avgPaid), Math.round(c.paid)]; })) });
+    sheets.push({ name: 'Medicare by code', rows: [['Code', 'Description', 'Billers', 'Patients (summed)', 'Services', 'Office services', 'Facility services', 'Services by clinicians', 'Services by organizations', 'Avg allowed (blended)', 'Avg paid (blended)', 'Clinician avg paid (doctor fee)', 'Organization avg paid (facility fee)', 'Est. paid to clinicians', 'Est. paid to organizations', 'Est. Medicare paid']]
+      .concat(s.codes.map(function (c) { return [c.code, c.description, c.billers, c.patients, c.services, c.office, c.facility, c.individual, c.organization, r2(c.avgAllowed), r2(c.avgPaid), r2(c.clinicianAvgPaid), r2(c.orgAvgPaid), Math.round(c.clinicianPaid), Math.round(c.orgPaid), Math.round(c.paid)]; })) });
     sheets.push({ name: 'Medicare by clinician', rows: [['NPI', 'Name', 'Credentials', 'Organization', 'CMS specialty', 'City', 'ZIP', 'Codes billed', 'Top code', 'Patients (summed)', 'Services', 'Est. Medicare paid']]
       .concat(s.clinicians.map(function (c) { return [c.npi, c.name, c.credentials, c.organization ? 'yes' : 'no', c.specialty, c.city, c.zip, c.codes, c.topCode, c.patients, c.services, Math.round(c.paid)]; })) });
     sheets.push({ name: 'Medicare rows', rows: [['Code', 'Description', 'NPI', 'Last or organization name', 'First name', 'Credentials', 'Entity', 'CMS specialty', 'City', 'ZIP', 'Place of service', 'Patients', 'Services', 'Avg allowed', 'Avg paid', 'Est. Medicare paid']]

@@ -601,6 +601,21 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-22
 
+- **Doctor fee and facility fee are shown apart.** A procedure done in a
+  surgery center is billed twice: the physician's professional fee and the
+  center's facility fee. The blended average mixed them (colonoscopy with
+  biopsy, 45380, read $236 while the doctor's own fee was about $103). The
+  Procedures tab's code list now has Doctor fee and Facility fee columns, the
+  Excel download adds both averages and both estimated totals, and Ask AI and
+  reports quote the clinician's fee for what a physician is paid.
+- **A pasted code list reaches Ask AI whole.** The assistant's procedure
+  lookup cut its search text at 80 characters, about 13 codes, so a 46-code
+  list arrived chopped mid-code and the AI split it into chunks, then
+  misreported which codes it had asked for. A list of up to 100 codes now
+  goes through in one call per source, and the result echoes the codes
+  requested, those with rows and those without, so the AI checks gaps against
+  that list. A code list sent to a hospital source is refused with advice to
+  search by words, since hospitals report payment groups.
 - **Competitor lists in Ask AI and reports are now complete.** The lookup
   used to load every listing nearby, stop at 4,000 per table and only then
   pick the specialty, so around Fort Worth it named 9 GI organizations and

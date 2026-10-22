@@ -101,6 +101,22 @@ check('notes list each code\'s topic and the codes with no rows', /45385 Digesti
 check('an incomplete pull is marked in the notes', /INCOMPLETE/.test(CodeList.workbook({ codes: ['45385'], summary: s, zips: 1, incomplete: true }).find(x => x.name === 'Notes').rows.map(r => r.join(' ')).join(' ')));
 check('a hospital source not loaded at all says so', /Not loaded/.test(CodeList.workbook({ codes: ['45385'], summary: s, zips: 1 }).find(x => x.name === 'Hospital outpatient').rows[0][0]));
 
+console.log('\n4b. Doctor fee vs facility fee');
+{
+  const fs = CodeList.summarize(['45380'], [
+    { npi: '1', entity_code: 'I', hcpcs_cd: '45380', place_of_service: 'F', tot_benes: 100, tot_srvcs: 100, avg_mdcr_alowd_amt: 130, avg_mdcr_pymt_amt: 103 },
+    { npi: '9', entity_code: 'O', hcpcs_cd: '45380', place_of_service: 'F', tot_benes: 100, tot_srvcs: 100, avg_mdcr_alowd_amt: 460, avg_mdcr_pymt_amt: 369 }
+  ], [], {});
+  const c = fs.codes[0];
+  check('the blended average mixes the clinician and surgery center fees', Math.round(c.avgPaid) === 236);
+  check('the clinician average is the doctor\'s own fee', c.clinicianAvgPaid === 103 && c.clinicianPaid === 10300);
+  check('the organization average is the facility fee', c.orgAvgPaid === 369 && c.orgPaid === 36900);
+  const row = CodeList.workbook({ codes: ['45380'], summary: fs, zips: 1 }).find(x => x.name === 'Medicare by code').rows;
+  const head = row[0];
+  check('the Excel sheet has both fees beside the blended average', head.includes('Clinician avg paid (doctor fee)') && row[1][head.indexOf('Clinician avg paid (doctor fee)')] === 103 && row[1][head.indexOf('Organization avg paid (facility fee)')] === 369);
+  check('a code billed by clinicians only has no facility fee', CodeList.summarize(['45380'], [{ npi: '1', entity_code: 'I', hcpcs_cd: '45380', tot_srvcs: 5, avg_mdcr_pymt_amt: 100 }], [], {}).codes[0].orgAvgPaid === null);
+}
+
 console.log('\n5. CSV');
 const csv = CodeList.toCsv([{ a: 'x, "y"', b: 1.23456, c: 7 }], [['A', 'a'], ['B', 'b'], ['C', 'c']]);
 check('values with commas and quotes are quoted, decimals rounded to cents', csv === 'A,B,C\n"x, ""y""",1.23,7', JSON.stringify(csv));

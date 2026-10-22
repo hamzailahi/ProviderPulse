@@ -220,7 +220,7 @@ if (!ONLY) {
     };
     await step('open Procedures', () => page.evaluate(() => switchTab('procedures')), () => !/Loading/.test(document.getElementById('proceduresContent').innerText));
     await step('paste 46 codes', async () => { await page.fill('#proceduresSearch', CODES); await page.evaluate(() => filterProcedures(document.getElementById('proceduresSearch').value)); },
-      () => /codes across|did not load/.test(document.getElementById('proceduresContent').innerText));
+      () => /codes across .* on the map|did not load/.test(document.getElementById('proceduresContent').innerText));   // not the "Loading 46 codes across" line
     await step('by clinician', () => page.click('.code-list-view[data-view=clinician]'));
     await step('by ZIP', () => page.click('.code-list-view[data-view=zip]'));
     await step('clear the box', async () => { await page.fill('#proceduresSearch', ''); await page.evaluate(() => filterProcedures('')); },

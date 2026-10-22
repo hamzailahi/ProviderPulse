@@ -32,7 +32,8 @@ const NOTES = {
     'CMS Medicare Physician & Other Practitioners by Provider and Service, 2024: traditional (fee-for-service) Medicare only, which covers people 65 and older and some younger people with disabilities; Medicare Advantage, Medicaid and commercial claims are not in it.',
     'CMS leaves out any code a clinician billed for fewer than 11 Medicare patients in the year, so small volumes and pregnancy or children\'s care barely appear.',
     'Each row sits at the address the clinician bills Medicare from, often a group\'s main office. Patient counts are summed across clinicians, so one patient seen by two clinicians counts twice.',
-    'Average allowed is what Medicare approves per service (its payment plus the patient\'s share); average paid is Medicare\'s own payment. Both are weighted by services here.'
+    'Average allowed is what Medicare approves per service (its payment plus the patient\'s share); average paid is Medicare\'s own payment. Both are weighted by services here.',
+    'avg_medicare_paid blends every biller of a code: the clinician\'s professional fee and, for procedures done in a surgery center, the center\'s facility fee (billed by an organization). clinician_fee is the clinicians\' own average and facility_fee the organizations\'; quote clinician_fee for what a physician is paid.'
   ],
   medicaid: [
     'HHS Medicaid Provider Spending by HCPCS (T-MSIS), 2024: Medicaid and CHIP, fee-for-service and managed care, placed at each provider\'s listed ZIP.',
@@ -67,7 +68,12 @@ async function getProcedures(input, opts) {
   if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return { error: 'Database is not configured' };
   const hospital = source.startsWith('hospital_');
   const specialty = typeof input.specialty === 'string' && input.specialty.trim() ? input.specialty.trim().slice(0, 80) : null;
-  const query = typeof input.query === 'string' && input.query.trim() ? input.query.trim().slice(0, 80) : null;
+  // Words are cut at 80 characters; a code list keeps up to 100 codes. Until
+  // 2026-10-22 every query was cut at 80, which held about 13 codes, so a
+  // 46-code list arrived chopped mid-code, read as words, and the model split
+  // it into chunks.
+  const rawQuery = typeof input.query === 'string' ? input.query.trim().slice(0, 1200) : '';
+  const query = rawQuery ? (CodeList.parse(rawQuery).isList ? rawQuery : rawQuery.slice(0, 80)) : null;
   const askedRadius = Math.max(0, Math.min(hospital ? 50 : 15, int(input.radius_miles)));
   // opts.zips: an explicit area (the ZIPs on the user's map), used instead of
   // a radius by get_area_profile and by get_procedures' use_map_area.
@@ -114,7 +120,9 @@ async function getProcedures(input, opts) {
   const radius = given ? null : hospital ? (askedRadius || 25) : askedRadius;
   // A list of codes in `query` (2026-10-22): every code is reported, codes
   // with no rows are named, and the map can be wider since few rows return.
-  const list = query && CodeList.parse(query).isList ? CodeList.parse(query).codes : null;
+  const parsed = query ? CodeList.parse(query) : null;
+  const list = parsed && parsed.isList ? parsed.codes : null;
+  if (list && hospital) return { zip, source, error: 'Hospitals report payment groups (APC outpatient, DRG inpatient), not CPT codes, so a code list cannot filter them. Search this source with words instead, for example "colonoscopy" or "endoscopy".' };
   const zipCap = list ? MAX_ZIPS_CODE_LIST : MAX_ZIPS;
   if (given && zips.length > zipCap) { zips = zips.slice(0, zipCap); capped = true; }
   if (!given && !hospital && radius > 0 && centre) {
@@ -144,6 +152,15 @@ async function getProcedures(input, opts) {
   };
   const finish = (out, notes) => {
     const incomplete = failed > 0 || capped || outOfTime;
+    // A code list echoes what was asked and what came back (2026-10-22): a
+    // report split 46 codes into several calls, then said codes it had asked
+    // for were left out or never requested. The echo is the check.
+    if (list) {
+      const withRows = (out.top_codes || []).map(c => String(c.code).toUpperCase());
+      out.code_list = { requested_count: list.length, requested_codes: list, with_rows_count: withRows.length, codes_with_rows: withRows,
+        codes_without_rows: out.codes_without_rows, codes_beyond_limit: parsed.ignored || 0,
+        rule: 'This one call covered every code in requested_codes. Do not call a code missing, left out or not requested unless it is absent from requested_codes or listed in codes_without_rows.' };
+    }
     return Object.assign(base, out, {
       incomplete,
       incomplete_reason: incomplete ? [failed ? failed + ' request(s) failed or timed out' : null, capped ? 'some results were capped' : null,
@@ -154,7 +171,7 @@ async function getProcedures(input, opts) {
 
   // ---- Medicare clinicians (Part B)
   if (source === 'medicare_clinicians') {
-    const sel = 'zip,npi,specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt';
+    const sel = 'zip,npi,entity_code,specialty,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_mdcr_alowd_amt,avg_mdcr_pymt_amt';
     const codeF = list ? `&hcpcs_cd=in.(${listIn})` : codeLike ? `&hcpcs_cd=eq.${encodeURIComponent(codeLike)}` : descFilter('hcpcs_desc');
     const parts = await inGroups(zips, 10, 3, list => paged(`cms_procedures_full?zip=in.(${list.join(',')})${specFilter}${codeF}&select=${sel}&order=specialty,tot_benes.desc,npi,hcpcs_cd,place_of_service`));
     const rows = parts.flatMap(p => p.rows);
@@ -164,10 +181,12 @@ async function getProcedures(input, opts) {
       const z = zs[r.zip] || (zs[r.zip] = { zip: r.zip, npis: new Set(), patients: 0, services: 0, paid: 0 });
       z.npis.add(r.npi); z.patients += Number(r.tot_benes) || 0; z.services += Number(r.tot_srvcs) || 0;
       z.paid += (Number(r.avg_mdcr_pymt_amt) || 0) * (Number(r.tot_srvcs) || 0);
-      const c = by[r.hcpcs_cd] || (by[r.hcpcs_cd] = { code: r.hcpcs_cd, description: r.hcpcs_desc, patients: 0, services: 0, allowed: 0, paid: 0, npis: new Set() });
+      const c = by[r.hcpcs_cd] || (by[r.hcpcs_cd] = { code: r.hcpcs_cd, description: r.hcpcs_desc, patients: 0, services: 0, allowed: 0, paid: 0, npis: new Set(), ind: [0, 0], org: [0, 0] });
       const s = Number(r.tot_srvcs) || 0;
       c.patients += Number(r.tot_benes) || 0; c.services += s;
       c.allowed += (Number(r.avg_mdcr_alowd_amt) || 0) * s; c.paid += (Number(r.avg_mdcr_pymt_amt) || 0) * s;
+      const side = r.entity_code === 'O' ? c.org : c.ind;   // facility fee vs the clinician's own fee
+      side[0] += s; side[1] += (Number(r.avg_mdcr_pymt_amt) || 0) * s;
       c.npis.add(r.npi); npis.add(r.npi);
       const sp = specs[r.specialty] || (specs[r.specialty] = { specialty: r.specialty, patients: 0, npis: new Set() });
       sp.patients += Number(r.tot_benes) || 0; sp.npis.add(r.npi);
@@ -179,7 +198,9 @@ async function getProcedures(input, opts) {
       codes_without_rows: list ? (failed || capped || outOfTime ? 'unknown: some requests did not complete' : without(new Set(codes.map(c => c.code)))) : undefined,
       top_codes: (list ? codes : codes.slice(0, TOP)).map(c => ({ code: c.code, description: c.description, clinicians: c.npis.size, patients: int(c.patients), services: int(c.services),
         avg_allowed: c.services ? r2(c.allowed / c.services) : null, avg_medicare_paid: c.services ? r2(c.paid / c.services) : null,
-        services_per_patient: c.patients ? r2(c.services / c.patients) : null })),
+        services_per_patient: c.patients ? r2(c.services / c.patients) : null,
+        clinician_fee: { services: int(c.ind[0]), avg_medicare_paid: c.ind[0] ? r2(c.ind[1] / c.ind[0]) : null, medicare_paid: int(c.ind[1]) },
+        facility_fee: { services: int(c.org[0]), avg_medicare_paid: c.org[0] ? r2(c.org[1] / c.org[0]) : null, medicare_paid: int(c.org[1]) } })),
       by_specialty: specialty ? undefined : Object.values(specs).sort((a, b) => b.patients - a.patients).slice(0, 8)
         .map(s => ({ specialty: s.specialty, clinicians: s.npis.size, patients_summed: int(s.patients) })),
       by_zip: zips.length > 1 ? zips.map(z => zs[z] ? { zip: z, clinicians: zs[z].npis.size, patients_summed: int(zs[z].patients), services: int(zs[z].services), medicare_paid: int(zs[z].paid) }
