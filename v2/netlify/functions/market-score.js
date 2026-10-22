@@ -158,8 +158,8 @@ const CATCHMENT_MAX_ADULTS = 1000000;
 // A 10-mile city catchment holds tens of thousands of listings, loaded in
 // ZIP groups in parallel. Hitting the cap is reported, never silently absorbed.
 const CATCHMENT_MAX_CLINIC_ROWS = 60000;
-const CATCHMENT_ZIP_GROUP = 6;
-const CATCHMENT_PARALLEL = 6;
+const CATCHMENT_ZIP_GROUP = 4;
+const CATCHMENT_PARALLEL = 8;
 
 // DENTAL is published for all 32,520 ZCTAs; the 2023 measures cover 29,983. Any
 // measure carries the same centroid and denominator, so pick the widest one or
@@ -573,9 +573,16 @@ exports.handler = async (event) => {
           for (let i = 0; i < memberZips.length; i += CATCHMENT_ZIP_GROUP) groups.push(memberZips.slice(i, i + CATCHMENT_ZIP_GROUP));
           const out = { rows: [], truncated: false, failed: false };
           for (let i = 0; i < groups.length; i += CATCHMENT_PARALLEL) {
-            const parts = await Promise.all(groups.slice(i, i + CATCHMENT_PARALLEL).map(g =>
-              pagedGet(`${table}?zip=in.(${variantsOf(g).join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude`,
-                'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000, strict: true })));
+            const one = g => pagedGet(`${table}?zip=in.(${variantsOf(g).join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude`,
+              'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000, strict: true });
+            // A dense group can hit the 3s statement timeout (57014; four
+            // Manhattan ZIPs, 2026-10-22): load its ZIPs one at a time instead.
+            const parts = await Promise.all(groups.slice(i, i + CATCHMENT_PARALLEL).map(async g => {
+              const r = await one(g);
+              if (!r.failed || g.length === 1) return r;
+              const each = await Promise.all(g.map(z => one([z])));
+              return { rows: each.flatMap(x => x.rows), truncated: each.some(x => x.truncated), failed: each.some(x => x.failed) };
+            }));
             parts.forEach(p => { out.rows.push(...p.rows); if (p.truncated) out.truncated = true; if (p.failed) out.failed = true; });
             if (out.rows.length >= CATCHMENT_MAX_CLINIC_ROWS) { out.truncated = true; break; }
           }
