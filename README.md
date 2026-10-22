@@ -601,6 +601,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-22
 
+- **City searches keep ZIPs with no official centre.** A ZIP that Census
+  maps do not place, such as a PO-box ZIP like 76199 in Fort Worth, stays
+  in the area rather than being treated as a stray. A few mistyped ZIPs on
+  listings stay too (26109, 75179 and 76100 in a Fort Worth search), which
+  is the price of never dropping real ones.
 - **Doctor fee and facility fee are shown apart.** A procedure done in a
   surgery center is billed twice: the physician's professional fee and the
   center's facility fee. The blended average mixed them (colonoscopy with

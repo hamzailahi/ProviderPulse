@@ -691,7 +691,11 @@ positions) decides: a stray ZIP goes into `strayAreaZips` and is kept out of
 the demographics fetch, `zipDemographics`, `zipsWithClinics` and the
 PLACES/procedures ZIP list, while its in-town pins stay on the map; only
 listings whose own pins are far away (`pinsFar`) leave the map. Every
-search resets the set. The map's notice names the ZIPs and both counts.
+search resets the set. The map's notice names the ZIPs and both counts. A ZIP with no
+official centre is **kept** (the user's choice, 2026-10-22): such ZIPs are
+often real PO-box ZIPs (76199 in Fort Worth), so dropping them would lose
+real listings; mistyped ones with no centre (26109, 75179, 76100 in the Fort
+Worth search) stay too. Do not drop unknown ZIPs.
 
 `dashboard-v3.js` overrides `window.renderVerdict`. For a city or county
 search there is no single ZIP, so it anchors the score on the most populous
