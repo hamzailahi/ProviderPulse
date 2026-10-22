@@ -58,6 +58,14 @@ box = Array.from({ length: 100 }, (_, i) => zipAt(i, 0.05 + i * 0.09));
 d = await run();
 check('at most 60 ZIPs, the nearest', d.catchment.zip_count === 60 && d.catchment.furthest_miles < 6, JSON.stringify([d.catchment.zip_count, d.catchment.furthest_miles]));
 
+console.log('\n3b. A crowded core stops near 1 million adults');
+box = Array.from({ length: 50 }, (_, i) => Object.assign(zipAt(i, 0.2 + i * 0.15), { pop_18plus: 60000 }));
+d = await run();
+check('ZIPs are added nearest first until 1M adults, keeping at least 10', d.catchment.zip_count === 18 && d.catchment.adults_18plus === 1050000 && d.catchment.max_adults === 1000000, JSON.stringify([d.catchment.zip_count, d.catchment.adults_18plus]));
+box = Array.from({ length: 30 }, (_, i) => Object.assign(zipAt(i, 0.2 + i * 0.15), { pop_18plus: 200000 }));
+d = await run();
+check('never fewer than the 10 nearest, however crowded', d.catchment.zip_count === 11);
+
 console.log('\n4. A failed listing load is never an empty area');
 box = Array.from({ length: 12 }, (_, i) => zipAt(i, 1 + i * 0.5));
 listingFails = 1;

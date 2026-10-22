@@ -150,6 +150,11 @@ const CATCHMENT_CORE_MILES = 10;
 const CATCHMENT_MIN_NEIGHBORS = 10;
 const CATCHMENT_MAX_MILES = 25;
 const CATCHMENT_MAX_ZIPS = 60;
+// Also stop once the nearest ZIPs hold this many adults (always keeping the 10
+// nearest): 60 ZIPs around Manhattan's 10001 held 1.9M adults and 58,000
+// listings, took 19.5s live and failed, against a 20s function limit. Haltom
+// City's 36 ZIPs hold about 783,000.
+const CATCHMENT_MAX_ADULTS = 1000000;
 // A 10-mile city catchment holds tens of thousands of listings, loaded in
 // ZIP groups in parallel. Hitting the cap is reported, never silently absorbed.
 const CATCHMENT_MAX_CLINIC_ROWS = 60000;
@@ -548,6 +553,8 @@ exports.handler = async (event) => {
         let near = inRange.filter(r => r.miles <= CATCHMENT_CORE_MILES);
         if (near.length < CATCHMENT_MIN_NEIGHBORS) near = inRange.slice(0, CATCHMENT_MIN_NEIGHBORS);
         near = near.slice(0, CATCHMENT_MAX_ZIPS - 1);
+        let adultsSoFar = Number(origin.pop_18plus) || 0;
+        near = near.filter((r, i) => { const keep = i < CATCHMENT_MIN_NEIGHBORS || adultsSoFar < CATCHMENT_MAX_ADULTS; if (keep) adultsSoFar += r.pop; return keep; });
 
         const members = [{ zip, pop: Number(origin.pop_18plus) || 0, miles: 0 }, ...near];
         const memberZips = members.map(m => m.zip);
@@ -593,6 +600,7 @@ exports.handler = async (event) => {
           core_miles: CATCHMENT_CORE_MILES,
           min_neighbors: CATCHMENT_MIN_NEIGHBORS,
           max_zips: CATCHMENT_MAX_ZIPS,
+          max_adults: CATCHMENT_MAX_ADULTS,
           listings_failed: !!(clinicPage.failed || individualPage.failed),
           furthest_miles: members.length > 1 ? Number(members[members.length - 1].miles.toFixed(1)) : 0,
           clinic_rows: clinicPage.rows.length,
