@@ -676,9 +676,9 @@ function drawProc(card, s) {
     } }, '✦ Ask AI about these')));
 }
 
-// What the market model counted: the ZIP and its 10 nearest ZIPs, capped at
-// 25 miles. In a city that is a few miles across, so "within 25 miles" was
-// wrong (2026-10-22).
+// What the market model counted: every ZIP within 10 miles (at least the 10
+// nearest, out to 25), described by its real reach; "within 25 miles" was
+// wrong for the old 10-nearest catchment in a city (2026-10-22).
 function catchWords(d) {
   var c = d && d.catchment;
   if (!c) return 'the area';

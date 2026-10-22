@@ -194,7 +194,9 @@ practice in Hospital-based clinicians or Other health services, nurses are
 almost always employed, and physician assistants already count toward
 primary care. A listing
 belongs to a specialty by its official NUCC code, the same table patient
-search uses. The area is the ZIP plus everything within 25 miles. It lives in
+search uses. The area is every ZIP whose centre is within 10 miles (at least
+the 10 nearest, out to 25 miles in rural areas; at most 60 ZIPs or about 1
+million adults in dense cores). It lives in
 `v2/assets/market-model.js`, runs inside `market-score.js`, and is covered
 by `scripts/test-market-model.mjs`.
 
@@ -545,6 +547,7 @@ python3 scripts/test-procedure-tables.py  # the Medicaid and Medicare hospital p
 node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list, specialty coverage
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 node scripts/test-providers-near.mjs      # the assistant's competitor lookup: codes in a location box, clinicians and organizations, failures never "none"
+node scripts/test-catchment.mjs           # the market score's area: every ZIP within 10 miles, ZIP groups, a failed load refuses to score
 node scripts/test-procedures-tool.mjs     # the assistant's procedures tool on a fake database: averages, word search, failures reported, hospitals
 node scripts/test-area-zips.mjs           # stray ZIPs a city search leaves out
 node scripts/test-code-list.mjs           # Procedures tab code lists: what counts as a list, the by-code, by-clinician and by-ZIP summaries
@@ -601,13 +604,20 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-22
 
-- **The opportunity score's area is described as it really is.** The market
-  model counts the ZIP and its 10 nearest ZIPs, capped at 25 miles. In a city
-  those 11 ZIPs span only a few miles, yet Insights and Ask AI called it
-  "within 25 miles", so a Haltom City report put 9 GI clinicians in "the
-  25-mile catchment" while listing 62 in Fort Worth's medical district 6 miles
-  away. Insights now says "this ZIP and its 10 nearest (within 4.8 mi)", and
-  the assistant is told to say the same and to mention listings just outside.
+- **The opportunity score now counts every ZIP within 10 miles.** It used to
+  count the ZIP and its 10 nearest ZIPs, which in a city span only a few
+  miles, while Insights and Ask AI called the area "within 25 miles". A Haltom
+  City report put 9 GI clinicians in "the 25-mile catchment" while listing 62
+  in Fort Worth's medical district 6 miles away. Now the score counts every
+  ZIP within 10 miles (at least the 10 nearest, out to 25 miles in rural
+  areas; at most 60 ZIPs or about 1 million adults in dense cores), and
+  Insights and Ask AI describe it by its real reach. Every specialty's score
+  can move. Haltom City GI: 36 ZIPs within 9.9 miles, 122 clinicians, score 45
+  (saturated), where it read 9 clinicians and 60 (balanced). A listing load
+  that fails even after a retry now refuses to score instead of undercounting
+  competitors. Measured live: 0.8 to 2.5 seconds for Haltom City, Fort Worth,
+  Collierville and Helena, 13 seconds for Manhattan (capped, with a caveat).
+  The procedures panel check runs this score live for five ZIPs.
 - **Competitor lists no longer read a failed lookup as "no practices".** One
   failed request for organizations made a report say no GI practices or
   surgery centers came back. A failed page is now retried once, and if it

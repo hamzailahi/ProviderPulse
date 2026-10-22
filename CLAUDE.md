@@ -1323,8 +1323,8 @@ far was a bad input faithfully reported.
 
 ## Market opportunity model (`assets/market-model.js`)
 
-Runs inside `market-score.js` over a catchment of the ZIP plus nearby ZCTAs
-within 25 miles (by centroid). For each of the 40 scored specialties
+Runs inside `market-score.js` over a catchment of the ZIP plus every ZCTA
+within 10 miles by centroid (see below). For each of the 40 scored specialties
 (`SPECIALTIES.SCORED`), with listings assigned by NUCC code:
 
 | Factor | Weight | Input |
@@ -1335,7 +1335,7 @@ within 25 miles (by centroid). For each of the 40 scored specialties
 | shortage | .10 | HPSA score / 25 for the matching discipline (behavioral → mental, dental → dental, else primary) |
 | competition | .10 | nearest same-specialty listing: ≤1 mi → 30, ≥10 mi → 90, none → 95 |
 
-The catchment is the ZIP plus its **10 nearest** ZCTAs (`CATCHMENT_MAX_NEIGHBORS`), none past 25 miles (`CATCHMENT_MAX_MILES`). In a city the 10 nearest span a few miles, so describe it with `furthest_miles` (Insights' `catchWords`, the assistant's `catchmentText`), never "within 25 miles": a Haltom City report put 9 GI clinicians in "the 25-mile catchment" while 62 sat 6 miles away in 76104 (2026-10-22).
+**The catchment (2026-10-22, the user's choice)** is every ZCTA whose centre is within `CATCHMENT_CORE_MILES` (10); fewer than `CATCHMENT_MIN_NEIGHBORS` (10) that close takes the 10 nearest out to `CATCHMENT_MAX_MILES` (25); a dense core stops at `CATCHMENT_MAX_ZIPS` (60) or once the nearest ZIPs hold `CATCHMENT_MAX_ADULTS` (1,000,000), always keeping the 10 nearest. Until then it was the 10 nearest only, which in a city reach a few miles: Haltom City's reached 4.8 miles and left out 76104's 62 GI listings, so a report read 9 clinicians as thin supply (now 36 ZIPs within 9.9 miles, 122 clinicians, GI 60 balanced to 45 saturated). Listings load in groups of 4 ZIPs, 8 in flight, keyset on `npi` with `strict` paging (`getStrict`: one retry; a group that still fails, usually 57014 on dense Manhattan ZIPs, reloads one ZIP at a time); a load that still fails sets `catchment.listings_failed` and `listings_error` (status and code only) and the model refuses (`available:false`), because an undercount inflates every score. Cap 60,000 rows per table, reported as `truncated`. Live (`scripts/live/market-score-check.mjs`, a step of `procedures-panel-check.yml`): 76117 2.2s, 76104 2.5s, 38017 1.8s, 59601 0.8s, 10001 13.0s (36 ZIPs within 2.9 miles, individuals capped). Describe it with `furthest_miles` (Insights' `catchWords`, the assistant's `catchmentText`), never "within 25 miles". Covered by `scripts/test-catchment.mjs`.
 
 Rules that must hold:
 
@@ -1686,6 +1686,7 @@ node scripts/test-providers-near.mjs      # 20: the assistant's find_providers: 
 node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
+node scripts/test-catchment.mjs           # 11: the market score's catchment: every ZIP within 10 miles, the 10 nearest in sparse areas, 60 ZIPs or 1M adults at most, ZIP groups, a timed-out group one ZIP at a time, a failed load refuses to score
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```
 

@@ -198,7 +198,7 @@ How to answer:
 The market model, for explaining results:
 - Each specialty is scored 0 to 100 from five factors: health need (30%, local rates of the conditions that specialty treats, and age mix, vs the US), access gap (30%, clinicians per 1,000 adults vs the national rate for that specialty; higher means thinner supply), ability to pay (20%, insured rate and household income within the state), federal shortage designation (10%), and room from competitors (10%, distance to the nearest same-specialty listing). Missing factors are left out, never assumed average.
 - Archetypes: Prime expansion (high need, thin supply, good payers), Safety-net opportunity (high need, thin supply, weaker payers), Latent demand (thin supply, average need), Crowded premium market (dense supply, strong payers), Saturated (dense supply, weaker payers), Balanced, Unserved (no clinicians of that specialty within 25 miles), Not enough data.
-- The catchment is the ZIP plus its 10 nearest ZIPs by centre, none further than 25 miles; in a city that is often only a few miles across (get_market_insights returns catchment.description and furthest_miles). Describe it that way, for example "76117 and its 10 nearest ZIPs (within 4.8 miles)", never as "the 25-mile area", and when find_providers shows listings just outside it (a medical district a few miles away), say the catchment count leaves them out. Listings come from the federal NPPES registry and include organizations and individual clinicians.
+- The market model's catchment is every ZIP whose centre is within 10 miles (at least the 10 nearest, out to 25 miles in sparse areas; at most 60 ZIPs or about 1 million adults in dense cores). get_market_insights returns catchment.description and furthest_miles: describe it that way, for example "76117 and its 35 nearest ZIPs (within 9.9 miles)", never as "the 25-mile area", and when find_providers or the map shows listings outside it, say the catchment count leaves them out. Listings come from the federal NPPES registry and include organizations and individual clinicians.
 
 Boundaries:
 - You cannot see patient data, provider accounts, contact details or search logs. Do not claim patient demand trends.
@@ -400,7 +400,7 @@ async function scoreFor(zip, specialty, npi, add) {
 }
 
 // The model needs the story, not every field of market-score's response.
-// "76117 and its 10 nearest ZIPs (within 4.8 miles)": what the market model
+// "76117 and its 35 nearest ZIPs (within 9.9 miles)": what the market model
 // actually counted, in words the model can repeat.
 function catchmentText(d) {
   const c = d && d.catchment;
@@ -436,9 +436,9 @@ async function getMarketInsights({ zip, specialty }, ctx) {
       level: d.medicare.level, as_of: d.medicare.as_of
     } : null,
     catchment: d.catchment ? {
-      // The ZIP and its 10 nearest ZIPs, capped at 25 miles: in a city that is
-      // a few miles across, and a report called it "the 25-mile catchment"
-      // (2026-10-22). radius_miles is the cap, furthest_miles the real reach.
+      // Every ZIP within 10 miles (at least the 10 nearest, out to 25), so
+      // furthest_miles is the real reach; a report had called the old
+      // 10-nearest catchment "the 25-mile catchment" (2026-10-22).
       description: catchmentText(d), furthest_miles: d.catchment.furthest_miles, radius_cap_miles: d.catchment.radius_miles,
       zip_count: d.catchment.zip_count, adults: d.catchment.adults_18plus, counts_truncated: !!d.catchment.truncated
     } : null,
