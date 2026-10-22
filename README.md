@@ -544,6 +544,7 @@ node scripts/test-payers.mjs              # the insurance plan proposal: names, 
 python3 scripts/test-procedure-tables.py  # the Medicaid and Medicare hospital procedure builder, end to end on small files (needs duckdb)
 node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bucket, primary-code choice, exact-name fallback, the reviewed ambiguous-name list, specialty coverage
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
+node scripts/test-providers-near.mjs      # the assistant's competitor lookup: codes in a location box, clinicians and organizations, failures never "none"
 node scripts/test-procedures-tool.mjs     # the assistant's procedures tool on a fake database: averages, word search, failures reported, hospitals
 node scripts/test-area-zips.mjs           # stray ZIPs a city search leaves out
 node scripts/test-code-list.mjs           # Procedures tab code lists: what counts as a list, the by-code, by-clinician and by-ZIP summaries
@@ -599,6 +600,20 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-10-22
+
+- **Competitor lists in Ask AI and reports are now complete.** The lookup
+  used to load every listing nearby, stop at 4,000 per table and only then
+  pick the specialty, so around Fort Worth it named 9 GI organizations and
+  no gastroenterologist, and a 25-mile search that timed out read as "none
+  found". It now asks only for the specialty's codes, covers a radius or
+  every ZIP on the map, lists practices and surgery centers separately from
+  individual clinicians with counts per ZIP, and says when a lookup was
+  incomplete instead of calling the area empty.
+- **Medicaid amounts per claim come with a warning.** A Medicaid claim line
+  can carry several units, so paid per claim line is not a price per
+  service. Where it runs more than three times Medicare's local average for
+  the same code (an ECG showed $205.76 per claim line against about $10),
+  the AI, the code-list view and the Excel file flag it as unreliable.
 
 - **Reports cover the whole map and everything you ask.** Four fixes after
   a Haltom City report came back thin. Clicking one ZIP to see its numbers

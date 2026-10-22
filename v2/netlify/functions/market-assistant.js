@@ -38,12 +38,12 @@ const { validatePlan, buildPath, summarise, TABLES, OPS } = require('./lib/query
 const { verifyText } = require('./lib/answer-check.js');
 const { getProcedures, SOURCES: PROC_SOURCES } = require('./lib/procedures.js');
 const { getAreaProfile, mapZips } = require('./lib/area-profile.js');
+const { findProviders } = require('./lib/providers-near.js');
 const MarketModel = require('../../assets/market-model.js');
 // Every searchable specialty (find_providers, update_map) and the ones the
 // market model scores (insights, compare, scenario). Membership is by NUCC code.
 const SPECIALTIES = require('../../assets/specialties.js');
 const SCORED = SPECIALTIES.SCORED;
-const TaxonomyMap = require('../../assets/taxonomy-map.js');
 const marketScore = require('./market-score.js');
 
 const MODEL = 'claude-opus-5-5';
@@ -67,7 +67,6 @@ const MAX_ROUNDS_PER_QUESTION = 8;
 const MAX_HISTORY_BYTES = 350000;
 const SPEC_LABELS = SPECIALTIES.map(s => s[0]);
 const SCORED_LABELS = SCORED.map(s => s[0]);
-const GEO_MEASURE = 'DENTAL';     // the PLACES measure market-score reads centroids from
 
 const JSONH = { 'Content-Type': 'application/json' };
 const reply = (statusCode, body) => ({ statusCode, headers: JSONH, body: JSON.stringify(body) });
@@ -191,7 +190,7 @@ Each user turn starts with a <dashboard> block describing what the user is looki
 How to answer:
 - Ground every number in a tool result from this conversation. Never estimate, extrapolate or invent figures. State each figure as a tool returned it (rounding is fine). If you compute a difference, ratio or percent change, put the two figures it comes from on the same line. The server checks every figure in your answers and documents against the tool results, and an untraceable one is rejected. If the data does not cover something (rents, salaries, commercial insurance rates, referral patterns, patient search volume), say so plainly.
 - For questions about a market, call get_market_insights first, and alongside it get_area_profile with area "map", so the answer covers every ZIP on the map (at least 8; the tool adds the nearest when the map holds fewer): Census demographics, the CDC PLACES health survey measures and Medicare and Medicaid procedures, as area totals plus a line per ZIP. Pass the CMS specialty name for procedures. Name the neighboring ZIPs that stand out (largest, oldest, least insured, sickest, busiest). Use area "nearest" for a ZIP that is not on the map. Explain results in plain language: the archetype and what it means, the factors that drove the score, and the confidence level. Mention a caveat when the tool reports one that affects the answer.
-- For "what if I open here" or "what if another practice opens", call run_scenario and report the before and after with its assumptions; say plainly that only supply changes. To compare places, call compare_markets. To count or list nearby providers of a specialty, call find_providers. When the user lists procedure codes, pass the whole list as one get_procedures query (specialty null so surgery centers, anesthesia and pathology count too), report every code in a table, and name the codes with no rows and why (withheld under 11 or 12 patients, or not billed here). For procedures, billing volumes, how often codes are billed and what Medicare or Medicaid pays (CPT and HCPCS codes, hospital APC and DRG groups), call get_procedures: medicare_clinicians for most specialties; medicaid for pregnancy, children's and other Medicaid-heavy care (and whenever Medicare shows little); hospital_outpatient or hospital_inpatient for facility volumes. Pass the CMS specialty name, for example Gastroenterology, and a code or plain words in query. Report patients, services and the average allowed and paid amounts as returned, and carry the tool's notes that change the reading (traditional Medicare only, small counts withheld, a state's own billing codes). Commercial insurance volumes and rates are not available. For statewide or cross-market counts the other tools cannot answer, call query_database with a plan.
+- For "what if I open here" or "what if another practice opens", call run_scenario and report the before and after with its assumptions; say plainly that only supply changes. To compare places, call compare_markets. To count or list nearby providers of a specialty, call find_providers (use_map_area true for reports and questions about the map); name the main organizations and individual clinicians it returns, and when it is incomplete say the counts are floors. When the user lists procedure codes, pass the whole list as one get_procedures query (specialty null so surgery centers, anesthesia and pathology count too), report every code in a table, and name the codes with no rows and why (withheld under 11 or 12 patients, or not billed here). For procedures, billing volumes, how often codes are billed and what Medicare or Medicaid pays (CPT and HCPCS codes, hospital APC and DRG groups), call get_procedures: medicare_clinicians for most specialties; medicaid for pregnancy, children's and other Medicaid-heavy care (and whenever Medicare shows little); hospital_outpatient or hospital_inpatient for facility volumes. Pass the CMS specialty name, for example Gastroenterology, and a code or plain words in query. Report patients, services and the average allowed and paid amounts as returned, and carry the tool's notes that change the reading (traditional Medicare only, small counts withheld, a state's own billing codes). Commercial insurance volumes and rates are not available. For statewide or cross-market counts the other tools cannot answer, call query_database with a plan.
 - When the user wants to see something on the map ("show me", "zoom to", "switch to"), call update_map. Say briefly what you changed.
 - When the user asks for a memo, one-pager, summary for a client, pitch or report, gather the numbers first (always including get_area_profile for the area), then call create_deliverable. A memo or one-pager asked for in chat is one part under ${PART_WORDS} words. A report from the Reports tab runs to about 1,200 words in two or three parts of at most ${PART_WORDS} words, each its own create_deliverable call (continues and more_parts join them): plan the sections first, put the summary and market verdict in part 1, and end the last part with the Data notes. Organize it with short headings and bullets, every figure traceable to a tool result, an "Area profile" section with the area's people, income and insurance and a compact line or table row per ZIP, a "Medicare population" section (get_area_profile's medicare_age_bands and its county Medicare enrollment and utilization, saying the county figures are county-wide), a "Health of the area" section listing get_area_profile's health.key_measures (the specialty's measures first), each as the share of adults and the estimated number of adults, local figures only, with one sentence on what they mean for the specialty and the note that these are CDC PLACES survey-based estimates, and a short "Data notes" section listing sources and caveats. When the document is about a specialty's practice, include a short "Procedures and reimbursement" section from get_procedures (the specialty's top codes, volumes and average Medicare payment nearby). After the last part, reply with one or two sentences; do not repeat the document.
 - Independent tool calls can go in the same turn.
@@ -260,16 +259,17 @@ const TOOLS = [
   },
   {
     name: 'find_providers',
-    description: 'Counts listings of one specialty within a radius of a ZIP and lists the nearest ones (name, type, city, distance). Public NPPES registry data.',
+    description: 'Counts listings of one specialty (matched by their NUCC taxonomy codes) within a radius of a ZIP, or across every ZIP on the user\'s map, and lists the nearest organizations (practices, surgery centers) and individual clinicians separately (name, specialty, city, ZIP, distance), with counts per ZIP. Public NPPES registry data. When incomplete is true the counts are floors; never call the area empty.',
     strict: true,
     input_schema: {
       type: 'object',
       properties: {
         zip: zipProp,
         specialty: Object.assign({ description: 'Specialty to look for' }, specEnum),
-        radius_miles: { type: 'integer', description: 'Search radius, 1 to 25 miles' }
+        radius_miles: { type: 'integer', description: 'Search radius, 1 to 25 miles (ignored with use_map_area)' },
+        use_map_area: { type: 'boolean', description: 'true: every ZIP loaded on the user\'s map instead of a radius (use for reports)' }
       },
-      required: ['zip', 'specialty', 'radius_miles'],
+      required: ['zip', 'specialty', 'radius_miles', 'use_map_area'],
       additionalProperties: false
     }
   },
@@ -378,11 +378,6 @@ const TOOLS = [
 // Tool implementations
 // ---------------------------------------------------------------------------
 const isZip = z => typeof z === 'string' && /^\d{5}$/.test(z);
-const milesBetween = (lat1, lon1, lat2, lon2) => {
-  const R = 3958.8, r = Math.PI / 180;
-  const a = Math.sin((lat2 - lat1) * r / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin((lon2 - lon1) * r / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-};
 
 // Market scores are pure functions of public data that changes monthly at
 // most, so a warm instance reuses them across the steps of one conversation.
@@ -477,59 +472,6 @@ async function compareMarkets({ zips, specialty }, ctx) {
   return { specialty: want, markets: rows };
 }
 
-async function findProviders({ zip, specialty, radius_miles }) {
-  if (!isZip(zip)) return { error: 'zip must be 5 digits' };
-  const label = specialty || 'Primary care / family doctor';
-  const radius = Math.max(1, Math.min(25, Number(radius_miles) || 10));
-  const env = process.env;
-  const H = { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` };
-  const get = (path, ms) => fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, { headers: H, signal: AbortSignal.timeout(ms || 6000) })
-    .then(r => (r.ok ? r.json() : [])).catch(() => []);
-
-  const home = await get(`cdc_places?zip=eq.${zip}&measureid=eq.${GEO_MEASURE}&select=zip,lat,lon&limit=1`, 5000);
-  if (!home[0] || home[0].lat == null) return { zip, error: 'No location data for this ZIP' };
-  const lat = Number(home[0].lat), lon = Number(home[0].lon);
-  const dLat = radius / 69, dLon = radius / Math.max(1, 69 * Math.cos(lat * Math.PI / 180));
-  const box = await get(`cdc_places?measureid=eq.${GEO_MEASURE}&lat=gte.${(lat - dLat).toFixed(4)}&lat=lte.${(lat + dLat).toFixed(4)}` +
-    `&lon=gte.${(lon - dLon).toFixed(4)}&lon=lte.${(lon + dLon).toFixed(4)}&select=zip,lat,lon&limit=1000`, 6000);
-  // Listings in a ZIP can sit a little outside the radius from its centroid;
-  // the per-listing distance filter below is what decides.
-  const zips = [...new Set([zip].concat(box.filter(r => milesBetween(lat, lon, +r.lat, +r.lon) <= radius + 3).map(r => r.zip)))].slice(0, 150);
-  const variants = [...new Set(zips.flatMap(z => [z, String(parseInt(z, 10))]))].join(',');
-  const codes = new Set(TaxonomyMap.codesFor(label));
-
-  // Keyset on npi (unique), up to 4 pages per table.
-  const pageAll = async table => {
-    const out = []; let last = '';
-    for (let i = 0; i < 4; i++) {
-      const rows = await get(`${table}?zip=in.(${variants})&select=npi,name,city,primary_taxonomy,taxonomy_code,latitude,longitude${last ? `&npi=gt.${last}` : ''}&order=npi&limit=1000`, 7000);
-      out.push(...rows);
-      if (rows.length < 1000) return { rows: out, truncated: false };
-      last = rows[rows.length - 1].npi;
-    }
-    return { rows: out, truncated: true };
-  };
-  const [orgs, people] = await Promise.all([pageAll('clinics'), pageAll('provider_individuals')]);
-  const hits = [];
-  for (const [rows, type] of [[orgs.rows, 'organization'], [people.rows, 'individual']]) {
-    for (const r of rows) {
-      if (!codes.has(r.taxonomy_code) || r.latitude == null) continue;
-      const mi = milesBetween(lat, lon, +r.latitude, +r.longitude);
-      if (mi <= radius) hits.push({ name: r.name, type, taxonomy: r.primary_taxonomy, city: r.city, miles: Math.round(mi * 10) / 10 });
-    }
-  }
-  hits.sort((a, b) => a.miles - b.miles);
-  return {
-    zip, specialty: label, radius_miles: radius,
-    total: hits.length,
-    organizations: hits.filter(h => h.type === 'organization').length,
-    individuals: hits.filter(h => h.type === 'individual').length,
-    nearest: hits.slice(0, 10),
-    count_is_floor: orgs.truncated || people.truncated,
-    source: 'NPPES registry listings with coordinates'
-  };
-}
-
 async function queryDatabase(input) {
   const env = process.env;
   const check = validatePlan(input);
@@ -594,7 +536,7 @@ const RUNNERS = {
   get_market_insights: getMarketInsights,
   compare_markets: compareMarkets,
   run_scenario: runScenario,
-  find_providers: findProviders,
+  find_providers: (input, ctx) => findProviders(input, input && input.use_map_area ? { zips: mapZips(ctx && ctx.messages) } : undefined),
   get_procedures: (input, ctx) => getProcedures(input, input && input.use_map_area ? { zips: mapZips(ctx && ctx.messages) } : undefined),
   get_area_profile: (input, ctx) => getAreaProfile(input, { messages: ctx && ctx.messages, keyMeasures: profileMeasures(ctx && ctx.messages) }),
   query_database: queryDatabase,
@@ -625,7 +567,7 @@ function stepLabel(name, input) {
     case 'get_market_insights': return `Scoring ${i.zip}${spec}`;
     case 'run_scenario': return `Modelling ${i.clinicians || 1} new ${String(i.specialty || '').toLowerCase()} in ${i.zip}`;
     case 'compare_markets': return `Comparing ${(i.zips || []).join(', ')}${spec}`;
-    case 'find_providers': return `Finding ${String(i.specialty || 'primary care').toLowerCase()} listings within ${i.radius_miles} mi of ${i.zip}`;
+    case 'find_providers': return `Finding ${String(i.specialty || 'primary care').toLowerCase()} listings ${i.use_map_area ? 'across the map' : 'within ' + i.radius_miles + ' mi of ' + i.zip}`;
     case 'get_procedures': return `Reading ${String(i.source || 'procedure').replace(/_/g, ' ')} procedures${i.query ? ' for "' + String(i.query).slice(0, 40) + '"' : ''} ${i.use_map_area ? 'across the map' : 'around ' + i.zip}`;
     case 'get_area_profile': return `Reading demographics, health and procedures for ${i.area === 'nearest' ? 'the ZIPs nearest ' + i.zip : 'every ZIP on the map'}`;
     case 'query_database': return `Querying ${i.table || 'the database'}`;

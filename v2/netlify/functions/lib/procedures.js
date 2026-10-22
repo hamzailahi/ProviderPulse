@@ -38,6 +38,7 @@ const NOTES = {
     'HHS Medicaid Provider Spending by HCPCS (T-MSIS), 2024: Medicaid and CHIP, fee-for-service and managed care, placed at each provider\'s listed ZIP.',
     'HHS withholds any provider, code and month with fewer than 12 patients, so these are floors; most obstetricians deliver fewer than 12 Medicaid babies a month.',
     'Patient-months add each month\'s patients, so one patient seen in three months counts three times; it is not a head count. Paid per claim is total paid divided by claim lines.',
+    'A claim line can carry several units of a service, so paid per claim line is not a price per service and is not comparable with Medicare\'s average per service. Where it is far above Medicare\'s local average for the same code, per_claim_check says so: do not quote that figure as a payment rate.',
     'States bill differently: Texas bills deliveries as 59409, 59514 and 59430 rather than the global 59400.'
   ],
   hospital: [
@@ -213,11 +214,39 @@ async function getProcedures(input, opts) {
     const top = list ? codes : codes.slice(0, TOP);
     const desc = {};
     if (top.length) (await get(`procedure_codes?code=in.(${top.map(c => encodeURIComponent(c.code)).join(',')})&select=code,description`, 5000) || []).forEach(d => { desc[d.code] = d.description; });
+    // Medicare's local average paid per service for the same codes, from a
+    // sample of the area (2026-10-22: ECG 93000 showed $205.76 per Medicaid
+    // claim line against about $10 from Medicare). A side check: a failure
+    // here leaves the check out, it does not make the Medicaid figures incomplete.
+    const mcr = {};
+    if (top.length && Date.now() - started < budgetMs - 3000) {
+      const inCodes = top.map(c => encodeURIComponent(c.code)).join(',');
+      const groups = [];
+      for (let i = 0; i < Math.min(zips.length, 30); i += 10) groups.push(zips.slice(i, i + 10));
+      const pages = await Promise.all(groups.map(async g => {
+        try {
+          const r = await doFetch(`${env.SUPABASE_URL}/rest/v1/cms_procedures_full?zip=in.(${g.join(',')})&hcpcs_cd=in.(${inCodes})&select=hcpcs_cd,tot_srvcs,avg_mdcr_pymt_amt&limit=1000`, { headers: H, signal: AbortSignal.timeout(5000) });
+          const b = r.ok ? await r.json() : null;
+          return Array.isArray(b) ? b : [];
+        } catch (e) { return []; }
+      }));
+      pages.flat().forEach(r => {
+        const k = String(r.hcpcs_cd).toUpperCase(), sv = Number(r.tot_srvcs) || 0;
+        const m = mcr[k] || (mcr[k] = { s: 0, p: 0 });
+        m.s += sv; m.p += sv * (Number(r.avg_mdcr_pymt_amt) || 0);
+      });
+    }
+    const check = c => {
+      const m = mcr[String(c.code).toUpperCase()];
+      if (!c.claims || !m || !m.s) return undefined;
+      const per = c.paid / c.claims, avg = m.p / m.s;
+      return per > 3 * avg ? `Unreliable as a rate: $${r2(per)} per claim line is ${Math.round(per / avg)} times Medicare's local average of $${r2(avg)} per service, so these claim lines likely carry several units or bundled services.` : undefined;
+    };
     return finish({
       totals: { rows: rows.length, codes: codes.length, claim_lines: int(codes.reduce((a, c) => a + c.claims, 0)), paid: int(codes.reduce((a, c) => a + c.paid, 0)) },
       codes_without_rows: list ? (failed || capped || outOfTime ? 'unknown: some requests did not complete' : without(new Set(codes.map(c => String(c.code).toUpperCase())))) : undefined,
       top_codes: top.map(c => ({ code: c.code, description: desc[c.code] || null, claim_lines: int(c.claims), patient_months: int(c.patient_months),
-        total_paid: int(c.paid), paid_per_claim: c.claims ? r2(c.paid / c.claims) : null, provider_count_summed: int(c.providers) })),
+        total_paid: int(c.paid), paid_per_claim: c.claims ? r2(c.paid / c.claims) : null, per_claim_check: check(c), provider_count_summed: int(c.providers) })),
       by_specialty: specialty ? undefined : Object.values(specs).sort((a, b) => b.claims - a.claims).slice(0, 8)
         .map(s => ({ specialty: s.specialty, claim_lines: int(s.claims), total_paid: int(s.paid) })),
       by_zip: zips.length > 1 ? zips.map(z => (zs[z] || !(failed || capped) ? { zip: z, claim_lines: int(zs[z] ? zs[z].claims : 0), total_paid: int(zs[z] ? zs[z].paid : 0) } : { zip: z, unknown: true })) : undefined

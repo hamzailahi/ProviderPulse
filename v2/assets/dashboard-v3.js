@@ -1313,6 +1313,8 @@ if (isProviderAcct) {
     // not "within 10 miles" (2026-10-22).
     brief += ' Include a "Procedures and reimbursement" section: get_procedures with use_map_area true across the ZIPs on the map, the specialty\'s top codes from Medicare clinicians' +
       ' (patients, services, average Medicare payment), plus Medicaid where the specialty does much Medicaid work.';
+    // Competitors across the map, organizations and clinicians (2026-10-22).
+    brief += ' Include a "Competition" section from find_providers with use_map_area true: the main practices and surgery centers and the individual clinicians, with counts per ZIP.';
     // Medicare-eligible ages and the Health tab's Medicare data (2026-10-22).
     brief += ' Include a "Medicare population" section from get_area_profile: the Medicare-eligible age bands (60-64 turning 65, then 65-69 up to 85 and over) and the county Medicare enrollment (traditional vs Medicare Advantage) and utilization, saying the county figures are county-wide.';
     // The area around the ZIP, not just the ZIP: every ZIP on the map, at

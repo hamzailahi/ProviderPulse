@@ -921,7 +921,9 @@ Tables:
   whole-area load; up to 400 ZIPs; a failed or capped request marks the
   result incomplete with Try again and is never cached (`codeListCache`).
   The list survives a source toggle and a new area; clearing it reloads the
-  source (`codeListShown`). Views and "Copy as CSV" come from
+  source (`codeListShown`). Medicaid per claim line above 3x Medicare's average per
+  service for the same code is flagged (`mcdCheck`, a note under the table
+  and a Check column in the Excel file). Views and "Copy as CSV" come from
   `CodeList.summarize` / `toCsv`; every value goes through `escHtml`. Checked
   against the 2026-10-21 Haltom City pull: identical totals. Copy as CSV
   copies the view on screen only. **Download all (Excel)** (`downloadCodeList`,
@@ -1143,8 +1145,16 @@ AI tab in `dashboard-v3.js`.
 - **Tools** (all read-only): `get_market_insights`, `compare_markets` and
   `run_scenario` (1 to 5 more clinicians; before/after; capped server-side)
   (call `market-score.js`'s handler in-process, cached 10 min per warm
-  instance), `find_providers` (clinics + provider_individuals around a ZIP,
-  word-boundary taxonomy match, distance filter), `get_procedures`
+  instance), `find_providers` (`lib/providers-near.js`, rewritten
+  2026-10-22: the old version loaded every listing in up to 150 ZIPs,
+  stopped at 4,000 rows per table and only then kept the specialty, so a
+  Fort Worth GI report named 9 organizations and no gastroenterologist, and
+  a 25-mile timeout read as "none found". Now it asks for the specialty's
+  NUCC codes inside a location box, `order=latitude,longitude,npi` offset
+  pages (10 per table), a radius or the map's ZIPs (`use_map_area`), lists
+  the nearest 25 organizations and 25 individuals separately with counts per
+  ZIP, and marks a failed or capped lookup incomplete (both tables failing
+  is an error), never empty), `get_procedures`
   (`lib/procedures.js`, 2026-10-20: the Procedures panel's four public
   sources around a ZIP or radius, medicare_clinicians / medicaid /
   hospital_outpatient / hospital_inpatient, filtered by CMS specialty name
@@ -1159,7 +1169,11 @@ AI tab in `dashboard-v3.js`.
   failed) and allows 120 map ZIPs; at most 30 ZIPs otherwise, 8 pages per
   request group, a 14s budget; `use_map_area` searches the map's ZIPs
   instead of a radius and adds `by_zip`, where a ZIP in a failed group
-  reads `unknown`, never 0), `get_area_profile` (`lib/area-profile.js`,
+  reads `unknown`, never 0; each Medicaid code carries `per_claim_check` when
+  its paid per claim line runs over 3x Medicare's local average per service,
+  from a side sample that never marks the result incomplete: a claim line can
+  carry several units, and ECG 93000 showed $205.76 per claim line against
+  about $10), `get_area_profile` (`lib/area-profile.js`,
   2026-10-20, the user's choice of "what's on the map" and "totals plus
   each ZIP": every map ZIP, topped up to 8 with the nearest by PLACES
   centroid and named in `notes`, cut to the nearest 60 (40 until
@@ -1631,7 +1645,7 @@ node scripts/test-demand-model.mjs        # 45: the learned demand model, traine
 node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick
 node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 18: the what-if re-score changes supply only; no six-group breakdown, clinicians by code section, shortage per specialty
-node scripts/test-market-assistant.mjs    # 67: the assistant, figure repair, tracing, reports in parts (needs npm ci in v2/)
+node scripts/test-market-assistant.mjs    # 68: the assistant, figure repair, tracing, reports in parts (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
@@ -1641,9 +1655,10 @@ node scripts/test-payers.mjs              # 40: insurance plan proposal: covered
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
 node scripts/test-area-profile.mjs        # 51: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
-node scripts/test-procedures-tool.mjs     # 28: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals
+node scripts/test-providers-near.mjs      # 17: the assistant's find_providers: codes in a location box, individuals and organizations, radius or map, failures never "none"
+node scripts/test-procedures-tool.mjs     # 32: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
-node scripts/test-code-list.mjs           # 47: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, hospital topics, the Download all sheets, CSV
+node scripts/test-code-list.mjs           # 49: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, hospital topics, the Download all sheets, CSV
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```
 

@@ -27,12 +27,12 @@ globalThis.fetch = async (url) => {
   if (u.includes('provider_profiles')) return J(isProviderRow ? [{ id: 'x' }] : []);
   if (u.includes('cdc_places?zip=eq.')) return J([{ zip: '38017', lat: 35.04, lon: -89.66 }]);
   if (u.includes('cdc_places?measureid=eq.')) return J([{ zip: '38017', lat: 35.04, lon: -89.66 }, { zip: '38138', lat: 35.09, lon: -89.80 }]);
-  if (u.includes('/clinics?zip=in')) return J(u.includes('npi=gt.') ? [] : [
+  if (u.includes('/clinics?latitude')) return J(!u.includes('offset=0') ? [] : [
     { npi: '1000000001', name: 'HEART CLINIC', city: 'COLLIERVILLE', primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207RC0000X', latitude: 35.05, longitude: -89.66 },
     { npi: '1000000002', name: 'SMILE DENTAL', city: 'COLLIERVILLE', primary_taxonomy: 'General Practice Dentistry', taxonomy_code: '1223G0001X', latitude: 35.05, longitude: -89.66 },
     { npi: '1000000003', name: 'FAR HEART', city: 'NOWHERE', primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207RC0000X', latitude: 36.5, longitude: -89.66 }
   ]);
-  if (u.includes('/provider_individuals?zip=in')) return J(u.includes('npi=gt.') ? [] : [
+  if (u.includes('/provider_individuals?latitude')) return J(!u.includes('offset=0') ? [] : [
     { npi: '1000000010', name: 'JANE CARDIO', city: 'GERMANTOWN', primary_taxonomy: 'Cardiovascular Disease Physician', taxonomy_code: '207RC0000X', latitude: 35.08, longitude: -89.78 }
   ]);
   if (u.includes('/clinics?select=')) return J([{ state: 'TN' }, { state: 'TN' }]);
@@ -185,7 +185,7 @@ check('... with the tool results kept and nothing half-written', r.body.messages
 
 console.log('\n6. Tool behaviour');
 fake = fakeClient([
-  turn('tool_use', [toolUse('f', 'find_providers', { zip: '38017', specialty: 'Heart / cardiology', radius_miles: 10 }),
+  turn('tool_use', [toolUse('f', 'find_providers', { zip: '38017', specialty: 'Heart / cardiology', radius_miles: 10, use_map_area: false }),
                     toolUse('q', 'query_database', { table: 'patient_profiles', select: ['name'] }),
                     toolUse('m', 'update_map', { zip: 'abc', specialty: 'Not a specialty' })]),
   turn('end_turn', [{ type: 'text', text: 'ok' }])
@@ -194,8 +194,11 @@ fn._setClient(fake);
 r = await call({ question: 'who is near', context: CTX });
 const res = fake.calls[1].messages[fake.calls[1].messages.length - 1].content;
 const found = JSON.parse(res[0].content);
-check('find_providers matches the specialty at a word boundary and within the radius', found.total === 2
-  && found.nearest.every(h => /Cardiovascular/.test(h.taxonomy)) && !found.nearest.some(h => h.name === 'FAR HEART'));
+const near = found.nearest_organizations.concat(found.nearest_individuals);
+check('find_providers keeps the specialty\'s listings within the radius', found.total === 2
+  && near.every(h => /Cardio/.test(h.taxonomy)) && !near.some(h => h.name === 'FAR HEART'), JSON.stringify(found).slice(0, 300));
+check('find_providers asks the database for the specialty\'s codes in a location box, not every listing in the ZIPs',
+  queries.some(q => /\/clinics\?latitude=gte\..*taxonomy_code=in\.\(/.test(q)) && !queries.some(q => /\/clinics\?zip=in/.test(q)));
 check('find_providers splits organizations and individuals', found.organizations === 1 && found.individuals === 1);
 check('query_database refuses tables outside the allowlist', res[1].is_error === true && /refused|not/i.test(res[1].content));
 check('update_map with nothing valid is an error, not an action', res[2].is_error === true && r.body.actions.length === 0);

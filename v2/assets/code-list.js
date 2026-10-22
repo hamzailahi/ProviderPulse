@@ -78,6 +78,11 @@
         office: Math.round(c.office), facility: Math.round(c.facility), individual: Math.round(c.individual), organization: Math.round(c.organization),
         avgAllowed: c.services ? c.allowed / c.services : null, avgPaid: c.services ? c.paid / c.services : null, paid: c.paid,
         mcdClaims: Math.round(c.mcdClaims), mcdPaid: c.mcdPaid, mcdPerClaim: c.mcdClaims ? c.mcdPaid / c.mcdClaims : null,
+        // A claim line can carry several units, so a Medicaid amount per
+        // claim line far above Medicare's average per service is not a rate
+        // (2026-10-22: ECG 93000 at $205.76 per claim line vs about $10).
+        mcdCheck: c.mcdClaims && c.services && (c.mcdPaid / c.mcdClaims) > 3 * (c.paid / c.services)
+          ? 'Unreliable as a rate: ' + Math.round((c.mcdPaid / c.mcdClaims) / (c.paid / c.services)) + ' times Medicare\'s average per service here; claim lines likely carry several units' : null,
         mcdProviders: Math.round(c.mcdProviders), inMedicare: n > 0, inMedicaid: c.mcdRows > 0 };
     }).sort(function (a, b) { return b.services - a.services || b.mcdClaims - a.mcdClaims || (a.code < b.code ? -1 : 1); });
 
@@ -203,7 +208,7 @@
       [spec.incomplete ? 'INCOMPLETE: some requests failed or hit a page limit, so these totals are floors.' : 'All requests answered.'],
       [''],
       ['Medicare clinicians: traditional Medicare only (65+ and some disabled). CMS leaves out any code a clinician billed for fewer than 11 patients. Patients are summed across billers; one procedure can appear under the physician, the surgery center, anesthesia and pathology, so do not add services across codes. Est. Medicare paid = services x average paid.'],
-      ['Medicaid: the state\'s Medicaid and CHIP claims at the provider\'s ZIP, without clinician names. HHS withholds any provider, code and month under 12 patients, so counts are floors.'],
+      ['Medicaid: the state\'s Medicaid and CHIP claims at the provider\'s ZIP, without clinician names. HHS withholds any provider, code and month under 12 patients, so counts are floors. A claim line can carry several units of a service, so paid per claim line is not a price per service and is not comparable with Medicare\'s average; the Check column flags codes where it runs more than three times Medicare\'s average here.'],
       ['Hospitals: payment groups (APC outpatient, DRG inpatient), not CPT codes, matched to your codes by topic. Approximate: a group can cover procedures outside your list. Anesthesia has no hospital group (it is packaged into the procedure\'s group). CMS withholds hospital counts under 11.'],
       [''],
       ['Code', 'Topic used for hospital groups']
@@ -216,8 +221,8 @@
       .concat(s.clinicians.map(function (c) { return [c.npi, c.name, c.credentials, c.organization ? 'yes' : 'no', c.specialty, c.city, c.zip, c.codes, c.topCode, c.patients, c.services, Math.round(c.paid)]; })) });
     sheets.push({ name: 'Medicare rows', rows: [['Code', 'Description', 'NPI', 'Last or organization name', 'First name', 'Credentials', 'Entity', 'CMS specialty', 'City', 'ZIP', 'Place of service', 'Patients', 'Services', 'Avg allowed', 'Avg paid', 'Est. Medicare paid']]
       .concat((spec.med || []).map(function (r) { var sv = Number(r.tot_srvcs) || 0; return [r.hcpcs_cd, r.hcpcs_desc, r.npi, r.provider_name, r.first_name, r.credentials, r.entity_code, r.specialty, r.city, r.zip, r.place_of_service === 'F' ? 'facility' : r.place_of_service === 'O' ? 'office' : r.place_of_service, Number(r.tot_benes) || 0, sv, r2(Number(r.avg_mdcr_alowd_amt)), r2(Number(r.avg_mdcr_pymt_amt)), Math.round(sv * (Number(r.avg_mdcr_pymt_amt) || 0))]; })) });
-    sheets.push({ name: 'Medicaid by code', rows: [['Code', 'Description', 'Claim lines', 'Total paid', 'Paid per claim line', 'Providers (summed)']]
-      .concat(s.codes.filter(function (c) { return c.inMedicaid; }).map(function (c) { return [c.code, c.description, c.mcdClaims, Math.round(c.mcdPaid), r2(c.mcdPerClaim), c.mcdProviders]; })) });
+    sheets.push({ name: 'Medicaid by code', rows: [['Code', 'Description', 'Claim lines', 'Total paid', 'Paid per claim line', 'Providers (summed)', 'Check']]
+      .concat(s.codes.filter(function (c) { return c.inMedicaid; }).map(function (c) { return [c.code, c.description, c.mcdClaims, Math.round(c.mcdPaid), r2(c.mcdPerClaim), c.mcdProviders, c.mcdCheck || '']; })) });
     sheets.push({ name: 'Medicaid rows', rows: [['Code', 'Description', 'ZIP', 'Billing specialty', 'Claim lines', 'Total paid', 'Providers']]
       .concat((spec.mcd || []).map(function (r) { return [r.code, desc[String(r.code).toUpperCase()] || null, r.zip, r.specialty, Number(r.claims) || 0, r2(Number(r.paid)), Number(r.providers) || 0]; })) });
     sheets.push({ name: 'By ZIP', rows: [['ZIP', 'Medicare billers', 'Medicare services', 'Est. Medicare paid', 'Medicaid claim lines', 'Medicaid paid']]

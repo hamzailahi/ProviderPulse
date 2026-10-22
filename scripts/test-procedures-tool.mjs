@@ -116,5 +116,18 @@ const MED = [
   check('code list: a failed request never names codes as missing', !!bad.error || /unknown/.test(String(bad.codes_without_rows)));
 }
 
+// Medicaid per claim line checked against Medicare's local average per service
+{
+  const f = fakeDb([centroid, box, [/medicaid_procedures/, u => (u.includes('offset=0') ? [{ specialty: 'Cardiology', code: '93000', claims: 100, patient_months: 90, paid: 20576, providers: 3 }, { specialty: 'Physician/Gastroenterology', code: '43239', claims: 10, patient_months: 9, paid: 940, providers: 1 }] : [])],
+    [/cms_procedures_full/, [{ hcpcs_cd: '93000', tot_srvcs: 1000, avg_mdcr_pymt_amt: 9.74 }, { hcpcs_cd: '43239', tot_srvcs: 100, avg_mdcr_pymt_amt: 127 }]], [/procedure_codes/, []]]);
+  const r = await getProcedures({ zip: '76104', source: 'medicaid', specialty: null, query: null, radius_miles: 5 }, { fetch: f, env });
+  const ecg = r.top_codes.find(c => c.code === '93000'), egd = r.top_codes.find(c => c.code === '43239');
+  check('Medicaid ECG at $205.76 per claim line is flagged against Medicare\'s ~$10', /Unreliable as a rate/.test(ecg.per_claim_check || '') && /21 times/.test(ecg.per_claim_check), JSON.stringify(ecg));
+  check('an ordinary per-claim amount is not flagged', egd.per_claim_check === undefined);
+  check('the notes say a claim line can carry several units', r.notes.some(n => /several units/.test(n)));
+  const r2 = await getProcedures({ zip: '76104', source: 'medicaid', specialty: null, query: null, radius_miles: 5 }, { fetch: fakeDb([centroid, box, [/medicaid_procedures/, u => (u.includes('offset=0') ? [{ specialty: 'C', code: '93000', claims: 100, patient_months: 90, paid: 20576, providers: 3 }] : [])], [/cms_procedures_full/, 500]]), env });
+  check('a failed Medicare comparison leaves the check out and the Medicaid figures complete', r2.incomplete === false && r2.top_codes[0].per_claim_check === undefined);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

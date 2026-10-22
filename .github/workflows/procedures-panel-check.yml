@@ -45,3 +45,6 @@ jobs:
       - name: The assistant's get_area_profile tool, live (Fort Worth 76104)
         if: always()
         run: node scripts/live/area-profile-check.mjs 76104
+      - name: The assistant's find_providers tool, live (Haltom City 76117)
+        if: always()
+        run: node scripts/live/providers-near-check.mjs 76117

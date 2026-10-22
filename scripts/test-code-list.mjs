@@ -64,6 +64,9 @@ check('rows for codes not in the list are ignored', CodeList.summarize(['43239']
 check('codes match whatever the case in the rows', CodeList.summarize(['C9777'], [Object.assign({}, MED[0], { hcpcs_cd: 'c9777' })], []).codes[0].services === 110);
 check('nothing loaded still summarizes, every code missing', CodeList.summarize(['45385', '43239'], [], []).missing.length === 2);
 
+const ecg = CodeList.summarize(['93000', '43239'], [Object.assign({}, MED[0], { hcpcs_cd: '93000', tot_srvcs: 100, avg_mdcr_pymt_amt: 10 }), Object.assign({}, MED[2])], [{ zip: '76104', specialty: 'x', code: '93000', claims: 10, paid: 2000, providers: 1 }, { zip: '76104', specialty: 'x', code: '43239', claims: 10, paid: 1000, providers: 1 }]);
+check('Medicaid per claim far above Medicare\'s average is flagged; a normal one is not', /Unreliable as a rate: 20 times/.test(ecg.codes.find(c => c.code === '93000').mcdCheck) && ecg.codes.find(c => c.code === '43239').mcdCheck === null);
+
 console.log('\n3. Hospital groups by topic');
 const T = CodeList.topicsFor(['45385', '43239', '88305', '00811', '93000', 'C9777', '76700'], {});
 check('GI codes are Digestive (GI), pathology, heart and imaging by CPT range', T.byCode['45385'] === 'Digestive (GI)' && T.byCode['43239'] === 'Digestive (GI)' && T.byCode['88305'] === 'Pathology' && T.byCode['93000'] === 'Heart' && T.byCode['76700'] === 'Imaging');
@@ -86,6 +89,7 @@ const sheet = n => wb.find(x => x.name === n);
 check('one sheet per view, rows, source and hospital setting', wb.map(x => x.name).join('|') === 'Notes|Medicare by code|Medicare by clinician|Medicare rows|Medicaid by code|Medicaid rows|By ZIP|Hospital outpatient|Hospital inpatient');
 check('Medicare by code matches the panel summary', sheet('Medicare by code').rows[1][0] === '45385' && sheet('Medicare by code').rows[1][4] === 430 && sheet('Medicare by code').rows.length === 4);
 check('every clinician and every raw row is in the file', sheet('Medicare by clinician').rows.length === 3 && sheet('Medicare rows').rows.length === 5);
+check('the Medicaid sheet has a Check column', sheet('Medicaid by code').rows[0][6] === 'Check');
 check('Medicaid sheets hold only codes and rows with Medicaid data', sheet('Medicaid by code').rows.length === 2 && sheet('Medicaid rows').rows.length === 3);
 const op = sheet('Hospital outpatient').rows;
 check('hospital outpatient keeps the GI group and drops airway endoscopy', op.length === 2 && op[1][0] === 'Digestive (GI)' && op[1][1] === '5302' && op[1][11] === Math.round(32 * 1367.09));

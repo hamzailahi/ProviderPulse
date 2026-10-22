@@ -90,6 +90,9 @@ jobs:
       - name: Procedures panel word search, against CMS's real descriptions
         run: node scripts/test-procedure-search.mjs
 
+      - name: The assistant's find_providers tool (competitors by code), on a fake database
+        run: node scripts/test-providers-near.mjs
+
       - name: Stray ZIPs left out of a city search
         run: node scripts/test-area-zips.mjs
 
