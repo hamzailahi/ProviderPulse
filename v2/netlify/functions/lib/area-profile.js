@@ -134,6 +134,12 @@ async function getAreaProfile(input, opts) {
   const band = (r, key, from, to) => (Array.isArray(r[key]) ? r[key].slice(from, to + 1).reduce((a, v) => a + N(v), 0) : 0);
   const pop = sum('pop_total'), hh = sum('households');
   const hhInc = rows.filter(r => r.median_hh_income != null && N(r.households) > 0);
+  // The Census caps ZIP medians: 250,001 means "$250,000 or more" (a report
+  // printed 76092's median as $250,001, 2026-10-22). Capped ZIPs count as
+  // 250,000, so the area figure is a floor and says so.
+  const INCOME_CAP = 250000;
+  const incOf = r => Math.min(N(r.median_hh_income), INCOME_CAP);
+  const cappedZips = rows.filter(r => N(r.median_hh_income) > INCOME_CAP).map(r => r.zip);
   const hhW = hhInc.reduce((a, r) => a + N(r.households), 0);
   const allIns = rows.length && rows.every(r => r.ins_universe != null && r.ins_uninsured != null);
   const insU = allIns ? sum('ins_universe') : 0;
@@ -150,8 +156,9 @@ async function getAreaProfile(input, opts) {
   const demographics = rows.length ? {
     source: `Census ACS 5-year (${rows[0].acs_year})`, zips_with_data: rows.length,
     population: pop, households: hh,
-    median_household_income: hhW ? Math.round(hhInc.reduce((a, r) => a + N(r.median_hh_income) * N(r.households), 0) / hhW) : null,
-    median_income_note: rows.length > 1 ? 'household-weighted average of ZIP medians, not a true median' : undefined,
+    median_household_income: hhW ? Math.round(hhInc.reduce((a, r) => a + incOf(r) * N(r.households), 0) / hhW) : null,
+    median_income_note: [rows.length > 1 ? 'household-weighted average of ZIP medians, not a true median' : null,
+      cappedZips.length ? `the Census caps ZIP medians at $250,000 or more (${cappedZips.join(', ')}); they count as 250,000, so this is a floor` : null].filter(Boolean).join('; ') || undefined,
     below_poverty: { people: sum('poverty_below'), share_pct: pct(sum('poverty_below'), sum('poverty_universe')) },
     households_100k_plus: { households: inc100, share_pct: pct(inc100, hh) },
     households_200k_plus: { households: inc200, share_pct: pct(inc200, hh) },
@@ -237,7 +244,8 @@ async function getAreaProfile(input, opts) {
     const z65 = a ? band(a, 'age_male', 13, 17) + band(a, 'age_female', 13, 17) : null;
     const out = { zip: z, miles: dist[z] == null ? null : r1(dist[z]), on_map: onMap.includes(z) || z === zip };
     if (a) Object.assign(out, {
-      population: zpop, median_household_income: a.median_hh_income,
+      population: zpop, median_household_income: a.median_hh_income == null ? null : incOf(a),
+      median_income_capped: N(a.median_hh_income) > INCOME_CAP ? 'the Census caps this median: $250,000 or more' : undefined,
       uninsured: a.ins_uninsured, uninsured_pct: pct(N(a.ins_uninsured), N(a.ins_universe)),
       age_65_plus: z65, age_65_plus_pct: pct(z65, zpop), below_poverty_pct: pct(N(a.poverty_below), N(a.poverty_universe))
     });

@@ -2847,12 +2847,16 @@
             const popTotal = rows.reduce((a, r) => a + N(r.pop_total), 0);
             const povU = rows.reduce((a, r) => a + N(r.poverty_universe), 0), povB = rows.reduce((a, r) => a + N(r.poverty_below), 0);
             const single = rows.length === 1;
+            // The Census caps ZIP medians: 250,001 means "$250,000 or more"
+            // (2026-10-22: a report printed 76092's median as $250,001).
+            const INCOME_CAP = 250000;
+            const capped = rows.filter(r => N(r.median_hh_income) > INCOME_CAP).length;
             let median = null;
             if (single) median = rows[0].median_hh_income;
             else {
                 const w = rows.filter(r => r.median_hh_income != null && N(r.households) > 0);
                 const tw = w.reduce((a, r) => a + N(r.households), 0);
-                median = tw ? w.reduce((a, r) => a + N(r.median_hh_income) * N(r.households), 0) / tw : null;
+                median = tw ? w.reduce((a, r) => a + Math.min(N(r.median_hh_income), INCOME_CAP) * N(r.households), 0) / tw : null;
             }
             const pct = (a, b) => (b ? (a / b * 100) : null);
             const fmtPct = v => v == null ? '--' : v.toFixed(1) + '%';
@@ -2879,7 +2883,7 @@
             const kp = document.getElementById('acs-kpis');
             while (kp.firstChild) kp.removeChild(kp.firstChild);
             const share = (a, b, of) => b ? fmtPct(pct(a, b)) + ' ' + of : '';
-            [[single ? 'Median household income' : 'Median income (avg. of ZIPs)', acsFmtMoney(median)],
+            [[single ? 'Median household income' : 'Median income (avg. of ZIPs)', single && capped ? '$250,000+' : acsFmtMoney(median)],
              ['Below poverty line', povU ? fmtCount(povB) : '--', share(povB, povU, 'of residents')],
              ['Households $100k+', hh ? fmtCount(high100) : '--', share(high100, hh, 'of households')],
              ['Households $200k+', hh ? fmtCount(high200) : '--', share(high200, hh, 'of households')],
@@ -2902,7 +2906,8 @@
                 (asked > rows.length ? ' ' + (asked - rows.length) + ' of ' + asked + ' ZIPs in view have no ACS row yet and are left out.' : '') +
                 (rows.some(r => r.signals) ? ' Insurance types overlap (people can have more than one), so the counts do not add up to the population.' : '') +
                 (hasIns ? ' Insurance counts cover the civilian non-institutionalized population. Medicare and Medicaid overlap (people with both are in each), so do not add them. The Insured and Uninsured boxes above use these Census counts.' : '') +
-                (single ? '' : ' Area medians are household-weighted averages of ZIP medians, not true medians.');
+                (single ? '' : ' Area medians are household-weighted averages of ZIP medians, not true medians.') +
+                (capped ? (single ? ' The Census caps this ZIP\'s median household income at $250,000 or more.' : ' ' + capped + ' ZIP' + (capped === 1 ? '\'s median is' : 's\' medians are') + ' capped by the Census at $250,000 or more and count as $250,000, so the average is a floor.') : '');
 
             card.hidden = false;
             acsDestroy();

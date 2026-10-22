@@ -987,7 +987,10 @@ Tables:
   no finer split exists), `median_hh_income`, poverty, `age_male`/`age_female`
   (18 five-year bands), `race`, `education`. `state` is copied from
   `demographics_raw` so `market-score` can rank within a state. Suppressed
-  Census values are `null`, never 0. Public read, service-role write. It sits
+  Census values are `null`, never 0. `median_hh_income` 250,001 is the
+  Census cap ("$250,000 or more"): the Demographics tab, Insights and
+  `get_area_profile` show it as $250,000+, count it as 250,000 in area
+  averages and call those averages floors (a report printed "$250,001"). Public read, service-role write. It sits
   beside `demographics_raw`, which is untouched (its income stops at "$100,000
   and over", and its insurance-by-income cut cannot be made finer: ACS does not
   publish it). Migration 024 adds `ins_universe`, `ins_uninsured`, `ins_medicare`,
@@ -1133,6 +1136,11 @@ AI tab in `dashboard-v3.js`.
   `use_map_area` (it said "within 10 miles"), a pasted code list as one
   `get_procedures` query, and a "Medicare population" section. The builder's
   label reads "N ZIPs on the map · opportunity score anchored on ZIP X".
+  **Write it starts a fresh conversation** (`ask(q, shown, {fresh: true})`,
+  2026-10-22): it sends no earlier messages and a new `cid`, and the chat's
+  old bubbles stay on screen above a `divider` row. A report written into an
+  open chat repeated that chat's batched code lookups and its stale "the list
+  exceeded the query length" note.
 - **History is append-only and echoed verbatim.** The browser stores the API
   messages exactly as returned (thinking blocks included) and sends them back.
   Never edit or reorder earlier turns: that invalidates preserved thinking.
@@ -1667,7 +1675,7 @@ node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, pri
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
-node scripts/test-area-profile.mjs        # 51: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
+node scripts/test-area-profile.mjs        # 53: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
 node scripts/test-providers-near.mjs      # 17: the assistant's find_providers: codes in a location box, individuals and organizations, radius or map, failures never "none"
 node scripts/test-procedures-tool.mjs     # 41: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole

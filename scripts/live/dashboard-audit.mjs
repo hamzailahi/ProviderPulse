@@ -277,7 +277,10 @@ if (!ONLY || ONLY === 'report-context') {
     r.steps.push({ label: 'Reports: Write it', err, snap: { ...(await snapshot(page)), ...(await state()),
       sent: bodies.length, ctxZip: c.zip, ctxSpecialty: c.specialty, areaZips: Array.isArray(c.area_zips) ? c.area_zips.length : 'missing',
       areaHas76117: Array.isArray(c.area_zips) ? c.area_zips.includes('76117') : null, areaFirst: Array.isArray(c.area_zips) ? c.area_zips.slice(0, 15).join(',') : '',
-      questionChars: String(b.question || '').length }, newRequests: [] });
+      questionChars: String(b.question || '').length,
+      // Which build is live: the 2026-10-22 brief checks codes against
+      // code_list, and a report goes out with no earlier conversation.
+      briefChecksCodeList: /code_list before saying so/.test(String(b.question || '')), messagesSent: Array.isArray(b.messages) ? b.messages.length : 'missing' }, newRequests: [] });
     await page.screenshot({ path: join(OUT, 'report_context.png') });
   } catch (e) { r.error = String(e.message || e).slice(0, 300); }
   r.requests = log.requests; r.console = log.console; r.pageErrors = log.pageErrors;

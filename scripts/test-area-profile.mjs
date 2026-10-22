@@ -174,5 +174,15 @@ const dash = (zips, spec) => [{ role: 'user', content: [{ type: 'text', text: _i
   check('the step label says what is being read', /every ZIP on the map/.test(_internals.stepLabel('get_area_profile', { zip: '76104', area: 'map' })));
 }
 
+// The Census caps ZIP medians: 250,001 means "$250,000 or more" (a report
+// printed 76092's median as $250,001, 2026-10-22)
+{
+  const capAcs = [/census_acs_zcta/, u => inList(u).map((z, i) => Object.assign(acsRow(z, 1), { median_hh_income: i === 0 ? 250001 : 50000 }))];
+  const r = await getAreaProfile({ zip: '76104', area: 'map', specialty: null }, { fetch: fakeDb([...geo, capAcs, places, med, mcd]), env, messages: dash(['76104']) });
+  const z = r.per_zip.find(x => x.zip === '76104');
+  check('a capped ZIP reads 250,000 and says the Census caps it', z.median_household_income === 250000 && /250,000 or more/.test(z.median_income_capped));
+  check('the area average counts it as 250,000 and calls itself a floor', r.demographics.median_household_income === Math.round((250000 + 7 * 50000) / 8) && /76104.*floor/.test(r.demographics.median_income_note));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -710,7 +710,7 @@ function evidenceLine(k, e) {
   if (k === 'pay') {
     var det = e.income_detail;
     if (e.income_basis === 'acs' && det) {
-      return 'Insured ' + ordinal(e.insured_pct) + (det.median_income != null ? ' · median household income $' + fmtN(det.median_income) + ' (' + ordinal(det.median_pct) + ')' : '') +
+      return 'Insured ' + ordinal(e.insured_pct) + (det.median_income != null ? ' · median household income ' + (det.median_income > 250000 ? '$250,000+' : '$' + fmtN(det.median_income)) + ' (' + ordinal(det.median_pct) + ')' : '') +
         (det.share_100k != null ? ' · ' + det.share_100k + '% of households at $100k+ (' + ordinal(det.share_100k_pct) + ')' : '') +
         (det.poverty_rate != null ? ' · ' + det.poverty_rate + '% in poverty' : '') + ', percentiles in state';
     }
@@ -986,6 +986,7 @@ if (isProviderAcct) {
   }
 
   function bubble(m) {
+    if (m.role === 'divider') return el('div', { class: 'as-divider', role: 'separator' }, m.text);
     if (m.role === 'user') return el('div', { class: 'as-msg user' }, m.text);
     var box = el('div', { class: 'as-msg bot' + (m.error ? ' err' : '') });
     if (m.steps && m.steps.length) {
@@ -1195,10 +1196,19 @@ if (isProviderAcct) {
 
   // `shown` is what the chat bubble says when the prompt itself is long
   // (the Reports tab sends a full brief but shows a one-line request).
-  function ask(q, shown) {
+  // opts.fresh (the Reports tab, 2026-10-22): the request goes out with no
+  // earlier conversation. A report written into a long chat inherited its
+  // old tool calls; one repeated an earlier chat's batched code lookups and
+  // its stale "the list exceeded the query length" note. The messages above
+  // stay on screen behind a divider; they are just not sent.
+  function ask(q, shown, opts) {
     q = String(q || '').trim();
     if (!q || busy) return false;
     input.value = ''; input.style.height = 'auto';
+    if (opts && opts.fresh && chat.api.length) {
+      chat.api = []; chat.cid = null;
+      chat.ui.push({ role: 'divider', text: 'New report: a fresh conversation. The messages above are not sent with it.' });
+    }
     chat.ui.push({ role: 'user', text: shown || q });
     run({ question: q, messages: chat.api, context: context(), npi: profile && profile.npi });
     return true;
@@ -1331,7 +1341,7 @@ if (isProviderAcct) {
     var shown = label + ': ' + spec.value + ' around ' + z + (others.length ? ' vs ' + others.join(', ') : '') + (focus.value.trim() ? '. ' + focus.value.trim() : '');
     note.textContent = '';
     switchTab('ai');
-    A.ask(brief, shown);
+    A.ask(brief, shown, { fresh: true });
   }
 
   A.onChange(refresh);
