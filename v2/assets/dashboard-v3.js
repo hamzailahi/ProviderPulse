@@ -710,7 +710,7 @@ function evidenceLine(k, e) {
   }
   if (k === 'need') {
     return (e.parts || []).slice().sort(function (a, b) { return b.percentile - a.percentile; }).slice(0, 3)
-      .map(function (x) { return (x.inverted ? 'low ' : '') + (x.label || x.measure) + ' ' + ordinal(x.percentile); }).join(' · ');
+      .map(function (x) { return (x.label || x.measure) + ' ' + ordinal(x.percentile); }).join(' · ');   // inverted labels already say "missed"
   }
   if (k === 'access' && !e.clinicians) return 'None within the catchment' + (e.national_per_1k ? ' (' + e.national_per_1k + ' per 1,000 nationally)' : '');
   if (k === 'access') return fmtN(e.clinicians) + ' within the catchment' + (e.per_1k != null ? ', ' + e.per_1k + ' per 1,000 adults' : '') +

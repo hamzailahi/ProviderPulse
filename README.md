@@ -604,6 +604,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-22
 
+- **"Missed screening" figures now show the share that missed.** For colon
+  screening, checkups and dental visits, low uptake is what signals need, so
+  the model labels them "missed colon screening" and so on, but it reported
+  the share who were screened. A Haltom City report said 58.8% of adults had
+  missed colon screening when 58.8% were screened (about 41% missed). The
+  model now reports the share missing with the uptake beside it, and Insights
+  no longer reads "low missed colon screening".
 - **The opportunity score now counts every ZIP within 10 miles.** It used to
   count the ZIP and its 10 nearest ZIPs, which in a city span only a few
   miles, while Insights and Ask AI called the area "within 25 miles". A Haltom

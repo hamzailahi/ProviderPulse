@@ -1351,6 +1351,7 @@ Rules that must hold:
   else prime; access ≥ 60 and need < 55 → latent; access < 40 → crowded
   premium if pay ≥ 60, else saturated; otherwise balanced.
 - **Reasons** are the top 3 factors by distance from 50 × weight, in words.
+- **An inverted need measure** (`COLON_SCREEN`, `CHECKUP`, `DENTAL`: low uptake is need) is labelled by what is missing, so its `parts[].value` is `100 - uptake` with `uptake` beside it. Until 2026-10-22 the raw uptake went out under the "missed" label (a report: "58.8% missed colon screening" when 58.8% were screened).
 
 HPSA county matching: `countyKey()` strips suffixes (County, Parish, Borough,
 City, Census Area, Municipality) and normalizes "St." on both sides. It reports
@@ -1667,7 +1668,7 @@ function, asset and script and a `require` of every function.
 node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) case
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 49: specialty gating (imports the real practisesAny), NPPES board-name results
-node scripts/test-market-model.mjs        # 33: the market opportunity model, incl. bucketing by code
+node scripts/test-market-model.mjs        # 34: the market opportunity model, incl. bucketing by code
 node scripts/test-demand-model.mjs        # 45: the learned demand model, trainer end to end, and scoring
 node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick
 node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking

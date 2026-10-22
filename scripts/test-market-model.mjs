@@ -79,6 +79,10 @@ console.log('\n4. Need measures');
 const prim = one(base({ specialties: [PRIMARY], groupOf: () => 'primary', places: { CHECKUP: 2 }, demo: {},
   benchmarks: { measures: { CHECKUP: anchors }, specialties: { 'Primary care / family doctor': { rate_per_1k: 0.6 } } } }));
 check('prevention measures are inverted (low checkups = high need)', prim.evidence.need.parts[0].inverted && prim.factors.need >= 90, JSON.stringify(prim.evidence.need));
+{
+  const ck = prim.evidence.need.parts.find(x => x.measure === 'CHECKUP');
+  check('an inverted measure reports the share missing, with the uptake beside it', ck && ck.label === 'missed checkups' && ck.uptake != null && Math.abs(ck.value - (100 - ck.uptake)) < 0.11, JSON.stringify(ck));
+}
 check('every model measure is a known PLACES id list', M.measureIds().includes('CHD') && M.measureIds().includes('KIDNEY'));
 check('every scored specialty has a profile', SPECIALTIES.every(s => M.PROFILES[s[0]]));
 

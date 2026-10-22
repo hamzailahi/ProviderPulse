@@ -227,7 +227,14 @@
         if (p == null) return;
         if (m[2]) p = 100 - p;
         acc += p * m[1]; wsum += m[1];
-        parts.push({ measure: m[0], label: MEASURE_NAME[m[0]] || m[0], value: Math.round(raw * 10) / 10, percentile: Math.round(p), inverted: !!m[2] });
+        // An inverted measure is labelled by what is missing ("missed colon
+        // screening"), so its value is the share missing, with the uptake
+        // beside it. Until 2026-10-22 the raw uptake went out under the
+        // "missed" label, and a report said 58.8% had missed colon screening
+        // when 58.8% were screened.
+        parts.push(m[2]
+          ? { measure: m[0], label: MEASURE_NAME[m[0]] || m[0], value: Math.round((100 - raw) * 10) / 10, uptake: Math.round(raw * 10) / 10, percentile: Math.round(p), inverted: true }
+          : { measure: m[0], label: MEASURE_NAME[m[0]] || m[0], value: Math.round(raw * 10) / 10, percentile: Math.round(p), inverted: false });
         basis = 'specialty';
       });
       if (!parts.length && prof.m.length && input.groupNeedPct && input.groupNeedPct[group] != null) {
