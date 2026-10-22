@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-21. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-22. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -597,6 +597,14 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-10-22
+
+- **The live dashboard audit can run one diagnostic on its own.** Its new
+  `only: report-context` option searches "haltom city, tx", adds two
+  neighbor rings, presses Write it on the Reports tab and records which ZIPs
+  the request tells the AI are on the map. It was added after a Haltom City
+  report covered 8 ZIPs while the map held many more.
 
 ### 2026-10-21
 

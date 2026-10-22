@@ -15,6 +15,8 @@ import { join } from 'node:path';
 
 const OUT = process.argv[2] || 'audit-out';
 const BASE = process.argv[3] || 'https://providerpulse-v2.netlify.app';
+// ONLY=report-context runs just that scenario (a quicker diagnostic).
+const ONLY = process.env.ONLY || '';
 mkdirSync(OUT, { recursive: true });
 
 const SEARCHES = [
@@ -92,7 +94,7 @@ async function snapshot(page) {
   }).catch(e => ({ error: String(e) }));
 }
 
-for (const s of SEARCHES) {
+if (!ONLY) for (const s of SEARCHES) {
   const { ctx, page, log } = await fresh();
   const r = { name: s.name, q: s.q };
   try {
@@ -112,7 +114,7 @@ for (const s of SEARCHES) {
 }
 
 // Follow-on interactions on one ZIP: specialty, neighbors, every tab, procedure sources.
-{
+if (!ONLY) {
   const { ctx, page, log } = await fresh();
   const r = { name: 'Interactions on 38017', q: '38017', steps: [] };
   try {
@@ -154,7 +156,7 @@ for (const s of SEARCHES) {
 // listing in 38017, nothing else is mocked. It should open on 38017 with
 // primary care selected and "Where you stand", keep that specialty when
 // another area is searched, and go back home from the top-bar button.
-{
+if (!ONLY) {
   const { ctx, page, log } = await fresh();
   await page.route('**/.netlify/functions/profile', route => route.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ role: 'provider', profile: { zip: '38017', taxonomy_desc: 'Family Medicine', npi: '0000000000' } }) }));
@@ -194,7 +196,7 @@ for (const s of SEARCHES) {
 }
 // A pasted code list on the Procedures tab (2026-10-21): Fort Worth's ZIPs and
 // a GI practice's codes, as a doctor would paste them from a spreadsheet.
-{
+if (!ONLY) {
   const { ctx, page, log } = await fresh();
   const CODES = '43235\n43236\n43239\n43246\n43247\n43249\n43250\n43251\n43252\n43255\n43499\n43762\n44361\n44388\n44389\n45330\n45331\n45332\n45334\n45338\n45378\n45380\n45381\n45382\n45384\n45385\n45388\n46221\n51784\n76700\n76981\n88300\n88305\n88312\n88313\n88342\n91110\n91120\n91122\n93000\n95921\n00731\n00811\n00812\n00813\nC9777';
   const r = { name: 'Procedures code list (Fort Worth, TX; 46 GI codes)', q: 'Fort Worth, TX', steps: [] };
@@ -228,6 +230,60 @@ for (const s of SEARCHES) {
   results.push(r);
   await ctx.close();
 }
+// What the Reports tab sends the assistant after a city search plus two
+// neighbor rings (2026-10-22: a Haltom City report covered 8 ZIPs while the
+// map held many more). The placeholder session gets a 401, but the request
+// body, with its dashboard context, is what this checks.
+if (!ONLY || ONLY === 'report-context') {
+  const { ctx, page, log } = await fresh();
+  const bodies = [];
+  page.on('request', q => { if (/market-assistant/.test(q.url()) && q.method() === 'POST') { try { bodies.push(JSON.parse(q.postData() || '{}')); } catch (e) {} } });
+  const r = { name: 'Reports context (haltom city, tx + two rings)', q: 'haltom city, tx', steps: [] };
+  const state = () => page.evaluate(() => {
+    const z = (() => { try { return procZips.slice(); } catch (e) { return null; } })();
+    let seed = null, locked = null, ring = null; try { seed = neighborSeedZip; } catch (e) {} try { locked = lockedZip; } catch (e) {} try { ring = [...neighborZipSet].length; } catch (e) {}
+    return { procZips: z ? z.length : null, has76117: z ? z.includes('76117') : null, first: z ? z.slice(0, 12).join(',') : null,
+      demZips: Object.keys(zipDemographics || {}).length, neighborSeedZip: seed, lockedZip: locked, ringZips: ring,
+      warning: ((document.getElementById('load-warning') || {}).textContent || ''), status: (document.getElementById('dbStatus') || {}).textContent || '',
+      market: ((document.querySelector('.rp-market') || {}).textContent || '') };
+  }).catch(e => ({ error: String(e) }));
+  try {
+    await page.goto(BASE + '/dashboard', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForFunction(() => document.getElementById('addressInput'), null, { timeout: 30000 });
+    await page.fill('#addressInput', 'haltom city, tx'); await page.press('#addressInput', 'Enter');
+    r.ms = await settle(page);
+    r.after = await snapshot(page);
+    r.steps.push({ label: 'searched', err: null, snap: { ...r.after, ...(await state()) }, newRequests: [] });
+    for (const ring of [1, 2]) {
+      let err = null;
+      try {
+        await page.evaluate(() => loadNeighboringZips());
+        await page.waitForFunction(() => /Added|already loaded|No bordering/.test((document.getElementById('dbStatus') || {}).textContent || ''), null, { timeout: 90000 });
+      } catch (e) { err = String(e.message || e).slice(0, 200); }
+      await page.waitForTimeout(4000);
+      r.steps.push({ label: 'ring ' + ring, err, snap: { ...(await snapshot(page)), ...(await state()) }, newRequests: [] });
+    }
+    await page.evaluate(() => switchTab('reports'));
+    await page.waitForTimeout(1500);
+    let err = null;
+    try {
+      await page.selectOption('.rp-wrap select', 'Digestive / gastroenterology');
+      await page.fill('.rp-wrap textarea', 'Where is there room for more GI volume?');
+      await page.click('.rp-go');
+      await page.waitForTimeout(5000);
+    } catch (e) { err = String(e.message || e).slice(0, 200); }
+    const b = bodies[bodies.length - 1] || {};
+    const c = b.context || {};
+    r.steps.push({ label: 'Reports: Write it', err, snap: { ...(await snapshot(page)), ...(await state()),
+      sent: bodies.length, ctxZip: c.zip, ctxSpecialty: c.specialty, areaZips: Array.isArray(c.area_zips) ? c.area_zips.length : 'missing',
+      areaHas76117: Array.isArray(c.area_zips) ? c.area_zips.includes('76117') : null, areaFirst: Array.isArray(c.area_zips) ? c.area_zips.slice(0, 15).join(',') : '',
+      questionChars: String(b.question || '').length }, newRequests: [] });
+    await page.screenshot({ path: join(OUT, 'report_context.png') });
+  } catch (e) { r.error = String(e.message || e).slice(0, 300); }
+  r.requests = log.requests; r.console = log.console; r.pageErrors = log.pageErrors;
+  results.push(r);
+  await ctx.close();
+}
 await browser.close();
 
 // ---- report ----
@@ -250,6 +306,7 @@ for (const r of results) {
   (r.steps || []).forEach(st => {
     md.push(`- step **${st.label}**${st.err ? ' (error: ' + st.err + ')' : ''}: status \`${st.snap.status}\`${st.snap.warning ? ', warning: ' + st.snap.warning : ''}, drawn ${st.snap.visible}, map key ${String(st.snap.mapKey || '').slice(0, 120)}` +
       ('codeList' in st.snap ? `; panel: ${st.snap.codeList}` : '') +
+      ('procZips' in st.snap ? `; STATE ${JSON.stringify(Object.fromEntries(Object.entries(st.snap).filter(([k]) => ['procZips', 'has76117', 'first', 'demZips', 'neighborSeedZip', 'lockedZip', 'ringZips', 'warning', 'market', 'sent', 'ctxZip', 'ctxSpecialty', 'areaZips', 'areaHas76117', 'areaFirst', 'questionChars'].includes(k))))}` : '') +
       ('hash' in st.snap ? `; hash \`${st.snap.hash}\`, specialty \`${st.snap.specialty}\`, home button ${st.snap.homeButton}, where you stand ${st.snap.whereYouStand}, old mode switch ${st.snap.modeSwitch}; procedures card: ${st.snap.procCard}; insights ${String(st.snap.insights || '').slice(0, 160)}` : ''));
     st.newRequests.filter(x => !/^2\d\d/.test(x) || / (2[5-9]\d\d|[3-9]\d{3}|\d{5,})ms /.test(x)).slice(0, 8).forEach(x => md.push('    - ' + x));
   });

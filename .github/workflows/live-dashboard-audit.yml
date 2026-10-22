@@ -12,6 +12,9 @@ on:
       base_url:
         description: Site to audit
         default: https://providerpulse-v2.netlify.app
+      only:
+        description: "Run one scenario only (report-context), or leave blank for all"
+        default: ""
 
 permissions:
   contents: read
@@ -32,7 +35,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw" && npm init -y >/dev/null && npm i -s playwright@1.48.2
           npx playwright install --with-deps chromium
       - name: Audit
-        run: cp scripts/live/dashboard-audit.mjs "$RUNNER_TEMP/pw/" && cd "$RUNNER_TEMP/pw" && node dashboard-audit.mjs "$GITHUB_WORKSPACE/audit-out" "${{ inputs.base_url }}"
+        run: cp scripts/live/dashboard-audit.mjs "$RUNNER_TEMP/pw/" && cd "$RUNNER_TEMP/pw" && ONLY="${{ inputs.only }}" node dashboard-audit.mjs "$GITHUB_WORKSPACE/audit-out" "${{ inputs.base_url }}"
       - name: Summary
         if: always()
         run: cat audit-out/audit.md >> "$GITHUB_STEP_SUMMARY" || true
