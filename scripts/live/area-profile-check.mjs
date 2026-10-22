@@ -34,6 +34,8 @@ for (const c of CASES) {
   const pm = r.procedures.medicare_clinicians, pd = r.procedures.medicaid;
   out.push(`- Medicare: ${pm.error ? 'error ' + pm.error : JSON.stringify(pm.totals) + (pm.incomplete ? ' INCOMPLETE ' + pm.incomplete_reason : '') + '; top ' + (pm.top_codes || []).slice(0, 3).map(x => x.code).join(',')}`);
   out.push(`- Medicaid: ${pd.error ? 'error ' + pd.error : JSON.stringify(pd.totals) + (pd.incomplete ? ' INCOMPLETE ' + pd.incomplete_reason : '')}`);
+  if (d && d.medicare_age_bands) out.push(`- Medicare-eligible ages: ${d.medicare_age_bands.map(b => b.ages.split(' ')[0] + ' ' + b.people).join(', ')}`);
+  out.push(`- county Medicare: ${r.medicare ? JSON.stringify(r.medicare.counties) : 'none'}`);
   r.per_zip.slice(0, 5).forEach(z => out.push(`  - ${JSON.stringify(z)}`));
   out.push('');
 }

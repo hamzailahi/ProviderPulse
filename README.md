@@ -611,7 +611,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   a Medicare population section: the Medicare-eligible age bands (60-64, then
   65-69 up to 85 and over) and the Health tab's county Medicare figures
   (traditional vs Medicare Advantage enrollment, ER visits, hospital stays,
-  readmissions, nursing facility, home health and hospice use).
+  readmissions, nursing facility, home health and hospice use). The live
+  area-profile check prints both.
 
 - **The live dashboard audit can run one diagnostic on its own.** Its new
   `only: report-context` option searches "haltom city, tx", adds two
