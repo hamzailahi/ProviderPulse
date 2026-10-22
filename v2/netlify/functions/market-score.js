@@ -243,12 +243,15 @@ exports.handler = async (event) => {
   // ---------------------------------------------------------------------------
   // strict: a failed page is retried once, then reported as `failed` instead
   // of read as the end of the data (`get` turns a failure into []).
+  // The last failure's status and database code only, for the response.
+  let lastListingError = null;
   const getStrict = async (path, ms) => {
     for (let i = 0; i < 2; i++) {
       try {
         const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, { headers: anon, signal: AbortSignal.timeout(ms || 6000) });
-        if (r.ok) { const b = await r.json(); if (Array.isArray(b)) return b; }
-      } catch (e) {}
+        if (r.ok) { const b = await r.json(); if (Array.isArray(b)) return b; lastListingError = 'not a list'; }
+        else { let code = ''; try { code = (await r.json()).code || ''; } catch (e) {} lastListingError = 'HTTP ' + r.status + (code ? ' ' + code : ''); }
+      } catch (e) { lastListingError = e && e.name === 'TimeoutError' ? 'timed out' : 'network error'; }
     }
     return null;
   };
@@ -602,6 +605,7 @@ exports.handler = async (event) => {
           max_zips: CATCHMENT_MAX_ZIPS,
           max_adults: CATCHMENT_MAX_ADULTS,
           listings_failed: !!(clinicPage.failed || individualPage.failed),
+          listings_error: clinicPage.failed || individualPage.failed ? lastListingError : undefined,
           furthest_miles: members.length > 1 ? Number(members[members.length - 1].miles.toFixed(1)) : 0,
           clinic_rows: clinicPage.rows.length,
           individual_rows: individualPage.rows.length,

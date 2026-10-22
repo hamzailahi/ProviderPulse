@@ -23,7 +23,7 @@ for (const zip of zips) {
   const c = d.catchment || {};
   const s = d.model && Array.isArray(d.model.specialties) ? d.model.specialties.find(x => x.specialty === spec) : null;
   out.push(`## ${zip}: ${(ms / 1000).toFixed(1)}s, HTTP ${res.statusCode}${ms > 20000 ? ' (OVER the 20s function limit)' : ''}`);
-  out.push(`- catchment: ${c.zip_count} ZIPs within ${c.furthest_miles} mi, ${c.adults_18plus} adults; listings ${c.clinic_rows} organizations + ${c.individual_rows} individuals; truncated ${!!c.truncated}; failed ${!!c.listings_failed}`);
+  out.push(`- catchment: ${c.zip_count} ZIPs within ${c.furthest_miles} mi, ${c.adults_18plus} adults; listings ${c.clinic_rows} organizations + ${c.individual_rows} individuals; truncated ${!!c.truncated}; failed ${!!c.listings_failed}${c.listings_error ? ' (' + c.listings_error + ')' : ''}`);
   out.push(s ? `- ${spec}: score ${s.score} (${s.archetype_name}, ${s.confidence}), ${s.clinicians} clinicians, factors ${JSON.stringify(s.factors)}${s.caveats && s.caveats.length ? '; caveats: ' + s.caveats.join(' | ') : ''}`
     : `- model: ${d.model && d.model.reason ? d.model.reason : 'none'}`);
   out.push('');
