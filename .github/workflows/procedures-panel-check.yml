@@ -48,3 +48,6 @@ jobs:
       - name: The assistant's find_providers tool, live (Haltom City 76117)
         if: always()
         run: node scripts/live/providers-near-check.mjs 76117
+      - name: The market score's 10-mile catchment, live (timing and counts)
+        if: always()
+        run: node scripts/live/market-score-check.mjs "Digestive / gastroenterology" 76117 76104 38017 10001 59601

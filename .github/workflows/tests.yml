@@ -93,6 +93,9 @@ jobs:
       - name: The assistant's find_providers tool (competitors by code), on a fake database
         run: node scripts/test-providers-near.mjs
 
+      - name: Market score catchment (10 miles, ZIP groups, failed loads)
+        run: node scripts/test-catchment.mjs
+
       - name: Stray ZIPs left out of a city search
         run: node scripts/test-area-zips.mjs
 

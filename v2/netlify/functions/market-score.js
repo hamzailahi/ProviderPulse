@@ -137,11 +137,24 @@ const countyKey = s => String(s || '').toLowerCase()
 // no listings reports `unserved`, because widening until a number appears would
 // quietly make rural areas look served.
 // ---------------------------------------------------------------------------
+//
+// Every ZIP whose centre is within CATCHMENT_CORE_MILES (2026-10-22, the
+// user's choice). Until then it was the 10 nearest ZIPs, which in a city span
+// only a few miles: around Haltom City (76117) they reached 4.8 miles and left
+// out the Fort Worth medical district (62 GI listings, 6 miles away), so a
+// report read 9 GI clinicians as thin supply. A sparse area with fewer than
+// CATCHMENT_MIN_NEIGHBORS ZIPs that close takes its 10 nearest out to
+// CATCHMENT_MAX_MILES, as before; a dense core stops at the nearest
+// CATCHMENT_MAX_ZIPS.
+const CATCHMENT_CORE_MILES = 10;
+const CATCHMENT_MIN_NEIGHBORS = 10;
 const CATCHMENT_MAX_MILES = 25;
-const CATCHMENT_MAX_NEIGHBORS = 10;
-// One dense catchment can hold far more listings than one dense ZIP, and every
-// row costs budget. Hitting this is reported, never silently absorbed.
-const CATCHMENT_MAX_CLINIC_ROWS = 12000;
+const CATCHMENT_MAX_ZIPS = 60;
+// A 10-mile city catchment holds tens of thousands of listings, loaded in
+// ZIP groups in parallel. Hitting the cap is reported, never silently absorbed.
+const CATCHMENT_MAX_CLINIC_ROWS = 60000;
+const CATCHMENT_ZIP_GROUP = 6;
+const CATCHMENT_PARALLEL = 6;
 
 // DENTAL is published for all 32,520 ZCTAs; the 2023 measures cover 29,983. Any
 // measure carries the same centroid and denominator, so pick the widest one or
@@ -223,12 +236,24 @@ exports.handler = async (event) => {
   // budget. Hitting it is reported as `truncated`, never swallowed -- the whole
   // point of this change is that a partial answer says so.
   // ---------------------------------------------------------------------------
-  const pagedGet = async (path, key, { cap = 6000, ms = 8000 } = {}) => {
+  // strict: a failed page is retried once, then reported as `failed` instead
+  // of read as the end of the data (`get` turns a failure into []).
+  const getStrict = async (path, ms) => {
+    for (let i = 0; i < 2; i++) {
+      try {
+        const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, { headers: anon, signal: AbortSignal.timeout(ms || 6000) });
+        if (r.ok) { const b = await r.json(); if (Array.isArray(b)) return b; }
+      } catch (e) {}
+    }
+    return null;
+  };
+  const pagedGet = async (path, key, { cap = 6000, ms = 8000, strict = false } = {}) => {
     const rows = [];
     let cursor = null;
     while (rows.length < cap) {
       const seek = cursor === null ? '' : `&${key}=gt.${encodeURIComponent(cursor)}`;
-      const batch = await get(`${path}${seek}&order=${key}&limit=1000`, ms);
+      const batch = strict ? await getStrict(`${path}${seek}&order=${key}&limit=1000`, ms) : await get(`${path}${seek}&order=${key}&limit=1000`, ms);
+      if (batch === null) return { rows, truncated: false, failed: true };
       if (!batch.length) return { rows, truncated: false };
       rows.push(...batch);
       if (batch.length < 1000) return { rows, truncated: false };
@@ -512,15 +537,17 @@ exports.handler = async (event) => {
           `&lon=gte.${(oLon - dLon).toFixed(4)}&lon=lte.${(oLon + dLon).toFixed(4)}` +
           `&select=zip,lat,lon,pop_18plus`, 'zip', { cap: 4000, ms: 7000 });
 
-        const near = boxPage.rows
+        const inRange = boxPage.rows
           .map(r => ({
             zip: r.zip,
             pop: Number(r.pop_18plus) || 0,
             miles: milesBetween(oLat, oLon, Number(r.lat), Number(r.lon))
           }))
           .filter(r => r.zip !== zip && r.miles <= CATCHMENT_MAX_MILES)
-          .sort((a, b) => a.miles - b.miles)
-          .slice(0, CATCHMENT_MAX_NEIGHBORS);
+          .sort((a, b) => a.miles - b.miles);
+        let near = inRange.filter(r => r.miles <= CATCHMENT_CORE_MILES);
+        if (near.length < CATCHMENT_MIN_NEIGHBORS) near = inRange.slice(0, CATCHMENT_MIN_NEIGHBORS);
+        near = near.slice(0, CATCHMENT_MAX_ZIPS - 1);
 
         const members = [{ zip, pop: Number(origin.pop_18plus) || 0, miles: 0 }, ...near];
         const memberZips = members.map(m => m.zip);
@@ -528,13 +555,26 @@ exports.handler = async (event) => {
 
         // clinics.zip is not consistently padded, which is why the single-ZIP
         // query above already asks for both forms. Same problem across a list.
-        const zipVariants = [...new Set(memberZips.flatMap(z => [z, String(parseInt(z, 10))]))];
+        const variantsOf = zs => [...new Set(zs.flatMap(z => [z, String(parseInt(z, 10))]))];
+        // Listings in ZIP groups, several at a time: one keyset walk over a
+        // 10-mile city catchment would take longer than the function may run.
+        const loadListings = async table => {
+          const groups = [];
+          for (let i = 0; i < memberZips.length; i += CATCHMENT_ZIP_GROUP) groups.push(memberZips.slice(i, i + CATCHMENT_ZIP_GROUP));
+          const out = { rows: [], truncated: false, failed: false };
+          for (let i = 0; i < groups.length; i += CATCHMENT_PARALLEL) {
+            const parts = await Promise.all(groups.slice(i, i + CATCHMENT_PARALLEL).map(g =>
+              pagedGet(`${table}?zip=in.(${variantsOf(g).join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude`,
+                'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000, strict: true })));
+            parts.forEach(p => { out.rows.push(...p.rows); if (p.truncated) out.truncated = true; if (p.failed) out.failed = true; });
+            if (out.rows.length >= CATCHMENT_MAX_CLINIC_ROWS) { out.truncated = true; break; }
+          }
+          return out;
+        };
 
         const [clinicPage, individualPage, placesPage, catchAcsPage] = await Promise.all([
-          pagedGet(`clinics?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude`,
-            'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
-          pagedGet(`provider_individuals?zip=in.(${zipVariants.join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude`,
-            'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000 }),
+          loadListings('clinics'),
+          loadListings('provider_individuals'),
           pagedGet(`cdc_places?zip=in.(${memberZips.join(',')})` +
             `&measureid=in.(${MarketModel.measureIds().join(',')})` +
             `&select=zip,measureid,value,pop_18plus,data_year`, 'zip', { cap: 4000, ms: 7000 }),
@@ -550,7 +590,10 @@ exports.handler = async (event) => {
           zip_count: memberZips.length,
           adults_18plus: catchmentAdults,
           radius_miles: CATCHMENT_MAX_MILES,
-          max_neighbors: CATCHMENT_MAX_NEIGHBORS,
+          core_miles: CATCHMENT_CORE_MILES,
+          min_neighbors: CATCHMENT_MIN_NEIGHBORS,
+          max_zips: CATCHMENT_MAX_ZIPS,
+          listings_failed: !!(clinicPage.failed || individualPage.failed),
           furthest_miles: members.length > 1 ? Number(members[members.length - 1].miles.toFixed(1)) : 0,
           clinic_rows: clinicPage.rows.length,
           individual_rows: individualPage.rows.length,
@@ -559,8 +602,12 @@ exports.handler = async (event) => {
         };
 
         // ---- per-specialty opportunity model (assets/market-model.js) ------
-        // Isolated: a failure here drops `model` and nothing else.
-        try {
+        // Isolated: a failure here drops `model` and nothing else. A listing
+        // load that failed even after a retry would undercount competitors and
+        // inflate every score, so the model refuses instead.
+        if (catchment.listings_failed) {
+          model = { available: false, reason: 'The provider directory did not answer for part of this area, so competitors cannot be counted. Try again in a moment.' };
+        } else try {
           // Catchment prevalence per measure, population-weighted across ZIPs.
           const places = {}, pw = {};
           for (const r of placesPage.rows) {
@@ -658,7 +705,7 @@ exports.handler = async (event) => {
             milesBetween, center: { lat: oLat, lng: oLon }, adults: catchmentAdults,
             places, demo, pay, shortage,
             benchmarks: Object.keys(benchmarks.measures).length || Object.keys(benchmarks.specialties).length ? benchmarks : null,
-            catchmentTruncated: catchment.truncated, radiusMiles: CATCHMENT_MAX_MILES,
+            catchmentTruncated: catchment.truncated, radiusMiles: catchment.furthest_miles || CATCHMENT_MAX_MILES,
             learnedNeed
           };
           const scored = MarketModel.score(baseInput);
