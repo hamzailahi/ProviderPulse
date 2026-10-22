@@ -254,6 +254,11 @@ if (!ONLY || ONLY === 'report-context') {
     r.ms = await settle(page);
     r.after = await snapshot(page);
     r.steps.push({ label: 'searched', err: null, snap: { ...r.after, ...(await state()) }, newRequests: [] });
+    // A city search selects no ZIP, so loadNeighboringZips has no seed and
+    // returns at once (both ring steps timed out until 2026-10-22). Click
+    // 76117 on the map first, as a user does before loading neighbors.
+    await page.evaluate(() => zipGeoJSONLayer.eachLayer(l => { if (String(l.feature.properties.ZCTA5CE10).padStart(5, '0') === '76117') l.fire('click'); }));
+    await page.waitForTimeout(3000);
     for (const ring of [1, 2]) {
       let err = null;
       try {
@@ -309,7 +314,7 @@ for (const r of results) {
   (r.steps || []).forEach(st => {
     md.push(`- step **${st.label}**${st.err ? ' (error: ' + st.err + ')' : ''}: status \`${st.snap.status}\`${st.snap.warning ? ', warning: ' + st.snap.warning : ''}, drawn ${st.snap.visible}, map key ${String(st.snap.mapKey || '').slice(0, 120)}` +
       ('codeList' in st.snap ? `; panel: ${st.snap.codeList}` : '') +
-      ('procZips' in st.snap ? `; STATE ${JSON.stringify(Object.fromEntries(Object.entries(st.snap).filter(([k]) => ['procZips', 'has76117', 'first', 'demZips', 'neighborSeedZip', 'lockedZip', 'ringZips', 'warning', 'market', 'sent', 'ctxZip', 'ctxSpecialty', 'areaZips', 'areaHas76117', 'areaFirst', 'questionChars'].includes(k))))}` : '') +
+      ('procZips' in st.snap ? `; STATE ${JSON.stringify(Object.fromEntries(Object.entries(st.snap).filter(([k]) => ['procZips', 'has76117', 'first', 'demZips', 'neighborSeedZip', 'lockedZip', 'ringZips', 'warning', 'market', 'sent', 'ctxZip', 'ctxSpecialty', 'areaZips', 'areaHas76117', 'areaFirst', 'questionChars', 'briefChecksCodeList', 'messagesSent'].includes(k))))}` : '') +
       ('hash' in st.snap ? `; hash \`${st.snap.hash}\`, specialty \`${st.snap.specialty}\`, home button ${st.snap.homeButton}, where you stand ${st.snap.whereYouStand}, old mode switch ${st.snap.modeSwitch}; procedures card: ${st.snap.procCard}; insights ${String(st.snap.insights || '').slice(0, 160)}` : ''));
     st.newRequests.filter(x => !/^2\d\d/.test(x) || / (2[5-9]\d\d|[3-9]\d{3}|\d{5,})ms /.test(x)).slice(0, 8).forEach(x => md.push('    - ' + x));
   });

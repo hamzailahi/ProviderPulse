@@ -611,6 +611,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   "$250,001" for Southlake (76092). The Demographics tab, Insights and Ask AI
   now say "$250,000+", and an area average that includes a capped ZIP says it
   is a floor.
+- **The live dashboard audit's report scenario now loads neighbor rings.** It
+  clicked "load neighbors" with no ZIP selected, so both rings timed out and
+  the report check ran on 4 ZIPs. It now clicks 76117 first, as a user does,
+  and records whether the deployed report brief is the latest one.
 - **City searches keep ZIPs with no official centre.** A ZIP that Census
   maps do not place, such as a PO-box ZIP like 76199 in Fort Worth, stays
   in the area rather than being treated as a stray. A few mistyped ZIPs on
