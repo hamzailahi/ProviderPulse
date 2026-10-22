@@ -254,11 +254,10 @@ if (!ONLY || ONLY === 'report-context') {
     r.ms = await settle(page);
     r.after = await snapshot(page);
     r.steps.push({ label: 'searched', err: null, snap: { ...r.after, ...(await state()) }, newRequests: [] });
-    // A city search selects no ZIP, so loadNeighboringZips has no seed and
-    // returns at once (both ring steps timed out until 2026-10-22). Click
-    // 76117 on the map first, as a user does before loading neighbors.
-    await page.evaluate(() => zipGeoJSONLayer.eachLayer(l => { if (String(l.feature.properties.ZCTA5CE10).padStart(5, '0') === '76117') l.fire('click'); }));
-    await page.waitForTimeout(3000);
+    // Known gap: a city search selects no ZIP, so loadNeighboringZips has no
+    // seed and returns at once, and both ring steps time out. Firing a click
+    // on 76117's boundary first (2026-10-22) hung the run past its 40-minute
+    // limit with no output, so it was taken out again.
     for (const ring of [1, 2]) {
       let err = null;
       try {
