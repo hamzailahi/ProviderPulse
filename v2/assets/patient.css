@@ -297,7 +297,7 @@ dl.f dt { color: var(--muted); }
 dl.f dd { overflow-wrap: anywhere; }
 dl.f dd.m { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-.sec-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin: 22px 0 10px; }
+.sec-label { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 22px 0 10px; }
 
 /* forms inside sheets / gate ---------------------------------------------- */
 .field { margin-bottom: 14px; }

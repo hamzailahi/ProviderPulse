@@ -176,7 +176,7 @@ async function search(page, log, { what, zip, miles, tile }) {
   // would sit over the search bar.
   if (await page.$('.sheet')) { await page.keyboard.press('Escape'); await page.waitForTimeout(400); }
   // Phones fold the form after a search (2026-10-24): open it first.
-  if (await page.$('.find-top.folded .sbar-sum')) { await page.click('.sbar-sum'); await page.waitForTimeout(200); }
+  if (await page.isVisible('.find-top.folded .sbar-sum').catch(() => false)) { await page.click('.sbar-sum'); await page.waitForTimeout(200); }
   const mark = Date.now();
   if (tile != null) {
     await page.locator('.start .tile').nth(tile).click();
