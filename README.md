@@ -604,6 +604,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **Patient search shows clinicians' phone numbers.** Results now carry the
+  practice phone from the federal registry for individual clinicians, with a
+  tap-to-call link; before, only claimed listings showed one. Organizations
+  have no phone in the data yet.
+- **"Claim this listing" fills in the NPI.** The dashboard's claim link opens
+  the pitch page, and its sign-up button now opens the provider form with the
+  NPI already entered (it still has to pass the registry check).
 - **Competitor counts list every ZIP.** Ask AI's competitor lookup showed
   only the 20 ZIPs with the most listings, so a report read ZIPs missing from
   that list as having no GI listings. Every ZIP is now listed; on a map

@@ -106,6 +106,14 @@ let session = (function () {
 // moved to /portal (portal.html) with the inbox, locations and competition.
 if (session) location.replace('/portal');
 
+// "Claim this listing" links arrive as #npi=<npi> (dashboard popups). Carry
+// the NPI on to sign-up so it does not have to be retyped (2026-10-24).
+(function () {
+  const m = /(?:^#|&)npi=(\d{10})\b/.exec(location.hash || '');
+  if (!m) return;
+  document.querySelectorAll('a[href="/join"]').forEach(a => { a.href = '/join?role=provider&npi=' + m[1]; });
+})();
+
 // Escapes & < " for values placed into innerHTML by the ZIP readout below.
 const escAttr = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 

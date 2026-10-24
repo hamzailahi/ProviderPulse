@@ -75,7 +75,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `portal.css`, `portal.js` | `portal.html` |
 | `dashboard.css`, `dashboard-v3.css`, `dashboard-v3.js` | `index.html` (v3 files layer the redesign over the original dashboard) |
 | `forms.css` | `register-provider.html`, `auth.html`, `admin-review.html`, `404.html` |
-| `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code`), `milesBetween`, MapTiler key, ZIP centroid lookup |
+| `directory.js` | shared browser helpers: Supabase URL/key, `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code`, and `phone` from `provider_individuals`; `clinics` has no phone column), `milesBetween`, MapTiler key, ZIP centroid lookup |
 | `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (40: all but `NOT_SCORED`: Hospital-based clinicians, Other health services, Nursing (RN, LPN) and Physician assistant) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
 | `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `area-zips.js` | `strayZips(rows, {centroids})`: the ZIPs a city search leaves out (2026-10-21): under 1% of the listings **and** more than 25 miles from every ZIP holding 1% or more (nearest core ZIP, so multi-city and sprawling searches stay whole); a ZIP's position is its official centre when known, else its listings' middle; unknown is kept. `pinsFar` = strays whose listings themselves sit far away; browser + `require` |
@@ -760,9 +760,9 @@ maps scope these pins to what's on screen; an unscoped loop scatters pins
 nationwide.
 
 "Claim this listing" links in dashboard popups go to
-`register-provider.html#npi=<npi>`, but nothing reads that hash any more, so
-the NPI has to be retyped. Wire `#npi=` through to `auth.html` or stop
-advertising the prefill.
+`register-provider.html#npi=<npi>`; that page rewrites its `/join` links to
+`/join?role=provider&npi=<npi>`, and `auth.html` opens the provider form with
+the NPI filled in (2026-10-24). Registration still verifies it against NPPES.
 
 The navigator may say a provider takes the patient's insurance only when the
 provider confirmed it. **Never let the model imply unknown means accepted.**

@@ -256,6 +256,19 @@ $('jvNpi').addEventListener('input', () => {
   if (v.length === 10) li.classList.add(validNpi(v) ? 'ok' : 'bad');
 });
 
+// A claim link carries the NPI: /join?role=provider&npi=<npi> (2026-10-24).
+// It only fills the field; registration still checks it against NPPES.
+(function () {
+  try {
+    const q = new URLSearchParams(location.search);
+    const npi = (q.get('npi') || '').trim();
+    if (q.get('role') !== 'provider' && !/^\d{10}$/.test(npi)) return;
+    role = 'provider';
+    if (/^\d{10}$/.test(npi)) { $('jvNpi').value = npi; $('jvNpi').dispatchEvent(new Event('input')); }
+    paint();
+  } catch (e) {}
+})();
+
 /* ── sign in ─────────────────────────────────────────────────────────────── */
 $('formSignin').onsubmit = async e => {
   e.preventDefault(); busy(e.target, true); setMsg('siMsg', '');

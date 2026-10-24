@@ -108,7 +108,8 @@ function tagSrc(rows, src) { (rows || []).forEach(function (r) { r._src = src; }
 function providerRowsQuery(filter) {
   return Promise.all([
     clinicsQuery(filter),
-    tableQuery('provider_individuals', PROVIDER_ROW_SELECT, filter),
+    // Individuals carry the NPPES practice phone (organizations do not yet).
+    tableQuery('provider_individuals', PROVIDER_ROW_SELECT + ',phone', filter),
     tableQuery('clinic_secondary_locations', 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude', filter)
   ]).then(function (results) {
     var all = tagSrc(results[0], 'clinic').concat(tagSrc(results[1], 'individual'), tagSrc(results[2], 'secondary'));

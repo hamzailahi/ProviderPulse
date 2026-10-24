@@ -423,7 +423,7 @@ function buildResults(rows, s) {
   (rows || []).forEach(function (row) {
     if (!row.npi || !(s.codeSet ? s.codeSet[row.taxonomy_code] : taxMatches(row.primary_taxonomy, s.terms))) return;
     consider({
-      npi: String(row.npi), name: titleCase(row.name), specialty: row.primary_taxonomy || '',
+      npi: String(row.npi), name: titleCase(row.name), specialty: row.primary_taxonomy || '', phone: fmtPhone(row.phone),
       address: titleCase(row.address), city: titleCase(row.city), state: row.state, zip: row.zip,
       lat: +row.latitude, lng: +row.longitude, src: row._src
     });
@@ -655,6 +655,13 @@ function pickSpecialty(i) {
   runProviderSearch();
 }
 
+// NPPES stores 10 bare digits; show (817) 555-0123 and dial the digits.
+function fmtPhone(v) {
+  var d = String(v || '').replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '1') d = d.slice(1);
+  return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : (v ? String(v) : '');
+}
+function telHref(v) { return 'tel:' + String(v || '').replace(/[^\d+]/g, ''); }
 function fmtMiles(m) { return m < 0.1 ? '< 0.1 mi' : (m < 10 ? m.toFixed(1) : Math.round(m)) + ' mi'; }
 
 function resultCard(p) {
@@ -670,7 +677,7 @@ function resultCard(p) {
 
   var acts = [];
   if (p.registered) acts.push(h('button', { class: 'act primary', type: 'button', onclick: function (e) { e.stopPropagation(); location.hash = '#/book/' + p.npi; } }, 'Request appointment'));
-  if (p.phone) acts.push(h('a', { class: 'act', href: 'tel:' + p.phone, onclick: function (e) { e.stopPropagation(); } }, 'Call ' + p.phone));
+  if (p.phone) acts.push(h('a', { class: 'act', href: telHref(p.phone), onclick: function (e) { e.stopPropagation(); } }, 'Call ' + p.phone));
   acts.push(h('button', { class: 'act', type: 'button', onclick: function (e) { e.stopPropagation(); location.hash = '#/p/' + p.npi; } }, 'Details'));
 
   var card = h('article', { class: 'res' + (s.active === p.npi ? ' active' : ''), 'data-npi': p.npi, tabindex: '0',
@@ -1144,15 +1151,15 @@ function detailSheet(npi) {
   // Unclaimed rows carry no phone. NPPES has the practice line, so fetch it
   // when someone actually opens the listing rather than for every result.
   var phoneDd = h('dd', { class: 'm' }, p.phone || 'Looking up…');
-  var callSlot = h('span', {}, p.phone ? h('a', { class: 'act primary', href: 'tel:' + p.phone }, '📞 Call') : null);
+  var callSlot = h('span', {}, p.phone ? h('a', { class: 'act primary', href: telHref(p.phone) }, '📞 Call') : null);
   if (!p.phone) {
     nppes.then(function (rec) {
       var addrs = (rec && rec.addresses) || [];
       var loc = addrs.filter(function (a) { return a.address_purpose === 'LOCATION'; })[0] || addrs[0] || {};
       if (loc.telephone_number) {
-        p.phone = loc.telephone_number;
+        p.phone = fmtPhone(loc.telephone_number);
         phoneDd.textContent = p.phone;
-        callSlot.appendChild(h('a', { class: 'act primary', href: 'tel:' + p.phone }, '📞 Call'));
+        callSlot.appendChild(h('a', { class: 'act primary', href: telHref(p.phone) }, '📞 Call'));
       } else phoneDd.textContent = 'Not listed';
     }).catch(function () { phoneDd.textContent = 'Not listed'; });
   }
