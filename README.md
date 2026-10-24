@@ -607,6 +607,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **Phones no longer zoom in when you tap a search field.** The find-care
+  search bar, the sort menu and the "Not sure who to see?" box used text
+  smaller than 16px, so iPhones zoomed the page on every tap. They are 16px
+  on phones and small tablets now.
 - **A live audit of the patient app.** A new manual job, "Live patient app
   audit", opens the deployed find-care app as a visitor and as a placeholder
   patient, on a desktop and on a phone (once on slow 4G). It runs about a

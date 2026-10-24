@@ -184,6 +184,12 @@ main { min-height: 0; }
   }
   .tiles { grid-template-columns: 1fr 1fr; }
 }
+/* 16px stops iOS zooming the page when a field is tapped. The search bar's
+   15px fields, the sort select and the AI helper's box all sat under it
+   (patient audit, 2026-10-24); patient.css's .field rule never reached them. */
+@media (max-width: 900px) {
+  .sfield input, .sfield select, .fsort, .sheet textarea, .sheet input, .sheet select { font-size: 16px; }
+}
 
 /* Leaflet gives its panes z-index 400-1000. Contain them in their own stacking
    context so sheets and the scrim always sit above the map. */
