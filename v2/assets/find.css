@@ -65,6 +65,7 @@ main { min-height: 0; }
 
 /* filters -------------------------------------------------------------- */
 .fbar { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.fbar:empty { display: none; }
 .fchips { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
 .fchip {
   border: 1px solid #d5dde8; background: #fff; color: #334155; cursor: pointer;
@@ -217,7 +218,7 @@ main { min-height: 0; }
   /* 44px tap targets on touch screens (the audit counted 15 of 25 under it). */
   .fchip, .fsort, .act, .pill, .sgo, .more, .map-toggle, .ask-link { min-height: 44px; }
   .fchip { display: inline-flex; align-items: center; }
-  .res .act.call { display: inline-flex; }
+  .res .act.call { display: inline-flex; background: #0f766e; border-color: transparent; color: #fff; }
   .res-phone { display: none; }                       /* the Call button carries it */
   .avatar { width: 44px; height: 44px; }
 }
@@ -232,6 +233,20 @@ main { min-height: 0; }
   .fbar { flex-direction: column; align-items: stretch; gap: 8px; }
   .fchips { width: 100%; }
   .fsort { align-self: flex-end; }
+}
+
+/* The folded search line (phones only; see foldSearch in patient.js). */
+.sbar-sum { display: none; }
+@media (max-width: 900px) {
+  .find-top.folded .sbar, .find-top.folded .ask-link { display: none; }
+  .find-top.folded .sbar-sum {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 10px 14px;
+    border: 1px solid #d5dde8; border-radius: 12px; background: #fff; cursor: pointer; text-align: left;
+    font: 550 15px var(--sans); color: #0f172a; box-shadow: 0 6px 20px -12px rgba(15,23,42,.25);
+  }
+  .sum-icon { font-size: 18px; color: #4f46e5; }
+  .sum-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sum-edit { font-weight: 650; color: #4f46e5; font-size: 14px; }
 }
 
 /* An inline action inside a note ("Try again"). */

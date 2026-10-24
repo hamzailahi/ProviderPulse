@@ -609,6 +609,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **On phones the search folds away after you search.** The form, which
+  used to fill two thirds of the screen above the results, folds into one
+  line ("Dental · 76117 · 10 mi"). Tap it to change the search. The first
+  result now starts near the top of the screen.
 - **Compact result cards.** A desktop screen now holds about six results
   instead of three and a half. Cards drop the initials circle, show the
   official name of what each provider is ("General Practice Dentistry",

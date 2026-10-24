@@ -399,6 +399,7 @@ function runProviderSearch() {
       if (rows.failed && !s.all.length) { s.loading = false; s.error = 'Search is unavailable right now. Please try again, or try a smaller distance.'; paintFind(); return; }
       s.partial = !!rows.failed;
       s.loading = false;
+      foldSearch();
       paintFind(true);
       logSearch(s);
     });
@@ -560,10 +561,25 @@ function findView() {
   } }, '🗺 Map');
   var body = h('div', { class: 'find-body' }, results, h('div', { class: 'mapwrap' }, mapEl), toggle);
 
-  findEls = { filters: filters, results: results, map: mapEl, what: fWhat, toggle: toggle, body: body };
-  var view = h('section', { class: 'find' }, h('div', { class: 'find-top' }, form, helper, filters), body);
+  // Phones: after a search the form folds into one line ("Dental · 76117 ·
+  // 10 mi") that opens it again; folded, the first result shows without
+  // scrolling (the form and chips took two thirds of the screen, live audit).
+  var sumText = h('span', { class: 'sum-text' });
+  var summary = h('button', { class: 'sbar-sum', type: 'button', 'aria-label': 'Edit search', onclick: function () {
+    top.classList.remove('folded'); fWhat.focus();
+  } }, h('span', { class: 'sum-icon', 'aria-hidden': 'true' }, '⌕'), sumText, h('span', { class: 'sum-edit' }, 'Edit'));
+  var top = h('div', { class: 'find-top' }, summary, form, helper, filters);
+  findEls = { filters: filters, results: results, map: mapEl, what: fWhat, toggle: toggle, body: body, top: top, sumText: sumText };
+  var view = h('section', { class: 'find' }, top, body);
   setTimeout(function () { mountMap(); paintFind(true); }, 0);
   return view;
+}
+
+function foldSearch() {
+  if (!findEls) return;
+  var s = state.search;
+  findEls.sumText.textContent = [s.label || 'Providers', s.zip, s.miles + ' mi', s.payer || null].filter(Boolean).join(' · ');
+  findEls.top.classList.add('folded');
 }
 
 function rescorePayer() {
