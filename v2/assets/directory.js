@@ -126,7 +126,8 @@ function providerRowsQuery(filter) {
 // limit: 10001 urgent care and primary care, 76117 dentists; live audit
 // 2026-10-24), and patients saw "part of the directory did not answer" or
 // nothing. A table whose box fails is asked again as four quarter boxes, and
-// a quarter that fails again as four more (16 at most), all in parallel;
+// a quarter that fails again as four more, down to 64 boxes, in parallel
+// (Manhattan primary care still timed out at 16 on the live check);
 // only that table pays. box = {s, n, w, e}; extra = the rest of the filter.
 // A part that still fails keeps .failed, so the caller still says
 // "incomplete", never "none".
@@ -141,7 +142,7 @@ function quarters(b) {
 }
 function tableBoxQuery(table, select, box, extra, depth) {
   return tableQuery(table, select, boxFilter(box) + extra).then(function (rows) {
-    if (!rows.failed || depth >= 2) return rows;
+    if (!rows.failed || depth >= 3) return rows;
     return Promise.all(quarters(box).map(function (q) { return tableBoxQuery(table, select, q, extra, depth + 1); }))
       .then(function (parts) {
         // Quarter edges overlap by one coordinate value: keep each row once.
