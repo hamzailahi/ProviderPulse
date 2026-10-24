@@ -77,6 +77,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 037 | `037_medicare_hospitals.sql` | `medicare_hospitals`: one row per hospital at its ZIP centre, so the Procedures panel lists hospitals within 25 miles; filled by `procedure-tables.yml` | applied and loaded 2026-10-12 |
 | 038 | `038_geo_indexes.sql` | location indexes on `clinics` and `provider_individuals` (the map-box searches timed out without them); concurrent, run with `concurrent-indexes.yml` | applied 2026-10-13 by the workflow (74 MB + 215 MB, both valid) |
 | 039 | `039_city_state_indexes.sql` | `(state, city)` and `(city)` indexes on `provider_individuals` and `clinic_secondary_locations` (Explore city and state searches timed out without them); concurrent, run with `concurrent-indexes.yml` | applied 2026-10-20 by the workflow, all four valid |
+| 040 | `040_clinics_phone.sql` | `phone` column on `clinics` (organizations had none); filled from NPPES by `org-phone-backfill.yml`, which runs this file in apply mode | written 2026-10-24, not applied |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

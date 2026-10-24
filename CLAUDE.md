@@ -834,7 +834,12 @@ directly**, not with a query built the same way as the policy code.
 
 Tables:
 
-- `clinics`: bulk NPPES NPI-2 organizations; the map's primary source.
+- `clinics`: bulk NPPES NPI-2 organizations; the map's primary source. No
+  phone until migration 040 (2026-10-24, written; `org-phone-backfill.yml`
+  applies it and fills `phone` from the NPPES monthly file's practice
+  telephone, `scripts/org-phone-backfill.sh`, dry run first). Add `phone` to
+  the clinics select in `directory.js` only after it has run, or every
+  patient search fails with a 400.
 - `provider_individuals`: NPI-1 individuals (migration 013), kept separate so
   org-only assumptions hold. `affiliated_clinic_npi` (015) is NULL everywhere
   in production.
@@ -1475,6 +1480,13 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   Commits `taxonomy-backfill-summary.md` and `taxonomy-exceptions.csv` (capped
   at 200,000 rows). The NPPES file is about 1 GB zipped, 9M rows; NPPES_MIN_ROWS
   exists only for tests.
+- **Organization phone backfill** (`org-phone-backfill.yml`, manual,
+  `scripts/org-phone-backfill.sh`, parser `scripts/nppes-phones.mjs`, rules
+  in `scripts/lib/phones.mjs`): `dry_run` / `apply` with `disk_free_gb`,
+  the taxonomy backfill's pattern (size check, NPPES download, per-prefix
+  batches with VACUUM, rerun resumes). Only active NPI-2 rows with a
+  plausible 10-digit US number; a row NPPES has no phone for is left alone.
+  Summary to `supabase/reference/org-phone-backfill-summary.md`.
 - **Taxonomy code indexes** (`taxonomy-indexes.yml`, manual,
   `scripts/taxonomy-indexes.sh`): applies 030 through psql, because the SQL
   editor wraps a pasted script in one transaction and `CREATE INDEX
@@ -1689,6 +1701,7 @@ node scripts/test-providers-near.mjs      # 22: the assistant's find_providers: 
 node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
+node scripts/test-org-phones.mjs          # 14: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end
 node scripts/test-catchment.mjs           # 11: the market score's catchment: every ZIP within 10 miles, the 10 nearest in sparse areas, 60 ZIPs or 1M adults at most, ZIP groups, a timed-out group one ZIP at a time, a failed load refuses to score
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```

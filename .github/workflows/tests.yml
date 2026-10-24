@@ -96,6 +96,9 @@ jobs:
       - name: Market score catchment (10 miles, ZIP groups, failed loads)
         run: node scripts/test-catchment.mjs
 
+      - name: Organization phones from NPPES
+        run: node scripts/test-org-phones.mjs
+
       - name: Stray ZIPs left out of a city search
         run: node scripts/test-area-zips.mjs
 
