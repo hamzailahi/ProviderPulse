@@ -1238,11 +1238,44 @@ function detailSheet(npi) {
     }).catch(function () { phoneDd.textContent = 'Not listed'; });
   }
 
+  // Who else lists this spot (any specialty), from a tiny box around the pin.
+  // Same coordinates are a hint, not an affiliation: NPPES records none.
+  var here = h('div', { class: 'here' });
+  if (p.lat && p.lng) {
+    here.appendChild(h('p', { class: 'muted' }, h('span', { class: 'spin' }), ' Looking for other listings here…'));
+    var e = 0.0004;   // about 40 m
+    providerRowsQuery('latitude=gte.' + (p.lat - e).toFixed(5) + '&latitude=lte.' + (p.lat + e).toFixed(5) +
+      '&longitude=gte.' + (p.lng - e).toFixed(5) + '&longitude=lte.' + (p.lng + e).toFixed(5)).then(function (rows) {
+      clear(here);
+      var seen = {}, list = [];
+      rows.forEach(function (r) {
+        if (!r.npi || String(r.npi) === p.npi || seen[r.npi]) return;
+        if (milesBetween(p.lat, p.lng, +r.latitude, +r.longitude) > 0.02) return;   // within about 30 m
+        seen[r.npi] = true;
+        list.push({ name: displayName(r.name), code: r.taxonomy_code, specialty: r.primary_taxonomy, phone: fmtPhone(r.phone), src: r._src });
+      });
+      if (!list.length) {
+        here.appendChild(h('p', { class: 'muted' }, rows.failed ? 'Other listings at this address could not be loaded.' : 'No other listings at this address.'));
+        return;
+      }
+      list.sort(function (a, b) { return kindOf(a) === kindOf(b) ? a.name.localeCompare(b.name) : (kindOf(a) === 'place' ? -1 : 1); });
+      here.appendChild(h('p', { class: 'muted', style: 'margin-bottom:8px' },
+        (rows.failed ? 'At least ' : '') + list.length + ' other listing' + (list.length === 1 ? '' : 's') +
+        ' at this address. They may be separate practices; the registry does not record who works where.'));
+      here.appendChild(h('ul', { class: 'here-list' }, list.slice(0, 12).map(function (x) {
+        return h('li', { class: kindOf(x) },
+          h('span', { class: 'here-name' }, x.name || 'Provider'), h('span', { class: 'here-type' }, plainType(x)),
+          x.phone ? h('a', { href: telHref(x.phone) }, x.phone) : null);
+      })));
+      if (list.length > 12) here.appendChild(h('p', { class: 'muted' }, 'and ' + (list.length - 12) + ' more.'));
+    });
+  }
+
   return sheet(p.name || 'Provider', [
     h('div', { class: 'badges', style: 'margin-top:0' }, badgesFor(p)),
     p.bio ? h('p', { style: 'margin-top:14px;color:var(--muted);font-size:14px' }, p.bio) : null,
     h('dl', { class: 'f', style: 'margin-top:18px' },
-      h('dt', {}, 'Specialty'), h('dd', {}, p.specialty || '—'),
+      h('dt', {}, 'Specialty'), h('dd', {}, plainType(p) || '—'),
       h('dt', {}, 'NPI'), h('dd', { class: 'm' }, p.npi),
       h('dt', {}, 'Address'), h('dd', {}, [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ') || '—'),
       p.miles != null ? h('dt', {}, 'Distance') : null, p.miles != null ? h('dd', {}, fmtMiles(p.miles) + ' from ' + state.search.zip) : null,
@@ -1250,6 +1283,7 @@ function detailSheet(npi) {
       (p.registered && p.payers && p.payers.length) ? h('dt', {}, 'Accepts') : null,
       (p.registered && p.payers && p.payers.length) ? h('dd', {}, p.payers.join(', ')) : null),
     h('div', { class: 'sec-label' }, 'From Medicare records'), cms,
+    p.lat && p.lng ? h('div', { class: 'sec-label' }, 'Also at this address') : null, p.lat && p.lng ? here : null,
     h('div', { class: 'actions' },
       p.registered ? h('button', { class: 'act primary', type: 'button',
         onclick: function () { location.hash = '#/book/' + p.npi; } }, '📅 Request appointment') : null,

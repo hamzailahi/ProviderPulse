@@ -1686,8 +1686,10 @@ Both maps read `clinics`, `provider_individuals` and
 - **Secondary rows never wear the verified ring** (they're aliased to the
   parent NPI).
 - **Affiliation is a live same-coordinate guess** in the dashboard popup ("May
-  practice at …"), because `affiliated_clinic_npi` is NULL in production. A
-  hint, never a fact.
+  practice at …") and the patient detail sheet's "Also at this address"
+  (every listing within about 30 m, any specialty, worded as possibly separate
+  practices; 2026-10-24), because `affiliated_clinic_npi` is NULL in
+  production. A hint, never a fact.
 
 Density fixes on the dashboard (2026-08-12): popups scroll via CSS
 (`.leaflet-popup-content { max-height: 360px; overflow-y: auto; }`), because

@@ -609,6 +609,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **Provider details show who else is at the same address.** Opening a
+  listing now lists the other registry entries at that spot, places first,
+  with their type and phone number, and says they may be separate
+  practices, since the registry doesn't record who works where. The
+  details also show the official type name instead of the stored text.
 - **Map pins match the list.** The results on screen get numbered pins that
   match their cards, teal for places (clinics, pharmacies, hospitals) and
   indigo for individual clinicians, with a key in the corner. Results
