@@ -609,6 +609,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **Map pins match the list.** The results on screen get numbered pins that
+  match their cards, teal for places (clinics, pharmacies, hospitals) and
+  indigo for individual clinicians, with a key in the corner. Results
+  further down the list are small dots. Hovering a card raises its pin.
 - **On phones the search folds away after you search.** The form, which
   used to fill two thirds of the screen above the results, folds into one
   line ("Dental · 76117 · 10 mi"). Tap it to change the search. The first

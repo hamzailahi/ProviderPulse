@@ -559,7 +559,9 @@ function findView() {
       body.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }, 50);
   } }, '🗺 Map');
-  var body = h('div', { class: 'find-body' }, results, h('div', { class: 'mapwrap' }, mapEl), toggle);
+  var mapKey = h('div', { class: 'map-key', 'aria-hidden': 'true' },
+    h('span', { class: 'k place' }), 'Places (clinics, pharmacies)', h('span', { class: 'k person' }), 'Clinicians');
+  var body = h('div', { class: 'find-body' }, results, h('div', { class: 'mapwrap' }, mapEl, mapKey), toggle);
 
   // Phones: after a search the form folds into one line ("Dental · 76117 ·
   // 10 mi") that opens it again; folded, the first result shows without
@@ -658,7 +660,7 @@ function paintFind(refit) {
           s.miles = RADIUS_CHOICES.filter(function (m) { return m > s.miles; })[0] || 50; runProviderSearch();
         } }, 'Search within ' + (RADIUS_CHOICES.filter(function (m) { return m > s.miles; })[0] || 50) + ' miles') : null));
     }
-    list.slice(0, s.shown).forEach(function (p) { r.appendChild(resultCard(p)); });
+    list.slice(0, s.shown).forEach(function (p, i) { r.appendChild(resultCard(p, i + 1)); });
     if (list.length > s.shown) {
       r.appendChild(h('button', { class: 'more', type: 'button', onclick: function () { s.shown += RESULTS_PAGE; paintFind(); } },
         'Show ' + Math.min(RESULTS_PAGE, list.length - s.shown) + ' more of ' + (list.length - s.shown).toLocaleString()));
@@ -717,7 +719,7 @@ function kindOf(p) {
   return p.src === 'individual' ? 'person' : 'place';
 }
 
-function resultCard(p) {
+function resultCard(p, n) {
   var s = state.search;
   var badges = [];
   if (s.suggested[p.npi]) badges.push(h('span', { class: 'badge sug' }, '✦ Suggested for you'));
@@ -746,6 +748,7 @@ function resultCard(p) {
     onkeydown: function (e) { if (e.target === card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); focusResult(p.npi, true); } } },
     h('div', { class: 'res-main' },
       h('div', { class: 'res-top' },
+        n ? h('span', { class: 'res-num', 'aria-hidden': 'true' }, String(n)) : null,
         h('h3', {}, p.name || 'Provider'),
         h('span', { class: 'dist' }, fmtMiles(p.miles))),
       h('div', { class: 'res-spec' }, plainType(p)),
@@ -784,14 +787,17 @@ function mountMap() {
   });
 }
 
-function markerStyle(p, hot) {
-  var ver = p.registered;
-  return {
-    radius: hot ? 11 : (ver ? 8 : 6),
-    color: '#ffffff', weight: hot ? 3 : 2,
-    fillColor: hot ? '#4f46e5' : (ver ? '#0d9488' : '#2563eb'),
-    fillOpacity: hot ? 1 : 0.9
-  };
+// Pins (2026-10-24): the cards on screen get numbered pins that match their
+// card, teal for a place and indigo for a clinician (the cards' left edge);
+// results further down the list are small dots. All one blue before, with
+// nothing tying a pin to a card (live audit).
+var PIN = { place: '#0f766e', person: '#4f46e5' };
+function dotStyle(p, hot) {
+  return { radius: hot ? 9 : 4.5, color: '#ffffff', weight: hot ? 3 : 1.5, fillColor: PIN[kindOf(p)], fillOpacity: hot ? 1 : 0.75 };
+}
+function pinIcon(p, n, hot) {
+  return L.divIcon({ className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+    html: '<span class="pin pin-' + kindOf(p) + (p.registered ? ' pin-ver' : '') + (hot ? ' pin-hot' : '') + '">' + (+n) + '</span>' });
 }
 
 function paintMarkers(list, refit) {
@@ -808,14 +814,22 @@ function paintMarkers(list, refit) {
     L.circleMarker([s.center.lat, s.center.lng], { radius: 5, color: '#fff', weight: 2, fillColor: '#111827', fillOpacity: 1, interactive: false })
       .addTo(findMap.layer);
   }
-  // Draw nearest last so they sit on top of the pile.
-  list.slice().reverse().forEach(function (p) {
-    var mk = L.circleMarker([p.lat, p.lng], markerStyle(p, s.active === p.npi));
+  // Dots first, then numbered pins, nearest last so they sit on top.
+  var shown = Math.min(s.shown, list.length);
+  list.slice(shown).reverse().forEach(function (p) {
+    var mk = L.circleMarker([p.lat, p.lng], dotStyle(p, s.active === p.npi));
     mk.bindTooltip(p.name || 'Provider', { direction: 'top', offset: [0, -6] });
     mk.on('click', function () { focusResult(p.npi, false); });
     mk.addTo(findMap.layer);
     findMap.markers[p.npi] = { mk: mk, p: p };
   });
+  for (var i = shown - 1; i >= 0; i--) (function (p, n) {
+    var mk = L.marker([p.lat, p.lng], { icon: pinIcon(p, n, s.active === p.npi), keyboard: false, riseOnHover: true });
+    mk.bindTooltip(n + '. ' + (p.name || 'Provider'), { direction: 'top', offset: [0, -14] });
+    mk.on('click', function () { focusResult(p.npi, false); });
+    mk.addTo(findMap.layer);
+    findMap.markers[p.npi] = { mk: mk, p: p, n: n };
+  })(list[i], i + 1);
   if (refit && s.center) {
     var dLat = s.miles / 69, dLng = s.miles / (69 * Math.cos(s.center.lat * Math.PI / 180));
     m.fitBounds([[s.center.lat - dLat, s.center.lng - dLng], [s.center.lat + dLat, s.center.lng + dLng]], { padding: [20, 20] });
@@ -826,8 +840,8 @@ function highlight(npi, pan) {
   Object.keys(findMap.markers).forEach(function (k) {
     var o = findMap.markers[k];
     var hot = k === npi || k === state.search.active;
-    o.mk.setStyle(markerStyle(o.p, hot));
-    if (hot) o.mk.bringToFront();
+    if (o.n) { o.mk.setIcon(pinIcon(o.p, o.n, hot)); o.mk.setZIndexOffset(hot ? 1000 : 0); }
+    else { o.mk.setStyle(dotStyle(o.p, hot)); if (hot) o.mk.bringToFront(); }
   });
   if (pan && npi && findMap.markers[npi] && findMap.map) {
     var ll = findMap.markers[npi].mk.getLatLng();

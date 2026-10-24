@@ -626,7 +626,7 @@ far (**5, 10, 25 or 50 miles**, default 10) and insurance. A specialty's
 listings are found by NUCC code (see NUCC codes phase 3). Results come
 straight from the directory tables through the publishable key, so search
 never waits on the AI and still works if functions are down. Claimed listings
-are overlaid from `providers-public`; the accepting / insurance / telehealth / verified chips read only claimed listings, so they appear only when a search found some, each with its count, and a count from a failed or capped search reads "At least N" (2026-10-24). One circle marker per listed result
+are overlaid from `providers-public`; the accepting / insurance / telehealth / verified chips read only claimed listings, so they appear only when a search found some, each with its count, and a count from a failed or capped search reads "At least N" (2026-10-24). The results on screen get numbered pins matching their cards (teal = a place, indigo = a clinician, by the code's NUCC section via `kindOf`), the rest small dots, with a map key (2026-10-24); before, one circle marker per listed result
 (results are paged, so density stays bounded). The AI navigator is an optional
 helper that only fills in the search. There is no Directions button; restore it
 only when directions are built in-app.
