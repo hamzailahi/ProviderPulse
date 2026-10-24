@@ -1092,9 +1092,20 @@ Refresh tokens rotate on every exchange. `patient.js` keeps a single in-flight
 server returns. Neither registration endpoint returns a session (both need
 email confirmation), so signup ends on "check your email".
 
+**Guests search (2026-10-24, the user's choice).** `app.html` has no
+sign-in wall: search, results, the detail sheet and phone numbers work
+signed out (all public data and `auth:false` functions). The routes in
+`SIGNED_IN_ROUTES` (`account`, `documents`, `book`, `appointments`, `ask`)
+open `signInSheet()` instead; a guest's unmatched text gets "pick a
+specialty" rather than the AI helper. The header swaps Appointments and
+the account button for a Sign in pill. A guest's search is **not** written
+to `demand_log` (`patient-match`'s log mode needs a token; the ZIP backfill
+request is public and still sent). `#/join` and `#/login` go to `/join` and
+`/signin`.
+
 Not built, because the backend cannot honor them: guest navigator chat
-(`patient-match` requires a token; directory search itself needs no sign-in)
-and Google/Apple SSO (`auth-login` is a password grant).
+(`patient-match` requires a token) and Google/Apple SSO (`auth-login` is a
+password grant).
 
 ## The provider pitch is scarcity-led, never demand-led
 

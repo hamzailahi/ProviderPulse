@@ -122,8 +122,8 @@ main { min-height: 0; }
 .badge.sug { background: #eef2ff; color: #3730a3; }
 
 .act { background: #fff; }
-/* The sign-in gate's "Create an account": teal-800 reads at 6:1 on the card
-   (the accent teal was 3.2:1), and the padding makes a 44px tap target. */
+/* "Create an account" in the sign-in sheet: teal-800 reads at 6:1 (the accent
+   teal was 3.2:1), and the padding makes a 44px tap target. */
 .alt a { color: #115e59; text-decoration: underline; text-underline-offset: 2px; display: inline-block; padding: 12px 4px; }
 .act.primary { background: linear-gradient(135deg, #0d9488, #4f46e5); color: #fff; border-color: transparent; }
 
@@ -223,3 +223,4 @@ main { min-height: 0; }
 
 /* An inline action inside a note ("Try again"). */
 .linkbtn { border: 0; background: none; padding: 4px 2px; font: inherit; font-weight: 650; color: inherit; text-decoration: underline; cursor: pointer; }
+#signinBtn { text-decoration: none; }

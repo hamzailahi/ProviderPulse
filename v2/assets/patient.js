@@ -480,7 +480,9 @@ function visibleResults() {
 // Aggregate demand (migration 008) plus the ZIP backfill queue. Fire and forget:
 // neither may slow or break a search.
 function logSearch(s) {
-  api('/patient-match', { method: 'POST', body: { mode: 'log', zip: s.zip, taxonomies: [s.label], matched: s.all.length } }).catch(function () {});
+  // demand_log is written by patient-match, which needs an account; a guest's
+  // search is not counted (the ZIP backfill below is public and still runs).
+  if (state.session) api('/patient-match', { method: 'POST', body: { mode: 'log', zip: s.zip, taxonomies: [s.label], matched: s.all.length } }).catch(function () {});
   fetch(FN + '/zip-enrich-request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ zip: s.zip }) }).catch(function () {});
 }
 
@@ -1324,29 +1326,27 @@ function accountSheet() {
   ]);
 }
 
-/* ---------- auth gate ----------------------------------------------------- */
+/* ---------- signing in --------------------------------------------------- */
 // Sign-in and sign-up live on ONE page for both roles (auth.html, served at
 // /signin and /join). A second patient-only copy here is what made a provider
 // signing in on the patient page a dead end: it could only tell them they were
 // on the wrong page. auth.html writes the same session key this app reads, so
 // returning from it lands straight in the app.
-function gateEl(mode) {
-  var joining = mode === 'register';
-  var go = joining ? '/join' : '/signin';
-  var alt = joining ? '/signin' : '/join';
-  return h('div', { class: 'gate' },
-    h('div', { class: 'gate-card' },
-      h('h2', {}, joining ? 'Create your account' : 'Find care that takes your insurance'),
-      h('p', { class: 'sub' }, joining
-        ? 'One account covers both sides — you choose patient or provider on the next screen.'
-        : 'Sign in to search verified providers near you.'),
-      h('a', {
-        class: 'btn-full', href: go,
-        style: 'display:block;text-align:center;text-decoration:none'
-      }, joining ? 'Create account' : 'Sign in'),
-      h('p', { class: 'alt' },
-        joining ? 'Already registered? ' : 'New here? ',
-        h('a', { href: alt }, joining ? 'Sign in' : 'Create an account'))));
+// Guests search freely (2026-10-24; the directory is public data read with
+// the publishable key). Booking, appointments, the account, documents and the
+// AI helper need an account, so those routes open this sheet instead.
+var SIGNED_IN_ROUTES = { account: 'see your account', documents: 'manage your documents', book: 'request an appointment',
+  appointments: 'see your appointment requests', ask: 'use the "Not sure who to see?" helper' };
+function signInSheet(what) {
+  var asked = what === SIGNED_IN_ROUTES.ask && state.askDraft;
+  return sheet('Sign in to continue', [
+    h('p', { class: 'muted', style: 'margin-bottom:14px' }, asked
+      ? 'We couldn\'t tell which kind of care "' + state.askDraft + '" means. Pick a specialty below, or sign in to describe it to our helper.'
+      : 'Sign in to ' + what + '. Searching, details and phone numbers work without an account.'),
+    asked ? h('button', { class: 'btn-full', type: 'button', onclick: function () { state.askDraft = ''; location.hash = '#/specialties'; } }, 'Browse all ' + SPECIALTIES.length + ' specialties') : null,
+    h('a', { class: asked ? 'act' : 'btn-full', href: '/signin', style: 'display:block;text-align:center;text-decoration:none;margin-top:10px' }, 'Sign in'),
+    h('p', { class: 'alt' }, 'New here? ', h('a', { href: '/join' }, 'Create an account'))
+  ]);
 }
 
 /* ---------- misc ---------------------------------------------------------- */
@@ -1365,6 +1365,9 @@ function toast(text, isErr) {
 }
 
 function paintHeader() {
+  var guest = !state.session;
+  $('#apptBtn').hidden = guest; $('#acctBtn').hidden = guest; $('#signinBtn').hidden = !guest;
+  if (guest) return;
   var p = state.profile || {};
   var initial = (p.first_name || '?').trim().charAt(0).toUpperCase() || '?';
   $('#acctBtn').textContent = initial;
@@ -1418,14 +1421,9 @@ function render() {
 
   var r = route();
   var authed = !!state.session;
-  $('#hdr').hidden = !authed;
-
-  if (!authed) {
-    unmountFind();
-    clear(main); main.appendChild(pageTitle());
-    main.appendChild(gateEl(r.name === 'join' ? 'register' : 'login'));
-    return;
-  }
+  $('#hdr').hidden = false;
+  // The old sign-in links (#/join, #/login) go to the one sign-in page.
+  if (!authed && (r.name === 'join' || r.name === 'login')) { location.href = r.name === 'join' ? '/join' : '/signin'; return; }
 
   paintHeader();
   if (!findMounted) {
@@ -1435,7 +1433,8 @@ function render() {
     findMounted = true;
   }
 
-  if (r.name === 'p' && r.arg) document.body.appendChild(detailSheet(r.arg));
+  if (!authed && SIGNED_IN_ROUTES[r.name]) document.body.appendChild(signInSheet(SIGNED_IN_ROUTES[r.name]));
+  else if (r.name === 'p' && r.arg) document.body.appendChild(detailSheet(r.arg));
   else if (r.name === 'account') document.body.appendChild(accountSheet());
   else if (r.name === 'documents') { document.body.appendChild(documentsSheet()); loadDocuments(); }
   else if (r.name === 'specialties') document.body.appendChild(specialtiesSheet());

@@ -321,13 +321,6 @@ dl.f dd.m { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .checks label:has(input:checked) { border-color: color-mix(in srgb, var(--a1) 35%, transparent); background: color-mix(in srgb, var(--a1) 7%, transparent); }
 .checks input { width: 16px; height: 16px; accent-color: var(--a1); flex-shrink: 0; }
 
-.gate { flex: 1; display: grid; place-items: center; padding: 40px 20px; }
-.gate-card {
-  width: 100%; max-width: 420px; padding: 30px; border-radius: var(--r-lg);
-  border: 1px solid var(--hairline-2); background: var(--surface); backdrop-filter: blur(20px);
-}
-.gate-card h2 { font-family: var(--serif); font-weight: 400; font-size: 27px; letter-spacing: -.02em; margin-bottom: 6px; }
-.gate-card .sub { color: var(--muted); font-size: 14px; margin-bottom: 22px; }
 .stay { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--muted); margin: 4px 0 18px; cursor: pointer; }
 .stay input { width: 16px; height: 16px; accent-color: var(--a1); }
 .btn-full {

@@ -67,9 +67,10 @@ opens a detail sheet with hours, accepted insurance, and Medicare
 credentials pulled live from CMS for individual clinicians (organizations
 are recognized from the NPPES enumeration type and told apart honestly,
 since Medicare does not publish those details for them). An AI helper is
-available as an optional side panel, not the main way in. Signed-in
-patients can request an appointment with any claimed listing and track
-their requests in one place.
+available as an optional side panel, not the main way in. Nobody has to
+sign in to search, open a listing or call. An account is needed only to
+request an appointment with a claimed listing, track requests, keep a
+profile, or use the AI helper.
 
 The helper maps symptoms and conditions to NPPES taxonomy terms and ranks
 by proximity. If the patient has insurance on file, it promotes listings
@@ -608,6 +609,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **Anyone can search for care without signing in.** The find-care app used
+  to open on a sign-in card, and with patient sign-up closed a visitor
+  could not get past it. Now search, results, provider details and phone
+  numbers are open to everyone. Requesting an appointment, viewing
+  requests, the account page and the AI helper ask you to sign in. Searches
+  by visitors who are not signed in are not added to the demand log.
 - **Search results say what they really know.** The "Accepting new
   patients", insurance, telehealth and verified filters only work on
   practices that have claimed their listing, so they now appear only when a
