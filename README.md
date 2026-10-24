@@ -614,9 +614,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   it in batches, and it refuses unless the free disk you enter covers the
   rewrite. Patient search shows organization phones once it has run.
   Both NPPES jobs now find the monthly file more reliably: when the download
-  page offers no recognizable link, they list what it offered and try the
-  standard file names for the last three months, instead of stopping without
-  a message.
+  page offers no recognizable link, they print the page's text, then try the
+  standard file names for the last three months and log each answer, instead
+  of stopping without a message.
 - **Patient search shows clinicians' phone numbers.** Results now carry the
   practice phone from the federal registry for individual clinicians, with a
   tap-to-call link; before, only claimed listings showed one. Organizations
