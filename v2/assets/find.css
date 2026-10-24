@@ -98,27 +98,38 @@ main { min-height: 0; }
 
 /* result card ------------------------------------------------------------ */
 .res {
-  display: flex; gap: 14px; padding: 16px; margin-bottom: 10px; border-radius: 14px;
-  background: #ffffff; border: 1px solid #e3e8ef; cursor: pointer;
+  display: block; padding: 12px 14px 12px 16px; margin-bottom: 8px; border-radius: 12px;
+  background: #ffffff; border: 1px solid #e3e8ef; border-left: 4px solid #6366f1; cursor: pointer;
   box-shadow: 0 1px 2px rgba(15,23,42,.04);
-  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
+.res.place { border-left-color: #0d9488; }          /* teal = a place you go; indigo = a clinician (pins match) */
 .res:hover { border-color: #c7d2fe; box-shadow: 0 8px 24px -14px rgba(79,70,229,.45); }
+.res.place:hover, .res.place.active { border-left-color: #0d9488; }
+.res.person:hover, .res.person.active { border-left-color: #6366f1; }
 .res.active { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
-.res-av {
-  width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center;
-  font: 700 16px var(--sans); letter-spacing: .02em;
-  color: hsl(var(--h) 60% 24%); background: hsl(var(--h) 70% 92%);
-}
-.res-main { flex: 1; min-width: 0; }
+.res-main { min-width: 0; }
 .res-top { display: flex; align-items: baseline; gap: 10px; }
-.res-top h3 { flex: 1; font: 650 16px/1.3 var(--sans); color: #0f172a; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.res-top h3 { flex: 1; font: 650 15.5px/1.3 var(--sans); color: #0f172a; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .dist { font: 600 12.5px var(--sans); color: #475569; white-space: nowrap; background: #f1f5f9; border-radius: 999px; padding: 2px 8px; }
-.res-spec { font-size: 13.5px; color: #4f46e5; font-weight: 550; margin-top: 2px; }
-.res-addr { font-size: 13.5px; color: #475569; margin-top: 4px; }
-.res-hours { font-size: 12.5px; color: #475569; margin-top: 6px; }
-.res .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.res .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.res-spec { font-size: 13.5px; color: #3730a3; font-weight: 550; margin-top: 1px; }
+.res.place .res-spec { color: #115e59; }
+.res-addr { font-size: 13.5px; color: #475569; margin-top: 2px; }
+.res-phone a { color: #334155; text-decoration: none; white-space: nowrap; }
+.res-phone a:hover { text-decoration: underline; }
+.res-hours { font-size: 12.5px; color: #475569; margin-top: 4px; }
+.res .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.res .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.res .act { padding: 5px 12px; }
+.res .act.call { display: none; }                     /* phones only: a desktop shows the number as a link */
+/* Desktop: the buttons sit right of the details lines, so a card is three
+   lines tall (131px with a button row under it, 4 per screen). */
+@media (min-width: 901px) {
+  .res-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; }
+  .res-main > * { grid-column: 1; }
+  .res-main > .res-top { grid-column: 1 / -1; }
+  .res .actions { grid-column: 2; grid-row: 2 / span 2; align-self: end; margin-top: 0; flex-wrap: nowrap; }
+}
 .badge.sug { background: #eef2ff; color: #3730a3; }
 
 .act { background: #fff; }
@@ -206,6 +217,8 @@ main { min-height: 0; }
   /* 44px tap targets on touch screens (the audit counted 15 of 25 under it). */
   .fchip, .fsort, .act, .pill, .sgo, .more, .map-toggle, .ask-link { min-height: 44px; }
   .fchip { display: inline-flex; align-items: center; }
+  .res .act.call { display: inline-flex; }
+  .res-phone { display: none; }                       /* the Call button carries it */
   .avatar { width: 44px; height: 44px; }
 }
 

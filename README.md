@@ -609,6 +609,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **Compact result cards.** A desktop screen now holds about six results
+  instead of three and a half. Cards drop the initials circle, show the
+  official name of what each provider is ("General Practice Dentistry",
+  "Urgent Care Clinic"), and put the phone number in the details line. On
+  phones a Call button carries it. A colored left edge tells places (teal)
+  from individual clinicians (indigo).
 - **Anyone can search for care without signing in.** The find-care app used
   to open on a sign-in card, and with patient sign-up closed a visitor
   could not get past it. Now search, results, provider details and phone

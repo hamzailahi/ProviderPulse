@@ -423,7 +423,7 @@ function buildResults(rows, s) {
   (rows || []).forEach(function (row) {
     if (!row.npi || !(s.codeSet ? s.codeSet[row.taxonomy_code] : taxMatches(row.primary_taxonomy, s.terms))) return;
     consider({
-      npi: String(row.npi), name: displayName(row.name), specialty: row.primary_taxonomy || '', phone: fmtPhone(row.phone),
+      npi: String(row.npi), name: displayName(row.name), specialty: row.primary_taxonomy || '', code: row.taxonomy_code || '', phone: fmtPhone(row.phone),
       address: titleCase(row.address), city: cityName(row.city), state: row.state, zip: row.zip,
       lat: +row.latitude, lng: +row.longitude, src: row._src
     });
@@ -685,6 +685,22 @@ function fmtPhone(v) {
 function telHref(v) { return 'tel:' + String(v || '').replace(/[^\d+]/g, ''); }
 function fmtMiles(m) { return m < 0.1 ? '< 0.1 mi' : (m < 10 ? m.toFixed(1) : Math.round(m)) + ' mi'; }
 
+// The listing's own NUCC display name ("General Practice Dentistry",
+// "Urgent Care Clinic/Center"), not the stored text, which mixes vocabularies.
+function plainType(p) {
+  var t = (typeof TaxonomyMap !== 'undefined' && p.code) ? TaxonomyMap.get(p.code) : null;
+  var name = (t && t.displayName) || p.specialty || '';
+  return name.replace(/ Clinic\/Center$/, ' Clinic').replace(/Clinic\/Center/, 'Clinic');
+}
+// Place (an organization: clinic, pharmacy, hospital) or clinician, from the
+// code's NUCC section (clinics holds some individual NPIs, so the table is
+// only the fallback); a claimed listing with no code counts as a place.
+function kindOf(p) {
+  var t = (typeof TaxonomyMap !== 'undefined' && p.code) ? TaxonomyMap.get(p.code) : null;
+  if (t) return t.individual ? 'person' : 'place';
+  return p.src === 'individual' ? 'person' : 'place';
+}
+
 function resultCard(p) {
   var s = state.search;
   var badges = [];
@@ -698,22 +714,28 @@ function resultCard(p) {
 
   var acts = [];
   if (p.registered) acts.push(h('button', { class: 'act primary', type: 'button', onclick: function (e) { e.stopPropagation(); location.hash = '#/book/' + p.npi; } }, 'Request appointment'));
-  if (p.phone) acts.push(h('a', { class: 'act', href: telHref(p.phone), onclick: function (e) { e.stopPropagation(); } }, 'Call ' + p.phone));
+  if (p.phone) acts.push(h('a', { class: 'act call', href: telHref(p.phone), onclick: function (e) { e.stopPropagation(); } }, 'Call'));
   acts.push(h('button', { class: 'act', type: 'button', onclick: function (e) { e.stopPropagation(); location.hash = '#/p/' + p.npi; } }, 'Details'));
 
-  var card = h('article', { class: 'res' + (s.active === p.npi ? ' active' : ''), 'data-npi': p.npi, tabindex: '0',
+  // Compact (2026-10-24): about twice as many results per screen. No
+  // initials circle (it meant nothing for a practice); the official taxonomy
+  // name instead of the stored text; the phone in the details line, with a
+  // Call button on phones only (find.css); a left edge that says place or
+  // clinician, matching the map pins.
+  var place = kindOf(p) === 'place';
+  var card = h('article', { class: 'res' + (place ? ' place' : ' person') + (s.active === p.npi ? ' active' : ''), 'data-npi': p.npi, tabindex: '0',
     onmouseenter: function () { highlight(p.npi, false); },
     onmouseleave: function () { highlight(null, false); },
     onclick: function () { focusResult(p.npi, true); },
     onkeydown: function (e) { if (e.target === card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); focusResult(p.npi, true); } } },
-    h('div', { class: 'res-av', style: '--h:' + hueFor(p.npi) }, initials(p.name)),
     h('div', { class: 'res-main' },
       h('div', { class: 'res-top' },
         h('h3', {}, p.name || 'Provider'),
         h('span', { class: 'dist' }, fmtMiles(p.miles))),
-      h('div', { class: 'res-spec' }, p.specialty),
+      h('div', { class: 'res-spec' }, plainType(p)),
       h('div', { class: 'res-addr' }, [p.address, p.city].filter(Boolean).join(', '),
-        p.sites > 1 ? h('span', { class: 'muted' }, ' · ' + (p.sites - 1) + ' more location' + (p.sites > 2 ? 's' : '')) : null),
+        p.sites > 1 ? h('span', { class: 'muted' }, ' · ' + (p.sites - 1) + ' more location' + (p.sites > 2 ? 's' : '')) : null,
+        p.phone ? h('span', { class: 'res-phone' }, ' · ', h('a', { href: telHref(p.phone), onclick: function (e) { e.stopPropagation(); } }, p.phone)) : null),
       badges.length ? h('div', { class: 'badges' }, badges) : null,
       p.office_hours ? h('div', { class: 'res-hours' }, 'Hours: ', summariseHours(p.office_hours)) : null,
       h('div', { class: 'actions' }, acts)));
