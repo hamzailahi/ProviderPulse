@@ -589,12 +589,21 @@ function paintFind(refit) {
   var sort = h('select', { class: 'fsort', 'aria-label': 'Sort results', onchange: function (e) { s.sort = e.target.value; paintFind(); } },
     h('option', { value: 'near', selected: s.sort === 'near' }, 'Nearest first'),
     h('option', { value: 'verified', selected: s.sort === 'verified' }, 'Verified first'));
-  findEls.filters.appendChild(h('div', { class: 'fchips' },
-    chip('Accepting new patients', f.accepting, toggle('accepting')),
-    chip(s.payer ? 'Takes ' + s.payer : 'Takes my insurance', f.insurance, toggle('insurance')),
-    chip('Telehealth', f.telehealth, toggle('telehealth')),
-    chip('✓ Verified on ProviderPulse', f.verified, toggle('verified'))));
-  findEls.filters.appendChild(sort);
+  // These filters read what claimed listings say about themselves, so they
+  // only appear when this search found some (each with how many it keeps).
+  // Shown on every search, "Accepting new patients" hid all 8,376 primary
+  // care results in 76117 (live audit, 2026-10-24).
+  var claimed = s.all.filter(function (p) { return p.registered; });
+  var anyOn = f.accepting || f.insurance || f.telehealth || f.verified;
+  if (claimed.length || anyOn) {
+    var n = function (test) { return ' (' + claimed.filter(test).length + ')'; };
+    findEls.filters.appendChild(h('div', { class: 'fchips' },
+      chip('Accepting new patients' + n(function (p) { return p.accepting_new_patients === true; }), f.accepting, toggle('accepting')),
+      chip((s.payer ? 'Takes ' + s.payer : 'Takes my insurance') + n(function (p) { return p.takes_your_insurance === true; }), f.insurance, toggle('insurance')),
+      chip('Telehealth' + n(function (p) { return p.telehealth === true; }), f.telehealth, toggle('telehealth')),
+      chip('✓ Verified on ProviderPulse (' + claimed.length + ')', f.verified, toggle('verified'))));
+    findEls.filters.appendChild(sort);
+  }
 
   // results
   var r = findEls.results;
@@ -608,15 +617,19 @@ function paintFind(refit) {
     r.appendChild(startEl());
   } else {
     var filtered = list.length !== s.all.length;
+    // A table that failed or hit the row cap makes the count a floor: say
+    // "at least". A partial search once read "660" where the full one had 4,289.
+    var floor = s.partial || s.truncated;
     r.appendChild(h('h2', { class: 'rhead' },
-      h('b', {}, list.length.toLocaleString() + ' ' + (s.label || 'providers')),
+      h('b', {}, (floor ? 'At least ' : '') + list.length.toLocaleString() + ' ' + (s.label || 'providers')),
       ' within ' + s.miles + ' mi of ' + s.zip,
       filtered ? h('span', { class: 'muted' }, ' · ' + (s.all.length - list.length) + ' hidden by filters') : null));
     // Phones: the Map/List toggle rides in the pinned count row (find.css).
     if (!findEls.body.classList.contains('show-map')) r.firstChild.appendChild(findEls.toggle);
     var hdr = $('#hdr');
     if (hdr) document.documentElement.style.setProperty('--hdr-h', hdr.offsetHeight + 'px');
-    if (s.partial) r.appendChild(h('div', { class: 'note' }, 'Part of the directory did not answer in time, so some providers may be missing. Try again in a moment.'));
+    if (s.partial) r.appendChild(h('div', { class: 'note' }, 'Part of the directory did not answer in time, so this list is missing some providers. ',
+      h('button', { class: 'linkbtn', type: 'button', onclick: function () { runProviderSearch(); } }, 'Try again')));
     else if (s.truncated) r.appendChild(h('div', { class: 'note' }, 'This area has more listings than we can show at once, so these are a sample. Try a shorter distance.'));
     if (!list.length) {
       r.appendChild(h('div', { class: 'empty' },

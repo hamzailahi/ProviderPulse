@@ -608,6 +608,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **Search results say what they really know.** The "Accepting new
+  patients", insurance, telehealth and verified filters only work on
+  practices that have claimed their listing, so they now appear only when a
+  search finds some, each showing how many it would keep. When part of the
+  directory doesn't answer, the count reads "At least N" and the note offers
+  Try again.
 - **Listing names read like names, not legal filings.** Results and the
   portal's Competition list drop suffixes such as PLLC, Inc. and P.A.
   ("Haltom Dental, P.A." shows as "Haltom Dental"), keep acronyms like CVS

@@ -220,3 +220,6 @@ main { min-height: 0; }
   .fchips { width: 100%; }
   .fsort { align-self: flex-end; }
 }
+
+/* An inline action inside a note ("Try again"). */
+.linkbtn { border: 0; background: none; padding: 4px 2px; font: inherit; font-weight: 650; color: inherit; text-decoration: underline; cursor: pointer; }
