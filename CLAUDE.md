@@ -1500,6 +1500,12 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   `scripts/lib/nppes-api-phones.mjs`): every ZIP `clinics` lists, biggest
   first, `enumeration_type=NPI-2`, `address_purpose=PRIMARY` (LOCATION if the
   API refuses it), six in flight with retries; the LOCATION address's phone.
+  **Paced** (`makePacer`): the first full pass ran about 25 requests a second
+  and got HTTP 403 for everything after about 1,300 ZIPs (the 150-ZIP sample
+  at the same speed had passed), so requests start 4 a second, a 403 or 429
+  pauses every worker (60s, growing to 4 min) and halves the pace, 300
+  answers in a row earn 25% back (at most 6 a second), and eight pauses with
+  no answer between stop the run with what it has (`blocked`).
   One query reaches 1,200 records (limit 200, skip up to 1,000), so a ZIP
   that fills it is split by ZIP+4 range (`761170*`, then `7611701*`) and what
   the directory still lists there is looked up NPI by NPI (40,000 at most).
@@ -1724,7 +1730,7 @@ node scripts/test-providers-near.mjs      # 22: the assistant's find_providers: 
 node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
-node scripts/test-org-phones.mjs          # 32: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty) and the API script against a local server
+node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty), the API script against a local server, and the pacer on a fake clock
 node scripts/test-catchment.mjs           # 11: the market score's catchment: every ZIP within 10 miles, the 10 nearest in sparse areas, 60 ZIPs or 1M adults at most, ZIP groups, a timed-out group one ZIP at a time, a failed load refuses to score
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```

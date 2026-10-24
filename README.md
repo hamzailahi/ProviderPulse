@@ -625,7 +625,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   that fails is reported, never counted as having no organizations. A full
   `api` dry run keeps its results for a week, so `apply` can reuse them with
   `from_run` instead of asking again. `zip_limit` tries the largest ZIPs
-  only, as a quick test.
+  only, as a quick test. The registry turned the first full pass away for
+  asking too fast, so the job now paces itself (about 4 requests a second)
+  and backs off whenever it is refused.
 - **Patient search shows clinicians' phone numbers.** Results now carry the
   practice phone from the federal registry for individual clinicians, with a
   tap-to-call link; before, only claimed listings showed one. Organizations

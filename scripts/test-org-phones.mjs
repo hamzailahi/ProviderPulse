@@ -10,7 +10,7 @@ import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanPhone, phoneChanges } from './lib/phones.mjs';
-import { apiError, collectPhones, recordPhone } from './lib/nppes-api-phones.mjs';
+import { apiError, collectPhones, makePacer, recordPhone } from './lib/nppes-api-phones.mjs';
 
 let pass = 0, fail = 0;
 const check = (l, c, d) => { if (c) { pass++; console.log(`  PASS  ${l}`); } else { fail++; console.log(`  FAIL  ${l}${d ? '\n        ' + d : ''}`); } };
@@ -123,7 +123,7 @@ await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/`;
 writeFileSync(join(dir, 'clinics3.csv'), 'npi,phone,zip\n' + world.slice(0, 3).map(r => `${r.number},,76117`).join('\n') + '\n' + world.slice(3).map(r => `${r.number},,10001`).join('\n') + '\n');
 const runCli = extra => new Promise(resolve => execFile('node', ['scripts/nppes-phones-api.mjs', '--clinics', join(dir, 'clinics3.csv'), '--out', join(dir, 'api-phones.csv'),
-  '--stats', join(dir, 'api-stats.json'), '--summary', join(dir, 'api.md'), ...extra], { env: { ...process.env, NPPES_API_BASE: base, NPPES_API_MIN_PHONES: '1' } },
+  '--stats', join(dir, 'api-stats.json'), '--summary', join(dir, 'api.md'), '--rate', '500', ...extra], { env: { ...process.env, NPPES_API_BASE: base, NPPES_API_MIN_PHONES: '1' } },
   (err, stdout, stderr) => resolve({ err, stderr })));
 const cli = await runCli([]);
 const phonesOut = readFileSync(join(dir, 'api-phones.csv'), 'utf8').trim().split('\n');
@@ -134,6 +134,27 @@ check('the summary names the source and says it is complete', /NPI Registry API/
 const sample = await runCli(['--zip-limit', '1']);
 check('a sample queries only the largest ZIP', !sample.err && JSON.parse(readFileSync(join(dir, 'api-stats.json'), 'utf8')).zips === 1);
 server.close();
+
+console.log('\n6. Pacing (fake clock)');
+let clock = 0;
+const fakeSleep = async ms => { clock += ms; };
+let pacer = makePacer({ startRate: 4, rate: 6, pauseMs: 60000, growEvery: 3, now: () => clock, sleep: fakeSleep });
+for (let i = 0; i < 5; i++) await pacer.slot();
+check('requests are spaced at the pace (4 a second: 5 starts take 1 second)', clock === 1000, String(clock));
+pacer.refused(403); pacer.refused(403); pacer.refused(429);
+check('refusals during a pause count once', pacer.pauses === 1 && pacer.refusals === 3 && pacer.rate === 2, `${pacer.pauses} ${pacer.refusals} ${pacer.rate}`);
+const before = clock; await pacer.slot();
+check('a refusal pauses everyone for a minute and halves the pace', clock - before >= 59000 && pacer.rate === 2, `${clock - before} ${pacer.rate}`);
+for (let i = 0; i < 3; i++) pacer.ok();
+check('a run of answers earns speed back', pacer.rate === 2.5);
+for (let i = 0; i < 30; i++) pacer.ok();
+check('never faster than the ceiling', pacer.rate === 6);
+pacer = makePacer({ startRate: 4, maxPauses: 3, pauseMs: 1000, now: () => clock, sleep: fakeSleep });
+for (let i = 0; i < 4; i++) { pacer.refused(403); clock += 5000; }
+check('pause after pause with no answer stops the run', pacer.blocked === true);
+t = 0;
+res = await collectPhones(dirZips, fakeApi().get, { concurrency: 1, stop: () => true });
+check('a stopped run keeps what it has and counts the rest as not reached', res.stats.zips_not_reached === 3 && res.stats.zips_failed === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

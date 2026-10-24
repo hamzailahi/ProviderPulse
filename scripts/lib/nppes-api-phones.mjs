@@ -74,6 +74,7 @@ export async function collectPhones(zips, get, opt = {}) {
   const maxSingle = opt.maxSingle ?? 40000;
   const deadline = opt.deadline ?? Infinity;
   const now = opt.now || Date.now;
+  const stop = opt.stop || (() => false);     // the registry keeps refusing: keep what we have
   const log = opt.log || (() => {});
   const phones = new Map();
   const seen = new Set();
@@ -91,7 +92,7 @@ export async function collectPhones(zips, get, opt = {}) {
   let next = 0;
   const worker = async () => {
     while (next < zips.length) {
-      if (now() > deadline) return;
+      if (now() > deadline || stop()) return;
       const [zip, npis] = zips[next++];
       try {
         const r = await crawlZip(zip, get);
@@ -123,7 +124,7 @@ export async function collectPhones(zips, get, opt = {}) {
   let qi = 0;
   const single = async () => {
     while (qi < queue.length) {
-      if (now() > deadline) return;
+      if (now() > deadline || stop()) return;
       const npi = queue[qi++];
       try { (await get({ number: npi })).results.forEach(take); n.single_lookups++; }
       catch { n.single_failed++; }
@@ -133,4 +134,46 @@ export async function collectPhones(zips, get, opt = {}) {
   await Promise.all(Array.from({ length: concurrency }, single));
   n.single_not_reached = queue.length - n.single_lookups - n.single_failed;
   return { phones, stats: n, failed, overflow };
+}
+
+// A shared pace for every worker. The first full pass (2026-10-24) ran about
+// 25 requests a second and the registry answered HTTP 403 to everything after
+// roughly 1,300 ZIPs, so requests are spaced out, and a refusal (403, 429)
+// pauses everyone, halves the pace and retries; a long run of answers earns
+// some speed back, up to rate (startRate is where it begins).
+export function makePacer(opt = {}) {
+  const now = opt.now || Date.now;
+  const sleep = opt.sleep || (ms => new Promise(r => setTimeout(r, ms)));
+  const maxRate = opt.rate || 5, minRate = opt.minRate || 0.5;
+  const pauseMs = opt.pauseMs ?? 60000, growEvery = opt.growEvery || 300;
+  const log = opt.log || (() => {});
+  const startRate = opt.startRate || maxRate, maxPauses = opt.maxPauses || 8;
+  const p = { rate: startRate, next: 0, pauseUntil: 0, streak: 0, refusals: 0, pauses: 0, quiet: 0, blocked: false };
+  p.slot = async () => {
+    for (;;) {
+      const t = now(), at = Math.max(p.next, p.pauseUntil);
+      if (t >= at) { p.next = t + 1000 / p.rate; return; }
+      await sleep(at - t);
+    }
+  };
+  p.ok = () => {
+    p.quiet = 0;
+    if (++p.streak >= growEvery && p.rate < maxRate) {
+      p.rate = Math.min(maxRate, p.rate * 1.25); p.streak = 0;
+      log(`  pace up to ${p.rate.toFixed(2)} requests a second`);
+    }
+  };
+  p.refused = status => {
+    p.refusals++; p.streak = 0;
+    const t = now();
+    if (t < p.pauseUntil) return;            // already paused by another worker
+    p.pauses++;
+    // Pause after pause with no answer in between: the registry has shut us
+    // out, so stop and keep the phones collected so far.
+    if (++p.quiet > maxPauses) { p.blocked = true; log(`  HTTP ${status}: ${maxPauses} pauses without an answer; stopping`); return; }
+    p.rate = Math.max(minRate, p.rate / 2);
+    p.pauseUntil = t + pauseMs * Math.min(4, p.quiet);
+    log(`  HTTP ${status}: pausing ${Math.round(pauseMs * Math.min(4, p.quiet) / 1000)}s, then ${p.rate.toFixed(2)} requests a second`);
+  };
+  return p;
 }

@@ -5,9 +5,9 @@
 // SOURCE=api.
 //
 // node scripts/nppes-phones-api.mjs --clinics clinics.csv --out nppes-phones.csv \
-//   --stats stats.json --summary api.md [--zip-limit 200] [--budget-min 300] [--concurrency 6]
+//   --stats stats.json --summary api.md [--zip-limit 200] [--budget-min 300] [--concurrency 6] [--rate 4]
 import { readFileSync, writeFileSync } from 'node:fs';
-import { PAGE, apiError, collectPhones } from './lib/nppes-api-phones.mjs';
+import { PAGE, apiError, collectPhones, makePacer } from './lib/nppes-api-phones.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i < 0 ? d : process.argv[i + 1]; };
 const need = k => { const v = arg(k); if (!v) throw new Error('missing --' + k); return v; };
@@ -32,26 +32,35 @@ console.error(`${zips.length.toLocaleString('en-US')} ZIPs to query (of ${byZip.
 let purpose = 'PRIMARY';
 let requests = 0, retries = 0;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const rate = Number(arg('rate', 4));
+const pacer = makePacer({ startRate: rate, rate: rate * 1.5, log: m => console.error(m) });
 async function get(params) {
   const q = new URLSearchParams({ version: '2.1', limit: String(PAGE), ...params });
   if (params.postal_code) { q.set('enumeration_type', 'NPI-2'); q.set('address_purpose', purpose); }
   q.set('skip', String(params.skip || 0));
-  let last;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    if (attempt) { retries++; await sleep(1000 * 2 ** attempt); }
+  let last, backoff = false;
+  for (let attempt = 0; attempt < 8 && !pacer.blocked; attempt++) {
+    if (attempt) retries++;
+    if (backoff) await sleep(1000 * 2 ** Math.min(attempt, 4));
+    backoff = false;
+    await pacer.slot();
     requests++;
     let res;
     try { res = await fetch(BASE + '?' + q, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(20000) }); }
-    catch (e) { last = e.name === 'TimeoutError' ? 'timeout' : String(e.message || e); continue; }
-    if (res.status === 429 || res.status >= 500) { last = `HTTP ${res.status}`; continue; }
+    catch (e) { last = e.name === 'TimeoutError' ? 'timeout' : String(e.message || e); backoff = true; continue; }
+    // 403 and 429 are the registry refusing the pace (it never answers bad
+    // input that way): everyone pauses, then this request is tried again.
+    if (res.status === 403 || res.status === 429) { last = `HTTP ${res.status}`; pacer.refused(res.status); continue; }
+    if (res.status >= 500) { last = `HTTP ${res.status}`; backoff = true; continue; }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     let data;
-    try { data = await res.json(); } catch { last = 'not JSON'; continue; }
+    try { data = await res.json(); } catch { last = 'not JSON'; backoff = true; continue; }
     const err = apiError(data);
     if (err) throw new Error(err);
+    pacer.ok();
     return data;
   }
-  throw new Error(last || 'failed');
+  throw new Error(pacer.blocked ? 'stopped: the registry kept refusing requests' : (last || 'failed'));
 }
 // One probe before the run: PRIMARY limits matches to the primary practice
 // address; if this API version refuses it, LOCATION (any practice address).
@@ -67,10 +76,12 @@ if (zips.length) {
 const { phones, stats, failed, overflow } = await collectPhones(zips, get, {
   concurrency: Number(arg('concurrency', 6)),
   deadline: started + budgetMin * 60000,
+  stop: () => pacer.blocked,
   log: m => console.error(m)
 });
 const minutes = Math.round((Date.now() - started) / 6000) / 10;
-Object.assign(stats, { requests, retries, minutes, address_purpose: purpose, zip_limit: zipLimit || null });
+Object.assign(stats, { requests, retries, minutes, address_purpose: purpose, zip_limit: zipLimit || null,
+  refusals: pacer.refusals, pauses: pacer.pauses, blocked: pacer.blocked, final_rate: Math.round(pacer.rate * 100) / 100 });
 
 writeFileSync(need('out'), 'npi,phone\n' + [...phones].map(p => p.join(',')).join('\n') + (phones.size ? '\n' : ''));
 writeFileSync(need('stats'), JSON.stringify(stats) + '\n');
@@ -79,7 +90,8 @@ const incomplete = stats.zips_failed || stats.zips_not_reached || stats.single_f
 writeFileSync(need('summary'), [
   '## NPI Registry API', '',
   `- ZIPs queried: ${f(stats.zips_done)} of ${f(stats.zips)}${zipLimit ? ` (a sample of the ${f(zipLimit)} largest)` : ''}; failed ${f(stats.zips_failed)}, not reached in the time budget ${f(stats.zips_not_reached)}`,
-  `- requests: ${f(requests)} (${f(retries)} retries), ${minutes} minutes, address_purpose ${purpose}`,
+  `- requests: ${f(requests)} (${f(retries)} retries), ${minutes} minutes, address_purpose ${purpose}; refused ${f(pacer.refusals)} times (${f(pacer.pauses)} pauses), pace at the end ${stats.final_rate} a second`,
+  pacer.blocked ? '- **Stopped early**: the registry kept refusing requests, so the ZIPs not reached keep their current phone.' : null,
   `- organizations returned: ${f(stats.records)}; with a usable phone ${f(stats.with_phone)}, none listed ${f(stats.no_phone)}, unusable ${f(stats.bad_phone)}, deactivated ${f(stats.deactivated)}`,
   `- ZIPs over the 1,200-record ceiling: ${f(stats.overflow_zips)} (ZIP+4 split refused in ${f(stats.split_failed_zips)}, still over in ${f(stats.still_full_zips)}); looked up one by one: ${f(stats.single_lookups)}, failed ${f(stats.single_failed)}, over the cap ${f(stats.single_skipped_cap)}`,
   overflow.length ? `- overflowing ZIPs: ${overflow.slice(0, 30).join(', ')}${overflow.length > 30 ? ', ...' : ''}` : null,
