@@ -69,8 +69,9 @@ main { min-height: 0; }
 .fchip {
   border: 1px solid #d5dde8; background: #fff; color: #334155; cursor: pointer;
   padding: 6px 12px; border-radius: 999px; font: 550 13px var(--sans);
-  transition: all var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
+.fchip:focus-visible, .res:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
 .fchip:hover { border-color: #94a3b8; }
 .fchip.on { background: #eef2ff; border-color: #4f46e5; color: #3730a3; }
 .fsort {
@@ -87,7 +88,7 @@ main { min-height: 0; }
 #findMap { position: absolute; inset: 0; background: #e8edf3; }
 .map-toggle { display: none; }
 
-.rhead { font-size: 14px; color: #334155; padding: 2px 4px 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rhead { font-weight: 400; font-size: 14px; color: #334155; padding: 2px 4px 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .rhead b { color: #0f172a; }
 .muted { color: #64748b; }
 .note {
@@ -107,7 +108,7 @@ main { min-height: 0; }
 .res-av {
   width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center;
   font: 700 16px var(--sans); letter-spacing: .02em;
-  color: hsl(var(--h) 55% 30%); background: hsl(var(--h) 70% 92%);
+  color: hsl(var(--h) 60% 24%); background: hsl(var(--h) 70% 92%);
 }
 .res-main { flex: 1; min-width: 0; }
 .res-top { display: flex; align-items: baseline; gap: 10px; }
@@ -121,6 +122,9 @@ main { min-height: 0; }
 .badge.sug { background: #eef2ff; color: #3730a3; }
 
 .act { background: #fff; }
+/* The sign-in gate's "Create an account": teal-800 reads at 6:1 on the card
+   (the accent teal was 3.2:1), and the padding makes a 44px tap target. */
+.alt a { color: #115e59; text-decoration: underline; text-underline-offset: 2px; display: inline-block; padding: 12px 4px; }
 .act.primary { background: linear-gradient(135deg, #0d9488, #4f46e5); color: #fff; border-color: transparent; }
 
 .more {
@@ -189,6 +193,10 @@ main { min-height: 0; }
    (patient audit, 2026-10-24); patient.css's .field rule never reached them. */
 @media (max-width: 900px) {
   .sfield input, .sfield select, .fsort, .sheet textarea, .sheet input, .sheet select { font-size: 16px; }
+  /* 44px tap targets on touch screens (the audit counted 15 of 25 under it). */
+  .fchip, .fsort, .act, .pill, .sgo, .more, .map-toggle, .ask-link { min-height: 44px; }
+  .fchip { display: inline-flex; align-items: center; }
+  .avatar { width: 44px; height: 44px; }
 }
 
 /* Leaflet gives its panes z-index 400-1000. Contain them in their own stacking

@@ -607,6 +607,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **The find-care app is easier to use with a keyboard, a screen reader or a
+  thumb.** Each page now has a main heading, and the results count is a
+  heading too. The sign-in card's "Create an account" link and the
+  initials circles meet contrast standards. Filter chips and result cards
+  show a focus ring, and Enter or Space on a focused card selects it. On
+  phones, buttons and chips are at least 44px tall. The sign-up form's
+  labels grew from 11px to 12.5px.
 - **Phones no longer zoom in when you tap a search field.** The find-care
   search bar, the sort menu and the "Not sure who to see?" box used text
   smaller than 16px, so iPhones zoomed the page on every tap. They are 16px

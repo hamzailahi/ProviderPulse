@@ -598,7 +598,7 @@ function paintFind(refit) {
   var r = findEls.results;
   clear(r);
   if (s.loading) {
-    r.appendChild(h('div', { class: 'rhead' }, h('span', { class: 'spin' }), 'Searching ' + (s.label || 'providers') + ' within ' + s.miles + ' mi of ' + s.zip + '…'));
+    r.appendChild(h('h2', { class: 'rhead' }, h('span', { class: 'spin' }), 'Searching ' + (s.label || 'providers') + ' within ' + s.miles + ' mi of ' + s.zip + '…'));
     for (var i = 0; i < 5; i++) r.appendChild(h('div', { class: 'res skel' }, h('div', { class: 'sk', style: 'width:52%' }), h('div', { class: 'sk', style: 'width:34%' }), h('div', { class: 'sk', style: 'width:70%' })));
   } else if (s.error) {
     r.appendChild(h('div', { class: 'empty' }, h('h3', {}, 'Let\'s fix the search'), h('p', {}, s.error)));
@@ -606,7 +606,7 @@ function paintFind(refit) {
     r.appendChild(startEl());
   } else {
     var filtered = list.length !== s.all.length;
-    r.appendChild(h('div', { class: 'rhead' },
+    r.appendChild(h('h2', { class: 'rhead' },
       h('b', {}, list.length.toLocaleString() + ' ' + (s.label || 'providers')),
       ' within ' + s.miles + ' mi of ' + s.zip,
       filtered ? h('span', { class: 'muted' }, ' · ' + (s.all.length - list.length) + ' hidden by filters') : null));
@@ -683,7 +683,8 @@ function resultCard(p) {
   var card = h('article', { class: 'res' + (s.active === p.npi ? ' active' : ''), 'data-npi': p.npi, tabindex: '0',
     onmouseenter: function () { highlight(p.npi, false); },
     onmouseleave: function () { highlight(null, false); },
-    onclick: function () { focusResult(p.npi, true); } },
+    onclick: function () { focusResult(p.npi, true); },
+    onkeydown: function (e) { if (e.target === card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); focusResult(p.npi, true); } } },
     h('div', { class: 'res-av', style: '--h:' + hueFor(p.npi) }, initials(p.name)),
     h('div', { class: 'res-main' },
       h('div', { class: 'res-top' },
@@ -1388,6 +1389,10 @@ function unmountFind() {
   findMap = { map: null, layer: null, ring: null, markers: {} };
 }
 
+// The page's one h1, inside <main> so it sits in a landmark; render() empties
+// main, so it is added back each time (screen readers navigate by it).
+function pageTitle() { return h('h1', { class: 'sr-only' }, 'ProviderPulse: find care near you'); }
+
 function render() {
   var main = $('#main');
   document.querySelectorAll('.scrim, .sheet').forEach(function (n) { n.remove(); });
@@ -1398,7 +1403,7 @@ function render() {
 
   if (!authed) {
     unmountFind();
-    clear(main);
+    clear(main); main.appendChild(pageTitle());
     main.appendChild(gateEl(r.name === 'join' ? 'register' : 'login'));
     return;
   }
@@ -1406,7 +1411,7 @@ function render() {
   paintHeader();
   if (!findMounted) {
     if (!state.search) state.search = newSearch();
-    clear(main);
+    clear(main); main.appendChild(pageTitle());
     main.appendChild(findView());
     findMounted = true;
   }
