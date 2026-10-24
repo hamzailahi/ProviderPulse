@@ -90,7 +90,8 @@ function tableQuery(table, select, filter) {
 
 var PROVIDER_ROW_SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude';
 function clinicsQuery(filter) {
-  return tableQuery('clinics', PROVIDER_ROW_SELECT, filter);
+  // clinics.phone exists since migration 040 (applied 2026-10-24).
+  return tableQuery('clinics', PROVIDER_ROW_SELECT + ',phone', filter);
 }
 
 // clinics (NPI-2 orgs) is what this used to query alone. provider_individuals
@@ -108,7 +109,7 @@ function tagSrc(rows, src) { (rows || []).forEach(function (r) { r._src = src; }
 function providerRowsQuery(filter) {
   return Promise.all([
     clinicsQuery(filter),
-    // Individuals carry the NPPES practice phone (organizations do not yet).
+    // Both carry the NPPES practice phone (organizations since migration 040).
     tableQuery('provider_individuals', PROVIDER_ROW_SELECT + ',phone', filter),
     tableQuery('clinic_secondary_locations', 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude', filter)
   ]).then(function (results) {
@@ -190,7 +191,7 @@ function tableBoxQuery(table, select, box, extra, depth, t0) {
 function providerBoxQuery(box, extra) {
   extra = extra || '';
   return Promise.all([
-    tableBoxQuery('clinics', PROVIDER_ROW_SELECT, box, extra, 0),
+    tableBoxQuery('clinics', PROVIDER_ROW_SELECT + ',phone', box, extra, 0),
     tableBoxQuery('provider_individuals', PROVIDER_ROW_SELECT + ',phone', box, extra, 0),
     tableBoxQuery('clinic_secondary_locations', 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude', box, extra, 0)
   ]).then(function (results) {

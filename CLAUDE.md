@@ -75,7 +75,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `portal.css`, `portal.js` | `portal.html` |
 | `dashboard.css`, `dashboard-v3.css`, `dashboard-v3.js` | `index.html` (v3 files layer the redesign over the original dashboard) |
 | `forms.css` | `register-provider.html`, `auth.html`, `admin-review.html`, `404.html` |
-| `directory.js` | shared browser helpers: Supabase URL/key, `displayName` / `cityName` (legal suffixes off, acronyms kept, Ft to Fort; patient results and Competition), `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code`, and `phone` from `provider_individuals`; `clinics` has no phone column), `milesBetween`, MapTiler key, ZIP centroid lookup |
+| `directory.js` | shared browser helpers: Supabase URL/key, `displayName` / `cityName` (legal suffixes off, acronyms kept, Ft to Fort; patient results and Competition), `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code` and `phone`; `clinics.phone` since migration 040), `milesBetween`, MapTiler key, ZIP centroid lookup |
 | `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (40: all but `NOT_SCORED`: Hospital-based clinicians, Other health services, Nursing (RN, LPN) and Physician assistant) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
 | `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `area-zips.js` | `strayZips(rows, {centroids})`: the ZIPs a city search leaves out (2026-10-21): under 1% of the listings **and** more than 25 miles from every ZIP holding 1% or more (nearest core ZIP, so multi-city and sprawling searches stay whole); a ZIP's position is its official centre when known, else its listings' middle; unknown is kept. `pinsFar` = strays whose listings themselves sit far away; browser + `require` |
@@ -836,12 +836,12 @@ directly**, not with a query built the same way as the policy code.
 
 Tables:
 
-- `clinics`: bulk NPPES NPI-2 organizations; the map's primary source. No
-  phone until migration 040 (2026-10-24, written; `org-phone-backfill.yml`
-  applies it and fills `phone` from the NPPES monthly file's practice
-  telephone, `scripts/org-phone-backfill.sh`, dry run first). Add `phone` to
-  the clinics select in `directory.js` only after it has run, or every
-  patient search fails with a 400.
+- `clinics`: bulk NPPES NPI-2 organizations; the map's primary source.
+  `phone` since migration 040, applied and filled 2026-10-24 by
+  `org-phone-backfill.yml` (`source: api`, the NPI Registry ZIP by ZIP,
+  91 minutes, no refusals, while CMS's file site was down): 1,894,376 of
+  1,901,951 organizations have one (99.6%); the rest had none in NPPES or an
+  unusable number. Patient search and the detail sheet select it.
 - `provider_individuals`: NPI-1 individuals (migration 013), kept separate so
   org-only assumptions hold. `affiliated_clinic_npi` (015) is NULL everywhere
   in production.

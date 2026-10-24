@@ -609,6 +609,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **Pharmacies, urgent cares, clinics and hospitals now show a phone
+  number.** The organization phone job ran: 1,894,376 of 1,901,951
+  organizations (99.6%) got their practice phone from the federal NPI
+  Registry, and patient search shows it with a Call button on phones.
 - **Busy areas load instead of timing out.** In dense places such as
   Manhattan or central Fort Worth, a 10-mile search could exceed the
   database's 3-second limit on one part of the directory, so results came
