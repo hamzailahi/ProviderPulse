@@ -8,19 +8,26 @@
 #                           DISK_FREE_GB covers the need
 #
 # Env: SUPABASE_DB_URL (Session pooler string), MODE, DISK_FREE_GB (free disk
-# shown in Supabase, Settings > Compute and Disk), NPPES_URL (optional override).
+# shown in Supabase, Settings > Compute and Disk), SOURCE (file, the NPPES
+# monthly file, or api, the NPI Registry API ZIP by ZIP: CMS's download site
+# was down for maintenance on 2026-10-24), NPPES_URL (optional override for
+# file), ZIP_LIMIT (api: only the N largest ZIPs, a sample), PHONES_FROM (a
+# dry run's npi,phone file, so apply skips the API pass).
 # Writes supabase/reference/org-phone-backfill-summary.md. Re-running is safe:
 # rows already right are skipped, so an interrupted apply resumes.
 set -euo pipefail
 
 : "${SUPABASE_DB_URL:?Set SUPABASE_DB_URL}"
 MODE="${MODE:-dry_run}"
+SOURCE="${SOURCE:-file}"
 WORK="${WORK:-/tmp/phonebf}"
 REF=supabase/reference
 mkdir -p "$WORK" "$REF"
 fail() { echo "::error::$1"; echo "$1" >&2; exit 1; }
 psqlq() { psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X "$@"; }
 [ "$MODE" = dry_run ] || [ "$MODE" = apply ] || fail "MODE must be dry_run or apply, got $MODE"
+[ "$SOURCE" = file ] || [ "$SOURCE" = api ] || fail "SOURCE must be file or api, got $SOURCE"
+[ "$MODE" = dry_run ] || [ -z "${ZIP_LIMIT:-}" ] || fail "ZIP_LIMIT is for dry runs only: an apply from a sample would leave most organizations without a phone"
 
 # ---- 1. Size check (read only) ------------------------------------------------
 # An UPDATE writes a new version of each changed row (and index entries); the
@@ -50,13 +57,31 @@ phone_expr=$([ "$has_col" = 1 ] && echo "coalesce(phone,'')" || echo "''")
 psqlq > /dev/null 2> "$WORK/err" <<SQL || fail "clinics export failed: $(tr '\n' ' ' < "$WORK/err" | cut -c1-300)"
 begin transaction read only;
 set local statement_timeout = '30min';
-\\copy (select distinct on (npi) npi::text, $phone_expr as phone from public.clinics where npi ~ '^[0-9]{10}$' order by npi) to '$WORK/clinics.csv' with (format csv, header true)
+\\copy (select distinct on (npi) npi::text, $phone_expr as phone, coalesce(zip, '') as zip from public.clinics where npi ~ '^[0-9]{10}$' order by npi) to '$WORK/clinics.csv' with (format csv, header true)
 commit;
 SQL
 echo "   $(($(wc -l < "$WORK/clinics.csv") - 1)) organizations"
 
-# ---- 3. NPPES monthly full file ---------------------------------------------------
-echo "== NPPES"
+# ---- 3. NPPES phones: a dry run's results, the API, or the monthly file ----------
+: > "$WORK/api.md"
+if [ -n "${PHONES_FROM:-}" ]; then
+  echo "== NPPES phones from an earlier dry run"
+  [ -s "$PHONES_FROM" ] && head -1 "$PHONES_FROM" | grep -qx 'npi,phone' || fail "PHONES_FROM is not an npi,phone file: $PHONES_FROM"
+  cp "$PHONES_FROM" "$WORK/nppes-phones.csv"
+  [ -s "$(dirname "$PHONES_FROM")/api.md" ] && cp "$(dirname "$PHONES_FROM")/api.md" "$WORK/api.md"
+  src_label="the NPI Registry API (results of dry run ${FROM_RUN:-?})"
+  nppes_stats="$(($(wc -l < "$WORK/nppes-phones.csv") - 1)) organizations with a phone"
+elif [ "$SOURCE" = api ]; then
+  echo "== NPI Registry API, ZIP by ZIP"
+  # Leave room in the job's 350 minutes: apply still has to write.
+  budget=$([ "$MODE" = apply ] && echo 180 || echo 300)
+  node scripts/nppes-phones-api.mjs --clinics "$WORK/clinics.csv" --out "$WORK/nppes-phones.csv" \
+    --stats "$WORK/api-stats.json" --summary "$WORK/api.md" --budget-min "$budget" ${ZIP_LIMIT:+--zip-limit "$ZIP_LIMIT"} \
+    || fail "NPI Registry API pass failed (see the lines above)"
+  src_label="the NPI Registry API${ZIP_LIMIT:+ (sample: the $ZIP_LIMIT largest ZIPs)}"
+  nppes_stats=$(cat "$WORK/api-stats.json")
+else
+echo "== NPPES monthly file"
 if [ -z "${NPPES_URL:-}" ]; then
   # shellcheck source=lib/nppes-url.sh
   . scripts/lib/nppes-url.sh
@@ -70,6 +95,8 @@ unzip -p "$WORK/nppes.zip" "$member" | node scripts/nppes-phones.mjs > "$WORK/np
   || fail "NPPES parse failed: $(tail -3 "$WORK/nppes.log" | tr '\n' ' ' | cut -c1-300)"
 rm -f "$WORK/nppes.zip"
 nppes_stats=$(tail -1 "$WORK/nppes.log")
+src_label="NPPES file $(basename "$NPPES_URL")"
+fi
 echo "   $nppes_stats"
 
 # ---- 4. Which rows change -----------------------------------------------------------
@@ -78,9 +105,10 @@ node --max-old-space-size=4096 scripts/org-phone-assign.mjs --rows "$WORK/clinic
 to_write=$(($(wc -l < "$WORK/assign.csv") - 1))
 {
   echo "<!-- Written by scripts/org-phone-backfill.sh. -->"
-  echo "Run: $(date -u +%F' '%H:%M) UTC, mode **$MODE**, NPPES file $(basename "$NPPES_URL")."
+  echo "Run: $(date -u +%F' '%H:%M) UTC, mode **$MODE**, source: $src_label."
   echo; echo "NPPES extract: \`$nppes_stats\`"
   echo; cat "$WORK/size.md"; echo; cat "$WORK/assign.md"
+  [ -s "$WORK/api.md" ] && { echo; cat "$WORK/api.md"; }
 } > "$REF/org-phone-backfill-summary.md"
 
 if [ "$MODE" = dry_run ]; then

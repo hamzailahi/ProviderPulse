@@ -518,7 +518,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `procedure-tables-check.yml` | manual, read only | shows what the Procedures panel gets for one ZIP through the public key, beside direct counts and the tables' policies |
 | `nppes-terms-check.yml` | manual, read only | sends every specialty's registry search term to NPPES and records what comes back |
 | `db-size-report.yml` | manual only | read-only report of table, index and write-ahead-log sizes and dead rows, written to `supabase/reference/db-size-report.md` |
-| `org-phone-backfill.yml` | manual only | fills organizations' phone numbers from the NPPES monthly file. `dry_run` writes nothing and reports how many would change; `apply` adds the column (migration 040), writes in batches and refuses unless the free disk entered covers the rewrite |
+| `org-phone-backfill.yml` | manual only | fills organizations' phone numbers from the NPPES monthly file (`source: file`) or the NPI Registry API, ZIP by ZIP (`source: api`, while CMS's download site is down). `dry_run` writes nothing and reports how many would change; `apply` adds the column (migration 040), writes in batches and refuses unless the free disk entered covers the rewrite; `from_run` reuses an api dry run's results |
 | `taxonomy-backfill.yml` | manual only | gives every listing its official NUCC taxonomy code from the NPPES monthly file and loads the `taxonomy_map` table. `dry_run` writes nothing and reports coverage and exceptions; `apply` refuses unless the free disk entered covers the rewrite |
 | `schema-snapshot.yml` | weekly, Mondays | dumps the live database's structure (tables, indexes, policies, grants; no data) to `supabase/schema/public.sql` and commits it only when it changed, so every such commit records a schema change |
 | `tests.yml` | every pull request and push to main | syntax check, loading every function, and the test scripts below |
@@ -549,7 +549,7 @@ node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bu
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 node scripts/test-providers-near.mjs      # the assistant's competitor lookup: codes in a location box, clinicians and organizations, failures never "none"
 node scripts/test-catchment.mjs           # the market score's area: every ZIP within 10 miles, ZIP groups, a failed load refuses to score
-node scripts/test-org-phones.mjs          # organization phones from NPPES: usable numbers, which rows change, the parser end to end
+node scripts/test-org-phones.mjs          # organization phones from NPPES: usable numbers, which rows change, the parser end to end, the API pass on a fake API
 node scripts/test-procedures-tool.mjs     # the assistant's procedures tool on a fake database: averages, word search, failures reported, hospitals
 node scripts/test-area-zips.mjs           # stray ZIPs a city search leaves out
 node scripts/test-code-list.mjs           # Procedures tab code lists: what counts as a list, the by-code, by-clinician and by-ZIP summaries
@@ -617,6 +617,15 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   page offers no recognizable link, they print the page's text, then try the
   standard file names for the last three months and log each answer, instead
   of stopping without a message.
+- **Organization phones can come from the NPI Registry API.** CMS's NPPES
+  download site is down for maintenance, and every monthly file returns "not
+  found". The phone job now has a `source` choice: `api` asks the federal NPI
+  Registry for every ZIP in the directory instead (a few hours). Large ZIPs
+  are split so none is cut off at the API's 1,200-result limit, and a ZIP
+  that fails is reported, never counted as having no organizations. A full
+  `api` dry run keeps its results for a week, so `apply` can reuse them with
+  `from_run` instead of asking again. `zip_limit` tries the largest ZIPs
+  only, as a quick test.
 - **Patient search shows clinicians' phone numbers.** Results now carry the
   practice phone from the federal registry for individual clinicians, with a
   tap-to-call link; before, only claimed listings showed one. Organizations

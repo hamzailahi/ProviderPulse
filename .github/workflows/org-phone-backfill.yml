@@ -1,12 +1,17 @@
 name: Organization phone backfill
 
-# Manual only. Fills clinics.phone (NPI-2 organizations) from the NPPES
-# monthly full file. See scripts/org-phone-backfill.sh.
+# Manual only. Fills clinics.phone (NPI-2 organizations) from NPPES: the
+# monthly full file (source: file) or, while CMS's download site is down (it
+# was "down for maintenance" on 2026-10-24), the NPI Registry API ZIP by ZIP
+# (source: api, a few hours). See scripts/org-phone-backfill.sh.
 #
 # Run dry_run first: it writes nothing to the database and commits a summary
-# to supabase/reference/. Then run apply with the free disk shown in Supabase
-# (Settings, Compute and Disk); apply runs migration 040 (adds the column),
-# then updates in batches, and refuses if the disk is short. Re-running resumes.
+# to supabase/reference/. zip_limit runs the API on the largest N ZIPs only, a
+# quick test. A full api dry run keeps its phones as a 7-day artifact; pass
+# its run id as from_run to apply, which then skips the API pass. Apply needs
+# the free disk shown in Supabase (Settings, Compute and Disk), runs migration
+# 040 (adds the column), updates in batches, and refuses if the disk is short.
+# Re-running resumes.
 
 on:
   workflow_dispatch:
@@ -19,12 +24,24 @@ on:
       disk_free_gb:
         description: Free database disk in GB, from Supabase (needed for apply)
         required: false
+      source:
+        description: file = NPPES monthly file; api = NPI Registry API, ZIP by ZIP
+        type: choice
+        options: [file, api]
+        default: file
+      zip_limit:
+        description: "api dry run only: query just the N largest ZIPs (a test)"
+        required: false
+      from_run:
+        description: "apply only: run id of a full api dry run whose phones to use"
+        required: false
       nppes_url:
         description: Optional direct link to the NPPES monthly zip (skips the download page)
         required: false
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: nppes-backfill
@@ -33,7 +50,7 @@ concurrency:
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v5
         with:
@@ -60,14 +77,38 @@ jobs:
           sudo apt-get install -y -q postgresql-client-17
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
+      - name: Phones from the dry run
+        if: inputs.from_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: nppes-phones
+          run-id: ${{ inputs.from_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/from-run
+
       - name: Backfill
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           MODE: ${{ inputs.mode }}
           DISK_FREE_GB: ${{ inputs.disk_free_gb }}
           NPPES_URL: ${{ inputs.nppes_url }}
+          SOURCE: ${{ inputs.source }}
+          ZIP_LIMIT: ${{ inputs.zip_limit }}
+          FROM_RUN: ${{ inputs.from_run }}
+          PHONES_FROM: ${{ inputs.from_run != '' && format('{0}/from-run/nppes-phones.csv', runner.temp) || '' }}
           WORK: ${{ runner.temp }}/phonebf
         run: bash scripts/org-phone-backfill.sh
+
+      - name: Keep the API phones for apply
+        if: always() && inputs.source == 'api' && inputs.mode == 'dry_run' && inputs.zip_limit == '' && inputs.from_run == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: nppes-phones
+          path: |
+            ${{ runner.temp }}/phonebf/nppes-phones.csv
+            ${{ runner.temp }}/phonebf/api.md
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Summary
         if: always()

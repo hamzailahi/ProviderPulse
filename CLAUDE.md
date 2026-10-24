@@ -1492,7 +1492,24 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   checked with a one-byte ranged GET whose status is logged; the page's text
   is printed when it has no link); an empty `grep` under `pipefail` once
   ended the phone job's dry run silently, and the next run got a 2,642-byte
-  page with no links (2026-10-24).
+  page with no links (2026-10-24). Its text read "This site will be down for
+  maintenance until further notice", and every monthly file, September's
+  included (the taxonomy backfill used it on 2026-10-09), returned 404.
+  So `source: api` (the user's choice, 2026-10-24) reads the NPI Registry API
+  ZIP by ZIP instead (`scripts/nppes-phones-api.mjs`, rules in
+  `scripts/lib/nppes-api-phones.mjs`): every ZIP `clinics` lists, biggest
+  first, `enumeration_type=NPI-2`, `address_purpose=PRIMARY` (LOCATION if the
+  API refuses it), six in flight with retries; the LOCATION address's phone.
+  One query reaches 1,200 records (limit 200, skip up to 1,000), so a ZIP
+  that fills it is split by ZIP+4 range (`761170*`, then `7611701*`) and what
+  the directory still lists there is looked up NPI by NPI (40,000 at most).
+  An answer with `Errors` (HTTP 200) is a failure; a failed ZIP is listed,
+  never read as empty; 20% of the first 200 ZIPs failing ends the run. Same
+  `npi,phone` output, so matching and apply are unchanged. A full api dry run
+  keeps its phones as a 7-day artifact and `from_run` lets apply reuse them;
+  `zip_limit` is a dry-run sample of the largest ZIPs. The container cannot
+  reach the API (its proxy refuses `npiregistry.cms.hhs.gov`), so it runs in
+  Actions only.
 - **Taxonomy code indexes** (`taxonomy-indexes.yml`, manual,
   `scripts/taxonomy-indexes.sh`): applies 030 through psql, because the SQL
   editor wraps a pasted script in one transaction and `CREATE INDEX
@@ -1707,7 +1724,7 @@ node scripts/test-providers-near.mjs      # 22: the assistant's find_providers: 
 node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
-node scripts/test-org-phones.mjs          # 14: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end
+node scripts/test-org-phones.mjs          # 32: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty) and the API script against a local server
 node scripts/test-catchment.mjs           # 11: the market score's catchment: every ZIP within 10 miles, the 10 nearest in sparse areas, 60 ZIPs or 1M adults at most, ZIP groups, a timed-out group one ZIP at a time, a failed load refuses to score
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```
