@@ -157,11 +157,20 @@ function splitSlot(fn) {
     if (splitBusy < SPLIT_SLOTS) run(); else splitWaiting.push(run);
   });
 }
-function tableBoxQuery(table, select, box, extra, depth) {
-  var ask = function () { return tableQuery(table, select, boxFilter(box) + extra); };
+// Splitting stops after SPLIT_BUDGET_MS: past that the search shows what it
+// has as "At least N" rather than keep a patient waiting. Fully split,
+// Manhattan primary care took 28s to list the nearest 25 of 31,823+; every
+// Fort Worth search finished inside 8s.
+var SPLIT_BUDGET_MS = 7000;
+function tableBoxQuery(table, select, box, extra, depth, t0) {
+  t0 = t0 || Date.now();
+  var ask = function () {
+    if (depth && Date.now() - t0 > SPLIT_BUDGET_MS) { var none = []; none.failed = true; return Promise.resolve(none); }
+    return tableQuery(table, select, boxFilter(box) + extra);
+  };
   return (depth ? splitSlot(ask) : ask()).then(function (rows) {
-    if (!rows.failed || depth >= 3) return rows;
-    return Promise.all(quarters(box).map(function (q) { return tableBoxQuery(table, select, q, extra, depth + 1); }))
+    if (!rows.failed || depth >= 3 || Date.now() - t0 > SPLIT_BUDGET_MS) return rows;
+    return Promise.all(quarters(box).map(function (q) { return tableBoxQuery(table, select, q, extra, depth + 1, t0); }))
       .then(function (parts) {
         // Quarter edges overlap by one coordinate value: keep each row once.
         var seen = {}, out = [];

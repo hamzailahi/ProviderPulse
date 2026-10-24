@@ -396,6 +396,7 @@ function runProviderSearch() {
       // Part of the directory did not answer: never present that as "none here".
       if (rows.failed && !s.all.length) { s.loading = false; s.error = 'Search is unavailable right now. Please try again, or try a smaller distance.'; paintFind(); return; }
       s.partial = !!rows.failed;
+      s.dense = !!(rows.failed && rows.split);   // a busy area that ran out of time, not an outage
       s.loading = false;
       foldSearch();
       paintFind(true);
@@ -646,7 +647,9 @@ function paintFind(refit) {
     if (!findEls.body.classList.contains('show-map')) r.firstChild.appendChild(findEls.toggle);
     var hdr = $('#hdr');
     if (hdr) document.documentElement.style.setProperty('--hdr-h', hdr.offsetHeight + 'px');
-    if (s.partial) r.appendChild(h('div', { class: 'note' }, 'Part of the directory did not answer in time, so this list is missing some providers. ',
+    if (s.partial) r.appendChild(h('div', { class: 'note' }, s.dense
+      ? 'This area has more listings than we could load in a few seconds, so some are missing. A shorter distance loads all of them. '
+      : 'Part of the directory did not answer in time, so this list is missing some providers. ',
       h('button', { class: 'linkbtn', type: 'button', onclick: function () { runProviderSearch(); } }, 'Try again')));
     else if (s.truncated) r.appendChild(h('div', { class: 'note' }, 'This area has more listings than we can show at once, so these are a sample. Try a shorter distance.'));
     if (!list.length) {

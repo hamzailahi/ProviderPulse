@@ -613,7 +613,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   Manhattan or central Fort Worth, a 10-mile search could exceed the
   database's 3-second limit on one part of the directory, so results came
   back incomplete or not at all. A part that times out is now asked again
-  as four smaller areas, then sixteen, then 64, in parallel. Only what still
+  as four smaller areas, then sixteen, then 64, for up to about seven
+  seconds; after that the list shows what loaded as "At least N". Only what still
   fails after that is reported as missing. The portal's Competition tab
   uses the same search.
 - **Provider details show who else is at the same address.** Opening a
