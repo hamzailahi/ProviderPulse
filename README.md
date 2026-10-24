@@ -609,6 +609,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **Busy areas load instead of timing out.** In dense places such as
+  Manhattan or central Fort Worth, a 10-mile search could exceed the
+  database's 3-second limit on one part of the directory, so results came
+  back incomplete or not at all. A part that times out is now asked again
+  as four smaller areas, and then sixteen, in parallel. Only what still
+  fails after that is reported as missing. The portal's Competition tab
+  uses the same search.
 - **Provider details show who else is at the same address.** Opening a
   listing now lists the other registry entries at that spot, places first,
   with their type and phone number, and says they may be separate

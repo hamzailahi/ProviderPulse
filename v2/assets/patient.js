@@ -384,14 +384,12 @@ function runProviderSearch() {
     var c = res[0];
     if (!c) { s.loading = false; s.all = []; s.center = null; s.error = 'We couldn\'t find ZIP ' + s.zip + '. Check it and try again.'; paintFind(); return; }
     s.center = c;
-    var dLat = s.miles / 69, dLng = s.miles / (69 * Math.max(0.2, Math.cos(c.lat * Math.PI / 180)));
-    var box = 'latitude=gte.' + (c.lat - dLat).toFixed(5) + '&latitude=lte.' + (c.lat + dLat).toFixed(5) +
-              '&longitude=gte.' + (c.lng - dLng).toFixed(5) + '&longitude=lte.' + (c.lng + dLng).toFixed(5);
+    var box = milesBox(c, s.miles);
     // A specialty finds its listings by NUCC code (the reviewed table). Terms
     // that are not a specialty (a navigator suggestion) still match by name.
     var codes = specialtyCodes(s.label);
     s.codeSet = codes.length ? codes.reduce(function (m, c) { m[c] = true; return m; }, {}) : null;
-    return providerRowsQuery(box + (s.codeSet ? codeFilter(codes) : taxonomyPrefilter(s.terms))).then(function (rows) {
+    return providerBoxQuery(box, s.codeSet ? codeFilter(codes) : taxonomyPrefilter(s.terms)).then(function (rows) {
       if (seq !== s.seq) return;
       s.truncated = !!rows.truncated;
       s.all = buildResults(rows, s);
@@ -1244,8 +1242,7 @@ function detailSheet(npi) {
   if (p.lat && p.lng) {
     here.appendChild(h('p', { class: 'muted' }, h('span', { class: 'spin' }), ' Looking for other listings here…'));
     var e = 0.0004;   // about 40 m
-    providerRowsQuery('latitude=gte.' + (p.lat - e).toFixed(5) + '&latitude=lte.' + (p.lat + e).toFixed(5) +
-      '&longitude=gte.' + (p.lng - e).toFixed(5) + '&longitude=lte.' + (p.lng + e).toFixed(5)).then(function (rows) {
+    providerBoxQuery({ s: p.lat - e, n: p.lat + e, w: p.lng - e, e: p.lng + e }).then(function (rows) {
       clear(here);
       var seen = {}, list = [];
       rows.forEach(function (r) {

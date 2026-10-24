@@ -261,6 +261,8 @@ await step('desktop searches', async () => {
   // The "Accepting new patients" chip on a real result list.
   await step('filter chip', async () => {
     await search(page, log, { what: 'Primary care / family doctor', zip: '76117' });
+    // Since 2026-10-24 the chips show only when the search found claimed listings.
+    if (!(await page.$('.fchip'))) { report.searches.push({ label: 'Filter chips on primary care, 76117', state: 'done', notes: ['chips hidden: no claimed listings in these results'] }); return; }
     await page.locator('.fchip').first().click();
     await page.waitForTimeout(500);
     const r = await readResults(page);

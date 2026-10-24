@@ -745,14 +745,12 @@ function loadCompetition(miles, specOverride) {
   var locP = S.locations ? Promise.resolve() : loadLocations();
   return locP.then(myCenter).then(function (c) {
     if (!c) return null;
-    var dLat = miles / 69, dLng = miles / (69 * Math.max(0.2, Math.cos(c.lat * Math.PI / 180)));
-    var box = 'latitude=gte.' + (c.lat - dLat).toFixed(5) + '&latitude=lte.' + (c.lat + dLat).toFixed(5) +
-              '&longitude=gte.' + (c.lng - dLng).toFixed(5) + '&longitude=lte.' + (c.lng + dLng).toFixed(5);
+    var box = milesBox(c, miles);
     // Competitors are found by NUCC code, like the patient search; a
     // description that is not one of the specialties still matches by name.
     var codes = specialtyCodes(spec.label), codeSet = null;
     if (codes.length) { codeSet = {}; codes.forEach(function (x) { codeSet[x] = true; }); }
-    return Promise.all([providerRowsQuery(box + (codeSet ? codeFilter(codes) : taxonomyPrefilter(spec.terms))), loadRegistered()]).then(function (res) {
+    return Promise.all([providerBoxQuery(box, codeSet ? codeFilter(codes) : taxonomyPrefilter(spec.terms)), loadRegistered()]).then(function (res) {
       var mine = String((S.profile || {}).npi || '');
       var byNpi = {};
       res[0].forEach(function (r) {

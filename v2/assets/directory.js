@@ -121,6 +121,64 @@ function providerRowsQuery(filter) {
   });
 }
 
+// A lat/lng box query on the three provider tables that splits instead of
+// failing. Dense areas timed out on one table (57014 at the anon role's 3s
+// limit: 10001 urgent care and primary care, 76117 dentists; live audit
+// 2026-10-24), and patients saw "part of the directory did not answer" or
+// nothing. A table whose box fails is asked again as four quarter boxes, and
+// a quarter that fails again as four more (16 at most), all in parallel;
+// only that table pays. box = {s, n, w, e}; extra = the rest of the filter.
+// A part that still fails keeps .failed, so the caller still says
+// "incomplete", never "none".
+function boxFilter(b) {
+  return 'latitude=gte.' + b.s.toFixed(5) + '&latitude=lte.' + b.n.toFixed(5) +
+    '&longitude=gte.' + b.w.toFixed(5) + '&longitude=lte.' + b.e.toFixed(5);
+}
+function quarters(b) {
+  var mLat = (b.s + b.n) / 2, mLng = (b.w + b.e) / 2;
+  return [{ s: b.s, n: mLat, w: b.w, e: mLng }, { s: b.s, n: mLat, w: mLng, e: b.e },
+          { s: mLat, n: b.n, w: b.w, e: mLng }, { s: mLat, n: b.n, w: mLng, e: b.e }];
+}
+function tableBoxQuery(table, select, box, extra, depth) {
+  return tableQuery(table, select, boxFilter(box) + extra).then(function (rows) {
+    if (!rows.failed || depth >= 2) return rows;
+    return Promise.all(quarters(box).map(function (q) { return tableBoxQuery(table, select, q, extra, depth + 1); }))
+      .then(function (parts) {
+        // Quarter edges overlap by one coordinate value: keep each row once.
+        var seen = {}, out = [];
+        out.failed = parts.some(function (x) { return x.failed; });
+        out.split = true;
+        parts.forEach(function (x) {
+          x.forEach(function (r) {
+            var k = r.npi + '|' + r.latitude + '|' + r.longitude + '|' + (r.address || '');
+            if (!seen[k]) { seen[k] = true; out.push(r); }
+          });
+          if (x.length >= CLINICS_PAGE_CAP) out.capped = true;
+        });
+        return out;
+      });
+  });
+}
+function providerBoxQuery(box, extra) {
+  extra = extra || '';
+  return Promise.all([
+    tableBoxQuery('clinics', PROVIDER_ROW_SELECT, box, extra, 0),
+    tableBoxQuery('provider_individuals', PROVIDER_ROW_SELECT + ',phone', box, extra, 0),
+    tableBoxQuery('clinic_secondary_locations', 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude', box, extra, 0)
+  ]).then(function (results) {
+    var all = tagSrc(results[0], 'clinic').concat(tagSrc(results[1], 'individual'), tagSrc(results[2], 'secondary'));
+    all.truncated = results.some(function (r) { return r.capped || (r || []).length >= CLINICS_PAGE_CAP; });
+    all.failed = results.some(function (r) { return r && r.failed; });
+    all.split = results.some(function (r) { return r && r.split; });
+    return all;
+  });
+}
+// The box around a point, `miles` out (longitude shrinks with latitude).
+function milesBox(c, miles) {
+  var dLat = miles / 69, dLng = miles / (69 * Math.max(0.2, Math.cos(c.lat * Math.PI / 180)));
+  return { s: c.lat - dLat, n: c.lat + dLat, w: c.lng - dLng, e: c.lng + dLng };
+}
+
 // CDC PLACES carries a real ZCTA centroid for every ZIP it covers (32,520 of
 // them — see supabase/migrations/010_cdc_places_centroids.sql), including
 // ZIPs with zero clinics. DENTAL is the measure asked for because it is
