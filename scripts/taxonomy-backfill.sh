@@ -62,12 +62,9 @@ echo "   $(($(wc -l < "$WORK/directory.csv") - 1)) rows"
 # ---- 3. NPPES monthly full file ---------------------------------------------
 echo "== NPPES"
 if [ -z "${NPPES_URL:-}" ]; then
-  page=https://download.cms.gov/nppes/NPI_Files.html
-  html=$(curl -fsSL "$page") || fail "NPPES download page unreachable: $page"
-  # The monthly full file is named by month and year; the weekly ones use digits.
-  file=$(echo "$html" | grep -oE 'NPPES_Data_Dissemination_[A-Za-z]+_20[0-9]{2}(_V2)?\.zip' | sort -u | awk '/_V2/ {v2=$0} {any=$0} END {print (v2 ? v2 : any)}')
-  [ -n "$file" ] || fail "No monthly NPPES file link found on $page. Pass nppes_url to the workflow."
-  NPPES_URL="https://download.cms.gov/nppes/$file"
+  # shellcheck source=lib/nppes-url.sh
+  . scripts/lib/nppes-url.sh
+  NPPES_URL=$(nppes_monthly_url) || fail "No NPPES monthly file found (see the links listed above). Pass nppes_url to the workflow."
 fi
 echo "   $NPPES_URL"
 curl -fsSL --retry 3 -o "$WORK/nppes.zip" "$NPPES_URL" || fail "NPPES download failed: $NPPES_URL"

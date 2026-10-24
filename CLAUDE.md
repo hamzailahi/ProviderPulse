@@ -1487,6 +1487,9 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   batches with VACUUM, rerun resumes). Only active NPI-2 rows with a
   plausible 10-digit US number; a row NPPES has no phone for is left alone.
   Summary to `supabase/reference/org-phone-backfill-summary.md`.
+  Both NPPES jobs find the monthly file through `scripts/lib/nppes-url.sh`
+  (the page link, else the standard names for the last three months); an
+  empty `grep` under `pipefail` once ended the phone job's dry run silently.
 - **Taxonomy code indexes** (`taxonomy-indexes.yml`, manual,
   `scripts/taxonomy-indexes.sh`): applies 030 through psql, because the SQL
   editor wraps a pasted script in one transaction and `CREATE INDEX
