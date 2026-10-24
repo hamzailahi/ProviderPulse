@@ -140,8 +140,26 @@ function quarters(b) {
   return [{ s: b.s, n: mLat, w: b.w, e: mLng }, { s: b.s, n: mLat, w: mLng, e: b.e },
           { s: mLat, n: b.n, w: b.w, e: mLng }, { s: mLat, n: b.n, w: mLng, e: b.e }];
 }
+// Split boxes wait for a slot: at most six of them in flight across all
+// tables. Unthrottled, a 64-box Manhattan split ran ~100 requests at once,
+// the queue itself pushed them past the timeout, and the search came back
+// with less than before (live audit, 2026-10-24).
+var SPLIT_SLOTS = 6, splitBusy = 0, splitWaiting = [];
+function splitSlot(fn) {
+  return new Promise(function (resolve) {
+    function run() {
+      splitBusy++;
+      fn().then(function (v) {
+        splitBusy--; if (splitWaiting.length) splitWaiting.shift()();
+        resolve(v);
+      });
+    }
+    if (splitBusy < SPLIT_SLOTS) run(); else splitWaiting.push(run);
+  });
+}
 function tableBoxQuery(table, select, box, extra, depth) {
-  return tableQuery(table, select, boxFilter(box) + extra).then(function (rows) {
+  var ask = function () { return tableQuery(table, select, boxFilter(box) + extra); };
+  return (depth ? splitSlot(ask) : ask()).then(function (rows) {
     if (!rows.failed || depth >= 3) return rows;
     return Promise.all(quarters(box).map(function (q) { return tableBoxQuery(table, select, q, extra, depth + 1); }))
       .then(function (parts) {

@@ -216,7 +216,7 @@ main { min-height: 0; }
 @media (max-width: 900px) {
   .sfield input, .sfield select, .fsort, .sheet textarea, .sheet input, .sheet select { font-size: 16px; }
   /* 44px tap targets on touch screens (the audit counted 15 of 25 under it). */
-  .fchip, .fsort, .act, .pill, .sgo, .more, .map-toggle, .ask-link { min-height: 44px; }
+  .fchip, .fsort, .act, .pill, .sgo, .more, .map-toggle, .ask-link, .linkbtn { min-height: 44px; }
   .fchip { display: inline-flex; align-items: center; }
   .res .act.call { display: inline-flex; background: #0f766e; border-color: transparent; color: #fff; }
   .res-phone { display: none; }                       /* the Call button carries it */

@@ -393,7 +393,7 @@ spaces, trim), then require `(' ' + stored).includes(' ' + term)`. The leading
 space is load-bearing: without it `Urology Physician` matches
 "Ne*urology Physician*". Never simplify it to a plain `includes`.
 
-**Box queries split instead of failing** (`providerBoxQuery` in `directory.js`, 2026-10-24): the patient search, portal Competition and the detail sheet's same-address list ask each provider table for a lat/lng box; a table whose box times out is asked again as four quarter boxes, then sixteen, then 64, in parallel, keeping `.failed` on whatever still fails. The live audit had dense areas (10001 urgent care and primary care, 76117 dentists) time out on one table at the anon role's 3s limit.
+**Box queries split instead of failing** (`providerBoxQuery` in `directory.js`, 2026-10-24): the patient search, portal Competition and the detail sheet's same-address list ask each provider table for a lat/lng box; a table whose box times out is asked again as four quarter boxes, then sixteen, then 64, at most six split requests in flight (unthrottled, ~100 at once queued past the timeout), keeping `.failed` on whatever still fails. The live audit had dense areas (10001 urgent care and primary care, 76117 dentists) time out on one table at the anon role's 3s limit.
 
 Copies of that rule: `assets/directory.js` (shared by `patient.js` and
 `portal.js`), `index.html` and `dashboard-v3.js`, `demand-stats.js`,
