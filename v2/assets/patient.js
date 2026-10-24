@@ -423,8 +423,8 @@ function buildResults(rows, s) {
   (rows || []).forEach(function (row) {
     if (!row.npi || !(s.codeSet ? s.codeSet[row.taxonomy_code] : taxMatches(row.primary_taxonomy, s.terms))) return;
     consider({
-      npi: String(row.npi), name: titleCase(row.name), specialty: row.primary_taxonomy || '', phone: fmtPhone(row.phone),
-      address: titleCase(row.address), city: titleCase(row.city), state: row.state, zip: row.zip,
+      npi: String(row.npi), name: displayName(row.name), specialty: row.primary_taxonomy || '', phone: fmtPhone(row.phone),
+      address: titleCase(row.address), city: cityName(row.city), state: row.state, zip: row.zip,
       lat: +row.latitude, lng: +row.longitude, src: row._src
     });
   });

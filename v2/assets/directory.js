@@ -228,6 +228,31 @@ function hueFor(key) {
   for (var i = 0; i < key.length; i++) n = (n * 31 + key.charCodeAt(i)) % 360;
   return n;
 }
+// A listing's name for patients: re-cased (titleCase), short all-consonant
+// words kept as the acronyms they are (CVS, HCA, not "Cvs"), and the legal
+// suffix dropped ("Haltom Dental, P.A." -> "Haltom Dental"; "Ty Ortho
+// Management PLLC" -> "Ty Ortho Management"). The suffix only goes when
+// something is left in front of it, so a name is never emptied.
+var LEGAL_SUFFIX = /[\s,]+(inc|incorporated|llc|l\.l\.c|pllc|p\.l\.l\.c|llp|lp|ltd|limited|corp|corporation|co|pc|p\.c|pa|p\.a|psc|sc|s\.c|apc|apmc|lc|l\.c)\.?$/i;
+function displayName(name) {
+  var raw = String(name || '').trim();
+  var s = titleCase(raw);
+  // Only a name titleCase re-cased from capitals gets its acronyms back.
+  if (s !== raw) s = s.replace(/\b[A-Za-z]{2,4}\b/g, function (w) {
+    return (/^[^aeiouy]+$/i.test(w) && !/^(st|dr|mt|ft|jr|sr|mr|mrs|ms)$/i.test(w)) ? w.toUpperCase() : w;
+  });
+  for (var i = 0; i < 3; i++) {
+    var t = s.replace(LEGAL_SUFFIX, '');
+    if (t === s || !/[A-Za-z]{2}/.test(t)) break;
+    s = t;
+  }
+  return s.replace(/[\s,]+$/, '');
+}
+// Cities as patients write them: "FT WORTH" and "Ft Worth" -> "Fort Worth".
+function cityName(city) {
+  return titleCase(String(city || '').trim()).replace(/^Ft\.? /i, 'Fort ').replace(/^Mt\.? /i, 'Mount ');
+}
+
 function titleCase(s) {
   s = String(s || '');
   // NPPES and the bulk tables store names in capitals; shout-case reads as a

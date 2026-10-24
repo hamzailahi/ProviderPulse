@@ -550,6 +550,7 @@ node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bu
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 node scripts/test-providers-near.mjs      # the assistant's competitor lookup: codes in a location box, clinicians and organizations, failures never "none"
 node scripts/test-catchment.mjs           # the market score's area: every ZIP within 10 miles, ZIP groups, a failed load refuses to score
+node scripts/test-display-names.mjs       # listing names and cities as patients see them
 node scripts/test-org-phones.mjs          # organization phones from NPPES: usable numbers, which rows change, the parser end to end, the API pass on a fake API
 node scripts/test-procedures-tool.mjs     # the assistant's procedures tool on a fake database: averages, word search, failures reported, hospitals
 node scripts/test-area-zips.mjs           # stray ZIPs a city search leaves out
@@ -607,6 +608,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **Listing names read like names, not legal filings.** Results and the
+  portal's Competition list drop suffixes such as PLLC, Inc. and P.A.
+  ("Haltom Dental, P.A." shows as "Haltom Dental"), keep acronyms like CVS
+  in capitals, and write "FT WORTH" as Fort Worth.
 - **On phones the Map button no longer covers results.** It used to float
   over the list and sat on the first result's Call button. It now sits in
   the results count row, which stays pinned under the header while you

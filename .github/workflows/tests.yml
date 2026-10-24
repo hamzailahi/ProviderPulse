@@ -99,6 +99,9 @@ jobs:
       - name: Organization phones from NPPES
         run: node scripts/test-org-phones.mjs
 
+      - name: Listing names and cities
+        run: node scripts/test-display-names.mjs
+
       - name: Stray ZIPs left out of a city search
         run: node scripts/test-area-zips.mjs
 

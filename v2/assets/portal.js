@@ -763,7 +763,7 @@ function loadCompetition(miles, specOverride) {
         var cur = byNpi[r.npi];
         if (cur && cur.miles <= d) return;
         var reg = r._src !== 'secondary' ? res[1][String(r.npi)] : null;
-        byNpi[r.npi] = { npi: String(r.npi), name: titleCase(reg && reg.name || r.name), specialty: r.primary_taxonomy,
+        byNpi[r.npi] = { npi: String(r.npi), name: displayName(reg && reg.name || r.name), specialty: r.primary_taxonomy,
           lat: +r.latitude, lng: +r.longitude, miles: d, registered: !!reg,
           accepting: reg ? reg.accepting_new_patients : undefined, telehealth: reg ? reg.telehealth : undefined };
       });
