@@ -1,13 +1,13 @@
 <!-- Written by scripts/org-phone-backfill.sh. -->
-Run: 2026-10-24 19:59 UTC, mode **dry_run**, source: the NPI Registry API.
+Run: 2026-10-24 20:04 UTC, mode **apply**, source: the NPI Registry API (results of dry run 40120499793).
 
-NPPES extract: `{"zips":27633,"zips_done":27633,"zips_failed":0,"zips_not_reached":0,"overflow_zips":12,"split_failed_zips":0,"still_full_zips":0,"queries":32285,"single_lookups":204,"single_failed":0,"single_skipped_cap":0,"records":1984459,"with_phone":1980787,"no_phone":282,"bad_phone":3390,"deactivated":0,"single_not_reached":0,"requests":32490,"retries":0,"minutes":91.1,"address_purpose":"PRIMARY","zip_limit":null,"refusals":0,"pauses":0,"blocked":false,"final_rate":6}`
+NPPES extract: `1980787 organizations with a phone`
 
 ## Size check
 
 - clinics: 0.87 GB
 - Estimated extra disk needed: **3.3 GB** (the table rewritten once, staging and WAL)
-- Free disk entered: not given
+- Free disk entered: 8
 - clinics.phone column (migration 040): not yet; apply adds it
 
 ## Organization phones
@@ -26,3 +26,7 @@ NPPES extract: `{"zips":27633,"zips_done":27633,"zips_failed":0,"zips_not_reache
 - ZIPs over the 1,200-record ceiling: 12 (ZIP+4 split refused in 0, still over in 0); looked up one by one: 204, failed 0, over the cap 0
 - overflowing ZIPs: 33155, 33012, 33186, 77036, 33144, 33166, 48075, 75093, 10016, 11235, 33016, 33134
 - Complete: every ZIP answered.
+
+## After apply
+
+- clinics with a phone: 1894376 of 1901951
