@@ -1,0 +1,63 @@
+name: Live patient app audit
+
+# Manual, read only. Drives the deployed patient app (/) in headless Chromium
+# (scripts/live/patient-audit.mjs): signed out and with a placeholder patient,
+# on desktop and a phone (one pass on slow 4G), real searches against live
+# data, detail sheets, axe-core accessibility checks, phone layout checks and
+# load timings. Writes nothing: demand logging, the ZIP queue and the AI
+# helper are answered locally. Results in the run summary and as an artifact.
+# push_branch (must start with tmp/) also pushes them to a throwaway orphan
+# branch for a cloud session that cannot download artifacts; delete it with
+# tmp-branch-cleanup.yml afterwards and never merge it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Site to audit
+        default: https://providerpulse-v2.netlify.app
+      push_branch:
+        description: "Optional: also push the results to this throwaway branch (must start with tmp/)"
+        required: false
+
+permissions:
+  contents: write   # only used by the optional tmp/ branch push
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install Playwright and axe-core
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw" && npm init -y >/dev/null && npm i -s playwright@1.48.2 axe-core@4.10.2
+          npx playwright install --with-deps chromium
+      - name: Audit
+        run: cp scripts/live/patient-audit.mjs "$RUNNER_TEMP/pw/" && cd "$RUNNER_TEMP/pw" && node patient-audit.mjs "$GITHUB_WORKSPACE/out" "${{ inputs.base_url }}"
+      - name: Summary
+        if: always()
+        run: cat out/audit.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: patient-audit
+          path: out
+      - name: Push to a throwaway branch
+        if: always() && inputs.push_branch != ''
+        env:
+          BRANCH: ${{ inputs.push_branch }}
+        run: |
+          case "$BRANCH" in tmp/*) ;; *) echo "push_branch must start with tmp/"; exit 1;; esac
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan "$BRANCH"
+          git rm -rq --cached .
+          git add -f out/
+          git commit -qm "Patient app audit (temporary branch; delete after use) [skip netlify]"
+          git push -f origin "HEAD:refs/heads/$BRANCH"

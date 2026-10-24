@@ -1607,6 +1607,18 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
 - **Procedure codes around a ZIP** (`code-area-report.yml`, manual, read only, `scripts/live/code-area-report.mjs`): inputs a centre ZIP, a radius and a code list; writes CSVs (Medicare rows per clinician, code and place of service with distance; Medicaid rows per ZIP and specialty; hospital outpatient rows whose APC description looks GI or endoscopic, since hospitals report payment groups, not CPT codes; the ZIPs searched) as a 7-day run artifact; with `push_branch` (must start with `tmp/`) it also pushes them to that orphan branch for a cloud session, which cannot reach GitHub's artifact storage. Delete the branch after use with `tmp-branch-cleanup.yml` (manual; deletes every `tmp/` branch and fails if any is left; the session's proxy refuses branch deletes); never merge it. Any failed request stops the run, so a partial pull never passes as complete.
 - **Procedures panel check** (`procedures-panel-check.yml`, manual, read only, `scripts/live/procedures-check.mjs`): the panel's Medicare loader replayed for one city, page by page, beside direct queries for one specialty and a list of codes, the same codes in the Medicaid table, and CMS's own file through its data API.
 - **Live dashboard audit** (`live-dashboard-audit.yml`, manual, read only): see "A failed query is not an empty answer". It also opens a provider's home with a mocked `profile` response (38017, Family Medicine), searches away, reloads, goes home and presses Back. Since 2026-10-21 it also pastes a GI practice's 46 codes into the Procedures tab for Fort Worth and records each view and its requests. Input `only: report-context` (2026-10-22) runs just one scenario: a city search plus two neighbor rings, then Reports' Write it, recording the area ZIPs the request carries. Rerun after any change to the dashboard's loaders or its home flow.
+- **Live patient app audit** (`live-patient-audit.yml`, manual, read only,
+  `scripts/live/patient-audit.mjs`, 2026-10-24): the deployed `/` signed out
+  and with a placeholder patient (mocked `profile`), desktop and an iPhone 13
+  viewport (one pass on slow 4G with a 4x CPU), about a dozen real searches
+  (tiles, typed specialties, plain words, organizations, dense and rural
+  ZIPs, a bad ZIP), detail sheets, the AI helper sheet, keyboard tab order,
+  axe-core (WCAG 2.2 AA and best practice) and phone layout checks (overflow,
+  tap targets under 44 px, text under 12 px, inputs under 16 px). Demand
+  logging, the ZIP queue and the AI reply are answered locally, so it writes
+  nothing. `push_branch` (tmp/ only) like the code report; delete after use.
+  `PW_CHROMIUM` runs it on the dev container's Chromium (`--headless=new`)
+  against a local copy, which checks the script but not the data.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is

@@ -518,6 +518,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `procedure-tables-check.yml` | manual, read only | shows what the Procedures panel gets for one ZIP through the public key, beside direct counts and the tables' policies |
 | `nppes-terms-check.yml` | manual, read only | sends every specialty's registry search term to NPPES and records what comes back |
 | `db-size-report.yml` | manual only | read-only report of table, index and write-ahead-log sizes and dead rows, written to `supabase/reference/db-size-report.md` |
+| `live-patient-audit.yml` | manual, read only | drives the deployed patient app on desktop and phone with real searches and records timings, results, accessibility (axe-core) and layout problems; `push_branch` (tmp/ only) copies the results for a cloud session |
 | `org-phone-backfill.yml` | manual only | fills organizations' phone numbers from the NPPES monthly file (`source: file`) or the NPI Registry API, ZIP by ZIP (`source: api`, while CMS's download site is down). `dry_run` writes nothing and reports how many would change; `apply` adds the column (migration 040), writes in batches and refuses unless the free disk entered covers the rewrite; `from_run` reuses an api dry run's results |
 | `taxonomy-backfill.yml` | manual only | gives every listing its official NUCC taxonomy code from the NPPES monthly file and loads the `taxonomy_map` table. `dry_run` writes nothing and reports coverage and exceptions; `apply` refuses unless the free disk entered covers the rewrite |
 | `schema-snapshot.yml` | weekly, Mondays | dumps the live database's structure (tables, indexes, policies, grants; no data) to `supabase/schema/public.sql` and commits it only when it changed, so every such commit records a schema change |
@@ -606,6 +607,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **A live audit of the patient app.** A new manual job, "Live patient app
+  audit", opens the deployed find-care app as a visitor and as a placeholder
+  patient, on a desktop and on a phone (once on slow 4G). It runs about a
+  dozen real searches and opens provider details, then records timings,
+  result counts, phone coverage, accessibility problems and phone layout
+  issues. It writes nothing: search logging and the AI helper are answered
+  locally.
 - **A job to give organizations a phone number.** Pharmacies, urgent cares,
   hospitals and other organizations have no phone in the directory. The new
   "Organization phone backfill" job reads each one's practice phone from the
