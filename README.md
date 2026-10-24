@@ -607,6 +607,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-24
 
+- **On phones the Map button no longer covers results.** It used to float
+  over the list and sat on the first result's Call button. It now sits in
+  the results count row, which stays pinned under the header while you
+  scroll. On the map it still floats at the bottom, where nothing is under it.
 - **The find-care app is easier to use with a keyboard, a screen reader or a
   thumb.** Each page now has a main heading, and the results count is a
   heading too. The sign-in card's "Create an account" link and the

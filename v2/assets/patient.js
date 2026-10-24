@@ -547,6 +547,8 @@ function findView() {
   var toggle = h('button', { class: 'map-toggle', type: 'button', onclick: function () {
     var on = body.classList.toggle('show-map');
     toggle.textContent = on ? '☰ List' : '🗺 Map';
+    // On the map the toggle floats; in the list it sits in the count row.
+    if (on) body.appendChild(toggle); else paintFind();
     // The map was laid out while hidden (zero size), so re-measure it and
     // re-fit to the search radius, or it opens zoomed to nothing.
     if (on && findMap.map) setTimeout(function () {
@@ -556,7 +558,7 @@ function findView() {
   } }, '🗺 Map');
   var body = h('div', { class: 'find-body' }, results, h('div', { class: 'mapwrap' }, mapEl), toggle);
 
-  findEls = { filters: filters, results: results, map: mapEl, what: fWhat };
+  findEls = { filters: filters, results: results, map: mapEl, what: fWhat, toggle: toggle, body: body };
   var view = h('section', { class: 'find' }, h('div', { class: 'find-top' }, form, helper, filters), body);
   setTimeout(function () { mountMap(); paintFind(true); }, 0);
   return view;
@@ -610,6 +612,10 @@ function paintFind(refit) {
       h('b', {}, list.length.toLocaleString() + ' ' + (s.label || 'providers')),
       ' within ' + s.miles + ' mi of ' + s.zip,
       filtered ? h('span', { class: 'muted' }, ' · ' + (s.all.length - list.length) + ' hidden by filters') : null));
+    // Phones: the Map/List toggle rides in the pinned count row (find.css).
+    if (!findEls.body.classList.contains('show-map')) r.firstChild.appendChild(findEls.toggle);
+    var hdr = $('#hdr');
+    if (hdr) document.documentElement.style.setProperty('--hdr-h', hdr.offsetHeight + 'px');
     if (s.partial) r.appendChild(h('div', { class: 'note' }, 'Part of the directory did not answer in time, so some providers may be missing. Try again in a moment.'));
     else if (s.truncated) r.appendChild(h('div', { class: 'note' }, 'This area has more listings than we can show at once, so these are a sample. Try a shorter distance.'));
     if (!list.length) {
