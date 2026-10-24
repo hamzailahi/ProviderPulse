@@ -57,6 +57,7 @@ const page = rows => u => (u.includes('offset=0') ? rows : []);
   const r = await findProviders({ zip: '76117', specialty: 'Digestive / gastroenterology', radius_miles: 5 }, { fetch: f, env, zips: ['76117', '76180', '76104'] });
   check('map area: listings in the map\'s ZIPs count whatever the radius', r.area.map_zips === 3 && r.total === 4, JSON.stringify(r.by_zip));
   check('map area: a ZIP not on the map is left out', !r.nearest_organizations.some(o => o.zip === '75201'));
+  check('map area: every map ZIP is listed, a ZIP with no listing reads 0', r.by_zip.length === 3 && r.by_zip.find(z => z.zip === '76117').listings === 0 && r.zips_without_listings.join() === '76117', JSON.stringify(r.by_zip));
   const q = f.urls.find(u => u.includes('/clinics?'));
   const lat = Number(q.match(/latitude=gte\.([\d.-]+)/)[1]);
   check('map area: the box reaches the southernmost map ZIP (76104) and past it', lat < 32.73);
@@ -67,6 +68,8 @@ const page = rows => u => (u.includes('offset=0') ? rows : []);
   const r = await findProviders({ zip: '76117', specialty: 'Digestive / gastroenterology', radius_miles: 25 }, { fetch: fakeDb([centre, [/\/clinics\?/, 500], [/\/provider_individuals\?/, 500]]), env });
   check('both tables failing is an error, not zero providers', !!r.error && r.total === undefined);
   const r2 = await findProviders({ zip: '76117', specialty: 'Digestive / gastroenterology', radius_miles: 25 }, { fetch: fakeDb([centre, [/\/clinics\?/, page(ORGS)], [/\/provider_individuals\?/, 500]]), env });
+  { const rf = await findProviders({ zip: '76117', specialty: 'Digestive / gastroenterology', radius_miles: 5 }, { fetch: fakeDb([centre, mapCentres, [/\/clinics\?/, 500], [/\/provider_individuals\?/, page(PEOPLE)]]), env, zips: ['76117', '76180'] });
+    check('an incomplete map lookup never reads a ZIP as 0', rf.by_zip.find(z => z.zip === '76117').listings === null && /unknown/.test(rf.zips_without_listings)); }
   check('one table failing: the result is incomplete and its counts are floors', r2.incomplete === true && r2.count_is_floor === true && /floors/.test(r2.incomplete_reason) && r2.organizations === 2);
   let n = 0;
   const full = Array.from({ length: 1000 }, (_, i) => L(String(100 + i), 'GI ' + i, GI, '76117', 32.80, -97.27));

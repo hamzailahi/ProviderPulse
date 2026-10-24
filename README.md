@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-22. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-24. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -602,6 +602,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
 
+### 2026-10-24
+
+- **Competitor counts list every ZIP.** Ask AI's competitor lookup showed
+  only the 20 ZIPs with the most listings, so a report read ZIPs missing from
+  that list as having no GI listings. Every ZIP is now listed; on a map
+  search each map ZIP appears, with 0 only when the lookup completed and
+  "unknown" when it did not.
 ### 2026-10-22
 
 - **"Missed screening" figures now show the share that missed.** For colon

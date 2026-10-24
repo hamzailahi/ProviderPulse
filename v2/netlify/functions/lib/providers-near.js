@@ -115,7 +115,8 @@ async function findProviders(input, opts) {
   }
   hits.sort((a, b) => a.miles - b.miles);
   const byZip = {};
-  hits.forEach(h => { byZip[h.zip] = (byZip[h.zip] || 0) + 1; });
+  const z5 = z => String(z || '').split('-')[0].trim().padStart(5, '0');
+  hits.forEach(h => { byZip[z5(h.zip)] = (byZip[z5(h.zip)] || 0) + 1; });
   const capped = !!(orgs.capped || people.capped);
   const orgN = hits.filter(h => h.type === 'organization').length, indN = hits.filter(h => h.type === 'individual').length;
   // A table whose lookup failed is unknown, never zero.
@@ -130,7 +131,13 @@ async function findProviders(input, opts) {
     lookups: { organizations: orgs.ok ? (orgs.capped ? 'capped' : 'complete') : 'failed', individuals: people.ok ? (people.capped ? 'capped' : 'complete') : 'failed' },
     nearest_organizations: hits.filter(h => h.type === 'organization').slice(0, LIST),
     nearest_individuals: hits.filter(h => h.type === 'individual').slice(0, LIST),
-    by_zip: Object.keys(byZip).map(z => ({ zip: z, listings: byZip[z] })).sort((a, b) => b.listings - a.listings).slice(0, 20),
+    // Every ZIP, not the top 20 (2026-10-24): a report read ZIPs missing
+    // from a 20-row list as having no GI listings. In map mode every map ZIP
+    // is listed, with 0 only when the lookup was complete, else null.
+    by_zip: useMap
+      ? mapZips.map(z => ({ zip: z, listings: byZip[z] || (incomplete ? null : 0) })).sort((a, b) => (b.listings || 0) - (a.listings || 0))
+      : Object.keys(byZip).map(z => ({ zip: z, listings: byZip[z] })).sort((a, b) => b.listings - a.listings),
+    zips_without_listings: useMap ? (incomplete ? 'unknown: the lookup was incomplete' : mapZips.filter(z => !byZip[z])) : undefined,
     count_is_floor: incomplete,
     incomplete,
     incomplete_reason: incomplete ? [!orgs.ok ? 'the organization lookup (practices, surgery centers) failed, so their count is unknown, not zero' : null,
