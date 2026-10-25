@@ -118,6 +118,9 @@ jobs:
       - name: Hospital campuses
         run: node scripts/test-hospital-campuses.mjs
 
+      - name: Typed addresses only match what was typed
+        run: node scripts/test-address-fit.mjs
+
       - name: Provider listing self-check
         run: node scripts/test-self-check.mjs
 

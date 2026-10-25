@@ -575,6 +575,7 @@ node scripts/test-catchment.mjs           # the market score's area: every ZIP w
 node scripts/test-provider-npis.mjs        # one account, many NPIs: checks, review, own rows only, publishing and booking
 node scripts/test-self-check.mjs           # a provider's own listing check: their NPI only, nothing written
 node scripts/test-listing-report.mjs       # report a wrong listing: only the NPI and issue are stored, repeats throttled
+node scripts/test-address-fit.mjs          # typed addresses only match places that fit what was typed
 node scripts/test-hospital-campuses.mjs     # the reviewed hospital campus list and how patient search shows it
 node scripts/test-nppes-refresh.mjs        # weekly NPPES refresh: new, changed and deactivated NPIs, accurate geocoding only, limits, a rerun writes nothing
 node scripts/test-npi-activity.mjs         # the public Medicare-activity lookup: published columns only, unknown never "inactive"
@@ -646,6 +647,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **A typed address no longer jumps to a random place.** The map service
+  always offers some match, so nonsense text once moved a search to a
+  street in Oklahoma. Typed text now has to fit the match (house number,
+  ZIP, and street or town names); otherwise the patient is asked to pick
+  from the suggestions or enter a ZIP.
 - **Baptist Memorial Hospital-Collierville now appears under Emergency rooms
   & hospitals.** Some hospital campuses have no registry entry of their own:
   they bill under a parent hospital's number at another address, so the

@@ -516,6 +516,40 @@ function geocodeAddress(text) {
     .then(function (d) { return ((d && d.features) || []).filter(function (f) { return f.center && f.center.length === 2; }).map(originOf); })
     .catch(function () { return []; });
 }
+// Whether a geocoder match is really the place typed (2026-10-25). The
+// geocoder always offers something: the live audit typed "zzzz nowhere
+// street" and got "County Street 2550, Caddo, OK", and the search moved there
+// silently. A typed house number must be in the match, a typed ZIP must agree,
+// and at least half of the other distinctive words (not street types,
+// directions or states) must appear in it. A suggestion the patient picks
+// skips this: they chose it.
+var ADDR_SYNONYMS = { ave: 'avenue', av: 'avenue', st: 'street', rd: 'road', dr: 'drive', blvd: 'boulevard', ln: 'lane', hwy: 'highway',
+  pkwy: 'parkway', ct: 'court', cir: 'circle', pl: 'place', ter: 'terrace', trl: 'trail', fwy: 'freeway', mt: 'mount', ft: 'fort', saint: 'st',
+  w: 'west', e: 'east', n: 'north', s: 'south', ne: 'northeast', nw: 'northwest', se: 'southeast', sw: 'southwest' };
+var ADDR_GENERIC = ('avenue street road drive boulevard lane highway parkway court circle place terrace trail freeway way loop ' +
+  'west east north south northeast northwest southeast southwest suite ste unit apt usa us united states america the of').split(' ');
+var US_STATES = ('al alabama ak alaska az arizona ar arkansas ca california co colorado ct connecticut de delaware dc district columbia fl florida ga georgia ' +
+  'hi hawaii id idaho il illinois in indiana ia iowa ks kansas ky kentucky la louisiana me maine md maryland ma massachusetts mi michigan ' +
+  'mn minnesota ms mississippi mo missouri mt montana ne nebraska nv nevada nh hampshire nj jersey nm mexico ny york nc carolina nd dakota ' +
+  'oh ohio ok oklahoma or oregon pa pennsylvania ri rhode island sc sd tn tennessee tx texas ut utah vt vermont va virginia wa washington ' +
+  'wv wi wisconsin wy wyoming new').split(' ');
+function addrTokens(t) {
+  return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean).map(function (w) { return ADDR_SYNONYMS[w] || w; });
+}
+function fitsQuery(q, o) {
+  var qt = addrTokens(q), lt = addrTokens(o.label + ' ' + (o.zip || ''));
+  var has = {}; lt.forEach(function (w) { has[w] = true; });
+  var zip = (String(q).match(/\b\d{5}\b/) || [])[0];
+  if (zip && o.zip && o.zip !== zip) return false;
+  var nums = qt.filter(function (w) { return /^\d+$/.test(w) && w !== zip; });
+  if (nums.length && !has[nums[0]]) return false;
+  var words = qt.filter(function (w) { return !/^\d+$/.test(w) && w.length > 1 && ADDR_GENERIC.indexOf(w) === -1 && US_STATES.indexOf(w) === -1; });
+  // "New York, NY": every word also names a state, so compare those words.
+  if (!words.length) words = qt.filter(function (w) { return !/^\d+$/.test(w) && w.length > 1 && ADDR_GENERIC.indexOf(w) === -1; });
+  if (!words.length) return !!(zip || nums.length);
+  var hit = words.filter(function (w) { return has[w]; }).length;
+  return hit * 2 >= words.length;
+}
 // The browser's location, named by reverse geocoding when possible.
 function locateMe() {
   return new Promise(function (resolve, reject) {
@@ -864,8 +898,15 @@ function findView() {
     if (s.origin && v === s.origin.label) return Promise.resolve(true);
     if (!v) { s.origin = null; s.zip = ''; return Promise.resolve(true); }
     return geocodeAddress(v).then(function (list) {
-      if (!list.length) { s.origin = null; s.ran = true; s.error = 'We couldn\'t find "' + v + '". Check the address, or enter a 5-digit ZIP.'; paintFind(); return false; }
-      useOrigin(list[0]); return true;
+      var fit = list.filter(function (o) { return fitsQuery(v, o); });
+      if (!fit.length) {
+        s.origin = null; s.ran = true;
+        s.error = list.length ? 'We couldn\'t find "' + v + '" exactly. Pick a match from the list under the box, check the address, or enter a 5-digit ZIP.'
+          : 'We couldn\'t find "' + v + '". Check the address, or enter a 5-digit ZIP.';
+        paintFind();
+        return false;
+      }
+      useOrigin(fit[0]); return true;
     });
   }
   function submit(e) {
