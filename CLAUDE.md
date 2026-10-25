@@ -77,7 +77,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `forms.css` | `register-provider.html`, `auth.html`, `admin-review.html`, `404.html` |
 | `directory.js` | shared browser helpers: Supabase URL/key, `displayName` / `cityName` (legal suffixes off, acronyms kept, Ft to Fort; patient results and Competition), `loadLeaflet`, `taxNorm`/`taxMatches`, `specialtyCodes`/`codeFilter`, paged `tableQuery`/`providerRowsQuery` (selects `taxonomy_code` and `phone`; `clinics.phone` since migration 040), `milesBetween`, MapTiler key, ZIP centroid lookup |
 | `specialties.js` | the 44 patient-facing specialties (see taxonomy section); `.SCORED` (40: all but `NOT_SCORED`: Hospital-based clinicians, Other health services, Nursing (RN, LPN) and Physician assistant) is what `market-score.js`, the assistant, the benchmark builder and the demand trainer score |
-| `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties. No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
+| `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties, and since 2026-10-25 care types (`careTypes`, `codesForCare(door)`, `safetyNetCodes()`, `safetyNet` / `eligibility` / `patientNote` texts; see "Care types"). No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `area-zips.js` | `strayZips(rows, {centroids})`: the ZIPs a city search leaves out (2026-10-21): under 1% of the listings **and** more than 25 miles from every ZIP holding 1% or more (nearest core ZIP, so multi-city and sprawling searches stay whole); a ZIP's position is its official centre when known, else its listings' middle; unknown is kept. `pinsFar` = strays whose listings themselves sit far away; browser + `require` |
 | `code-list.js` | the Procedures panel's pasted code list (2026-10-21): `parse` (two or more 5-character codes and nothing else; up to 100) and `summarize` (by code, by clinician, by ZIP from Medicare and Medicaid rows), `toCsv`, and for Download all `TOPICS` / `topicFor` / `hospitalTopics` (hospital APC and DRG groups matched to a code list by topic) and `workbook` (the sheets); browser + `require` |
 | `procedure-search.js` | the dashboard Procedures panel's search: common words ("colonoscopy", "EGD") to CMS's own description wording, tested against real descriptions; browser + `require` |
@@ -585,7 +585,29 @@ served specialties and a count of unserved ones. A PLACES-less ZIP (Puerto
 Rico) returns `model: {available:false, reason}`. Covered by section 4 of
 `scripts/test-scenario.mjs`. **The NUCC code work is complete**: no keyword
 classifier remains.
-`show_on_map` and patient specialties are data in the overrides CSV, never
+**Care types ("doors", approved 2026-10-25 as proposed in
+`Care-types-proposal.xlsx`).** The overrides CSV also carries `care_types`
+(`;`-separated, from `CARE_TYPES` in `scripts/lib/taxonomy-map.mjs`, 13
+doors: Doctors & clinics, Urgent care, Emergency rooms & hospitals,
+Pharmacies, Labs & imaging, Mental health & addiction, Dental, Therapy &
+rehab, Home & senior care, Medical equipment & supplies, Rides & transport,
+Community & support services, Surgery & procedure centers), `safety_net`
+(the low-cost flag with its patient-facing wording: FQHCs, community and
+migrant health centers, rural health clinics, which need not offer sliding
+fees and say so, health departments, charities), `eligibility` (veterans,
+military, tribal, students) and `patient_note`. Every organization code has
+a row (a door or none: insurers, school districts, prison clinics, research
+sites, closed pharmacies stay out); clinicians follow their patient
+specialty (pharmacists, nurses, home aides, hospital-based and emergency
+clinicians are in no door; patients find the pharmacies and hospitals). An
+unknown care type in the CSV fails the build. The same review moved 21
+specialties: surgery centers and ambulances out of "Urgent care &
+emergency", institutional, long-term care, insurer and nuclear pharmacies
+out of Pharmacy, and 13 unfiled facility types in. The care-type columns
+reach `taxonomy-map.js` only, not `taxonomy_map.csv` (the table's columns
+are unchanged).
+
+`show_on_map`, patient specialties and care types are data in the overrides CSV, never
 code; the only hidden code is `390200000X` (Student, Health Care).
 `taxonomy-map.js` and `supabase/reference/taxonomy_map.csv` are generated
 from `nucc_taxonomy.csv` + `cms_taxonomy_crosswalk.csv` + the overrides; CI
@@ -1751,7 +1773,7 @@ node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
 node scripts/test-market-benchmarks.mjs   # 8: the benchmark builder end to end, specialty rates by code
-node scripts/test-taxonomy-map.mjs        # 71: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage
+node scripts/test-taxonomy-map.mjs        # 91: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage, care types (every organization decided, the review's key calls)
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
 node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list

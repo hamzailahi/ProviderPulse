@@ -138,5 +138,32 @@ throws(() => parseNameOverrides(H + 'Pharmacist,183500000X\npharmacist,1835G0000
   ok(!ovAll.get('390200000X').specialties.length, 'Student is in no specialty');
 }
 
+// --- care types ("doors"; approved 2026-10-25) ------------------------------
+// Every organization code carries an explicit decision (a door, or none), the
+// doors come from the approved list, and the review's key calls hold.
+{
+  const ovAll = parseOverrides(ovText, known);
+  const undecided = nucc.filter(n => n.section !== 'Individual' && !ovAll.has(n.code));
+  ok(undecided.length === 0, `every organization code has a care-type decision (${undecided.slice(0, 5).map(n => n.code).join(', ')})`);
+  throws(() => parseOverrides('nucc_code,show_on_map,patient_specialties,care_types\n261QU0200X,,,Walk-in\n', known), /not one of the approved care types/, 'unknown care type');
+  ok(T.careTypes.length === 13 && T.careTypes[0] === 'Doctors & clinics', '13 doors, doctors first');
+  ok(T.codesForCare('Urgent care').join() === '261QU0200X', 'the urgent care door is urgent care centers only');
+  ok(!T.codesForCare('Urgent care').includes('261QA1903X') && T.codesForCare('Surgery & procedure centers').includes('261QA1903X'), 'surgery centers have their own door');
+  ok(!T.codesFor('Urgent care & emergency').includes('261QA1903X'), 'surgery centers left the urgent care specialty');
+  ok(!T.codesFor('Urgent care & emergency').includes('341600000X') && T.codesForCare('Rides & transport').includes('341600000X'), 'ambulances are transport');
+  for (const c of ['3336I0012X', '3336L0003X', '3336M0003X', '3336N0007X']) {
+    ok(!T.codesForCare('Pharmacies').includes(c) && !T.codesFor('Pharmacy').includes(c), `closed pharmacy ${c} is not a walk-in pharmacy`);
+  }
+  ok(T.codesForCare('Pharmacies').includes('332100000X') && T.get('332100000X').eligibility === 'Veterans', 'VA pharmacy in the door, marked for veterans');
+  ok(!T.codesForCare('Pharmacies').includes('183500000X'), 'individual pharmacists are not in the pharmacy door');
+  ok(T.get('207Q00000X').careTypes.join() === 'Doctors & clinics', 'family doctors are doctors & clinics');
+  ok(T.get('2084P0800X').careTypes.join() === 'Doctors & clinics,Mental health & addiction', 'a psychiatrist is a doctor and mental health');
+  ok(T.get('261QF0400X').safetyNet && T.get('261QR1300X').safetyNet.includes('not required'), 'FQHC is low cost; rural clinic note says sliding fees are not required');
+  ok(T.safetyNetCodes().length === 8, 'eight low-cost codes');
+  ok(!T.codesForCare('Doctors & clinics').includes('302F00000X') && !T.get('302F00000X').careTypes.length, 'insurers are in no door');
+  ok(T.get('261QM0850X').patientSpecialties.includes('Mental health & counseling'), 'adult mental health clinics gained a specialty');
+  ok(T.codesForCare('Nope').length === 0, 'unknown door is empty, never all');
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

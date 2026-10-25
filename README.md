@@ -609,6 +609,19 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **Every listing type now has a care type ("door"), approved from the
+  care-types spreadsheet.** Thirteen doors, from Doctors & clinics to Rides &
+  transport, each built from official NUCC codes, with a low-cost flag on
+  FQHCs, community, migrant and rural health clinics, health departments and
+  charities, and a note on who can use VA, military and tribal sites. 21
+  specialty assignments changed with it: surgery centers and ambulances are
+  no longer "urgent care" (an urgent care search had returned about 13,900
+  surgery centers), four pharmacy types the public cannot walk into left
+  Pharmacy, and 13 facility types that belonged nowhere (adult mental health
+  clinics, birth centers, MRI centers, pain clinics and others) now have a
+  specialty. Market scores for those specialties change once the benchmarks
+  are rebuilt.
+
 - **The monthly Medicare enrollment import works again.** CMS started adding
   a release date to its dataset titles, so the import could no longer find
   "Medicare Monthly Enrollment" and its October 18 run failed. It now ignores

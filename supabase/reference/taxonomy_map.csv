@@ -703,7 +703,7 @@ nucc_code,grouping,classification,specialization,display_name,section,cms_specia
 252Y00000X,Agencies,Early Intervention Provider Agency,,Early Intervention Provider Agency,Non-Individual,,,,true
 253J00000X,Agencies,Foster Care Agency,,Foster Care Agency,Non-Individual,,,,true
 251E00000X,Agencies,Home Health,,Home Health Agency,Non-Individual,A4[11],Home Health Agency; Home Health Agency (Subunit),Home health & in-home care,true
-251F00000X,Agencies,Home Infusion,,Home Infusion Agency,Non-Individual,,,,true
+251F00000X,Agencies,Home Infusion,,Home Infusion Agency,Non-Individual,,,Home health & in-home care,true
 251G00000X,Agencies,"Hospice Care, Community Based",,Community Based Hospice Care Agency,Non-Individual,B4[14],Hospice,Hospice & palliative care; Home health & in-home care,true
 253Z00000X,Agencies,In Home Supportive Care,,In Home Supportive Care Agency,Non-Individual,,,Home health & in-home care,true
 251300000X,Agencies,Local Education Agency (LEA),,Local Education Agency (LEA),Non-Individual,,,,true
@@ -715,13 +715,13 @@ nucc_code,grouping,classification,specialization,display_name,section,cms_specia
 261Q00000X,Ambulatory Health Care Facilities,Clinic/Center,,Clinic/Center,Non-Individual,70,Clinic or Group Practice,,true
 261QM0855X,Ambulatory Health Care Facilities,Clinic/Center,Adolescent and Children Mental Health,Adolescent and Children Mental Health Clinic/Center,Non-Individual,,,Mental health & counseling; Pediatrics (children),true
 261QA0600X,Ambulatory Health Care Facilities,Clinic/Center,Adult Day Care,Adult Day Care Clinic/Center,Non-Individual,,,,true
-261QM0850X,Ambulatory Health Care Facilities,Clinic/Center,Adult Mental Health,Adult Mental Health Clinic/Center,Non-Individual,,,,true
-261QA0005X,Ambulatory Health Care Facilities,Clinic/Center,Ambulatory Family Planning Facility,Ambulatory Family Planning Facility,Non-Individual,,,,true
-261QA0006X,Ambulatory Health Care Facilities,Clinic/Center,Ambulatory Fertility Facility,Ambulatory Fertility Facility,Non-Individual,,,,true
-261QA1903X,Ambulatory Health Care Facilities,Clinic/Center,Ambulatory Surgical,Ambulatory Surgical Clinic/Center,Non-Individual,49,Ambulatory Surgical Center,Urgent care & emergency,true
+261QM0850X,Ambulatory Health Care Facilities,Clinic/Center,Adult Mental Health,Adult Mental Health Clinic/Center,Non-Individual,,,Mental health & counseling,true
+261QA0005X,Ambulatory Health Care Facilities,Clinic/Center,Ambulatory Family Planning Facility,Ambulatory Family Planning Facility,Non-Individual,,,Women's health / OB-GYN,true
+261QA0006X,Ambulatory Health Care Facilities,Clinic/Center,Ambulatory Fertility Facility,Ambulatory Fertility Facility,Non-Individual,,,Women's health / OB-GYN,true
+261QA1903X,Ambulatory Health Care Facilities,Clinic/Center,Ambulatory Surgical,Ambulatory Surgical Clinic/Center,Non-Individual,49,Ambulatory Surgical Center,,true
 261QA0900X,Ambulatory Health Care Facilities,Clinic/Center,Amputee,Amputee Clinic/Center,Non-Individual,,,Medical equipment & supplies; Physical & occupational therapy,true
 261QA3000X,Ambulatory Health Care Facilities,Clinic/Center,Augmentative Communication,Augmentative Communication Clinic/Center,Non-Individual,,,Speech & language therapy,true
-261QB0400X,Ambulatory Health Care Facilities,Clinic/Center,Birthing,Birthing Clinic/Center,Non-Individual,,,,true
+261QB0400X,Ambulatory Health Care Facilities,Clinic/Center,Birthing,Birthing Clinic/Center,Non-Individual,,,Women's health / OB-GYN,true
 261QC1500X,Ambulatory Health Care Facilities,Clinic/Center,Community Health,Community Health Clinic/Center,Non-Individual,,,Primary care / family doctor,true
 261QC1800X,Ambulatory Health Care Facilities,Clinic/Center,Corporate Health,Corporate Health Clinic/Center,Non-Individual,,,,true
 261QC0050X,Ambulatory Health Care Facilities,Clinic/Center,Critical Access Hospital,Critical Access Hospital Clinic/Center,Non-Individual,,,Urgent care & emergency,true
@@ -732,12 +732,12 @@ nucc_code,grouping,classification,specialization,display_name,section,cms_specia
 261QE0800X,Ambulatory Health Care Facilities,Clinic/Center,Endoscopy,Endoscopy Clinic/Center,Non-Individual,,,Digestive / gastroenterology,true
 261QF0050X,Ambulatory Health Care Facilities,Clinic/Center,"Family Planning, Non-Surgical",Non-Surgical Family Planning Clinic/Center,Non-Individual,,,Women's health / OB-GYN,true
 261QF0400X,Ambulatory Health Care Facilities,Clinic/Center,Federally Qualified Health Center (FQHC),Federally Qualified Health Center (FQHC),Non-Individual,B4[14],Federally Qualified Health Center,Primary care / family doctor,true
-261QG0250X,Ambulatory Health Care Facilities,Clinic/Center,Genetics,Genetics Clinic/Center,Non-Individual,,,,true
+261QG0250X,Ambulatory Health Care Facilities,Clinic/Center,Genetics,Genetics Clinic/Center,Non-Individual,,,Genetics & genetic counseling,true
 261QH0100X,Ambulatory Health Care Facilities,Clinic/Center,Health Service,Health Service Clinic/Center,Non-Individual,,,,true
 261QH0700X,Ambulatory Health Care Facilities,Clinic/Center,Hearing and Speech,Hearing and Speech Clinic/Center,Non-Individual,,,Hearing & audiology; Speech & language therapy,true
 261QI0500X,Ambulatory Health Care Facilities,Clinic/Center,Infusion Therapy,Infusion Therapy Clinic/Center,Non-Individual,,,Cancer care / oncology,true
 261QL0400X,Ambulatory Health Care Facilities,Clinic/Center,Lithotripsy,Lithotripsy Clinic/Center,Non-Individual,,,Urology,true
-261QM1200X,Ambulatory Health Care Facilities,Clinic/Center,Magnetic Resonance Imaging (MRI),Magnetic Resonance Imaging (MRI) Clinic/Center,Non-Individual,,,,true
+261QM1200X,Ambulatory Health Care Facilities,Clinic/Center,Magnetic Resonance Imaging (MRI),Magnetic Resonance Imaging (MRI) Clinic/Center,Non-Individual,,,Imaging & lab,true
 261QM2500X,Ambulatory Health Care Facilities,Clinic/Center,Medical Specialty,Medical Specialty Clinic/Center,Non-Individual,,,Other health services,true
 261QM3000X,Ambulatory Health Care Facilities,Clinic/Center,Medically Fragile Infants and Children Day Care,Medically Fragile Infants and Children Day Care,Non-Individual,,,Pediatrics (children); Home health & in-home care,true
 261QM0801X,Ambulatory Health Care Facilities,Clinic/Center,Mental Health (Including Community Mental Health Center),Mental Health Clinic/Center (Including Community Mental Health Center),Non-Individual,B4[14],Community Mental Health Center,Mental health & counseling,true
@@ -753,7 +753,7 @@ nucc_code,grouping,classification,specialization,display_name,section,cms_specia
 261QX0203X,Ambulatory Health Care Facilities,Clinic/Center,"Oncology, Radiation",Radiation Oncology Clinic/Center,Non-Individual,,,Cancer care / oncology,true
 261QS0132X,Ambulatory Health Care Facilities,Clinic/Center,Ophthalmologic Surgery,Ophthalmologic Surgery Clinic/Center,Non-Individual,,,,true
 261QS0112X,Ambulatory Health Care Facilities,Clinic/Center,Oral and Maxillofacial Surgery,Oral and Maxillofacial Surgery Clinic/Center,Non-Individual,,,,true
-261QP3300X,Ambulatory Health Care Facilities,Clinic/Center,Pain,Pain Clinic/Center,Non-Individual,,,,true
+261QP3300X,Ambulatory Health Care Facilities,Clinic/Center,Pain,Pain Clinic/Center,Non-Individual,,,Pain management,true
 261QP2000X,Ambulatory Health Care Facilities,Clinic/Center,Physical Therapy,Physical Therapy Clinic/Center,Non-Individual,70,Clinic or Group Practice,Physical & occupational therapy,true
 261QP1100X,Ambulatory Health Care Facilities,Clinic/Center,Podiatric,Podiatric Clinic/Center,Non-Individual,,,Foot & ankle / podiatry,true
 261QP2300X,Ambulatory Health Care Facilities,Clinic/Center,Primary Care,Primary Care Clinic/Center,Non-Individual,,,Primary care / family doctor,true
@@ -766,7 +766,7 @@ nucc_code,grouping,classification,specialization,display_name,section,cms_specia
 261QR0207X,Ambulatory Health Care Facilities,Clinic/Center,"Radiology, Mobile Mammography",Mobile Mammography Clinic/Center,Non-Individual,45,Mammography Center,Imaging & lab; Women's health / OB-GYN,true
 261QR0800X,Ambulatory Health Care Facilities,Clinic/Center,Recovery Care,Recovery Care Clinic/Center,Non-Individual,,,,true
 261QR0400X,Ambulatory Health Care Facilities,Clinic/Center,Rehabilitation,Rehabilitation Clinic/Center,Non-Individual,B4[14],Rehabilitation Agency; Outpatient Physical Therapy/Occupational Therapy/Speech Pathology Services,Physical & occupational therapy,true
-261QR0404X,Ambulatory Health Care Facilities,Clinic/Center,"Rehabilitation, Cardiac Facilities",Cardiac Rehabilitation Clinic/Center,Non-Individual,31,Intensive Cardiac Rehabilitation,,true
+261QR0404X,Ambulatory Health Care Facilities,Clinic/Center,"Rehabilitation, Cardiac Facilities",Cardiac Rehabilitation Clinic/Center,Non-Individual,31,Intensive Cardiac Rehabilitation,Heart / cardiology,true
 261QR0401X,Ambulatory Health Care Facilities,Clinic/Center,"Rehabilitation, Comprehensive Outpatient Rehabilitation Facility (CORF)",Comprehensive Outpatient Rehabilitation Facility (CORF),Non-Individual,B4[14],Comprehensive Outpatient Rehabilitation Facility,Physical & occupational therapy,true
 261QR0405X,Ambulatory Health Care Facilities,Clinic/Center,"Rehabilitation, Substance Use Disorder",Substance Use Disorder Rehabilitation Clinic/Center,Non-Individual,D5,Opioid Treatment Program,Mental health & counseling,true
 261QR1100X,Ambulatory Health Care Facilities,Clinic/Center,Research,Research Clinic/Center,Non-Individual,,,,true
@@ -777,7 +777,7 @@ nucc_code,grouping,classification,specialization,display_name,section,cms_specia
 261QV0200X,Ambulatory Health Care Facilities,Clinic/Center,VA,VA Clinic/Center,Non-Individual,,,,true
 273100000X,Hospital Units,Epilepsy Unit,,Epilepsy Hospital Unit,Non-Individual,A0[7],Hospital Units,,true
 275N00000X,Hospital Units,Medicare Defined Swing Bed Unit,,Medicare Defined Swing Bed Hospital Unit,Non-Individual,A0[7],Hospital-Swing Bed Approved,,true
-273R00000X,Hospital Units,Psychiatric Unit,,Psychiatric Hospital Unit,Non-Individual,A0[7],Hospital-Psychiatric Unit,,true
+273R00000X,Hospital Units,Psychiatric Unit,,Psychiatric Hospital Unit,Non-Individual,A0[7],Hospital-Psychiatric Unit,Mental health & counseling,true
 273Y00000X,Hospital Units,Rehabilitation Unit,,Rehabilitation Hospital Unit,Non-Individual,A0[7],Hospital-Rehabilitation Unit,,true
 276400000X,Hospital Units,"Rehabilitation, Substance Use Disorder Unit",,Substance Use Disorder Rehabilitation Hospital Unit,Non-Individual,A0[7],Hospital Units,Mental health & counseling,true
 287300000X,Hospitals,Christian Science Sanitorium,,Christian Science Sanitorium,Non-Individual,,,,true
@@ -821,9 +821,9 @@ nucc_code,grouping,classification,specialization,display_name,section,cms_specia
 3140N1450X,Nursing & Custodial Care Facilities,Skilled Nursing Facility,"Nursing Care, Pediatric",Pediatric Skilled Nursing Facility,Non-Individual,A1[8],Skilled Nursing Facility,Nursing & assisted living,true
 177F00000X,Other Service Providers,Lodging,,Lodging Provider,Non-Individual,,,,true
 174200000X,Other Service Providers,Meals,,Meals Provider,Non-Individual,,,,true
-320800000X,Residential Treatment Facilities,"Community Based Residential Treatment Facility, Mental Illness",,Mental Illness Community Based Residential Treatment Facility,Non-Individual,,,,true
+320800000X,Residential Treatment Facilities,"Community Based Residential Treatment Facility, Mental Illness",,Mental Illness Community Based Residential Treatment Facility,Non-Individual,,,Mental health & counseling,true
 320900000X,Residential Treatment Facilities,"Community Based Residential Treatment Facility, Intellectual and/or Developmental Disabilities",,Intellectual and/or Developmental Disabilities Community Based Residential Treatment Facility,Non-Individual,,,,true
-323P00000X,Residential Treatment Facilities,Psychiatric Residential Treatment Facility,,Psychiatric Residential Treatment Facility,Non-Individual,,,,true
+323P00000X,Residential Treatment Facilities,Psychiatric Residential Treatment Facility,,Psychiatric Residential Treatment Facility,Non-Individual,,,Mental health & counseling,true
 322D00000X,Residential Treatment Facilities,"Residential Treatment Facility, Emotionally Disturbed Children",,Emotionally Disturbed Childrens' Residential Treatment Facility,Non-Individual,,,Mental health & counseling; Pediatrics (children),true
 320600000X,Residential Treatment Facilities,"Residential Treatment Facility, Intellectual and/or Developmental Disabilities",,Intellectual and/or Developmental Disabilities Residential Treatment Facility,Non-Individual,,,,true
 320700000X,Residential Treatment Facilities,"Residential Treatment Facility, Physical Disabilities",,Physical Disabilities Residential Treatment Facility,Non-Individual,,,,true
@@ -857,19 +857,19 @@ nucc_code,grouping,classification,specialization,display_name,section,cms_specia
 3336C0003X,Suppliers,Pharmacy,Community/Retail Pharmacy,Community/Retail Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,Pharmacy,true
 3336C0004X,Suppliers,Pharmacy,Compounding Pharmacy,Compounding Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,Pharmacy,true
 3336H0001X,Suppliers,Pharmacy,Home Infusion Therapy Pharmacy,Home Infusion Therapy Pharmacy,Non-Individual,58; A5; D6,Medical Supply Company with Pharmacist; Pharmacy; Home Infusion Therapy Services,Pharmacy,true
-3336I0012X,Suppliers,Pharmacy,Institutional Pharmacy,Institutional Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,Pharmacy,true
-3336L0003X,Suppliers,Pharmacy,Long Term Care Pharmacy,Long Term Care Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,Pharmacy,true
+3336I0012X,Suppliers,Pharmacy,Institutional Pharmacy,Institutional Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,,true
+3336L0003X,Suppliers,Pharmacy,Long Term Care Pharmacy,Long Term Care Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,,true
 3336M0002X,Suppliers,Pharmacy,Mail Order Pharmacy,Mail Order Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,Pharmacy,true
-3336M0003X,Suppliers,Pharmacy,Managed Care Organization Pharmacy,Managed Care Organization Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,Pharmacy,true
-3336N0007X,Suppliers,Pharmacy,Nuclear Pharmacy,Nuclear Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,Pharmacy,true
+3336M0003X,Suppliers,Pharmacy,Managed Care Organization Pharmacy,Managed Care Organization Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,,true
+3336N0007X,Suppliers,Pharmacy,Nuclear Pharmacy,Nuclear Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,,true
 3336S0011X,Suppliers,Pharmacy,Specialty Pharmacy,Specialty Pharmacy,Non-Individual,58; A5,Medical Supply Company with Pharmacist; Pharmacy,Pharmacy,true
 335V00000X,Suppliers,Portable X-ray and/or Other Portable Diagnostic Imaging Supplier,,Portable X-ray and/or Other Portable Diagnostic Imaging Supplier,Non-Individual,63,Portable X-Ray Supplier,,true
 335E00000X,Suppliers,Prosthetic/Orthotic Supplier,,Prosthetic/Orthotic Supplier,Non-Individual,51; 52; 53,Medical Supply Company with Orthotist; Medical Supply Company with Prosthetist; Medical Supply Company with Orthotist-Prosthetist,Medical equipment & supplies,true
 344800000X,Transportation Services,Air Carrier,,Air Carrier,Non-Individual,,,,true
-341600000X,Transportation Services,Ambulance,,Ambulance,Non-Individual,59,Ambulance Service Provider,Urgent care & emergency,true
-3416A0800X,Transportation Services,Ambulance,Air Transport,Air Ambulance,Non-Individual,59,Ambulance Service Provider,Urgent care & emergency,true
-3416L0300X,Transportation Services,Ambulance,Land Transport,Land Ambulance,Non-Individual,59,Ambulance Service Provider,Urgent care & emergency,true
-3416S0300X,Transportation Services,Ambulance,Water Transport,Water Ambulance,Non-Individual,59,Ambulance Service Provider,Urgent care & emergency,true
+341600000X,Transportation Services,Ambulance,,Ambulance,Non-Individual,59,Ambulance Service Provider,,true
+3416A0800X,Transportation Services,Ambulance,Air Transport,Air Ambulance,Non-Individual,59,Ambulance Service Provider,,true
+3416L0300X,Transportation Services,Ambulance,Land Transport,Land Ambulance,Non-Individual,59,Ambulance Service Provider,,true
+3416S0300X,Transportation Services,Ambulance,Water Transport,Water Ambulance,Non-Individual,59,Ambulance Service Provider,,true
 347B00000X,Transportation Services,Bus,,Bus,Non-Individual,,,,true
 341800000X,Transportation Services,Military/U.S. Coast Guard Transport,,Military/U.S. Coast Guard Transport,Non-Individual,,,,true
 3418M1120X,Transportation Services,Military/U.S. Coast Guard Transport,"Military or U.S. Coast Guard Ambulance, Air Transport",Military or U.S. Coast Guard Air Transport Ambulance,Non-Individual,,,,true
