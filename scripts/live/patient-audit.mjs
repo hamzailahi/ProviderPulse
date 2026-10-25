@@ -171,15 +171,25 @@ async function readResults(page) {
   }).catch(e => ({ error: String(e) }));
 }
 
-async function search(page, log, { what, zip, miles, tile }) {
+async function search(page, log, { what, zip, miles, tile, door }) {
   // A sheet left open (the AI helper opens one for words it cannot place)
   // would sit over the search bar.
   if (await page.$('.sheet')) { await page.keyboard.press('Escape'); await page.waitForTimeout(400); }
   // Phones fold the form after a search (2026-10-24): open it first.
   if (await page.isVisible('.find-top.folded .sbar-sum').catch(() => false)) { await page.click('.sbar-sum'); await page.waitForTimeout(200); }
   const mark = Date.now();
-  if (tile != null) {
-    await page.locator('.start .tile').nth(tile).click();
+  if (door && await page.isVisible('.start .tile.door')) {
+    // A care-type door (2026-10-25); the ZIP field counts when a tile is tapped.
+    if (zip != null) await page.fill('.sbar .zip input', zip);
+    await page.locator('.start .tile.door', { hasText: door }).first().click();
+  } else if (door) {
+    // After a search the start screen is gone; a door's name typed is the same search.
+    if (zip != null) await page.fill('.sbar .zip input', zip);
+    await page.fill('.sbar .what input', door);
+    await page.click('.sbar .sgo');
+  } else if (tile != null) {
+    // Specialty tiles sit under the doors.
+    await page.locator('.start .tiles:not(.doors) .tile').nth(tile).click();
   } else {
     if (zip != null) await page.fill('.sbar .zip input', zip);
     if (miles) await page.selectOption('.sbar .miles select', String(miles));   // re-runs only when a search exists
@@ -229,6 +239,9 @@ await step('join page', async () => {
 // ---- 2. Signed in on desktop: the start screen, then real searches ------------
 const DESKTOP_SEARCHES = [
   { label: 'Start tile 1 (profile ZIP 76117)', tile: 0 },
+  { label: 'Door "Pharmacies", 38017', door: 'Pharmacies', zip: '38017' },
+  { label: 'Door "Labs & imaging", 76117', door: 'Labs & imaging', zip: '76117' },
+  { label: 'Plain words "low cost clinic", 76117', what: 'low cost clinic', zip: '76117' },
   { label: 'Typed "dentist", 76117', what: 'dentist', zip: '76117' },
   { label: 'Plain words "knee pain", 76117', what: 'knee pain', zip: '76117' },
   { label: 'Plain words "flu shot", 76117', what: 'flu shot', zip: '76117' },

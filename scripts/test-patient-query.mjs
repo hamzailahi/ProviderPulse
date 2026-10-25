@@ -16,6 +16,7 @@ const src = readFileSync('v2/assets/patient.js', 'utf8');
 const code = src.slice(src.indexOf('var CONDITION_HINTS'), src.indexOf('function newSearch'));
 const resolveQuery = new Function('SPECIALTIES', code + ';return resolveQuery;')(SPECIALTIES);
 const label = q => { const r = resolveQuery(q); return r ? r.label : null; };
+const doorOf = q => { const r = resolveQuery(q); return r ? r.door || null : null; };
 
 const CASES = [
   // the user's question (2026-10-09): unchanged by the move to codes
@@ -26,7 +27,7 @@ const CASES = [
   ['hearing', 'Hearing & audiology'], ['hearing aid', 'Hearing & audiology'], ['audiologist', 'Hearing & audiology'],
   ['ear infection', 'Ear, nose & throat'], ['sore throat', 'Ear, nose & throat'],
   // generic words never resolve to a new category by prefix
-  ['physician', null], ['doctor', null], ['hospital', null], ['other', null], ['general', null],
+  ['physician', null], ['doctor', null], ['other', null], ['general', null],
   // the registry term matches from its start only: "Surgery" must not take "knee surgery"
   ['knee surgery', 'Orthopedics & sports injury'], ['surgeon', 'General surgery'],
   ['plastic surgery', 'Plastic & reconstructive surgery'], ['heart surgery', 'Heart / cardiology'],
@@ -37,11 +38,35 @@ const CASES = [
   ['hospice', 'Hospice & palliative care'], ['genetic testing', 'Genetics & genetic counseling'],
   ['infection', 'Infectious disease'], ['speech therapy', 'Speech & language therapy'], ['pharmacist', 'Pharmacy'],
   // existing behaviour kept
-  ['derm', 'Skin / dermatology'], ['cardio', 'Heart / cardiology'], ['dentist', 'Dental'], ['x-ray', 'Imaging & lab'],
+  ['derm', 'Skin / dermatology'], ['cardio', 'Heart / cardiology'], ['dentist', 'Dental'],
   ['ob-gyn', "Women's health / OB-GYN"], ['anxiety', 'Mental health & counseling'], ['back pain', 'Pain management'],
-  ['podiatrist', 'Foot & ankle / podiatry'], ['in-home care', 'Home health & in-home care']
+  ['podiatrist', 'Foot & ankle / podiatry'], ['in-home care', 'Home health & in-home care'],
+  // care types ("doors", 2026-10-25): what a patient needs goes to places, not
+  // to every clinician who could be filed there
+  ['pharmacy', 'Pharmacies'], ['pharmacies', 'Pharmacies'], ['drug store', 'Pharmacies'], ['prescription refill', 'Pharmacies'],
+  ['urgent care', 'Urgent care'], ['urgent', 'Urgent care'], ['walk-in clinic', 'Urgent care'],
+  ['emergency room', 'Emergency rooms & hospitals'], ['er', 'Emergency rooms & hospitals'], ['hospital', 'Emergency rooms & hospitals'],
+  ['x-ray', 'Labs & imaging'], ['blood test', 'Labs & imaging'], ['mri', 'Labs & imaging'], ['mammogram', 'Labs & imaging'],
+  ['opioid treatment', 'Mental health & addiction'], ['alcohol', 'Mental health & addiction'],
+  ['ambulance', 'Rides & transport'], ['ride to my appointment', 'Rides & transport'],
+  ['wheelchair', 'Medical equipment & supplies'], ['cpap', 'Medical equipment & supplies'],
+  ['surgery center', 'Surgery & procedure centers'], ['endoscopy center', 'Surgery & procedure centers'],
+  ['therapy & rehab', 'Therapy & rehab'], ['dental', 'Dental'],
+  // low cost: primary care with the low-cost filter on
+  ['free clinic', 'Primary care / family doctor'], ['sliding scale clinic', 'Primary care / family doctor'], ['I have no insurance', 'Primary care / family doctor'],
+  // these stay specialties
+  ['pharmacist', 'Pharmacy'], ['laser hair removal', null], ['her heart', 'Heart / cardiology'], ['braces', null]
 ];
 for (const [q, want] of CASES) ok(label(q) === want, `"${q}" -> ${want} (got ${label(q)})`);
+
+// A door hit says so (the search reads codesForCare); a specialty hit does not.
+ok(doorOf('pharmacy') === 'Pharmacies' && doorOf('pharmacist') === null, 'door hits carry the door');
+ok(resolveQuery('low cost clinic').lowcost === true && !resolveQuery('primary care').lowcost, 'low-cost words turn the filter on, nothing else does');
+for (const d of TaxonomyMap.careTypes) ok(d === 'Doctors & clinics' || label(d) === d, `door "${d}" resolves to itself`);
+for (const d of TaxonomyMap.careTypes) ok(TaxonomyMap.codesForCare(d).length > 0, `door "${d}" has codes`);
+// The door names in patient.js are the generated list, in order.
+const doorNames = new Function(src.slice(src.indexOf('var DOOR_NAMES'), src.indexOf('function doorHit')) + ';return DOOR_NAMES;')();
+ok(JSON.stringify(doorNames) === JSON.stringify(TaxonomyMap.careTypes), 'patient.js door names match taxonomy-map.js');
 
 // Every specialty finds listings by code, and every label is approved.
 const approved = JSON.parse(readFileSync('supabase/reference/patient-specialties-list.json', 'utf8')).map(s => s.label);

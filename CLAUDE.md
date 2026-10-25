@@ -645,9 +645,23 @@ call `invalidateSize()` and refit.
 
 ### Patient map (`patient.js`)
 
-Search-first: what (specialty or plain-language condition), where (ZIP), how
-far (**5, 10, 25 or 50 miles**, default 10) and insurance. A specialty's
-listings are found by NUCC code (see NUCC codes phase 3). Results come
+Search-first: what (a care-type door, a specialty or plain-language
+condition), where (ZIP), how far (**5, 10, 25 or 50 miles**, default 10) and
+insurance. A specialty's listings are found by NUCC code (see NUCC codes
+phase 3), a door's by `TaxonomyMap.codesForCare` (2026-10-25). Typed words
+reach a door before any specialty (`DOOR_HINTS` in `patient.js`: "pharmacy"
+is the Pharmacies door, "pharmacist" stays the Pharmacy specialty); the
+Doctors & clinics door (505 codes) opens the specialty list instead of
+searching. `LOWCOST_HINT` words ("free clinic", "no insurance") search
+primary care with the Low-cost filter on. `DOOR_NAMES` must equal
+`TaxonomyMap.careTypes` (tested). Default order is **Best match**
+(`tierOf`): organizations, physicians and the specialty's lead NUCC grouping
+(most of its clinician codes) first, NPs and PAs next, the rest after, and
+codes with an `eligibility` rule last; distance within each tier. Listings
+at one street address (suite dropped, same ZIP; `addrKey`, never
+coordinates, which ZIP-centroid geocodes share) fold into the first card
+(`here`, "+N more at this address"); the header still counts listings
+(`visibleResults().listings`). Results come
 straight from the directory tables through the publishable key, so search
 never waits on the AI and still works if functions are down. Claimed listings
 are overlaid from `providers-public`; the accepting / insurance / telehealth / verified chips read only claimed listings, so they appear only when a search found some, each with its count, and a count from a failed or capped search reads "At least N" (2026-10-24). The results on screen get numbered pins matching their cards (teal = a place, indigo = a clinician, by the code's NUCC section via `kindOf`), the rest small dots, with a map key (2026-10-24); before, one circle marker per listed result
@@ -1776,7 +1790,7 @@ node scripts/test-market-benchmarks.mjs   # 8: the benchmark builder end to end,
 node scripts/test-taxonomy-map.mjs        # 91: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage, care types (every organization decided, the review's key calls)
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
-node scripts/test-patient-query.mjs       # 92: typed words to specialties (whole words, generic words, new categories), codesFor per label, the frozen market list
+node scripts/test-patient-query.mjs       # 150: typed words to doors and specialties (whole words, generic words, new categories, low-cost words), codesFor per label and door, the frozen market list
 node scripts/test-area-profile.mjs        # 53: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
 node scripts/test-providers-near.mjs      # 22: the assistant's find_providers: codes in a location box, individuals and organizations, radius or map, failures never "none"
 node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo

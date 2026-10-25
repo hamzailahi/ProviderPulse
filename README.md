@@ -59,10 +59,17 @@ The product has two sides with separate homes. Patients land on `/`
 dashboard lives at `/dashboard`. The dashboard is provider-only (plus a
 staff allowlist for demos), so patients never see market data.
 
-**Patient side: search-first.** A patient types what they need, either a
-specialty or plain symptoms, and a ZIP code. Results appear as cards next
-to a full-size map, limited to the chosen radius (5, 10, 25 or 50 miles).
-Filters narrow by insurance, open now, and verified listings. Each result
+**Patient side: search-first.** A patient picks a kind of care (13
+"doors": doctors and clinics, urgent care, emergency rooms and hospitals,
+pharmacies, labs and imaging, mental health and addiction, dental, therapy,
+home and senior care, equipment, rides, community services, surgery
+centers) or types what they need, a specialty or plain symptoms, and a ZIP
+code. Results appear as cards next to a full-size map, limited to the
+chosen radius (5, 10, 25 or 50 miles), in "best match" order: the
+specialty's own clinicians and places first, sites only some people can
+use (VA, military, tribal) last. Listings at one street address fold into
+one card. Filters narrow by low-cost clinics (FQHCs, community and rural
+health clinics, health departments), insurance and verified listings. Each result
 opens a detail sheet with hours, accepted insurance, and Medicare
 credentials pulled live from CMS for individual clinicians (organizations
 are recognized from the NPPES enumeration type and told apart honestly,
@@ -608,6 +615,20 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-10-25
+
+- **Patients start from what they need.** The start screen leads with 13
+  kinds of care, and typed words go to them: "pharmacy" now lists
+  pharmacies instead of individual pharmacists, "urgent care" lists urgent
+  care centers instead of emergency doctors and surgery centers, "x-ray"
+  and "blood test" list labs and imaging centers. "Doctors & clinics" opens
+  the specialty list. Results are in "best match" order, so "knee pain"
+  leads with orthopedic and sports medicine physicians rather than athletic
+  trainers; "Nearest first" is one tap away. Listings at one address fold
+  into one card ("+5 more at this address"). A **Low-cost clinics** filter
+  appears whenever a search finds FQHCs, community or rural health clinics
+  or health departments, and "free clinic" or "no insurance" turns it on.
+  Emergency and ambulance searches say to call 911. A ZIP typed into the
+  search bar now counts when a tile is tapped.
 
 - **Every listing type now has a care type ("door"), approved from the
   care-types spreadsheet.** Thirteen doors, from Doctors & clinics to Rides &

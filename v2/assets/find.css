@@ -277,3 +277,21 @@ main { min-height: 0; }
 .here-name { font-weight: 600; color: #0f172a; }
 .here-type { grid-column: 1; color: #475569; font-size: 12.5px; }
 .here-list a { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: #334155; text-decoration: underline dotted; text-underline-offset: 3px; white-space: nowrap; display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; }
+
+/* Care-type doors on the start screen (2026-10-25). */
+.tiles.doors { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); margin-bottom: 18px; }
+.tile.door { display: flex; flex-direction: column; gap: 3px; min-height: 72px; }
+.tile-name { font: 650 14.5px var(--sans); }
+.tile-sub { font: 400 12.5px/1.35 var(--sans); color: #475569; }
+.start-sub { font: 650 13px var(--sans); color: #334155; margin: 4px 0 10px; text-transform: uppercase; letter-spacing: .04em; }
+.note.urgent { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+.res-note { font-size: 12.5px; color: #475569; margin-top: 3px; }
+/* Other listings at the card's address, folded under it. */
+.here-group { margin-top: 8px; border-top: 1px dashed #e3e8ef; padding-top: 4px; }
+.here-more { font-size: 13px; color: #334155; }
+.here-group .here-list { margin-top: 4px; }
+.here-list .here-name.linkbtn { text-align: left; padding: 2px 0; min-height: 0; }
+@media (max-width: 900px) {
+  .tiles.doors { grid-template-columns: 1fr 1fr; }
+  .here-list .here-name.linkbtn { min-height: 44px; }
+}
