@@ -628,6 +628,16 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **Search understands more of what patients type.** Misspelled specialties
+  ("dermotologist", "cardiolgist") now find the right one, as do
+  "obstetrician", "midwife", "opthamologist", pharmacy names such as
+  Walgreens and CVS, "covid test" (urgent care) and "help at home" (home and
+  senior care). Result cards no longer repeat the city when a listing
+  stores its whole address in the street line. Found by today's live audit,
+  which also confirmed "knee pain" now leads with orthopedic and sports
+  medicine physicians, "pharmacy" with pharmacies and "urgent care" with
+  urgent care clinics.
+
 - **Market Insights shows the places patients go.** A new card counts the
   pharmacies, urgent cares, hospitals, labs, home and senior care agencies,
   equipment suppliers, low-cost clinics and other facilities in the same

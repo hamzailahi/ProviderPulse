@@ -58,6 +58,11 @@ const CASES = [
   ['therapy & rehab', 'Therapy & rehab'], ['dental', 'Dental'],
   // low cost: primary care with the low-cost filter on
   ['free clinic', 'Primary care / family doctor'], ['sliding scale clinic', 'Primary care / family doctor'], ['I have no insurance', 'Primary care / family doctor'],
+  ['obstetrician', "Women's health / OB-GYN"], ['midwife', "Women's health / OB-GYN"], ['opthamologist', 'Eye care'],
+  ['walgreens', 'Pharmacies'], ['cvs near me', 'Pharmacies'], ['covid test', 'Urgent care'], ['help at home for my mom', 'Home & senior care'],
+  // misspellings, one or two letters off (2026-10-25, live audit)
+  ['dermotologist', 'Skin / dermatology'], ['cardiolgist', 'Heart / cardiology'], ['neurologyst', 'Brain & nerves / neurology'],
+  ['pediatrican', 'Pediatrics (children)'], ['gastroenterolgy', 'Digestive / gastroenterology'], ['xyzzyplugh', null],
   // these stay specialties
   ['pharmacist', 'Pharmacy'], ['laser hair removal', null], ['her heart', 'Heart / cardiology'], ['braces', null]
 ];

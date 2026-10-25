@@ -278,12 +278,12 @@ var CONDITION_HINTS = [
   [/\b(skin|rash|acne|eczema|psoria|mole|derma)/, 'Skin / dermatology'],
   [/\b(anxi|depress|therap(y|ist)|counsel|mental|adhd|bipolar|ptsd|psychiat|psycholog)/, 'Mental health & counseling'],
   [/\b(tooth|teeth|dent|gum)/, 'Dental'],
-  [/\b(eye|vision|glasses|contacts|optom|ophthal)/, 'Eye care'],
+  [/\b(eye|vision|glasses|contacts|optom|ophthal|opthal|optham)/, 'Eye care'],
   [/\b(chiropract|spine adjust)/, 'Chiropractic'],
   [/\b(physical therap|rehab|occupational therap)/, 'Physical & occupational therapy'],
   [/\b(knee|shoulder|hip|fracture|sprain|sports injur|ortho|broken bone)/, 'Orthopedics & sports injury'],
   [/\b(kid|child|baby|infant|toddler|pediatr)/, 'Pediatrics (children)'],
-  [/\b(pregnan|prenatal|obgyn|ob-gyn|gyne|women'?s health|period|menopaus)/, "Women's health / OB-GYN"],
+  [/\b(pregnan|prenatal|obgyn|ob-gyn|gyne|obstetric|midwi|women'?s health|period|menopaus)/, "Women's health / OB-GYN"],
   [/\b(asthma|copd|lung|breath|sleep apnea|snor|pulmon)/, 'Lung, breathing & sleep'],
   [/\b(stomach|gut|acid reflux|reflux|ibs|colon|gastro|digest|crohn)/, 'Digestive / gastroenterology'],
   [/\b(kidney|renal|nephro|dialysis)/, 'Kidney / nephrology'],
@@ -323,7 +323,9 @@ var DOOR_DOCTORS = 'Doctors & clinics';
 var DOOR_HINTS = [
   [/\b(urgent|walk.?in)\b/, 'Urgent care'],
   [/\b(emergency|er|e\.r\.?|hospitals?)(\s|$)/, 'Emergency rooms & hospitals'],
-  [/\b(pharmacy|pharmacies|drug ?stores?|prescriptions?|refills?)\b/, 'Pharmacies'],
+  [/\b(pharmacy|pharmacies|drug ?stores?|prescriptions?|refills?|walgreens|cvs|rite aid)\b/, 'Pharmacies'],
+  [/\b(covid|coronavirus) (test|tests|testing)\b/, 'Urgent care'],
+  [/\b(help at home|aging parents?|elderly (parent|mother|father|mom|dad))/, 'Home & senior care'],
   [/\b(labs?|lab work|blood (test|tests|work|draw)|x-?rays?|mri|ct scan|cat scan|ultrasound|mammogra\w*|imaging|radiology)\b/, 'Labs & imaging'],
   [/\b(addiction|substance|detox|opioids?|methadone|suboxone|alcohol\w*|sober)\b/, 'Mental health & addiction'],
   [/\b(ambulance|rides?|transportation|medical transport)\b/, 'Rides & transport'],
@@ -387,7 +389,52 @@ function resolveQuery(text) {
       if (s) return { label: s[0], terms: s[1].split(',') };
     }
   }
-  return null;
+  return fuzzySpecialty(t);
+}
+
+// Last resort (2026-10-25): a misspelt specialty word, one or two letters
+// off. "dermotologist" found nothing (live audit). Each specialty offers its
+// label and registry words of 6+ letters plus the person form ("cardiology"
+// -> "cardiologist", "pediatrics" -> "pediatrician"); a typed word of 7+
+// letters within two edits of one, and closer to it than to any other, wins.
+var fuzzyWords = null;
+function editDistance(a, b) {
+  var prev = [], cur, i, j;
+  for (j = 0; j <= b.length; j++) prev[j] = j;
+  for (i = 1; i <= a.length; i++) {
+    cur = [i];
+    for (j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+function fuzzySpecialty(t) {
+  if (!fuzzyWords) {
+    fuzzyWords = [];
+    SPECIALTIES.forEach(function (sp, k) {
+      (qNorm(sp[0]) + ' ' + qNorm(sp[2])).split(' ').forEach(function (w) {
+        if (w.length < 6 || GENERIC_QUERY.test(w)) return;
+        fuzzyWords.push([w, k]);
+        if (/ology$/.test(w)) fuzzyWords.push([w.replace(/ology$/, 'ologist'), k]);
+        if (/ics$/.test(w)) fuzzyWords.push([w.replace(/ics$/, 'ician'), k]);
+      });
+    });
+  }
+  var best = null, bestD = 3, tie = false;
+  t.split(' ').forEach(function (word) {
+    // Generic words never count ("physician" is two edits from "physical"),
+    // and a typo keeps its first letter.
+    if (word.length < 7 || GENERIC_QUERY.test(word)) return;
+    fuzzyWords.forEach(function (fw) {
+      if (fw[0].charAt(0) !== word.charAt(0)) return;
+      var d = editDistance(word, fw[0]);
+      if (d < bestD) { best = fw[1]; bestD = d; tie = false; }
+      else if (d === bestD && best !== fw[1]) tie = true;
+    });
+  });
+  if (best === null || tie || bestD === 0) return null;
+  var sp = SPECIALTIES[best];
+  return { label: sp[0], terms: sp[1].split(','), fuzzy: true };
 }
 
 // Condition search across care types (2026-10-25): a condition rarely needs
@@ -1001,6 +1048,13 @@ function kindOf(p) {
   return p.src === 'individual' ? 'person' : 'place';
 }
 
+// Street and city, without the city twice: some listings store the whole
+// address in the street field ("1001 N Waldrop Dr, Ste 705, Arlington, TX").
+function addrLine(p) {
+  var a = String(p.address || ''), c = String(p.city || '');
+  return c && a.toLowerCase().indexOf(c.toLowerCase()) !== -1 ? a : [a, c].filter(Boolean).join(', ');
+}
+
 function resultCard(p, n) {
   var s = state.search;
   var badges = [];
@@ -1037,7 +1091,7 @@ function resultCard(p, n) {
         h('h3', {}, p.name || 'Provider'),
         h('span', { class: 'dist' }, fmtMiles(p.miles))),
       h('div', { class: 'res-spec' }, plainType(p)),
-      h('div', { class: 'res-addr' }, [p.address, p.city].filter(Boolean).join(', '),
+      h('div', { class: 'res-addr' }, addrLine(p),
         p.sites > 1 ? h('span', { class: 'muted' }, ' · ' + (p.sites - 1) + ' more location' + (p.sites > 2 ? 's' : '')) : null,
         p.phone ? h('span', { class: 'res-phone' }, ' · ', h('a', { href: telHref(p.phone), onclick: function (e) { e.stopPropagation(); } }, p.phone)) : null),
       p.volume ? h('div', { class: 'res-vol' }, 'Billed Medicare ' + p.volume.services.toLocaleString() + ' time' + (p.volume.services === 1 ? '' : 's') +

@@ -277,12 +277,12 @@ await step('desktop searches', async () => {
   await step('filter chip', async () => {
     await search(page, log, { what: 'Primary care / family doctor', zip: '76117' });
     // Since 2026-10-24 the chips show only when the search found claimed listings.
-    if (!(await page.$('.fchip'))) { report.searches.push({ label: 'Filter chips on primary care, 76117', state: 'done', notes: ['chips hidden: no claimed listings in these results'] }); return; }
-    await page.locator('.fchip').first().click();
+    if (!(await page.locator('.fchip', { hasText: 'Accepting' }).count())) { report.searches.push({ label: 'Filter chips on primary care, 76117', state: 'done', notes: ['chips hidden: no claimed listings in these results'] }); return; }
+    await page.locator('.fchip', { hasText: 'Accepting' }).first().click();
     await page.waitForTimeout(500);
     const r = await readResults(page);
     report.searches.push({ label: 'Filter "Accepting new patients" on primary care, 76117', state: 'done', ...r, shot: await shot(page, 'filter-accepting') });
-    await page.locator('.fchip').first().click();
+    await page.locator('.fchip', { hasText: 'Accepting' }).first().click();
   });
   // Detail sheets: a clinician and an organization.
   for (const [label, q] of [['Detail: first primary care result (76117)', { what: 'Primary care / family doctor', zip: '76117' }], ['Detail: first urgent care result (76117)', { what: 'urgent care', zip: '76117' }]]) {
