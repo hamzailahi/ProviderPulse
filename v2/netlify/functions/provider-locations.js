@@ -127,8 +127,9 @@ exports.handler = async (event) => {
       const row = pick(body, FIELDS);
       if (!row.address_line) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'A street address is required' }) };
       row.provider_id = user.id;
-      // Self-reported until an NPPES match says otherwise. Never from input.
-      row.verified = false;
+      // Self-reported until an NPPES match says otherwise: `verified` defaults
+      // to false and is never sent. Since migration 043 a signed-in user has no
+      // privilege on that column at all, so sending it would fail the insert.
       // The first location a provider adds becomes primary; after that they choose.
       if (!Array.isArray(existing) || existing.length === 0) row.is_primary = true;
       else if (row.is_primary === true) await demoteOtherPrimaries(null);

@@ -253,3 +253,13 @@ a:hover { text-decoration: underline; }
 .sc-all li { padding: 4px 0; border-bottom: 1px solid #f1f5f9; }
 .sc-all li.sc-negative b { color: #b45309; }
 .sc-all li.sc-positive b { color: #047857; }
+/* My NPIs (2026-10-25). */
+.npi-list { display: grid; gap: 10px; margin-top: 12px; }
+.npi-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; flex-wrap: wrap; }
+.npi-main { display: grid; gap: 4px; min-width: 0; }
+.npi-main b { margin-right: 8px; }
+.npi-acts { display: flex; gap: 8px; }
+.npi-pick { max-width: 100%; padding: 8px 10px; border: 1px solid #d5dde8; border-radius: 10px; font: 500 14px var(--sans); background: #fff; }
+.form.inline { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 18px 8px; }
+.form.inline input { max-width: 220px; }
+@media (max-width: 640px) { .npi-pick { font-size: 16px; } .npi-acts .btn { min-height: 44px; } }

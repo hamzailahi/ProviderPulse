@@ -135,8 +135,12 @@ function row(p) {
     }
   };
 
-  const clearBtn = el('button', { class: 'btn ok', type: 'button' }, 'Not the same person — publish');
-  const blockBtn = el('button', { class: 'btn no', type: 'button' }, 'Confirmed match — block');
+  // An NPI added to an account (2026-10-25) is held when the registry's name is
+  // not the account's; the question is then whether they are the same practice.
+  const added = p.kind === 'added';
+  const oig = /OIG/.test(p.review_reason || '');
+  const clearBtn = el('button', { class: 'btn ok', type: 'button' }, added && !oig ? 'Same practice: approve' : 'Not the same person: publish');
+  const blockBtn = el('button', { class: 'btn no', type: 'button' }, added && !oig ? 'Not theirs: reject' : 'Confirmed match: block');
   clearBtn.addEventListener('click', () => decide('clear', clearBtn));
   blockBtn.addEventListener('click', () => decide('block', blockBtn));
 
@@ -146,7 +150,10 @@ function row(p) {
       el('span', { class: 'npi' }, 'NPI ' + p.npi),
       el('span', { class: 'npi' }, [p.city, p.state, p.zip].filter(Boolean).join(', '))),
     el('div', { class: 'flag' }, p.review_reason || 'Flagged by name screening'),
-    el('div', { class: 'ev' },
+    added ? el('div', { class: 'flag' }, 'Added to the account of ' + ((p.account && p.account.name) || 'unknown') +
+      ' (NPI ' + ((p.account && p.account.npi) || '?') + ', verified person ' + ((p.account && p.account.person) || '?') +
+      '). Check on nppes.cms.hhs.gov that both NPIs belong to the same practice.') : null,
+    (added && !oig) ? null : el('div', { class: 'ev' },
       el('h4', {}, 'Matching OIG exclusion records — verify against oig.hhs.gov before deciding'),
       (p.matches && p.matches.length) ? table
         : el('div', { class: 'empty' }, 'No matching records found now. The list may have changed since they registered.')),

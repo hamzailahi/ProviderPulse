@@ -37,7 +37,7 @@ No em dashes. Vary sentence structure.
 | Page | Who | What |
 |---|---|---|
 | `app.html` | patients | search-first find-care app with map, booking, optional AI helper |
-| `portal.html` | providers | Overview, Appointments, My listing, Locations, Competition, Market |
+| `portal.html` | providers | Overview, Appointments, My listing, Locations, My NPIs, Competition, Market |
 | `index.html` | providers + staff | market dashboard (`/dashboard`) |
 | `auth.html` | both | the only sign-in / sign-up surface |
 | `register-provider.html` | prospects | pitch page only; signed-in providers are sent to `/portal` |
@@ -101,7 +101,7 @@ documents already uploaded.
 Netlify Functions have a **26-second hard timeout**, and the *default* is 10s.
 `netlify.toml` raises everything that chains external calls: 26s for
 `market-assistant`, `report-generate`, `patient-match`, `auth-register-provider`,
-`doc-extract`, `provider-locations`, `audit-run`, `audit-narrate`; 20s for
+`doc-extract`, `provider-locations`, `audit-run`, `audit-narrate`, `provider-npis`; 20s for
 `cms-provider`, `appointment-briefing`, `market-score` and `listing-self-check`. Each entry carries a
 comment naming the chain that justifies it. Keep those comments current: an
 unexplained ceiling is indistinguishable from a copy-paste.
@@ -214,6 +214,27 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   rejects already-claimed NPIs (409). Creates the auth user, a
   `provider_profiles` row seeded from NPPES via the service role, and
   `provider_insurance` rows (max 50).
+  The NPI checks (Luhn, NPPES record, OIG NPI and name screening, "already
+  claimed" across `provider_profiles` and `provider_npis`) live in
+  **lib/npi-verify.js**, shared with `provider-npis.js`; a failed claimed
+  check returns 503, never lets an NPI be claimed twice.
+- **provider-npis.js** (2026-10-25, migration 044): one account, many NPIs
+  (the user's choices: auto when the registry's name matches, else review;
+  each NPI its own listing; organizations and clinicians). GET lists the
+  account's NPI and its added ones (with insurance); POST `{npi}` runs the
+  registration checks and inserts a `provider_npis` row seeded from NPPES,
+  `clear` when the registry's person (NPI-1 clinician, NPI-2 authorized
+  official) matches the account's verified first and last name, else
+  `pending` with a reason (also on an OIG name and state match; an OIG NPI
+  match or a deactivated NPI is refused); PUT edits an added listing's
+  `LISTING_FIELDS` (profile.js's fields) and replaces its insurance; DELETE
+  removes it. Every write is service role after an ownership check here;
+  the table has no write policy. At most 50 added NPIs. Pending ones appear
+  in `admin-review` with the account that asked (kind `added`); approving
+  publishes them. `providers-public` publishes cleared added NPIs
+  (`ADDED_COLUMNS`, never `id` or `account_id`); `appointment-request`
+  books them through their account and stores the booked `npi`; the portal
+  has a My NPIs page and a listing switcher in My listing.
 - **auth-register-patient.js**: stores PHI (DOB, conditions, concern) in
   `patient_profiles`. **Closed by default**: it runs only when `PATIENT_SIGNUP_ENABLED` is exactly
   `true`, otherwise 503 (this was an opt-out until 2026-09-30, which left it
@@ -907,6 +928,28 @@ confirmed by the next snapshot (policies and anon/authenticated grants gone). He
 Migrations use `drop policy if exists` before `create policy` so a re-run is
 safe.
 
+**Column grants (043, 2026-10-25).** Until 043, anon and authenticated held
+ALL on `provider_profiles`, `provider_locations` and `appointment_requests`,
+and the UPDATE policies check only row ownership, so with the public key and
+their own session a user could PATCH any column of their own row through the
+REST API, past the functions' whitelists: a provider could clear their own
+OIG review hold (`review_status`), change `npi` or `npi_verified`, or mark a
+location `verified`; a patient could confirm their own request or insert one
+already confirmed (and `appointment-request.js` read the role from
+user-writable `user_metadata`). 043 revokes INSERT/UPDATE/DELETE from anon
+and authenticated and grants back exactly the columns the functions write
+under the caller's JWT (profile.js `PROVIDER_FIELDS`; provider-locations.js
+`FIELDS` plus the geocoder's `latitude`, `longitude`, `geocoded`, never
+`verified`; appointment insert `patient_id, provider_id, requested_time,
+reason` (044 adds `npi`), update `status, requested_time, updated_at`), and
+`trg_appointment_guard` enforces the status transitions by whether
+`auth.uid()` is the row's patient or provider (the service role passes).
+`provider-locations.js` no longer sends `verified` on insert (the column
+defaults to false). **When a function starts writing a new column under the
+caller's JWT, grant that column in a migration, or the write fails with
+permission denied.** Tested on a local Postgres 16 with Supabase-like roles
+before applying.
+
 `011`/`012` closed a live leak: `provider_profiles` and `provider_insurance`
 were readable with the anon key. `011`'s cleanup filtered
 `pg_policies.cmd = 'r'`, but that column holds `'SELECT'`, so it matched
@@ -939,6 +982,17 @@ Tables:
 - `patient_documents` / `patient_document_facts`: **PHI**, migration 002, not
   applied.
 - `audit_log`: service role only.
+- `provider_npis`, `provider_npi_insurance` (044, 2026-10-25): NPIs added to
+  an account, each its own listing (the listing columns of
+  `provider_profiles` plus `account_id`, `review_status` default `pending`,
+  `review_reason`) and its plans. RLS on; the owner may select; no write
+  grant or policy for anon or authenticated (writes only through
+  `provider-npis.js` under the service role). `trg_npi_claimed_once` on both
+  `provider_profiles` and `provider_npis` refuses an NPI the other table
+  holds. `appointment_requests.npi` records which listing was booked
+  (null = the account's own, as before 044); `trg_appointment_npi_guard`
+  checks it is one of the provider's NPIs (`npi_belongs_to`, a definer
+  function that answers yes or no).
 - `listing_reports` (041, 2026-10-25): one row per patient "report a wrong
   listing" tap (`npi`, `issue` from a fixed list, `source`, `created_at`).
   RLS on, no policies, anon/authenticated revoked: service role only, like
@@ -1139,7 +1193,7 @@ column list.
 - Roles are checked server-side (see access model), never read from
   `user_metadata`.
 - The published surface, to re-read before shipping any change to it:
-  `providers-public.js` (`PUBLIC_COLUMNS`), `npi-activity.js` (`ACTIVITY_COLUMNS`), `demand-stats.js` (`MIN_GROUP`),
+  `providers-public.js` (`PUBLIC_COLUMNS`, `ADDED_COLUMNS`), `npi-activity.js` (`ACTIVITY_COLUMNS`), `demand-stats.js` (`MIN_GROUP`),
   `lib/query-plan.js` (`TABLES`), `appointment-briefing.js`
   (`BRIEFING_FIELDS`), `market-score.js` (aggregate public data only), and
   `market-assistant.js` (`TOOLS`: anything a tool returns reaches the model
@@ -1872,6 +1926,7 @@ node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures o
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
 node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty), the API script against a local server, and the pacer on a fake clock
+node scripts/test-provider-npis.mjs       # 34: one account, many NPIs: the registry and OIG checks, live only when the registry's person is the account's, caller never sets npi/review_status/account_id, own rows only, published once cleared, bookable through the account, registration refuses an added NPI
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
 node scripts/test-npi-activity.mjs        # 15: the public Medicare-activity lookup: only its columns, a missing NPI left out, nulls stay null, failures degraded

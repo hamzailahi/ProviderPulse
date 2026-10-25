@@ -11,7 +11,7 @@ on:
       migration:
         description: Migration to run
         type: choice
-        options: [042_benchmark_care_type.sql, 041_listing_reports.sql]
+        options: [043_column_grants.sql, 044_provider_npis.sql, 042_benchmark_care_type.sql, 041_listing_reports.sql]
 
 permissions:
   contents: read
@@ -60,4 +60,17 @@ jobs:
             if [ "$code" = "200" ] && [ "$(cat /tmp/body)" != "[]" ]; then echo "::error::listing_reports is readable with the public key"; exit 1; fi
             # 404 PGRST205 means the API has not loaded the table, so the function cannot write either.
             if [ "$code" = "404" ]; then echo "::error::The REST API does not see listing_reports yet (schema cache)"; exit 1; fi
+          fi
+          # 043/044: the public key may not write provider rows or read added NPIs.
+          if [ "$MIGRATION" = "043_column_grants.sql" ] || [ "$MIGRATION" = "044_provider_npis.sql" ]; then
+            K="sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ"; U="https://khkmdultmrggpfvkbfzj.supabase.co/rest/v1"
+            code=$(curl -s -o /tmp/b1 -w '%{http_code}' -X PATCH "$U/provider_profiles?npi=eq.0000000000" -H "apikey: $K" -H 'Content-Type: application/json' -d '{"review_status":"clear"}')
+            echo "anon PATCH provider_profiles.review_status: HTTP $code $(head -c 160 /tmp/b1)"
+            case "$code" in 2*) echo "::error::the public key can still write provider_profiles"; exit 1;; esac
+            if [ "$MIGRATION" = "044_provider_npis.sql" ]; then
+              code=$(curl -s -o /tmp/b2 -w '%{http_code}' "$U/provider_npis?select=npi&limit=1" -H "apikey: $K")
+              echo "anon read provider_npis: HTTP $code $(head -c 160 /tmp/b2)"
+              if [ "$code" = "200" ] && [ "$(cat /tmp/b2)" != "[]" ]; then echo "::error::provider_npis is readable with the public key"; exit 1; fi
+              if [ "$code" = "404" ]; then echo "::error::The REST API does not see provider_npis yet (schema cache)"; exit 1; fi
+            fi
           fi

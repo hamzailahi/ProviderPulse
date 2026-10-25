@@ -109,7 +109,10 @@ function toast(text, isErr) {
 /* ---------- state --------------------------------------------------------- */
 var S = {
   profile: null, insurance: [], appointments: null, locations: null,
-  demand: null, payers: null, comp: null, noListing: false
+  demand: null, payers: null, comp: null, noListing: false,
+  // NPIs added to the account (provider-npis, migration 044) and which listing
+  // My listing is editing: null is the account's own.
+  npis: null, npisEnabled: true, editing: null
 };
 function displayName(p) {
   p = p || S.profile || {};
@@ -157,6 +160,7 @@ var NAV = [
   ['appointments', 'Appointments', '📅'],
   ['listing', 'My listing', '✎'],
   ['locations', 'Locations', '📍'],
+  ['npis', 'My NPIs', '#'],
   ['competition', 'Competition', '◉'],
   ['market', 'Market', '📈']
 ];
@@ -218,6 +222,12 @@ function loadAppointments() {
 function loadLocations() {
   return api('/provider-locations').then(function (d) { S.locations = d.locations || []; })
     .catch(function () { S.locations = S.locations || []; });
+}
+function loadNpis() {
+  return api('/provider-npis').then(function (d) {
+    S.npis = d.npis || []; S.npisEnabled = d.enabled !== false;
+    if (S.editing) S.editing = S.npis.filter(function (n) { return n.id === S.editing.id; })[0] || null;
+  }).catch(function () { S.npis = S.npis || []; });
 }
 function loadDemand() {
   var zip = (S.profile || {}).zip;
@@ -505,7 +515,8 @@ function apptRow(a, compact) {
     h('div', { class: 'appt-main' },
       h('div', { class: 'appt-top' }, h('b', {}, a.patient_name || 'Patient'),
         h('span', { class: 'status s-' + a.status }, APPT_LABEL[a.status] || a.status)),
-      h('div', { class: 'muted small' }, fmtWhen(a.requested_time), a.created_at ? ' · requested ' + ago(a.created_at) : ''),
+      h('div', { class: 'muted small' }, fmtWhen(a.requested_time), a.created_at ? ' · requested ' + ago(a.created_at) : '',
+        a.listing_name ? ' · for ' + titleCase(a.listing_name) + ' (NPI ' + a.npi + ')' : ''),
       a.reason ? h('div', { class: 'reason' }, a.reason) : null,
       acts, resched, brief));
 }
@@ -540,9 +551,13 @@ function showBrief(a, out) {
 var DAYS = [['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']];
 
 VIEWS.listing = function () {
-  var p = S.profile || {};
+  // The account's own listing, or one of its added NPIs (2026-10-25): each
+  // keeps its own details, so the same sections edit whichever is chosen.
+  var added = S.editing;
+  var p = added || S.profile || {};
+  var myIns = added ? (added.insurance || []) : S.insurance;
   var preview = h('div', { class: 'preview' });
-  function paintPreview() { clear(preview); preview.appendChild(previewCard()); }
+  function paintPreview() { clear(preview); preview.appendChild(previewCard(p, myIns)); }
 
   // Saves one section. The profile endpoint accepts any subset of fields, so a
   // save never touches fields from another section.
@@ -551,9 +566,11 @@ VIEWS.listing = function () {
       var body = collect();
       if (!body) return;
       btn.disabled = true;
-      api('/profile', { method: 'PUT', body: body }).then(function () {
-        Object.keys(body).forEach(function (k) { if (k !== 'insurances') S.profile[k] = body[k]; });
-        if (body.insurances) S.insurance = body.insurances.slice();
+      var req = added ? api('/provider-npis', { method: 'PUT', body: Object.assign({ id: added.id }, body) })
+        : api('/profile', { method: 'PUT', body: body });
+      req.then(function () {
+        Object.keys(body).forEach(function (k) { if (k !== 'insurances') p[k] = body[k]; });
+        if (body.insurances) { myIns = body.insurances.slice(); if (added) added.insurance = myIns; else S.insurance = myIns; }
         btn.disabled = false; btn.textContent = 'Saved ✓';
         setTimeout(function () { btn.textContent = 'Save'; }, 1800);
         paintPreview(); paintNav('listing');
@@ -633,7 +650,7 @@ VIEWS.listing = function () {
   });
 
   /* insurance */
-  var chosen = S.insurance.slice();
+  var chosen = myIns.slice();
   var chosenEl = h('div', { class: 'chosen' });
   var insSub = h('p', { class: 'muted small' });
   var optsEl = h('div', { class: 'opts' });
@@ -675,8 +692,24 @@ VIEWS.listing = function () {
       body);
   }
 
+  // With added NPIs, a switcher picks which listing these sections edit.
+  var picker = null;
+  if (S.npis && S.npis.length) {
+    picker = h('select', { class: 'npi-pick', 'aria-label': 'Which listing to edit', onchange: function (e) {
+      var id = e.target.value;
+      S.editing = S.npis.filter(function (n) { return n.id === id; })[0] || null;
+      render();
+    } }, h('option', { value: '' }, displayName(S.profile) + ' · NPI ' + (S.profile || {}).npi + ' (this account)'),
+      S.npis.map(function (n) {
+        return h('option', { value: n.id, selected: added && added.id === n.id }, displayName(n) + ' · NPI ' + n.npi + (n.status === 'live' ? '' : ' (' + (n.status === 'review' ? 'under review' : 'blocked') + ')'));
+      }));
+  }
   var view = h('section', { class: 'view' },
-    pageHead('My listing', 'What patients see when they search. Each section saves on its own and goes live immediately.'),
+    pageHead('My listing', added ? 'An NPI added to your account. Its listing is separate: these sections save for this NPI only.'
+      : 'What patients see when they search. Each section saves on its own and goes live immediately.', picker),
+    added && added.status !== 'live' ? h('div', { class: 'banner warn' }, added.status === 'review'
+      ? 'This NPI is held for a short review before patients see it. You can fill in its listing meanwhile.'
+      : 'This NPI was not approved, so patients do not see it.') : null,
     h('div', { class: 'split' },
       h('div', { class: 'secs' },
         section('availability', 'Availability', 'The two things patients filter on most.',
@@ -692,11 +725,11 @@ VIEWS.listing = function () {
             h('label', {}, 'Hours note (optional)'), fNote), hoursSave),
         section('about', 'Contact & about', null,
           h('div', { class: 'form' }, h('label', {}, 'Phone'), fPhone, h('label', {}, 'About your practice ', bioCount), fBio), aboutSave),
-        section('address', 'Registered practice address', 'Your address of record. Map pins come from Locations.',
+        section('address', added ? 'Practice address' : 'Registered practice address', added ? 'This NPI\'s address, from the registry when it was added.' : 'Your address of record. Map pins come from Locations.',
           h('div', { class: 'form' }, h('label', {}, 'Street address'), fAddr,
             h('div', { class: 'row3' }, h('div', {}, h('label', {}, 'City'), fCity), h('div', {}, h('label', {}, 'State'), fState), h('div', {}, h('label', {}, 'ZIP'), fZip))), addrSave),
         h('div', { class: 'card sec readonly' }, h('div', { class: 'card-h' }, h('h2', {}, 'From the NPPES registry')),
-          h('dl', { class: 'kv' }, h('dt', {}, 'NPI'), h('dd', {}, p.npi || '—'), h('dt', {}, 'Name'), h('dd', {}, displayName()),
+          h('dl', { class: 'kv' }, h('dt', {}, 'NPI'), h('dd', {}, p.npi || '—'), h('dt', {}, 'Name'), h('dd', {}, displayName(p)),
             h('dt', {}, 'Specialty'), h('dd', {}, p.taxonomy_desc || '—')),
           h('p', { class: 'muted small' }, 'These come from the federal registry. Update them at nppes.cms.hhs.gov.'))),
       h('aside', { class: 'side' }, h('div', { class: 'sticky' }, h('div', { class: 'side-h' }, 'How patients see you'), preview,
@@ -709,13 +742,14 @@ VIEWS.listing = function () {
 
 // Mirrors the patient app's result card (assets/find.css .res), so the preview
 // is what a patient actually sees.
-function previewCard() {
-  var p = S.profile || {};
-  var name = displayName();
+function previewCard(p, ins) {
+  p = p || S.profile || {};
+  ins = ins || S.insurance;
+  var name = displayName(p);
   var badges = [h('span', { class: 'badge verified' }, '✓ Verified')];
   if (p.accepting_new_patients === true) badges.push(h('span', { class: 'badge good' }, 'Accepting new patients'));
   if (p.accepting_new_patients === false) badges.push(h('span', { class: 'badge unknown' }, 'Not taking new patients'));
-  if (S.insurance.length) badges.push(h('span', { class: 'badge good' }, 'Takes ' + S.insurance[0]));
+  if (ins.length) badges.push(h('span', { class: 'badge good' }, 'Takes ' + ins[0]));
   if (p.telehealth === true) badges.push(h('span', { class: 'badge tele' }, 'Telehealth'));
   return h('article', { class: 'res' },
     h('div', { class: 'res-av', style: '--h:' + hueFor(p.npi) }, initials(name)),
@@ -730,6 +764,65 @@ function previewCard() {
         p.phone ? h('span', { class: 'act' }, 'Call ' + p.phone) : null,
         h('span', { class: 'act' }, 'Details'))));
 }
+
+/* ======================================================================== */
+/*  MY NPIS (2026-10-25, provider-npis)                                     */
+/* ======================================================================== */
+// One account, many NPIs: a practice's other offices, a chain's stores, the
+// clinicians in a group. Each added NPI is checked against the registry and
+// goes live at once when the registry's name is this account's; otherwise it
+// waits for a short review. Each keeps its own listing, edited in My listing.
+VIEWS.npis = function () {
+  var p = S.profile || {};
+  var list = h('div', { class: 'npi-list' });
+  var msg = h('p', { class: 'muted small', 'aria-live': 'polite' });
+  var fNpi = h('input', { inputmode: 'numeric', maxlength: '10', placeholder: '10-digit NPI', 'aria-label': 'NPI to add' });
+  var addBtn = h('button', { class: 'btn primary', type: 'button' }, 'Add NPI');
+  addBtn.onclick = function () {
+    var v = fNpi.value.replace(/\D/g, '');
+    if (!/^\d{10}$/.test(v)) { toast('An NPI is 10 digits.', true); return; }
+    addBtn.disabled = true; msg.textContent = 'Checking the NPI registry…';
+    api('/provider-npis', { method: 'POST', body: { npi: v } }).then(function (d) {
+      fNpi.value = ''; msg.textContent = d.message || 'Added.';
+      return loadNpis();
+    }).then(function () { addBtn.disabled = false; paint(); })
+      .catch(function (e) { addBtn.disabled = false; msg.textContent = ''; toast(e.message, true); });
+  };
+  var STATUS = { live: ['Live', 'ok'], review: ['Under review', 'warn'], blocked: ['Not approved', 'bad'] };
+  function row(n, own) {
+    var st = own ? ['This account', 'ok'] : (STATUS[n.status] || [n.status, 'warn']);
+    return h('div', { class: 'card npi-row' },
+      h('div', { class: 'npi-main' },
+        h('div', {}, h('b', {}, displayName(n)), h('span', { class: 'chip ' + st[1] }, st[0])),
+        h('div', { class: 'muted small' }, 'NPI ' + n.npi + (n.taxonomy_desc ? ' · ' + n.taxonomy_desc : '') +
+          ([n.address_line, n.city, n.state].filter(Boolean).length ? ' · ' + [titleCase(n.address_line || ''), titleCase(n.city || ''), n.state].filter(Boolean).join(', ') : '')),
+        !own && n.status === 'review' && n.review_reason ? h('div', { class: 'muted small' }, 'Why: ' + n.review_reason) : null),
+      h('div', { class: 'npi-acts' },
+        h('button', { class: 'btn sm', type: 'button', onclick: function () { S.editing = own ? null : n; location.hash = '#/listing'; render(); } }, 'Edit listing'),
+        own ? null : h('button', { class: 'btn sm danger', type: 'button', onclick: function () {
+          if (!window.confirm('Remove NPI ' + n.npi + ' from this account? Its listing details are deleted; it stays in the public registry.')) return;
+          api('/provider-npis?id=' + encodeURIComponent(n.id), { method: 'DELETE' })
+            .then(function () { if (S.editing && S.editing.id === n.id) S.editing = null; return loadNpis(); })
+            .then(paint).catch(function (e) { toast(e.message, true); });
+        } }, 'Remove')));
+  }
+  function paint() {
+    clear(list);
+    list.appendChild(row({ npi: p.npi, org_name: p.org_name, first_name: p.first_name, last_name: p.last_name, taxonomy_desc: p.taxonomy_desc,
+      address_line: p.address_line, city: p.city, state: p.state }, true));
+    (S.npis || []).forEach(function (n) { list.appendChild(row(n, false)); });
+  }
+  paint();
+  return h('section', { class: 'view' },
+    pageHead('My NPIs', 'Add the NPIs of your other offices or clinicians, so they show as your practice in patient search. Each has its own listing.'),
+    S.npisEnabled ? h('div', { class: 'card sec' },
+      h('div', { class: 'card-h' }, h('div', {}, h('h2', {}, 'Add an NPI'),
+        h('p', { class: 'muted small' }, 'We check it against the federal registry. When the registry lists ' +
+          ([p.first_name, p.last_name].filter(Boolean).join(' ') || 'your name') + ' for it (as the clinician, or the organization\'s authorized official), it goes live at once; otherwise it waits for a short review.'))),
+      h('div', { class: 'form inline' }, fNpi, addBtn), msg)
+      : h('div', { class: 'banner warn' }, 'Adding NPIs is not switched on yet.'),
+    list);
+};
 
 /* ======================================================================== */
 /*  LOCATIONS                                                               */
@@ -973,7 +1066,7 @@ if (!session || !session.access_token) { toSignIn(); return; }
 $('pmain').appendChild(h('div', { class: 'view' }, h('p', { class: 'muted' }, 'Loading your portal…')));
 loadProfile().then(function () {
   if (S.noListing) return render();
-  return Promise.all([loadAppointments(), loadLocations(), loadDemand()]).then(render);
+  return Promise.all([loadAppointments(), loadLocations(), loadDemand(), loadNpis()]).then(render);
 }).catch(function (e) {
   clear($('pmain'));
   $('pmain').appendChild(h('div', { class: 'view' }, h('div', { class: 'card' }, h('p', { class: 'pad' }, 'Could not load your portal: ' + e.message))));

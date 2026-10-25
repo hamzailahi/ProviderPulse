@@ -125,6 +125,12 @@
 [functions."audit-narrate"]
   timeout = 26
 
+# Adding an NPI to an account: auth (5s) + account and added-NPI reads (6s
+# each) + claimed checks (5s each) + NPPES (8s) + two OIG reads (5s each) +
+# the insert. A few hundred ms normally; the ceiling covers a slow NPPES.
+[functions."provider-npis"]
+  timeout = 26
+
 # A provider checking their own listing: auth (5s) + profile (5s) + the
 # audit reads (5-8s, in parallel) + NPPES (6-8s) + up to two geocodes (5s
 # each, skipped when the addresses already match). Work is capped at 15s.

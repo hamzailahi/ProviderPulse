@@ -99,11 +99,25 @@ exports.handler = async (event) => {
       const nrows = nr && nr.ok ? await nr.json().catch(() => []) : [];
       for (const n of (Array.isArray(nrows) ? nrows : [])) names[n.id] = n;
     }
+    // A request made to one of an account's added NPIs (migration 044) names
+    // that listing, not the account's own.
+    const addedNpis = [...new Set(list.map(r => r.npi).filter(n => /^\d{10}$/.test(String(n || ''))))];
+    const addedByNpi = {};
+    if (addedNpis.length) {
+      const ar = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_npis?npi=in.(${addedNpis.join(',')})&select=npi,org_name,first_name,last_name,phone,city,state`,
+        { headers: svc, signal: AbortSignal.timeout(5000) }).catch(() => null);
+      const arows = ar && ar.ok ? await ar.json().catch(() => []) : [];
+      for (const a of (Array.isArray(arows) ? arows : [])) addedByNpi[a.npi] = a;
+    }
     const appointments = list.map(r => {
-      const o = names[role === 'provider' ? r.patient_id : r.provider_id] || {};
+      const listing = r.npi && addedByNpi[r.npi];
+      const o = (role === 'patient' && listing) || names[role === 'provider' ? r.patient_id : r.provider_id] || {};
       const out = { id: r.id, status: r.status, requested_time: r.requested_time, reason: r.reason, created_at: r.created_at, updated_at: r.updated_at };
       if (role === 'provider') {
         out.patient_name = [o.first_name, o.last_name].filter(Boolean).join(' ') || 'Patient';
+        // Which of the account's NPIs was booked, and its name when it is an added one.
+        out.npi = r.npi || null;
+        out.listing_name = listing ? (listing.org_name || [listing.first_name, listing.last_name].filter(Boolean).join(' ')) : null;
       } else {
         out.provider_name = o.org_name || [o.first_name, o.last_name].filter(Boolean).join(' ') || 'Provider';
         out.provider_npi = o.npi || null;
@@ -142,7 +156,15 @@ exports.handler = async (event) => {
     if (provRes.status === 400) {
       provRes = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_profiles?${filter}&select=id`, { headers: svc });
     }
-    const provRows = provRes.ok ? await provRes.json().catch(() => []) : [];
+    let provRows = provRes.ok ? await provRes.json().catch(() => []) : [];
+    // Not an account's own NPI: it may be one an account added (migration 044),
+    // booked through that account, and only once it cleared review.
+    let bookedNpi = /^\d{10}$/.test(npi) ? npi : null;
+    if ((!Array.isArray(provRows) || provRows.length === 0) && bookedNpi) {
+      const ar = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_npis?npi=eq.${npi}&review_status=eq.clear&select=account_id`, { headers: svc }).catch(() => null);
+      const arows = ar && ar.ok ? await ar.json().catch(() => []) : [];
+      provRows = Array.isArray(arows) ? arows.map(a => ({ id: a.account_id })) : [];
+    }
     if (!Array.isArray(provRows) || provRows.length === 0) {
       return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'This provider is not taking requests through ProviderPulse yet. Please call them.' }) };
     }
@@ -167,12 +189,21 @@ exports.handler = async (event) => {
       requested_time: requestedTime,
       reason: body.reason ? String(body.reason).trim().slice(0, 300) : null
     };
+    // Which listing was booked (migration 044); the database checks it is one
+    // of this account's NPIs. Left off when booked by account id.
+    if (bookedNpi) row.npi = bookedNpi;
 
-    const insRes = await fetch(`${env.SUPABASE_URL}/rest/v1/appointment_requests`, {
+    const insert = r => fetch(`${env.SUPABASE_URL}/rest/v1/appointment_requests`, {
       method: 'POST',
       headers: { ...userHeaders, Prefer: 'return=representation' },
-      body: JSON.stringify(row)
+      body: JSON.stringify(r)
     });
+    let insRes = await insert(row);
+    // Before migration 044 there is no npi column: book without it rather than fail.
+    if (!insRes.ok && row.npi && insRes.status === 400) {
+      const { npi: _drop, ...plain } = row;
+      insRes = await insert(plain);
+    }
     if (!insRes.ok) {
       const detail = await insRes.text().catch(() => '');
       return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Could not create request: ' + detail.slice(0, 200) }) };

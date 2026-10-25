@@ -93,7 +93,7 @@ requires the name on the form to match the registry record. From there it
 runs OIG exclusion screening (below). The registration page itself is now
 a pitch only; a signed-in provider is sent straight to the portal.
 
-**Provider portal (`/portal`).** A sidebar app with six sections:
+**Provider portal (`/portal`).** A sidebar app with seven sections:
 
 - *Overview*, the home screen: listing completeness, pending appointment
   requests, and a snapshot of the local market.
@@ -104,6 +104,9 @@ a pitch only; a signed-in provider is sent straight to the portal.
 - *Locations*: multiple practice addresses, one of them primary.
 - *Competition*: nearby listings in the same specialty on a map, and how
   many of them are missing hours or insurance.
+- *My NPIs*: add the NPIs of other offices or clinicians, each verified
+  against the registry (live at once when the registry lists the account
+  holder, otherwise after review) and each with its own listing.
 - *Listing accuracy check* (on Overview): the Directory Accuracy engine run
   on the provider's own listing, with what to fix.
 - *Medicare footprint* (on Overview): the provider's own top Medicare codes
@@ -478,7 +481,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`042_benchmark_care_type.sql` (run by the "Apply migration" job, or in the editor); 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
+`044_provider_npis.sql` (run by the "Apply migration" job, or in the editor, after `043_column_grants.sql`); 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
 
 ## Environment variables
 
@@ -566,6 +569,7 @@ node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bu
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 node scripts/test-providers-near.mjs      # the assistant's competitor lookup: codes in a location box, clinicians and organizations, failures never "none"
 node scripts/test-catchment.mjs           # the market score's area: every ZIP within 10 miles, ZIP groups, a failed load refuses to score
+node scripts/test-provider-npis.mjs        # one account, many NPIs: checks, review, own rows only, publishing and booking
 node scripts/test-self-check.mjs           # a provider's own listing check: their NPI only, nothing written
 node scripts/test-listing-report.mjs       # report a wrong listing: only the NPI and issue are stored, repeats throttled
 node scripts/test-npi-activity.mjs         # the public Medicare-activity lookup: published columns only, unknown never "inactive"
@@ -627,6 +631,25 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-10-25
+
+- **One provider account can now hold many NPIs.** A practice with several
+  offices, a pharmacy chain or a group with several clinicians adds each
+  NPI on the portal's new My NPIs page. We check each one against the
+  federal registry and the OIG exclusion list like a new sign-up. It goes
+  live at once when the registry lists the account holder (as the clinician,
+  or the organization's authorized official); otherwise it waits in the
+  admin review queue with the reason shown. Each NPI keeps its own listing
+  (hours, insurance, availability), edited in My listing through a switcher,
+  shows on the patient map as a verified listing once approved, and can be
+  booked; the provider sees which NPI each request was for. New tables
+  `provider_npis` and `provider_npi_insurance` (migration 044).
+- **Security fix: signed-in users could change columns the app never lets
+  them change.** Through the database's public API, a provider could clear
+  their own OIG review hold or change their NPI, mark a location verified,
+  and a patient could confirm their own appointment request. Migration 043
+  limits signed-in users to the exact columns the app writes and checks
+  appointment status changes in the database by who is asking. Nothing the
+  app does changed.
 
 - **The start screen no longer lists care twice.** Under the 13 kinds of
   care, a second grid repeated dental, mental health and urgent care. It is

@@ -8,7 +8,9 @@
 // use. This is a shared secret, not a user account — keep the endpoint off the
 // public nav and rotate the password if it is ever pasted anywhere.
 //
-// GET  ?password=...            -> the pending queue, with matching LEIE records
+// GET  ?password=...            -> the pending queue, with matching LEIE records;
+//                                  NPIs added to an account (044) carry kind
+//                                  'added' and the account that asked
 // POST {password, npi, action}  -> action: 'clear' | 'block'
 //
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_PASSWORD
@@ -83,7 +85,31 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers: CORS, body: JSON.stringify({ pending: [], unavailable: true }) };
     }
     const rows = await res.json();
-    const pending = Array.isArray(rows) ? rows : [];
+    const pending = Array.isArray(rows) ? rows.map(r => ({ ...r, kind: 'account' })) : [];
+
+    // NPIs added to an account (migration 044) wait here when the registry's
+    // name is not the account's, or on an OIG name match. The reviewer sees
+    // which account asked for it. A missing table means none.
+    const added = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/provider_npis?review_status=eq.pending` +
+      `&select=npi,first_name,last_name,org_name,entity_type,city,state,zip,review_reason,account_id`,
+      { headers: svc, signal: AbortSignal.timeout(6000) }).catch(() => null);
+    const addedRows = added && added.ok ? await added.json().catch(() => []) : [];
+    if (Array.isArray(addedRows) && addedRows.length) {
+      const ids = [...new Set(addedRows.map(r => r.account_id))];
+      const acc = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_profiles?id=in.(${ids.map(i => `"${i}"`).join(',')})&select=id,npi,org_name,first_name,last_name`,
+        { headers: svc, signal: AbortSignal.timeout(6000) }).catch(() => null);
+      const accRows = acc && acc.ok ? await acc.json().catch(() => []) : [];
+      const byId = {};
+      (Array.isArray(accRows) ? accRows : []).forEach(a => { byId[a.id] = a; });
+      for (const r of addedRows) {
+        const a = byId[r.account_id] || {};
+        const { account_id, ...pub } = r;
+        pending.push({ ...pub, kind: 'added', npi_verified: true,
+          account: { npi: a.npi || null, name: a.org_name || [a.first_name, a.last_name].filter(Boolean).join(' ') || null,
+            person: [a.first_name, a.last_name].filter(Boolean).join(' ') || null } });
+      }
+    }
 
     // Attach the actual LEIE records that triggered each flag. Without them a
     // reviewer is being asked to make a decision with no evidence in front of
@@ -126,15 +152,24 @@ exports.handler = async (event) => {
     // so 'blocked' stays hidden, and it is distinguishable from never-reviewed.
     : { review_status: 'blocked', review_reason: String(body.note || 'Confirmed OIG exclusion').slice(0, 300) };
 
+  // An account's own NPI, else one added to an account (migration 044).
+  let kind = 'account';
   const res = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=eq.${npi}`, {
     method: 'PATCH', headers: { ...svc, Prefer: 'return=representation' }, body: JSON.stringify(patch)
   });
   if (!res.ok) return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Update failed' }) };
-  const changed = await res.json().catch(() => []);
+  let changed = await res.json().catch(() => []);
+  if (!Array.isArray(changed) || !changed.length) {
+    kind = 'added';
+    const res2 = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_npis?npi=eq.${npi}`, {
+      method: 'PATCH', headers: { ...svc, Prefer: 'return=representation' }, body: JSON.stringify(patch)
+    });
+    changed = res2.ok ? await res2.json().catch(() => []) : [];
+  }
   if (!Array.isArray(changed) || !changed.length) {
     return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'No provider with that NPI' }) };
   }
 
-  await audit(env, { actor_role: 'admin', action: 'provider_review_' + action, target: npi, ip });
+  await audit(env, { actor_role: 'admin', action: 'provider_review_' + action, target: npi, ip, detail: { kind } });
   return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, npi, action }) };
 };

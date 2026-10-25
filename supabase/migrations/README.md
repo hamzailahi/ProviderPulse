@@ -80,6 +80,8 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 040 | `040_clinics_phone.sql` | `phone` column on `clinics` (organizations had none); filled from NPPES by `org-phone-backfill.yml`, which runs this file in apply mode | applied 2026-10-24 by the job's apply run (1,894,376 of 1,901,951 rows filled) |
 | 041 | `041_listing_reports.sql` | `listing_reports`: one row per patient "report a wrong listing" tap (NPI, issue from a fixed list, time; no free text, user or IP); RLS on, no policies, service role only | applied 2026-10-25 by `apply-migration.yml` |
 | 042 | `042_benchmark_care_type.sql` | allows kind `care_type` in `market_benchmarks` (organizations per facility type per 10,000 adults), keeping `demand_model`, which the live constraint already had | applied 2026-10-25 by `apply-migration.yml` |
+| 043 | `043_column_grants.sql` | anon and authenticated lose INSERT/UPDATE/DELETE on `provider_profiles`, `provider_locations`, `appointment_requests` and get back only the columns the functions write; `trg_appointment_guard` enforces status transitions by party (a provider could clear their own review hold, a patient confirm their own request) | applied 2026-10-25 by `apply-migration.yml` |
+| 044 | `044_provider_npis.sql` | `provider_npis` and `provider_npi_insurance` (one account, many NPIs), one-owner trigger across both listing tables, `appointment_requests.npi` with its guard, explicit service-role grants (incl. 041's table) | applied 2026-10-25 by `apply-migration.yml` |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

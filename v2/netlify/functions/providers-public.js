@@ -31,6 +31,11 @@ const LOCATION_COLUMNS = 'provider_id,npi,label,address_line,city,state,zip,lati
 
 const MAX_NPIS = 80;
 
+// NPIs added to an account (provider_npis, migration 044): each is its own
+// listing with the same published fields as PUBLIC_COLUMNS, and only once its
+// review_status is 'clear'. `id` and `account_id` are never selected.
+const ADDED_COLUMNS = 'npi,accepting_new_patients,telehealth,bio,org_name,first_name,last_name,address_line,city,state,zip,phone,taxonomy_desc,office_hours,hours_note,booking_mode,booking_url';
+
 // PostgREST caps every response at 1000 rows regardless of `limit`, and a
 // truncated reply is byte-for-byte indistinguishable from a complete one. The
 // `?all=1` path asked for `limit=500` with no loop at all, so once registered
@@ -57,6 +62,40 @@ async function pagedAll(url, key, headers) {
     cursor = next;
   }
   return { rows, ok: true, truncated: true };
+}
+
+// Cleared added NPIs (all, or the ones asked for) with their payer names.
+async function loadAdded(env, svc, npis) {
+  if (npis && !npis.length) return [];
+  const base = `${env.SUPABASE_URL}/rest/v1/provider_npis?review_status=eq.clear`;
+  let rows;
+  if (npis) {
+    const r = await fetch(`${base}&npi=in.(${npis.join(',')})&select=id,${ADDED_COLUMNS}`, { headers: svc, signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return [];
+    rows = await r.json();
+  } else {
+    const page = await pagedAll(`${base}&select=id,${ADDED_COLUMNS}`, 'npi', svc);
+    if (!page.ok) return [];
+    rows = page.rows;
+  }
+  if (!Array.isArray(rows) || !rows.length) return [];
+  const byId = {};
+  rows.forEach(r => { byId[r.id] = r; r.payers = []; });
+  const ids = Object.keys(byId);
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    for (let offset = 0; offset < ALL_PAGE_CAP; offset += 1000) {
+      const res = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_npi_insurance?npi_id=in.(${chunk.join(',')})&select=npi_id,payer_name` +
+        `&order=npi_id,payer_name&limit=1000&offset=${offset}`, { headers: svc, signal: AbortSignal.timeout(6000) });
+      if (!res.ok) break;
+      const batch = await res.json();
+      if (!Array.isArray(batch) || !batch.length) break;
+      batch.forEach(b => { if (byId[b.npi_id] && b.payer_name) byId[b.npi_id].payers.push(b.payer_name); });
+      if (batch.length < 1000) break;
+    }
+  }
+  // The internal row id never leaves this function.
+  return rows.map(({ id, ...pub }) => pub);
 }
 
 exports.handler = async (event) => {
@@ -141,7 +180,12 @@ exports.handler = async (event) => {
       if (!profRes.ok) throw new Error('profile lookup failed');
       rows = await profRes.json();
     }
-    if (!Array.isArray(rows) || !rows.length) {
+    if (!Array.isArray(rows)) rows = [];
+
+    // Added NPIs, with their own insurance. Additive: a missing table (044 not
+    // applied) or a failed read leaves the account listings standing.
+    const added = await loadAdded(env, svc, wantAll ? null : npis).catch(() => []);
+    if (!rows.length && !added.length) {
       return { statusCode: 200, headers: CORS, body: JSON.stringify({ providers: {} }) };
     }
 
@@ -251,6 +295,21 @@ exports.handler = async (event) => {
         booking_mode: r.booking_mode || 'phone',
         booking_url: r.booking_url || null,
         payers: payersByNpi[r.npi] || []
+      };
+    }
+
+    for (const a of added) {
+      if (providers[a.npi]) continue;
+      providers[a.npi] = {
+        npi: a.npi, registered: true, verified: true,
+        accepting_new_patients: a.accepting_new_patients, telehealth: a.telehealth,
+        org_name: a.org_name || null,
+        name: a.org_name || [a.first_name, a.last_name].filter(Boolean).join(' ') || null,
+        city: a.city || null, state: a.state || null, zip: a.zip || null, phone: a.phone || null,
+        specialty: a.taxonomy_desc || null, address_line: a.address_line || null, bio: a.bio || null,
+        locations: [], office_hours: a.office_hours || null, hours_note: a.hours_note || null,
+        booking_mode: a.booking_mode || 'phone', booking_url: a.booking_url || null,
+        payers: a.payers || []
       };
     }
 

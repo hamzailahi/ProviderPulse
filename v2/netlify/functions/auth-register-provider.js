@@ -9,105 +9,9 @@ const CORS = {
   'Content-Type': 'application/json'
 };
 
-const norm = s => (s || '').trim().toLowerCase().replace(/[^a-z]/g, '');
-
-// NPI Luhn check (with 80840 prefix constant of 24)
-function validNpi(npi) {
-  if (!/^\d{10}$/.test(npi)) return false;
-  let sum = 24;
-  const digits = npi.slice(0, 9).split('').reverse();
-  for (let i = 0; i < 9; i++) {
-    let d = parseInt(digits[i], 10);
-    if (i % 2 === 0) { d *= 2; if (d > 9) d -= 9; }
-    sum += d;
-  }
-  return (10 - (sum % 10)) % 10 === parseInt(npi[9], 10);
-}
-
-// OIG exclusion check (HHS Office of Inspector General, LEIE list).
-// NPPES only proves an NPI exists; it says nothing about whether that provider has
-// been excluded from federal healthcare programs. Listing an excluded provider to
-// patients is a materially worse failure than listing an unverified one.
-//
-// Reads an optional `leie_exclusions` table. If that table has not been imported
-// yet the check is skipped rather than blocking every registration — so an empty
-// or missing table must be read as "unknown", never as "cleared".
-//
-// Caveat worth knowing: the published LEIE file leaves NPI blank for many
-// individual exclusions, so an NPI match is a high-confidence positive but not
-// exhaustive. Name/DOB matching is OIG's own recommended verification step.
-async function isExcluded(env, npi) {
-  try {
-    const r = await fetch(`${env.SUPABASE_URL}/rest/v1/leie_exclusions?npi=eq.${npi}&select=npi&limit=1`, {
-      headers: {
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
-      },
-      signal: AbortSignal.timeout(5000)
-    });
-    if (!r.ok) return false; // table absent or unreachable -> unknown, do not block
-    const rows = await r.json();
-    return Array.isArray(rows) && rows.length > 0;
-  } catch {
-    return false;
-  }
-}
-
-// Name-based exclusion screening, the other 90% of the LEIE.
-//
-// Only ~10% of exclusion records carry an NPI, so an NPI match alone misses most
-// excluded providers. Names are the fallback, but they are NOT proof: last+first+
-// state collides for over a thousand real combinations (five different MARIA
-// HERNANDEZ in FL). A hit therefore flags the account for review rather than
-// blocking it — wrongly locking out a legitimate provider is its own harm.
-//
-// LEIE stores names uppercase and writes the literal string "NULL" where a name is
-// unknown, which must never be treated as a surname.
-async function exclusionNameHits(env, { entityType, lastName, firstName, orgName, state }) {
-  const up = s => String(s || '').trim().toUpperCase();
-  const st = up(state).slice(0, 2);
-  if (!st) return 0;
-
-  let query;
-  if (entityType === 2) {
-    const org = up(orgName);
-    if (!org || org === 'NULL') return 0;
-    query = `business_name=eq.${encodeURIComponent(org)}&state=eq.${encodeURIComponent(st)}`;
-  } else {
-    const ln = up(lastName), fn = up(firstName);
-    if (!ln || ln === 'NULL' || !fn) return 0;
-    query = `last_name=eq.${encodeURIComponent(ln)}&first_name=eq.${encodeURIComponent(fn)}&state=eq.${encodeURIComponent(st)}`;
-  }
-
-  try {
-    const r = await fetch(`${env.SUPABASE_URL}/rest/v1/leie_exclusions?${query}&select=npi&limit=5`, {
-      headers: {
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
-      },
-      signal: AbortSignal.timeout(5000)
-    });
-    if (!r.ok) return 0; // table absent -> unknown, not cleared
-    const rows = await r.json();
-    return Array.isArray(rows) ? rows.length : 0;
-  } catch {
-    return 0;
-  }
-}
-
-async function audit(env, row) {
-  try {
-    await fetch(`${env.SUPABASE_URL}/rest/v1/audit_log`, {
-      method: 'POST',
-      headers: {
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(row)
-    });
-  } catch (e) { /* audit failure must not block the request */ }
-}
+// The NPI checks (Luhn, OIG screening) live in lib/npi-verify.js, shared with
+// provider-npis.js, which adds further NPIs to an existing account.
+const { norm, validNpi, isExcluded, exclusionNameHits, npiClaimed, audit } = require('./lib/npi-verify.js');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' };
@@ -197,11 +101,13 @@ exports.handler = async (event) => {
     ? `OIG name match: ${nameHits} exclusion record(s) share this name and state`
     : null;
 
-  // 4) Reject if NPI already claimed
-  const claimed = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_profiles?npi=eq.${npi}&select=id`, {
-    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` }
-  }).then(r => r.json());
-  if (Array.isArray(claimed) && claimed.length) {
+  // 4) Reject if NPI already claimed, as an account's own NPI or one added to
+  // an account (migration 044). An unknown answer stops here rather than
+  // risking two owners.
+  let claimed;
+  try { claimed = await npiClaimed(env, npi); }
+  catch { return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Could not check this NPI just now. Try again in a minute.' }) }; }
+  if (claimed) {
     return { statusCode: 409, headers: CORS, body: JSON.stringify({ error: 'This NPI has already been claimed. Contact support if you believe this is an error.' }) };
   }
 
