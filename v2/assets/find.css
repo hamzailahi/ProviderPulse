@@ -28,8 +28,9 @@ main { min-height: 0; }
   position: relative; z-index: 5;
 }
 .sbar {
-  display: grid; grid-template-columns: minmax(240px, 2.4fr) minmax(90px, .8fr) minmax(140px, 1fr) minmax(170px, 1.3fr) auto;
-  border: 1px solid #d5dde8; border-radius: 14px; background: #fff; overflow: hidden;
+  display: grid; grid-template-columns: minmax(220px, 2.2fr) minmax(170px, 1.4fr) minmax(130px, .9fr) minmax(160px, 1.2fr) auto;
+  /* visible, so the address suggestions can drop below the bar */
+  border: 1px solid #d5dde8; border-radius: 14px; background: #fff; overflow: visible;
   box-shadow: 0 6px 20px -12px rgba(15,23,42,.25);
 }
 .sfield {
@@ -327,3 +328,26 @@ main { min-height: 0; }
 .spec-chip:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
 .spec-chip.more-specs { border-color: transparent; color: #4f46e5; background: none; }
 @media (max-width: 900px) { .spec-chip { min-height: 44px; } }
+
+/* Near: ZIP or address, suggestions and "use my location" (2026-10-25). */
+.sfield.what { border-radius: 14px 0 0 14px; }
+.sfield.zip { position: relative; }
+.near-row { display: flex; align-items: center; gap: 4px; }
+.near-me { flex: none; border: 0; background: none; cursor: pointer; font-size: 16px; line-height: 1; padding: 4px; border-radius: 8px; }
+.near-me:hover { background: #eef2ff; }
+.near-me:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+.near-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 40; margin-top: 4px; background: #fff; border: 1px solid #d5dde8;
+  border-radius: 12px; box-shadow: 0 12px 30px -12px rgba(15,23,42,.35); padding: 4px; display: grid; min-width: 260px; }
+.near-list[hidden] { display: none; }
+.near-opt { text-align: left; border: 0; background: none; padding: 10px 12px; border-radius: 8px; font: 500 14px var(--sans); color: #0f172a; cursor: pointer; }
+.near-opt:hover, .near-opt:focus-visible { background: #f1f5f9; outline: none; }
+@media (max-width: 900px) {
+  .sfield.what { border-radius: 12px 12px 0 0; }
+  .near-me { min-width: 44px; min-height: 44px; }
+  .near-opt { min-height: 44px; }
+}
+@media (max-width: 900px) {
+  /* an address needs the whole row on a phone */
+  .sfield.zip { grid-column: 1 / -1; border-right: 0; }
+  .sfield.miles { grid-column: 1 / -1; }
+}

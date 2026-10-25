@@ -632,6 +632,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **Patients can search from a street address or their current location.**
+  The Near box now takes a ZIP, an address (with suggestions as you type) or
+  the location button. Distances on results and in the detail sheet are
+  measured from that point in straight-line miles. The address stays in the
+  browser for this visit only; our servers see the ZIP and nothing else.
 - **One provider account can now hold many NPIs.** A practice with several
   offices, a pharmacy chain or a group with several clinicians adds each
   NPI on the portal's new My NPIs page. We check each one against the

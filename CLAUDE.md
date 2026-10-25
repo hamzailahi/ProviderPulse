@@ -693,7 +693,7 @@ call `invalidateSize()` and refit.
 ### Patient map (`patient.js`)
 
 Search-first: what (a care-type door, a specialty or plain-language
-condition), where (ZIP), how far (**5, 10, 25 or 50 miles**, default 10) and
+condition), where (a ZIP, a street address or the browser's location; 2026-10-25), how far (**5, 10, 25 or 50 miles**, default 10) and
 insurance. A specialty's listings are found by NUCC code (see NUCC codes
 phase 3), a door's by `TaxonomyMap.codesForCare` (2026-10-25). Typed words
 reach a door before any specialty (`DOOR_HINTS` in `patient.js`: "pharmacy"
@@ -717,7 +717,7 @@ query test), kept while the patient taps through them (`keepRelated`).
 and a specialty list sort on different fields.
 `LOWCOST_HINT` words ("free clinic", "no insurance") search
 primary care with the Low-cost filter on. `DOOR_NAMES` must equal
-`TaxonomyMap.careTypes` (tested). Default order is **Best match**
+`TaxonomyMap.careTypes` (tested). **Where** (2026-10-25, the user's choices): the Near box (`#nearIn`) takes a ZIP, an address (MapTiler geocoding from the browser with the public key, suggestions in `#nearList`) or the location button (`navigator.geolocation`, reverse geocoded for its ZIP). The point is `s.origin`, kept in memory for this visit only; distances are straight-line miles from it and the sheet says so. Only its ZIP ever reaches a function (demand logging, payers); an origin with no ZIP logs nothing. An address that geocodes to nothing says so and never falls back to a guess. Default order is **Best match**
 (`tierOf`): organizations, physicians and the specialty's lead NUCC grouping
 (most of its clinician codes) first, NPs and PAs next, the rest after, and
 codes with an `eligibility` rule last; distance within each tier. Listings

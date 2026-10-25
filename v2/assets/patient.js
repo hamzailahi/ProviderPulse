@@ -477,6 +477,7 @@ function newSearch() {
   var p = state.profile || {};
   return {
     text: '', label: '', terms: [], door: null, procedure: null, related: null,
+    origin: null,   // {lat, lng, label, zip}: a typed address or the browser's location (this visit only)
     zip: /^\d{5}$/.test(String(p.zip || '')) ? p.zip : '',
     miles: DEFAULT_RADIUS,
     payer: p.insurance_payer || '',
@@ -487,17 +488,71 @@ function newSearch() {
   };
 }
 
+/* ---------- where the patient starts (2026-10-25) -------------------------
+   A ZIP, a street address or the browser's own location. An address is
+   turned into coordinates by MapTiler's geocoder, called from the browser
+   with the map's public key, so it never reaches ProviderPulse's servers or
+   database; it lives in this tab's memory only (the user's choice: this visit
+   only) and is never logged, cached or put in the URL. Distances are
+   straight-line miles from that point. Only the ZIP (when the geocoder names
+   one) goes on to insurance plans and the anonymous search counts. */
+var GEO_BASE = 'https://api.maptiler.com/geocoding/';
+function zipOfFeature(f) {
+  if (!f) return '';
+  if ((f.place_type || []).indexOf('postal_code') !== -1 && /^\d{5}/.test(f.text || '')) return String(f.text).slice(0, 5);
+  var c = (f.context || []).filter(function (x) { return /^postal_code/.test(x.id || ''); })[0];
+  return c && /^\d{5}/.test(c.text || '') ? String(c.text).slice(0, 5) : '';
+}
+function originOf(f) {
+  return { lat: f.center[1], lng: f.center[0], label: String(f.place_name || f.text || '').replace(/, United States( of America)?$/, ''), zip: zipOfFeature(f) };
+}
+// Up to five US matches for typed text, or [] (never throws).
+function geocodeAddress(text) {
+  var q = String(text || '').trim().slice(0, 120);
+  if (q.length < 3) return Promise.resolve([]);
+  var url = GEO_BASE + encodeURIComponent(q) + '.json?key=' + MAPTILER_KEY + '&country=us&limit=5&language=en&autocomplete=true';
+  return fetch(url, { signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { return ((d && d.features) || []).filter(function (f) { return f.center && f.center.length === 2; }).map(originOf); })
+    .catch(function () { return []; });
+}
+// The browser's location, named by reverse geocoding when possible.
+function locateMe() {
+  return new Promise(function (resolve, reject) {
+    if (!navigator.geolocation) { reject(new Error('This browser cannot share your location. Type an address or ZIP instead.')); return; }
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      var lat = pos.coords.latitude, lng = pos.coords.longitude;
+      fetch(GEO_BASE + lng + ',' + lat + '.json?key=' + MAPTILER_KEY + '&language=en&limit=1', { signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          var f = d && d.features && d.features[0];
+          resolve({ lat: lat, lng: lng, label: 'Your location', zip: zipOfFeature(f) || (f && zipOfFeature({ context: f.context })) || '' });
+        })
+        .catch(function () { resolve({ lat: lat, lng: lng, label: 'Your location', zip: '' }); });
+    }, function (err) {
+      reject(new Error(err && err.code === 1 ? 'Location is turned off for this site. Type an address or ZIP instead.' : 'We could not get your location. Type an address or ZIP instead.'));
+    }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+  });
+}
+function hasPlace(s) { return !!s.origin || /^\d{5}$/.test(String(s.zip || '')); }
+// How the starting point reads in headings: "123 Main St", "your location", or the ZIP.
+function placeWords(s) {
+  if (s.origin) return s.origin.label === 'Your location' ? 'your location' : String(s.origin.label).split(',')[0];
+  return s.zip;
+}
+
 function runProviderSearch() {
   var s = state.search;
   if (!s.terms.length) { s.error = 'Choose a specialty, or describe what you need.'; paintFind(); return; }
-  if (!/^\d{5}$/.test(s.zip)) { s.error = 'Enter a 5-digit ZIP code.'; paintFind(); return; }
+  if (!hasPlace(s)) { s.error = 'Enter a ZIP code or an address, or use your location.'; paintFind(); return; }
   var seq = ++s.seq;
   // The previous answer goes now: a procedure list and a specialty list rank
   // by different fields, and the old rows were painted under the new kind.
   s.loading = true; s.error = ''; s.ran = true; s.shown = RESULTS_PAGE; s.active = null; s.expanded = {}; s.all = [];
   paintFind();
 
-  Promise.all([locateZip(s.zip), loadRegistered()]).then(function (res) {
+  var from = s.origin ? Promise.resolve({ lat: s.origin.lat, lng: s.origin.lng }) : locateZip(s.zip);
+  Promise.all([from, loadRegistered()]).then(function (res) {
     if (seq !== s.seq) return;
     var c = res[0];
     if (!c) { s.loading = false; s.all = []; s.center = null; s.error = 'We couldn\'t find ZIP ' + s.zip + '. Check it and try again.'; paintFind(); return; }
@@ -540,7 +595,7 @@ function runProcedureSearch(s, seq) {
   return zipsNear(c, s.miles).then(function (zips) {
     if (seq !== s.seq) return;
     if (!zips) { s.loading = false; s.error = 'Search is unavailable right now. Please try again.'; paintFind(); return; }
-    if (!zips[s.zip]) zips[s.zip] = { lat: c.lat, lng: c.lng };
+    if (/^\d{5}$/.test(String(s.zip || '')) && !zips[s.zip] && !s.origin) zips[s.zip] = { lat: c.lat, lng: c.lng };
     var list = Object.keys(zips);
     return inBatches(list, 10, 4, function (g) {
       return tableQuery('cms_procedures_full', PROC_SELECT, 'zip=in.(' + g.join(',') + ')&hcpcs_cd=in.(' + proc.codes.join(',') + ')' +
@@ -721,6 +776,8 @@ function visibleResults() {
 function logSearch(s) {
   // demand_log is written by patient-match, which needs an account; a guest's
   // search is not counted (the ZIP backfill below is public and still runs).
+  // Only the ZIP ever leaves the browser: never the address or coordinates.
+  if (!/^\d{5}$/.test(String(s.zip || ''))) return;
   if (state.session) api('/patient-match', { method: 'POST', body: { mode: 'log', zip: s.zip, taxonomies: [s.label], matched: s.all.length } }).catch(function () {});
   fetch(FN + '/zip-enrich-request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ zip: s.zip }) }).catch(function () {});
 }
@@ -734,7 +791,47 @@ function findView() {
   var fWhat = h('input', { type: 'search', list: 'specList', value: s.text || s.label, autocomplete: 'off',
     placeholder: 'Specialty or condition, e.g. dermatology, back pain', 'aria-label': 'Specialty or condition' });
   var dl = h('datalist', { id: 'specList' }, SPECIALTIES.map(function (x) { return h('option', { value: x[0] }); }));
-  var fZip = h('input', { value: s.zip, maxlength: '5', inputmode: 'numeric', placeholder: 'ZIP', 'aria-label': 'ZIP code' });
+  var fZip = h('input', { id: 'nearIn', value: s.origin ? s.origin.label : s.zip, maxlength: '120', autocomplete: 'off', placeholder: 'ZIP or address',
+    'aria-label': 'ZIP code or address', 'aria-autocomplete': 'list', 'aria-controls': 'nearList', 'aria-expanded': 'false' });
+  var nearList = h('div', { class: 'near-list', id: 'nearList', role: 'listbox', hidden: true });
+  var nearSeq = 0, nearTimer = null;
+  function closeNear() { nearList.hidden = true; fZip.setAttribute('aria-expanded', 'false'); clear(nearList); }
+  function useOrigin(o) {
+    s.origin = o; fZip.value = o.label; closeNear();
+    // The ZIP the geocoder names, for insurance plans and the anonymous
+    // counts; none means none, never the previous ZIP.
+    s.zip = o.zip || '';
+    if (o.zip) loadPayers(o.zip).then(paintPayers);
+  }
+  // Suggestions as an address is typed (not for a bare ZIP).
+  fZip.addEventListener('input', function () {
+    var v = fZip.value.trim();
+    if (s.origin && v !== s.origin.label) s.origin = null;
+    clearTimeout(nearTimer);
+    if (/^\d{0,5}$/.test(v) || v.length < 4) { closeNear(); return; }
+    var mine = ++nearSeq;
+    nearTimer = setTimeout(function () {
+      geocodeAddress(v).then(function (list) {
+        if (mine !== nearSeq) return;
+        clear(nearList);
+        if (!list.length) { closeNear(); return; }
+        list.forEach(function (o) {
+          nearList.appendChild(h('button', { type: 'button', role: 'option', class: 'near-opt', onclick: function () { useOrigin(o); } }, o.label));
+        });
+        nearList.hidden = false; fZip.setAttribute('aria-expanded', 'true');
+      });
+    }, 300);
+  });
+  fZip.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeNear(); });
+  fZip.addEventListener('blur', function () { setTimeout(closeNear, 200); });
+  var locBtn = h('button', { class: 'near-me', type: 'button', 'aria-label': 'Use my current location', title: 'Use my current location', onclick: function () {
+    locBtn.disabled = true; locBtn.textContent = '…';
+    locateMe().then(function (o) {
+      useOrigin(o);
+      if (s.terms.length) submit(); else toast('Using your location. Pick a kind of care or type what you need.');
+    }).catch(function (e) { toast(e.message, true); })
+      .then(function () { locBtn.disabled = false; locBtn.textContent = '📍'; });
+  } }, '📍');
   var fMiles = h('select', { 'aria-label': 'Distance' }, RADIUS_CHOICES.map(function (m) {
     return h('option', { value: String(m), selected: m === s.miles }, 'Within ' + m + ' mi');
   }));
@@ -752,9 +849,24 @@ function findView() {
     if (/^\d{5}$/.test(z)) loadPayers(z).then(paintPayers);
   });
 
+  // The Near box holds a ZIP, the address picked from the suggestions, or text
+  // to geocode now (its first match).
+  function resolveNear() {
+    var v = fZip.value.trim();
+    if (/^\d{5}$/.test(v)) { s.zip = v; s.origin = null; return Promise.resolve(true); }
+    if (s.origin && v === s.origin.label) return Promise.resolve(true);
+    if (!v) { s.origin = null; s.zip = ''; return Promise.resolve(true); }
+    return geocodeAddress(v).then(function (list) {
+      if (!list.length) { s.origin = null; s.ran = true; s.error = 'We couldn\'t find "' + v + '". Check the address, or enter a 5-digit ZIP.'; paintFind(); return false; }
+      useOrigin(list[0]); return true;
+    });
+  }
   function submit(e) {
     if (e) e.preventDefault();
-    s.zip = fZip.value.trim();
+    closeNear();
+    resolveNear().then(function (ok) { if (ok) go(); });
+  }
+  function go() {
     s.miles = parseInt(fMiles.value, 10) || DEFAULT_RADIUS;
     s.payer = fPayer.value;
     var text = fWhat.value.trim();
@@ -777,7 +889,7 @@ function findView() {
 
   var form = h('form', { class: 'sbar', onsubmit: submit },
     h('label', { class: 'sfield what' }, h('span', { class: 'slbl' }, 'Find'), fWhat, dl),
-    h('label', { class: 'sfield zip' }, h('span', { class: 'slbl' }, 'Near'), fZip),
+    h('div', { class: 'sfield zip' }, h('label', { class: 'slbl', for: 'nearIn' }, 'Near'), h('div', { class: 'near-row' }, fZip, locBtn), nearList),
     h('label', { class: 'sfield miles' }, h('span', { class: 'slbl' }, 'Distance'), fMiles),
     h('label', { class: 'sfield payer' }, h('span', { class: 'slbl' }, 'Insurance'), fPayer),
     h('button', { class: 'sgo', type: 'submit' }, 'Search'));
@@ -812,7 +924,7 @@ function findView() {
     top.classList.remove('folded'); fWhat.focus();
   } }, h('span', { class: 'sum-icon', 'aria-hidden': 'true' }, '⌕'), sumText, h('span', { class: 'sum-edit' }, 'Edit'));
   var top = h('div', { class: 'find-top' }, summary, form, helper, filters);
-  findEls = { filters: filters, results: results, map: mapEl, what: fWhat, zip: fZip, toggle: toggle, body: body, top: top, sumText: sumText };
+  findEls = { filters: filters, results: results, map: mapEl, what: fWhat, zip: fZip, resolveNear: resolveNear, toggle: toggle, body: body, top: top, sumText: sumText };
   var view = h('section', { class: 'find' }, top, body);
   setTimeout(function () { mountMap(); paintFind(true); }, 0);
   return view;
@@ -821,7 +933,7 @@ function findView() {
 function foldSearch() {
   if (!findEls) return;
   var s = state.search;
-  findEls.sumText.textContent = [s.label || 'Providers', s.zip, s.miles + ' mi', s.payer || null].filter(Boolean).join(' · ');
+  findEls.sumText.textContent = [s.label || 'Providers', placeWords(s), s.miles + ' mi', s.payer || null].filter(Boolean).join(' · ');
   findEls.top.classList.add('folded');
 }
 
@@ -877,7 +989,7 @@ function paintFind(refit) {
   var r = findEls.results;
   clear(r);
   if (s.loading) {
-    r.appendChild(h('h2', { class: 'rhead' }, h('span', { class: 'spin' }), 'Searching ' + (s.label || 'providers') + ' within ' + s.miles + ' mi of ' + s.zip + '…'));
+    r.appendChild(h('h2', { class: 'rhead' }, h('span', { class: 'spin' }), 'Searching ' + (s.label || 'providers') + ' within ' + s.miles + ' mi of ' + placeWords(s) + '…'));
     for (var i = 0; i < 5; i++) r.appendChild(h('div', { class: 'res skel' }, h('div', { class: 'sk', style: 'width:52%' }), h('div', { class: 'sk', style: 'width:34%' }), h('div', { class: 'sk', style: 'width:70%' })));
   } else if (s.error) {
     r.appendChild(h('div', { class: 'empty' }, h('h3', {}, 'Let\'s fix the search'), h('p', {}, s.error)));
@@ -891,7 +1003,7 @@ function paintFind(refit) {
     r.appendChild(h('h2', { class: 'rhead' },
       s.procedure ? h('b', {}, (floor ? 'At least ' : '') + list.listings.toLocaleString() + ' billed Medicare for ' + s.procedure.label.toLowerCase())
         : h('b', {}, (floor ? 'At least ' : '') + list.listings.toLocaleString() + ' ' + (s.label || 'providers')),
-      ' within ' + s.miles + ' mi of ' + s.zip,
+      ' within ' + s.miles + ' mi of ' + placeWords(s),
       filtered ? h('span', { class: 'muted' }, ' · ' + (s.all.length - list.listings) + ' hidden by filters') : null));
     // Phones: the Map/List toggle rides in the pinned count row (find.css).
     if (!findEls.body.classList.contains('show-map')) r.firstChild.appendChild(findEls.toggle);
@@ -949,8 +1061,8 @@ function pickProcedure(label) {
   if (!proc) return;
   var s = state.search;
   s.text = proc.label; s.label = proc.label; s.terms = [proc.label]; s.door = null; s.procedure = proc; s.suggested = {};
-  if (findEls) { findEls.what.value = proc.label; takeZip(); }
-  runProviderSearch();
+  if (findEls) findEls.what.value = proc.label;
+  searchWhenPlaced();
 }
 // "Also for diabetes": the related care for a typed condition, as buttons
 // that search it and keep the strip, so a patient can work through them.
@@ -1006,25 +1118,29 @@ function pickSpecialty(i, keepRelated) {
   var s = state.search;
   s.text = sp[0]; s.label = sp[0]; s.terms = sp[1].split(','); s.door = null; s.procedure = null; s.suggested = {};
   if (!keepRelated) s.related = null;
-  if (findEls) { findEls.what.value = sp[0]; takeZip(); }
-  if (!/^\d{5}$/.test(s.zip)) { s.ran = true; s.error = 'Enter your ZIP code, then press Search.'; paintFind(); return; }
-  runProviderSearch();
+  if (findEls) findEls.what.value = sp[0];
+  searchWhenPlaced();
 }
 
-// A ZIP typed into the search bar counts when a tile is tapped: the tiles read
-// only the saved ZIP before, so a guest who typed one was told to enter it.
-function takeZip() {
-  var z = findEls && findEls.zip ? findEls.zip.value.trim() : '';
-  if (/^\d{5}$/.test(z)) state.search.zip = z;
+// A ZIP or address typed into the search bar counts when a tile is tapped:
+// the tiles read only the saved ZIP before, so a guest who typed one was told
+// to enter it.
+function searchWhenPlaced() {
+  var s = state.search;
+  var ready = findEls && findEls.resolveNear ? findEls.resolveNear() : Promise.resolve(true);
+  ready.then(function (ok) {
+    if (!ok) return;
+    if (!hasPlace(s)) { s.ran = true; s.error = 'Enter your ZIP code or address, or use your location, then press Search.'; paintFind(); return; }
+    runProviderSearch();
+  });
 }
 function pickDoor(door, keepRelated) {
   if (door === DOOR_DOCTORS) { location.hash = '#/specialties'; return; }
   var s = state.search;
   s.text = door; s.label = door; s.terms = [door]; s.door = door; s.procedure = null; s.suggested = {};
   if (!keepRelated) s.related = null;
-  if (findEls) { findEls.what.value = door; takeZip(); }
-  if (!/^\d{5}$/.test(s.zip)) { s.ran = true; s.error = 'Enter your ZIP code, then press Search.'; paintFind(); return; }
-  runProviderSearch();
+  if (findEls) findEls.what.value = door;
+  searchWhenPlaced();
 }
 
 // NPPES stores 10 bare digits; show (817) 555-0123 and dial the digits.
@@ -1663,7 +1779,7 @@ function detailSheet(npi) {
       h('dt', {}, 'Specialty'), h('dd', {}, plainType(p) || '—'),
       h('dt', {}, 'NPI'), h('dd', { class: 'm' }, p.npi),
       h('dt', {}, 'Address'), h('dd', {}, [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ') || '—'),
-      p.miles != null ? h('dt', {}, 'Distance') : null, p.miles != null ? h('dd', {}, fmtMiles(p.miles) + ' from ' + state.search.zip) : null,
+      p.miles != null ? h('dt', {}, 'Distance') : null, p.miles != null ? h('dd', {}, fmtMiles(p.miles) + ' from ' + placeWords(state.search) + (state.search.origin ? ' (straight line)' : '')) : null,
       h('dt', {}, 'Phone'), phoneDd,
       (p.registered && p.payers && p.payers.length) ? h('dt', {}, 'Accepts') : null,
       (p.registered && p.payers && p.payers.length) ? h('dd', {}, p.payers.join(', ')) : null),
