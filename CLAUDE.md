@@ -1445,7 +1445,10 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
 - **Medicare enrollment** (`import-medicare-enrollment.mjs`, monthly 18th):
   the source is CMS's **full 2013-to-present history**; the script keeps the
   newest month and **upserts by `fips`**. Suppressed cells are the string
-  `"*"`: map to `null`, never 0. Floor: 2,500 counties.
+  `"*"`: map to `null`, never 0. Floor: 2,500 counties. It matches the bare
+  catalog title through `baseTitle` (`scripts/lib/cms-catalog.mjs`); its own
+  anchored match missed the new " : YYYY-MM-DD" stamp and the scheduled run
+  of 2026-10-18 failed.
 - **Medicare Advantage payers** (`import-medicare-advantage-payers.mjs`,
   monthly 22nd): MA enrollment by state joined to the Contract Directory's
   marketing names; Local/Regional CCP only.

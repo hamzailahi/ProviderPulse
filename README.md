@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-24. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-25. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -607,6 +607,12 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
 
+### 2026-10-25
+
+- **The monthly Medicare enrollment import works again.** CMS started adding
+  a release date to its dataset titles, so the import could no longer find
+  "Medicare Monthly Enrollment" and its October 18 run failed. It now ignores
+  the date, as the other CMS imports already did.
 ### 2026-10-24
 
 - **Pharmacies, urgent cares, clinics and hospitals now show a phone

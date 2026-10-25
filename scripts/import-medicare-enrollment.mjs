@@ -43,6 +43,7 @@
 // ---------------------------------------------------------------------------
 
 import { fetchCsvRows, fileCsvRows, columnIndex, batchWrite } from './lib/bulk.mjs';
+import { baseTitle } from './lib/cms-catalog.mjs';
 
 const CMS_CATALOG = 'https://data.cms.gov/data.json';
 
@@ -124,10 +125,14 @@ async function resolve() {
   if (!sets.length) throw new Error('catalog: parsed but found no datasets. Shape may have changed; pass --csv-url to bypass.');
   console.log(`catalog: ${sets.length.toLocaleString()} datasets`);
 
-  const hits = sets.filter(d => DATASET_TITLE.test(String(d.title || '').trim()));
+  // Titles now end in a release stamp (" : 2026-07-01"); match the bare title,
+  // as cms-catalog.mjs does for the other imports. The anchored pattern missed
+  // it and the scheduled run of 2026-10-18 failed.
+  const hits = sets.filter(d => DATASET_TITLE.test(baseTitle(d.title)));
   if (!hits.length) {
     const near = sets
       .filter(d => /enrollment/i.test(String(d.title || '')))
+      .sort((a, b) => (/medicare/i.test(b.title) ? 1 : 0) - (/medicare/i.test(a.title) ? 1 : 0))
       .slice(0, 15)
       .map(d => `      - ${d.title}`);
     throw new Error(
