@@ -111,6 +111,9 @@ jobs:
       - name: Report a wrong listing
         run: node scripts/test-listing-report.mjs
 
+      - name: Provider listing self-check
+        run: node scripts/test-self-check.mjs
+
       - name: Stray ZIPs left out of a city search
         run: node scripts/test-area-zips.mjs
 

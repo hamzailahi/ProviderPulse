@@ -102,7 +102,7 @@ Netlify Functions have a **26-second hard timeout**, and the *default* is 10s.
 `netlify.toml` raises everything that chains external calls: 26s for
 `market-assistant`, `report-generate`, `patient-match`, `auth-register-provider`,
 `doc-extract`, `provider-locations`, `audit-run`, `audit-narrate`; 20s for
-`cms-provider`, `appointment-briefing` and `market-score`. Each entry carries a
+`cms-provider`, `appointment-briefing`, `market-score` and `listing-self-check`. Each entry carries a
 comment naming the chain that justifies it. Keep those comments current: an
 unexplained ceiling is indistinguishable from a copy-paste.
 
@@ -334,6 +334,14 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   clinicians only (organizations never render services) and says "Billed
   Medicare in 2024" for the last three years, else "Last billed Medicare in
   2019 ... call to check".
+- **listing-self-check.js** (2026-10-25): provider-only. Runs `audit-run`'s
+  own `loadContext` / `auditOne` (exported for this) on the caller's NPI and
+  listed address, read from `provider_profiles` by their user id under the
+  service role, never from the request, and writes nothing. Returns the
+  verdict, confidence, signals in words (no weights) and `fixes` (what the
+  provider can do about each negative signal, `FIXES`). 20s in netlify.toml,
+  15s of work. The portal Overview's "Listing accuracy check" runs it on
+  request.
 - **listing-report.js** (2026-10-25): public. `POST {npi, issue}` with
   `issue` from `ISSUES` (closed, moved, wrong_phone, wrong_specialty,
   not_accepting, other) inserts one `listing_reports` row (migration 041)
@@ -1846,6 +1854,7 @@ node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures o
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
 node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty), the API script against a local server, and the pacer on a fake clock
+node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
 node scripts/test-npi-activity.mjs        # 15: the public Medicare-activity lookup: only its columns, a missing NPI left out, nulls stay null, failures degraded
 node scripts/test-procedure-finder.mjs    # 152: the patient procedure finder: every code a real CMS code, every specialty real, words to procedures, per-NPI counts never add patients across codes; the portal footprint (share, doctor vs facility fee)

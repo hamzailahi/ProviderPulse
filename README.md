@@ -104,6 +104,8 @@ a pitch only; a signed-in provider is sent straight to the portal.
 - *Locations*: multiple practice addresses, one of them primary.
 - *Competition*: nearby listings in the same specialty on a map, and how
   many of them are missing hours or insurance.
+- *Listing accuracy check* (on Overview): the Directory Accuracy engine run
+  on the provider's own listing, with what to fix.
 - *Medicare footprint* (on Overview): the provider's own top Medicare codes
   for 2024, with services, patients and average payment, beside the same
   codes within 10 miles: how many others bill them, the provider's share,
@@ -564,6 +566,7 @@ node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bu
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 node scripts/test-providers-near.mjs      # the assistant's competitor lookup: codes in a location box, clinicians and organizations, failures never "none"
 node scripts/test-catchment.mjs           # the market score's area: every ZIP within 10 miles, ZIP groups, a failed load refuses to score
+node scripts/test-self-check.mjs           # a provider's own listing check: their NPI only, nothing written
 node scripts/test-listing-report.mjs       # report a wrong listing: only the NPI and issue are stored, repeats throttled
 node scripts/test-npi-activity.mjs         # the public Medicare-activity lookup: published columns only, unknown never "inactive"
 node scripts/test-procedure-finder.mjs     # the patient procedure finder: real CMS codes, words to procedures, per-clinician counts
@@ -624,6 +627,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-10-25
+
+- **Providers can check their own listing's accuracy.** A "Listing accuracy
+  check" card on the portal Overview runs the same engine as the Directory
+  Accuracy audit on the provider's own NPI and address: the federal
+  registry, Medicare activity, saved locations and patient reports. It
+  shows a plain verdict and what to fix, such as adding the registered
+  address as a location or updating NPPES after a move. Nothing is saved,
+  and nobody can check another provider's listing.
 
 - **Providers see their Medicare footprint.** The portal's Overview now
   lists a provider's top Medicare codes for 2024 (services, patients,
