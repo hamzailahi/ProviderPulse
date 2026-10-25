@@ -111,6 +111,9 @@ jobs:
       - name: Report a wrong listing
         run: node scripts/test-listing-report.mjs
 
+      - name: NPPES weekly refresh
+        run: node scripts/test-nppes-refresh.mjs
+
       - name: Provider listing self-check
         run: node scripts/test-self-check.mjs
 

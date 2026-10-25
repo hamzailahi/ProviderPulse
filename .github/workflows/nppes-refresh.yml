@@ -1,0 +1,83 @@
+name: NPPES weekly refresh
+
+# Adds new NPIs, updates changed ones and removes deactivated ones in clinics,
+# provider_individuals and clinic_secondary_locations, from NPPES's weekly
+# increment files (the user's choices, 2026-10-25: weekly file with an API
+# fallback, apply additions, changes and deactivations, accurate geocoding,
+# weekly and automatic). scripts/nppes-refresh.sh has the flow; it refuses to
+# write when a week's totals look abnormal (LIMITS in
+# scripts/lib/nppes-refresh.mjs). The state (last week applied, NPIs held back
+# by a geocoder outage, the API cursor), the latest summary and a history line
+# per run are committed to supabase/reference/nppes-refresh/.
+on:
+  schedule:
+    # Wednesdays 09:23 UTC: NPPES posts the week ending Sunday early in the
+    # following week.
+    - cron: '23 9 * * 3'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'auto (weekly files, API fallback), weekly (no fallback), full (one-time catch-up from the monthly file), api'
+        type: choice
+        options: [auto, weekly, full, api]
+        default: auto
+      dry_run:
+        description: 'Plan and geocode a sample; write nothing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nppes-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check the secrets are set
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_GEOCODING_KEY: ${{ secrets.GOOGLE_GEOCODING_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY repository secrets are required"; exit 1
+          fi
+          if [ -z "$GOOGLE_GEOCODING_KEY" ]; then
+            echo "::warning::GOOGLE_GEOCODING_KEY is not set: addresses the Census cannot match exactly stay unplaced (stored, not drawn)."
+          fi
+
+      - name: Refresh
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_GEOCODING_KEY: ${{ secrets.GOOGLE_GEOCODING_KEY }}
+          MODE: ${{ inputs.mode || 'auto' }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: bash scripts/nppes-refresh.sh
+
+      # Weeks that finished are recorded even when a later one failed, so the
+      # next run starts after them.
+      - name: Commit the state and summary
+        if: always() && inputs.dry_run != true
+        run: |
+          git add supabase/reference/nppes-refresh
+          if git diff --cached --quiet; then echo "Nothing to commit."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "NPPES refresh $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

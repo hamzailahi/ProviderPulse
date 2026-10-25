@@ -29,3 +29,27 @@ nppes_monthly_url() {
   done
   return 1
 }
+
+# nppes_weekly_names prints the weekly increment file names on offer, one per
+# line (NPPES_Data_Dissemination_MMDDYY_MMDDYY_Weekly[_V2].zip, Monday to
+# Sunday), or nothing when the download site has none. The page is read
+# first; if it lists none, the names for the last eight weeks are checked
+# directly, the way nppes_monthly_url falls back.
+nppes_weekly_names() {
+  local page=https://download.cms.gov/nppes/NPI_Files.html html found back sun mon name code
+  html=$(curl -fsSL --retry 2 "$page" 2>/dev/null || true)
+  found=$( { echo "$html" | grep -oiE 'NPPES_Data_Dissemination_[0-9]{6}_[0-9]{6}_Weekly(_V2)?\.zip' || true; } | sort -u)
+  if [ -n "$found" ]; then echo "$found"; return 0; fi
+  echo "NPPES page listed no weekly files ($( [ -n "$html" ] && echo "$(echo "$html" | wc -c) bytes" || echo unreachable )); checking names directly" >&2
+  for back in 0 1 2 3 4 5 6 7; do
+    # The Sunday that ends each of the last eight weeks.
+    sun=$(date -u -d "last sunday -$back week" +%Y-%m-%d)
+    mon=$(date -u -d "$sun -6 day" +%m%d%y)
+    for name in "NPPES_Data_Dissemination_${mon}_$(date -u -d "$sun" +%m%d%y)_Weekly_V2.zip" \
+                "NPPES_Data_Dissemination_${mon}_$(date -u -d "$sun" +%m%d%y)_Weekly.zip"; do
+      code=$(curl -sS -r 0-0 -o /dev/null -w '%{http_code}' --retry 1 "https://download.cms.gov/nppes/$name" 2>/dev/null || true)
+      echo "  $name: HTTP ${code:-none}" >&2
+      case "$code" in 200|206) echo "$name"; break ;; esac
+    done
+  done
+}

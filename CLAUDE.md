@@ -1632,9 +1632,47 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   (`state_density`). Run it by hand after changing what it computes.
 - **CDC PLACES** (`import-cdc-places.mjs`, yearly Sept 20).
 - **NPI ZIP enrichment** (`enrich-npi-zips.mjs`, hourly): see below.
+- **NPPES weekly refresh** (`nppes-refresh.yml`, Wednesdays 09:23 UTC,
+  `scripts/nppes-refresh.sh` / `nppes-refresh.mjs`, rules in
+  `scripts/lib/nppes-refresh.mjs`, geocoding in `scripts/lib/geocode-batch.mjs`;
+  2026-10-25, the user's choices: the weekly file with an API fallback; add,
+  update and remove; accurate geocoding; weekly and automatic). Applies every
+  NPPES weekly increment (`NPPES_Data_Dissemination_MMDDYY_MMDDYY_Weekly[_V2].zip`,
+  found by `nppes_weekly_names` in `scripts/lib/nppes-url.sh`) that ends
+  after `state.json`'s `last_week_end`, oldest first; the first run takes
+  every week on offer and says what it cannot cover, and a gap is flagged
+  (catch up with `mode: full`, the monthly file). Per record: a new NPI goes
+  to `clinics` (NPI-2) or `provider_individuals` (NPI-1, `source:
+  nppes_weekly`); a listed one whose name, address, phone or taxonomy changed
+  is upserted (a blank incoming phone or code never blanks a stored one; an
+  NPI listed under the other entity type is skipped and counted); a
+  deactivated one (deactivation date, no later reactivation) is deleted from
+  all three tables, and the summary counts any that belong to claimed
+  accounts. New pl_pfile sites of this week's NPIs are added to
+  `clinic_secondary_locations` (matched case-insensitively on parent, address,
+  ZIP; never removed for being absent). Formats follow the national load:
+  capitals, "FIRST LAST", the first address line, 10-digit phones, the NUCC
+  display name. **Geocoding is accurate or nothing** (no ZIP centres): Census
+  batch Exact in the same ZIP, then Google (`GOOGLE_GEOCODING_KEY` GitHub
+  secret) ROOFTOP or RANGE_INTERPOLATED, not partial, same ZIP; else stored
+  with null coordinates (not drawn). An unmoved row keeps its coordinates; a
+  moved one with no accurate result loses them rather than keep the old pin.
+  A geocoder outage is not "no match": over 5% failed in a chunk stops the
+  run, and fewer are held back into `state.retry_npis`, looked up through
+  the API next run. Two passes: plan to a JSONL file and check `LIMITS`
+  (weekly: at least 1,000 records, at most 25,000 deletions and 300,000
+  additions or updates; full and api have their own; api never deletes),
+  then apply in chunks of 2,000; every step diffs against the database, so
+  a rerun writes nothing twice. With no weekly file, `auto` sweeps the NPI
+  Registry API (`crawlZip`/`makePacer` from `nppes-api-phones.mjs`, both
+  types, ZIPs from `cdc_places`, a rotating `api_cursor`, 240-minute
+  budget); it cannot see deactivations. `dry_run` plans and geocodes 300
+  addresses, writes nothing, keeps the state. State, `latest.md` and
+  `history.csv` are committed to `supabase/reference/nppes-refresh/` with
+  `[skip netlify]` (an exception to the README rule, like the snapshot).
 - **Schema snapshot** (`schema-snapshot.yml`, weekly Mondays): see Supabase
   schema. It commits to `main` itself (`[skip netlify]`); those bot commits
-  are the one exception to the README-per-push rule.
+  and `nppes-refresh.yml`'s are the exceptions to the README-per-push rule.
 - **Taxonomy inventory** (`taxonomy-inventory.yml`, manual only,
   `scripts/taxonomy-inventory.sh`): one read-only GROUP BY over `clinics`,
   `provider_individuals` and `clinic_secondary_locations` (session forced
@@ -1840,6 +1878,9 @@ An all-`unverifiable` audit almost always means the wrong **input**. That's why
 
 ## NPI ZIP enrichment (hourly backfill)
 
+The national weekly refresh is `nppes-refresh.yml` (see Scheduled imports),
+which geocodes; this hourly job stays for searched ZIPs.
+
 A search queues its ZIP (`zip-enrich-request.js`, `lib/zip-enrichment.js`,
 30-day freshness) instead of pulling NPPES inline, because an exhaustive pull
 doesn't fit a search's budget. `scripts/enrich-npi-zips.mjs` fetches NPI-1 and
@@ -1929,6 +1970,7 @@ node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: 
 node scripts/test-provider-npis.mjs       # 34: one account, many NPIs: the registry and OIG checks, live only when the registry's person is the account's, caller never sets npi/review_status/account_id, own rows only, published once cleared, bookable through the account, registration refuses an added NPI
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
+node scripts/test-nppes-refresh.mjs       # 56: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
 node scripts/test-npi-activity.mjs        # 15: the public Medicare-activity lookup: only its columns, a missing NPI left out, nulls stay null, failures degraded
 node scripts/test-procedure-finder.mjs    # 152: the patient procedure finder: every code a real CMS code, every specialty real, words to procedures, per-NPI counts never add patients across codes; the portal footprint (share, doctor vs facility fee)
 node scripts/test-display-names.mjs       # 16: listing names for patients: legal suffixes dropped, acronyms kept, "FT WORTH" as Fort Worth
