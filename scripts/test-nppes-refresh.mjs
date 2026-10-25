@@ -206,7 +206,7 @@ eq(db.clinics.length, 1, 'nothing written when refused');
 const lowered = (extra) => new Promise(resolve => {
   const c = spawn(process.execPath, ['--input-type=module', '-e', `
     import * as L from './scripts/lib/nppes-refresh.mjs';
-    L.LIMITS.weekly.min_records = 1;
+    L.LIMITS.weekly.min_records = 1; L.LIMITS.full.min_records = 1;
     process.argv = [process.argv[0], 'x', ...${JSON.stringify(extra)}];
     await import('./scripts/nppes-refresh.mjs');`],
     { env: { ...process.env, SUPABASE_URL: base, SUPABASE_SERVICE_ROLE_KEY: 'k', CENSUS_GEOCODER_URL: base + '/census', GOOGLE_GEOCODING_KEY: '' } });
@@ -254,6 +254,10 @@ res = await new Promise(resolve => {
 });
 // Everything now matches the database, so nothing is written again.
 eq([res.code, posted.length - before], [0, 0], 'a rerun of the same file writes nothing');
+// The full-file catch-up records itself as done (the daily check then stops).
+res = await lowered(['--mode', 'file', '--full', '--npidata', join(dir, 'np.csv'), '--plan', join(dir, 'plan.jsonl'), '--state', join(dir, 'full.json'), '--file-name', 'NPPES_Data_Dissemination_November_2026.zip']);
+const fs2 = existsSync(join(dir, 'full.json')) ? JSON.parse(readFileSync(join(dir, 'full.json'), 'utf8')) : {};
+eq([res.code, fs2.full_done && fs2.full_done.file, fs2.last_week_end], [0, 'NPPES_Data_Dissemination_November_2026.zip', undefined], 'a finished catch-up is recorded, and sets no week');
 server.close();
 
 console.log(`${pass} passed, ${fail} failed`);

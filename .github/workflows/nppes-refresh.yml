@@ -14,12 +14,17 @@ on:
     # Wednesdays 09:23 UTC: NPPES posts the week ending Sunday early in the
     # following week.
     - cron: '23 9 * * 3'
+    # Daily: the one-time March-to-now catch-up from the monthly full file,
+    # started the first morning CMS's download site offers it again (the
+    # user's choice, 2026-10-25: wait for the file rather than sweep the API).
+    # A quiet no-op while the site is down or once the catch-up is done.
+    - cron: '41 7 * * *'
   workflow_dispatch:
     inputs:
       mode:
-        description: 'auto (weekly files, API fallback), weekly (no fallback), full (one-time catch-up from the monthly file), api'
+        description: 'auto (weekly files, API fallback), weekly (no fallback), catchup (the monthly file once, when CMS offers it), full (the monthly file now), api'
         type: choice
-        options: [auto, weekly, full, api]
+        options: [auto, weekly, catchup, full, api]
         default: auto
       dry_run:
         description: 'Plan and geocode a sample; write nothing'
@@ -28,6 +33,7 @@ on:
 
 permissions:
   contents: write
+  actions: write     # a catch-up that stops at its time budget starts the next run
 
 concurrency:
   group: nppes-refresh
@@ -57,12 +63,13 @@ jobs:
           fi
 
       - name: Refresh
+        id: refresh
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # Census only for now (the user's choice, 2026-10-25). Passing
           # GOOGLE_GEOCODING_KEY here would turn on the Google tier.
-          MODE: ${{ inputs.mode || 'auto' }}
+          MODE: ${{ github.event.schedule == '41 7 * * *' && 'catchup' || inputs.mode || 'auto' }}
           DRY_RUN: ${{ inputs.dry_run || false }}
         run: bash scripts/nppes-refresh.sh
 
@@ -78,3 +85,13 @@ jobs:
           git commit -q -m "NPPES refresh $(date -u +%F) [skip netlify]"
           git pull -q --rebase origin main
           git push origin HEAD:main
+
+      # A catch-up too big for one run stops at its budget; start the next
+      # one straight away instead of waiting for tomorrow's check.
+      - name: Continue a stopped catch-up
+        if: success() && steps.refresh.outputs.continue == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run nppes-refresh.yml --ref main -f mode=catchup -f dry_run=false
+          echo "Started the next catch-up run." | tee -a "$GITHUB_STEP_SUMMARY"

@@ -331,6 +331,11 @@ async function main() {
   if (!dryRun && statePath) {
     if (arg('week-end') && !stats.stopped_for_time) state.last_week_end = arg('week-end');
     state.last_run = now; state.last_mode = mode; state.last_file = arg('file-name') || state.last_file || null;
+    // The one-time catch-up from the monthly full file (mode catchup / full).
+    if (full) {
+      if (stats.stopped_for_time) state.full_in_progress = arg('file-name') || 'monthly';
+      else { state.full_done = { file: arg('file-name') || 'monthly', date: now.slice(0, 10) }; delete state.full_in_progress; }
+    }
     writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
   }
   report();
