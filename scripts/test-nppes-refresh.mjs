@@ -201,6 +201,23 @@ const run = (extra) => new Promise(resolve => {
 let res = await run([]);
 ok(res.code !== 0 && /refusing to write/.test(res.err), 'a 4-record "weekly" file is refused');
 eq(db.clinics.length, 1, 'nothing written when refused');
+// Out of time before applying: nothing is written, the week is not marked
+// done, and the summary says how much is left.
+const lowered = (extra) => new Promise(resolve => {
+  const c = spawn(process.execPath, ['--input-type=module', '-e', `
+    import * as L from './scripts/lib/nppes-refresh.mjs';
+    L.LIMITS.weekly.min_records = 1;
+    process.argv = [process.argv[0], 'x', ...${JSON.stringify(extra)}];
+    await import('./scripts/nppes-refresh.mjs');`],
+    { env: { ...process.env, SUPABASE_URL: base, SUPABASE_SERVICE_ROLE_KEY: 'k', CENSUS_GEOCODER_URL: base + '/census', GOOGLE_GEOCODING_KEY: '' } });
+  let err = ''; c.stderr.on('data', d => { err += d; }); c.stdout.on('data', () => {});
+  c.on('close', code => resolve({ code, err }));
+});
+res = await lowered(['--mode', 'file', '--npidata', join(dir, 'np.csv'), '--pl', join(dir, 'pl.csv'), '--plan', join(dir, 'plan.jsonl'),
+  '--summary', join(dir, 'stop.md'), '--state', join(dir, 'state.json'), '--week-end', '2026-10-19', '--budget-min', '0']);
+eq([res.code, db.clinics.length, posted.length], [0, 1, 0], 'out of time: nothing written');
+ok(/Stopped at the time budget/.test(readFileSync(join(dir, 'stop.md'), 'utf8')), 'the summary says the run stopped and what is left');
+ok(!existsSync(join(dir, 'state.json')) || !JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')).last_week_end, 'a stopped week is not marked done');
 // Then the same file with the weekly floor lowered for the test (LIMITS is
 // a shared object, so the script sees the change).
 res = await new Promise(resolve => {

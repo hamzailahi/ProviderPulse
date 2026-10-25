@@ -77,8 +77,8 @@ const COLS = 'npi,name,address,city,state,zip,phone,primary_taxonomy,taxonomy_co
 async function existingFor(npis) {
   const out = { clinics: new Map(), provider_individuals: new Map() };
   const jobs = [];
-  for (const t of Object.keys(out)) for (const c of chunks(npis, 150)) jobs.push([t, c]);
-  await pool(jobs, 6, async ([t, c]) => {
+  for (const t of Object.keys(out)) for (const c of chunks(npis, 300)) jobs.push([t, c]);
+  await pool(jobs, 8, async ([t, c]) => {
     for (const r of await sb('GET', `${t}?npi=in.(${c.join(',')})&select=${COLS}`)) out[t].set(String(r.npi), r);
   });
   return out;
@@ -221,10 +221,14 @@ async function applyPlan() {
   let batch = [], done = 0;
   for await (const line of rl) {
     if (!line) continue;
+    // Out of time: stop between chunks. Everything written so far now
+    // matches the database, so the next run plans only what is left.
+    if (outOfTime()) { stats.stopped_for_time = 1; stats.ops_left = (stats.ops_left || 0) + 1; continue; }
     batch.push(JSON.parse(line));
     if (batch.length >= 2000) { await applyOps(batch); done += batch.length; batch = []; log(`  applied ${fmt(done)} operations`); }
   }
   if (batch.length) { await applyOps(batch); done += batch.length; }
+  stats.ops_applied = (stats.ops_applied || 0) + done;
 }
 
 // ---------- NPI Registry API ----------
@@ -325,7 +329,7 @@ async function main() {
 
   state.retry_npis = [...new Set(held)].slice(0, 5000);
   if (!dryRun && statePath) {
-    if (arg('week-end')) state.last_week_end = arg('week-end');
+    if (arg('week-end') && !stats.stopped_for_time) state.last_week_end = arg('week-end');
     state.last_run = now; state.last_mode = mode; state.last_file = arg('file-name') || state.last_file || null;
     writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
   }
@@ -345,6 +349,7 @@ function report() {
     `- Held back for a geocoder outage: ${fmt(held.length)} (looked up again next run)`,
     `- Skipped: ${s('no_practice_address')} with no practice address, ${s('type_changed_skipped')} whose entity type changed`
   ];
+  if (stats.stopped_for_time) lines.push(`- **Stopped at the time budget** with ${fmt(stats.ops_left)} of ${fmt(stats.ops_left + (stats.ops_applied || 0))} planned changes left. Run the same mode again: it plans afresh and applies only what is left.`);
   if (mode === 'api') lines.push(`- ZIPs crawled: ${s('api_zips_crawled')} of ${s('api_zips_total')} (failed ${s('api_zips_failed')}, over the API's 1,200-record ceiling ${s('api_zips_over_ceiling')}); next run starts at ZIP index ${fmt(state.api_cursor)}. The API cannot report deactivations.`);
   const md = lines.join('\n') + '\n';
   console.log(md);

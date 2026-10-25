@@ -1665,7 +1665,10 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   (weekly: at least 1,000 records, at most 25,000 deletions and 300,000
   additions or updates; full and api have their own; api never deletes),
   then apply in chunks of 2,000; every step diffs against the database, so
-  a rerun writes nothing twice. With no weekly file, `auto` sweeps the NPI
+  a rerun writes nothing twice. A run that reaches `--budget-min` (300 in
+  file mode, inside the job's 350) stops between chunks, does not mark its
+  week done and says how much is left; the next run plans afresh and applies
+  only the rest (a `mode: full` catch-up since March takes several runs). With no weekly file, `auto` sweeps the NPI
   Registry API (`crawlZip`/`makePacer` from `nppes-api-phones.mjs`, both
   types, ZIPs from `cdc_places`, a rotating `api_cursor`, 240-minute
   budget); it cannot see deactivations. `dry_run` plans and geocodes 300
@@ -1972,7 +1975,7 @@ node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: 
 node scripts/test-provider-npis.mjs       # 34: one account, many NPIs: the registry and OIG checks, live only when the registry's person is the account's, caller never sets npi/review_status/account_id, own rows only, published once cleared, bookable through the account, registration refuses an added NPI
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
-node scripts/test-nppes-refresh.mjs       # 56: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
+node scripts/test-nppes-refresh.mjs       # 59: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
 node scripts/test-npi-activity.mjs        # 15: the public Medicare-activity lookup: only its columns, a missing NPI left out, nulls stay null, failures degraded
 node scripts/test-procedure-finder.mjs    # 152: the patient procedure finder: every code a real CMS code, every specialty real, words to procedures, per-NPI counts never add patients across codes; the portal footprint (share, doctor vs facility fee)
 node scripts/test-display-names.mjs       # 16: listing names for patients: legal suffixes dropped, acronyms kept, "FT WORTH" as Fort Worth
