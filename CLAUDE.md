@@ -669,6 +669,12 @@ procedure's codes, `summarize` per NPI, then each NPI placed at its
 `provider_individuals` / `clinics` listing (else its ZIP's centre); "Most
 procedures" order, no address folding, a note on what Medicare leaves out
 and "See all <specialty>"; a failed request is partial, never short.
+`CONDITION_PATHS` / `relatedFor` (2026-10-25): a typed condition
+("diabetes") also gets a row of related searches under the count
+(specialties `s`, doors `d`, procedures `p`; each checked to exist by the
+query test), kept while the patient taps through them (`keepRelated`).
+`runProviderSearch` empties `s.all` before loading, because a procedure list
+and a specialty list sort on different fields.
 `LOWCOST_HINT` words ("free clinic", "no insurance") search
 primary care with the Low-cost filter on. `DOOR_NAMES` must equal
 `TaxonomyMap.careTypes` (tested). Default order is **Best match**
@@ -1808,7 +1814,7 @@ node scripts/test-market-benchmarks.mjs   # 8: the benchmark builder end to end,
 node scripts/test-taxonomy-map.mjs        # 91: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage, care types (every organization decided, the review's key calls)
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
-node scripts/test-patient-query.mjs       # 153: typed words to doors and specialties (whole words, generic words, new categories, low-cost words), codesFor per label and door, the frozen market list
+node scripts/test-patient-query.mjs       # 218: typed words to doors and specialties (whole words, generic words, new categories, low-cost words, every related-care entry real), codesFor per label and door, the frozen market list
 node scripts/test-area-profile.mjs        # 53: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
 node scripts/test-providers-near.mjs      # 22: the assistant's find_providers: codes in a location box, individuals and organizations, radius or map, failures never "none"
 node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo

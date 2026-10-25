@@ -390,10 +390,46 @@ function resolveQuery(text) {
   return null;
 }
 
+// Condition search across care types (2026-10-25): a condition rarely needs
+// one kind of care. "Diabetes" searches its specialty as before and offers,
+// under the results, the other care that goes with it: a dietitian, a
+// diabetic eye exam, foot care, a pharmacy, supplies. Each entry is a
+// specialty label ('s'), a door ('d') or a procedure ('p'); every one is
+// checked to exist by scripts/test-patient-query.mjs.
+var CONDITION_PATHS = [
+  [/\bdiabet/, 'diabetes', [['s', 'Primary care / family doctor'], ['s', 'Nutrition & dietitian'], ['p', 'Eye exam'], ['s', 'Foot & ankle / podiatry'], ['d', 'Pharmacies'], ['d', 'Medical equipment & supplies']]],
+  [/\b(blood pressure|hypertens|heart disease|heart failure|chest pain|palpitat)/, 'heart health', [['s', 'Primary care / family doctor'], ['p', 'Heart stress test'], ['p', 'Echocardiogram'], ['s', 'Nutrition & dietitian'], ['d', 'Pharmacies']]],
+  [/\b(opioid|addiction|substance|alcohol\w*|detox|methadone|suboxone|sober)/, 'recovery', [['s', 'Mental health & counseling'], ['s', 'Primary care / family doctor'], ['d', 'Pharmacies'], ['d', 'Community & support services']]],
+  [/\b(depress|anxi|ptsd|bipolar|panic)/, 'mental health', [['d', 'Mental health & addiction'], ['s', 'Primary care / family doctor'], ['d', 'Community & support services']]],
+  [/\b(pregnan|prenatal|expecting a baby)/, 'pregnancy', [['s', 'Nutrition & dietitian'], ['d', 'Labs & imaging'], ['s', 'Pediatrics (children)'], ['s', 'Mental health & counseling']]],
+  [/\b(cancer|tumou?r|chemo)/, 'cancer care', [['d', 'Labs & imaging'], ['p', 'Mammogram'], ['p', 'Colonoscopy'], ['d', 'Pharmacies'], ['d', 'Home & senior care'], ['s', 'Hospice & palliative care']]],
+  [/\b(back pain|neck pain|sciatica)/, 'back pain', [['s', 'Physical & occupational therapy'], ['s', 'Chiropractic'], ['s', 'Orthopedics & sports injury'], ['p', 'Spine injection']]],
+  [/\b(knee|hip|shoulder) pain/, 'joint pain', [['s', 'Physical & occupational therapy'], ['p', 'Joint injection'], ['s', 'Arthritis / rheumatology'], ['p', 'Knee replacement']]],
+  [/\b(asthma|copd|emphysema|short of breath|breathing)/, 'breathing', [['s', 'Allergy & immunology'], ['p', 'Sleep study'], ['d', 'Pharmacies'], ['d', 'Medical equipment & supplies']]],
+  [/\b(dementia|alzheimer|memory loss|memory)/, 'memory care', [['d', 'Home & senior care'], ['s', 'Care coordination & community health'], ['s', 'Hospice & palliative care'], ['d', 'Community & support services']]],
+  [/\b(kidney|renal|dialysis)/, 'kidney care', [['s', 'Nutrition & dietitian'], ['d', 'Labs & imaging'], ['d', 'Pharmacies']]],
+  [/\b(autism|autistic)/, 'autism', [['s', 'Speech & language therapy'], ['s', 'Physical & occupational therapy'], ['s', 'Pediatrics (children)'], ['s', 'Mental health & counseling']]],
+  [/\b(stroke)/, 'stroke recovery', [['d', 'Therapy & rehab'], ['s', 'Speech & language therapy'], ['s', 'Heart / cardiology'], ['d', 'Home & senior care']]],
+  [/\b(weight loss|obesity|overweight)/, 'weight', [['s', 'Primary care / family doctor'], ['s', 'Diabetes & hormones'], ['s', 'Mental health & counseling']]],
+  [/\b(arthritis|lupus|gout)/, 'arthritis', [['s', 'Physical & occupational therapy'], ['p', 'Joint injection'], ['s', 'Orthopedics & sports injury']]]
+];
+// Typed text -> {condition, items} or null. Items equal to the search itself
+// are dropped.
+function relatedFor(text, searched) {
+  var raw = String(text || '').toLowerCase();
+  for (var i = 0; i < CONDITION_PATHS.length; i++) {
+    var c = CONDITION_PATHS[i];
+    if (!c[0].test(raw)) continue;
+    var items = c[2].filter(function (it) { return it[1] !== searched; });
+    return items.length ? { condition: c[1], items: items } : null;
+  }
+  return null;
+}
+
 function newSearch() {
   var p = state.profile || {};
   return {
-    text: '', label: '', terms: [], door: null, procedure: null,
+    text: '', label: '', terms: [], door: null, procedure: null, related: null,
     zip: /^\d{5}$/.test(String(p.zip || '')) ? p.zip : '',
     miles: DEFAULT_RADIUS,
     payer: p.insurance_payer || '',
@@ -409,7 +445,9 @@ function runProviderSearch() {
   if (!s.terms.length) { s.error = 'Choose a specialty, or describe what you need.'; paintFind(); return; }
   if (!/^\d{5}$/.test(s.zip)) { s.error = 'Enter a 5-digit ZIP code.'; paintFind(); return; }
   var seq = ++s.seq;
-  s.loading = true; s.error = ''; s.ran = true; s.shown = RESULTS_PAGE; s.active = null; s.expanded = {};
+  // The previous answer goes now: a procedure list and a specialty list rank
+  // by different fields, and the old rows were painted under the new kind.
+  s.loading = true; s.error = ''; s.ran = true; s.shown = RESULTS_PAGE; s.active = null; s.expanded = {}; s.all = [];
   paintFind();
 
   Promise.all([locateZip(s.zip), loadRegistered()]).then(function (res) {
@@ -645,7 +683,7 @@ function visibleResults() {
   list.sort(function (a, b) {
     if (s.sort === 'verified' && !!a.registered !== !!b.registered) return a.registered ? -1 : 1;
     if (!!s.suggested[a.npi] !== !!s.suggested[b.npi]) return s.suggested[a.npi] ? -1 : 1;
-    if (s.procedure && s.sort === 'best') return b.volume.services - a.volume.services || a.miles - b.miles;
+    if (s.procedure && s.sort === 'best') return ((b.volume || {}).services || 0) - ((a.volume || {}).services || 0) || a.miles - b.miles;
     if (a.tier !== b.tier) return a.tier - b.tier;
     return a.miles - b.miles;
   });
@@ -709,6 +747,7 @@ function findView() {
     if (hit.door === DOOR_DOCTORS) { location.hash = '#/specialties'; return; }
     s.text = hit.label; fWhat.value = hit.label;
     s.label = hit.label; s.terms = hit.terms; s.door = hit.door || null; s.procedure = hit.procedure || null; s.suggested = {};
+    s.related = relatedFor(text, hit.label);
     s.filters.lowcost = !!hit.lowcost;
     runProviderSearch();
   }
@@ -846,6 +885,7 @@ function paintFind(refit) {
       : 'Part of the directory did not answer in time, so this list is missing some providers. ',
       h('button', { class: 'linkbtn', type: 'button', onclick: function () { runProviderSearch(); } }, 'Try again')));
     else if (s.truncated) r.appendChild(h('div', { class: 'note' }, 'This area has more listings than we can show at once, so these are a sample. Try a shorter distance.'));
+    if (s.related) r.appendChild(relatedEl(s));
     if (s.procedure) r.appendChild(procedureNote(s));
     if (s.door === 'Emergency rooms & hospitals' || s.door === 'Rides & transport') r.appendChild(h('div', { class: 'note urgent' },
       h('b', {}, 'In an emergency, call 911.'), s.door === 'Emergency rooms & hospitals' ? ' The registry does not say which hospitals have an emergency room, so call ahead if you can.' : ''));
@@ -885,6 +925,30 @@ var DOOR_BLURB = {
   'Community & support services': 'Meals, case management, day programs',
   'Surgery & procedure centers': 'Scheduled surgery and scopes'
 };
+// A procedure picked from the related-care strip.
+function pickProcedure(label) {
+  var proc = null;
+  ProcedureFinder.PROCEDURES.forEach(function (p) { if (p.label === label) proc = p; });
+  if (!proc) return;
+  var s = state.search;
+  s.text = proc.label; s.label = proc.label; s.terms = [proc.label]; s.door = null; s.procedure = proc; s.suggested = {};
+  if (findEls) { findEls.what.value = proc.label; takeZip(); }
+  runProviderSearch();
+}
+// "Also for diabetes": the related care for a typed condition, as buttons
+// that search it and keep the strip, so a patient can work through them.
+function relatedEl(s) {
+  var rel = s.related;
+  return h('div', { class: 'related' }, h('span', { class: 'related-lbl' }, 'Also for ' + rel.condition + ':'),
+    rel.items.filter(function (it) { return it[1] !== s.label; }).map(function (it) {
+      return h('button', { class: 'rel', type: 'button', onclick: function () {
+        if (it[0] === 'd') pickDoor(it[1], true);
+        else if (it[0] === 'p') pickProcedure(it[1]);
+        else { for (var k = 0; k < SPECIALTIES.length; k++) if (SPECIALTIES[k][0] === it[1]) pickSpecialty(k, true); }
+      } }, it[1]);
+    }));
+}
+
 // What a procedure list is and is not, and the way back to a specialty.
 function procedureNote(s) {
   var sp = s.procedure.specialty, i = -1;
@@ -915,11 +979,12 @@ function startEl() {
     h('button', { class: 'ask-link', type: 'button', onclick: function () { location.hash = '#/specialties'; } }, 'Browse all ' + SPECIALTIES.length + ' specialties →'));
 }
 
-function pickSpecialty(i) {
+function pickSpecialty(i, keepRelated) {
   var sp = SPECIALTIES[i];
   if (!sp) return;
   var s = state.search;
   s.text = sp[0]; s.label = sp[0]; s.terms = sp[1].split(','); s.door = null; s.procedure = null; s.suggested = {};
+  if (!keepRelated) s.related = null;
   if (findEls) { findEls.what.value = sp[0]; takeZip(); }
   if (!/^\d{5}$/.test(s.zip)) { s.ran = true; s.error = 'Enter your ZIP code, then press Search.'; paintFind(); return; }
   runProviderSearch();
@@ -931,10 +996,11 @@ function takeZip() {
   var z = findEls && findEls.zip ? findEls.zip.value.trim() : '';
   if (/^\d{5}$/.test(z)) state.search.zip = z;
 }
-function pickDoor(door) {
+function pickDoor(door, keepRelated) {
   if (door === DOOR_DOCTORS) { location.hash = '#/specialties'; return; }
   var s = state.search;
   s.text = door; s.label = door; s.terms = [door]; s.door = door; s.procedure = null; s.suggested = {};
+  if (!keepRelated) s.related = null;
   if (findEls) { findEls.what.value = door; takeZip(); }
   if (!/^\d{5}$/.test(s.zip)) { s.ran = true; s.error = 'Enter your ZIP code, then press Search.'; paintFind(); return; }
   runProviderSearch();

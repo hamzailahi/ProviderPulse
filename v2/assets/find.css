@@ -302,3 +302,15 @@ main { min-height: 0; }
 .activity p { font-size: 13.5px; margin: 0 0 6px; color: #334155; }
 .activity p.good { color: #166534; font-weight: 600; }
 .activity p.caution { color: #92400e; }
+/* Related care for a typed condition (2026-10-25). */
+.related { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; }
+.related-lbl { font-size: 13px; color: #334155; font-weight: 600; margin-right: 2px; }
+.rel { border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 6px 12px; font: 600 13px var(--sans); cursor: pointer; }
+.rel:hover { background: #e0e7ff; }
+.rel:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+@media (max-width: 900px) {
+  /* one scrolling row on phones, like the filter chips */
+  .related { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .related-lbl, .rel { flex: none; white-space: nowrap; }
+  .rel { min-height: 44px; }
+}

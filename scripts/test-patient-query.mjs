@@ -15,7 +15,8 @@ const ok = (cond, name) => { if (cond) pass++; else { fail++; console.log('FAIL'
 const src = readFileSync('v2/assets/patient.js', 'utf8');
 const code = src.slice(src.indexOf('var CONDITION_HINTS'), src.indexOf('function newSearch'));
 const ProcedureFinder = require('../v2/assets/procedure-finder.js');
-const resolveQuery = new Function('SPECIALTIES', 'ProcedureFinder', code + ';return resolveQuery;')(SPECIALTIES, ProcedureFinder);
+const lifted = new Function('SPECIALTIES', 'ProcedureFinder', code + ';return { resolveQuery, relatedFor, CONDITION_PATHS, DOOR_NAMES };')(SPECIALTIES, ProcedureFinder);
+const resolveQuery = lifted.resolveQuery;
 const label = q => { const r = resolveQuery(q); return r ? r.label : null; };
 const doorOf = q => { const r = resolveQuery(q); return r ? r.door || null : null; };
 
@@ -71,6 +72,23 @@ for (const d of TaxonomyMap.careTypes) ok(TaxonomyMap.codesForCare(d).length > 0
 // The door names in patient.js are the generated list, in order.
 const doorNames = new Function(src.slice(src.indexOf('var DOOR_NAMES'), src.indexOf('function doorHit')) + ';return DOOR_NAMES;')();
 ok(JSON.stringify(doorNames) === JSON.stringify(TaxonomyMap.careTypes), 'patient.js door names match taxonomy-map.js');
+
+// Related care for a condition (2026-10-25): every entry names a real
+// specialty, door or procedure, and the strip never repeats the search itself.
+for (const [, cond, items] of lifted.CONDITION_PATHS) {
+  for (const [kind, name] of items) {
+    const real = kind === 's' ? SPECIALTIES.some(x => x[0] === name) : kind === 'd' ? lifted.DOOR_NAMES.includes(name)
+      : kind === 'p' ? ProcedureFinder.PROCEDURES.some(x => x.label === name) : false;
+    ok(real, `${cond}: ${kind} "${name}" exists`);
+  }
+}
+{
+  const r = lifted.relatedFor('diabetes', 'Diabetes & hormones');
+  ok(r && r.condition === 'diabetes' && r.items.some(i => i[1] === 'Nutrition & dietitian') && r.items.some(i => i[1] === 'Pharmacies'), 'diabetes offers a dietitian and pharmacies');
+  ok(!lifted.relatedFor('knee pain', 'Physical & occupational therapy').items.some(i => i[1] === 'Physical & occupational therapy'), 'the search itself is not offered again');
+  ok(lifted.relatedFor('dentist', 'Dental') === null && lifted.relatedFor('', '') === null, 'no condition, no strip');
+  ok(lifted.relatedFor('opioid treatment', 'Mental health & addiction').condition === 'recovery', 'opioid treatment gets recovery care');
+}
 
 // Every specialty finds listings by code, and every label is approved.
 const approved = JSON.parse(readFileSync('supabase/reference/patient-specialties-list.json', 'utf8')).map(s => s.label);

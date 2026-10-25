@@ -619,6 +619,16 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **Searching a condition offers the rest of the care that goes with it.**
+  "Diabetes" still lists diabetes specialists, with a row of one-tap
+  searches under the count: primary care, dietitians, a diabetic eye exam,
+  foot care, pharmacies and supplies. Fifteen conditions have one (heart
+  health, recovery from addiction, pregnancy, cancer, back and joint pain,
+  breathing, memory, kidney care, autism, stroke and others), and the row
+  stays while the patient works through it. Fixed in the same change:
+  switching from a specialty search to a procedure search could stop the
+  results from drawing.
+
 - **Provider pages say whether a clinician still sees Medicare patients.**
   The detail sheet now shows "Billed Medicare in 2024 (812 services)" or
   "Last billed Medicare in 2019 ... call to check", and whether they are
