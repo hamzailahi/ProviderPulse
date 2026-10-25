@@ -14,7 +14,8 @@ const ok = (cond, name) => { if (cond) pass++; else { fail++; console.log('FAIL'
 // patient.js is a browser file; lift the matching code out of it unchanged.
 const src = readFileSync('v2/assets/patient.js', 'utf8');
 const code = src.slice(src.indexOf('var CONDITION_HINTS'), src.indexOf('function newSearch'));
-const resolveQuery = new Function('SPECIALTIES', code + ';return resolveQuery;')(SPECIALTIES);
+const ProcedureFinder = require('../v2/assets/procedure-finder.js');
+const resolveQuery = new Function('SPECIALTIES', 'ProcedureFinder', code + ';return resolveQuery;')(SPECIALTIES, ProcedureFinder);
 const label = q => { const r = resolveQuery(q); return r ? r.label : null; };
 const doorOf = q => { const r = resolveQuery(q); return r ? r.door || null : null; };
 
@@ -46,7 +47,9 @@ const CASES = [
   ['pharmacy', 'Pharmacies'], ['pharmacies', 'Pharmacies'], ['drug store', 'Pharmacies'], ['prescription refill', 'Pharmacies'],
   ['urgent care', 'Urgent care'], ['urgent', 'Urgent care'], ['walk-in clinic', 'Urgent care'],
   ['emergency room', 'Emergency rooms & hospitals'], ['er', 'Emergency rooms & hospitals'], ['hospital', 'Emergency rooms & hospitals'],
-  ['x-ray', 'Labs & imaging'], ['blood test', 'Labs & imaging'], ['mri', 'Labs & imaging'], ['mammogram', 'Labs & imaging'],
+  ['x-ray', 'Labs & imaging'], ['blood test', 'Labs & imaging'], ['mri', 'Labs & imaging'],
+  // procedures (2026-10-25) come first: who billed Medicare for it
+  ['mammogram', 'Mammogram'], ['colonoscopy', 'Colonoscopy'], ['cataract surgery', 'Cataract surgery'],
   ['opioid treatment', 'Mental health & addiction'], ['alcohol', 'Mental health & addiction'],
   ['ambulance', 'Rides & transport'], ['ride to my appointment', 'Rides & transport'],
   ['wheelchair', 'Medical equipment & supplies'], ['cpap', 'Medical equipment & supplies'],
@@ -61,6 +64,7 @@ for (const [q, want] of CASES) ok(label(q) === want, `"${q}" -> ${want} (got ${l
 
 // A door hit says so (the search reads codesForCare); a specialty hit does not.
 ok(doorOf('pharmacy') === 'Pharmacies' && doorOf('pharmacist') === null, 'door hits carry the door');
+ok(resolveQuery('colonoscopy').procedure && resolveQuery('colonoscopy').procedure.codes.includes('45380'), 'a procedure hit carries its codes');
 ok(resolveQuery('low cost clinic').lowcost === true && !resolveQuery('primary care').lowcost, 'low-cost words turn the filter on, nothing else does');
 for (const d of TaxonomyMap.careTypes) ok(d === 'Doctors & clinics' || label(d) === d, `door "${d}" resolves to itself`);
 for (const d of TaxonomyMap.careTypes) ok(TaxonomyMap.codesForCare(d).length > 0, `door "${d}" has codes`);

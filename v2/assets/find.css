@@ -295,3 +295,6 @@ main { min-height: 0; }
   .tiles.doors { grid-template-columns: 1fr 1fr; }
   .here-list .here-name.linkbtn { min-height: 44px; }
 }
+/* Procedure search (2026-10-25). */
+.res-vol { font-size: 13px; font-weight: 650; color: #3730a3; margin-top: 3px; }
+.note.info { color: #334155; background: #f1f5f9; border-color: #e2e8f0; }

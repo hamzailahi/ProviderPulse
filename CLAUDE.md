@@ -80,6 +80,7 @@ second copy. The `access_requests` table still holds v1's data.
 | `taxonomy-map.js` | **the only taxonomy classifier** (the six keyword groups, `taxonomy-groups.js`, and their need model `health-demand.js` were deleted 2026-10-11): the dashboard map's groupings, `codesFor(label)` (the reviewed patient-specialty table, visible codes only) behind patient search, portal Competition and the dashboard specialty filter; **generated** by `scripts/build-taxonomy-map.mjs`: every NUCC code to its official Grouping / Classification / Specialization, `show_on_map`, patient specialties, and since 2026-10-25 care types (`careTypes`, `codesForCare(door)`, `safetyNetCodes()`, `safetyNet` / `eligibility` / `patientNote` texts; see "Care types"). No default: an unknown code logs and returns null, `groupingOf()` throws. Never edit by hand |
 | `area-zips.js` | `strayZips(rows, {centroids})`: the ZIPs a city search leaves out (2026-10-21): under 1% of the listings **and** more than 25 miles from every ZIP holding 1% or more (nearest core ZIP, so multi-city and sprawling searches stay whole); a ZIP's position is its official centre when known, else its listings' middle; unknown is kept. `pinsFar` = strays whose listings themselves sit far away; browser + `require` |
 | `code-list.js` | the Procedures panel's pasted code list (2026-10-21): `parse` (two or more 5-character codes and nothing else; up to 100) and `summarize` (by code, by clinician, by ZIP from Medicare and Medicaid rows), `toCsv`, and for Download all `TOPICS` / `topicFor` / `hospitalTopics` (hospital APC and DRG groups matched to a code list by topic) and `workbook` (the sheets); browser + `require` |
+| `procedure-finder.js` | the patient app's procedure search (2026-10-25): `PROCEDURES` (about 28 plain-language procedures to HCPCS codes and the specialty that does them, every code checked against `procedure-codes.csv`), `match` (whole-word phrases, longest wins), `summarize` (per NPI: services, the largest single code's patients as a floor, codes); browser + `require` |
 | `procedure-search.js` | the dashboard Procedures panel's search: common words ("colonoscopy", "EGD") to CMS's own description wording, tested against real descriptions; browser + `require` |
 | `market-model.js` | the per-specialty market opportunity model; browser + `require` |
 | `demand-model.js` | the learned demand model (ridge regression per specialty, state-held-out validation, `addAcs`/`addPlaces` area builders shared by trainer and scorer); browser + `require` |
@@ -652,7 +653,14 @@ phase 3), a door's by `TaxonomyMap.codesForCare` (2026-10-25). Typed words
 reach a door before any specialty (`DOOR_HINTS` in `patient.js`: "pharmacy"
 is the Pharmacies door, "pharmacist" stays the Pharmacy specialty); the
 Doctors & clinics door (505 codes) opens the specialty list instead of
-searching. `LOWCOST_HINT` words ("free clinic", "no insurance") search
+searching. A procedure (`ProcedureFinder.match`, checked before doors) runs
+`runProcedureSearch`: ZCTAs whose `cdc_places` centre is inside the radius,
+`cms_procedures_full` for those ZIPs (10 per request, four at a time) and the
+procedure's codes, `summarize` per NPI, then each NPI placed at its
+`provider_individuals` / `clinics` listing (else its ZIP's centre); "Most
+procedures" order, no address folding, a note on what Medicare leaves out
+and "See all <specialty>"; a failed request is partial, never short.
+`LOWCOST_HINT` words ("free clinic", "no insurance") search
 primary care with the Low-cost filter on. `DOOR_NAMES` must equal
 `TaxonomyMap.careTypes` (tested). Default order is **Best match**
 (`tierOf`): organizations, physicians and the specialty's lead NUCC grouping
@@ -1790,13 +1798,14 @@ node scripts/test-market-benchmarks.mjs   # 8: the benchmark builder end to end,
 node scripts/test-taxonomy-map.mjs        # 91: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage, care types (every organization decided, the review's key calls)
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)
-node scripts/test-patient-query.mjs       # 150: typed words to doors and specialties (whole words, generic words, new categories, low-cost words), codesFor per label and door, the frozen market list
+node scripts/test-patient-query.mjs       # 153: typed words to doors and specialties (whole words, generic words, new categories, low-cost words), codesFor per label and door, the frozen market list
 node scripts/test-area-profile.mjs        # 53: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
 node scripts/test-providers-near.mjs      # 22: the assistant's find_providers: codes in a location box, individuals and organizations, radius or map, failures never "none"
 node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
 node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty), the API script against a local server, and the pacer on a fake clock
+node scripts/test-procedure-finder.mjs    # 143: the patient procedure finder: every code a real CMS code, every specialty real, words to procedures, per-NPI counts never add patients across codes
 node scripts/test-display-names.mjs       # 16: listing names for patients: legal suffixes dropped, acronyms kept, "FT WORTH" as Fort Worth
 node scripts/test-catchment.mjs           # 11: the market score's catchment: every ZIP within 10 miles, the 10 nearest in sparse areas, 60 ZIPs or 1M adults at most, ZIP groups, a timed-out group one ZIP at a time, a failed load refuses to score
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean

@@ -364,6 +364,8 @@ function resolveQuery(text) {
   if (!t) return null;
   var i, s;
   var raw = String(text).trim().toLowerCase();
+  var proc = typeof ProcedureFinder !== 'undefined' ? ProcedureFinder.match(text) : null;
+  if (proc) return { label: proc.label, terms: [proc.label], procedure: proc };
   if (LOWCOST_HINT.test(raw)) { s = specialtyByLabel('Primary care / family doctor'); return { label: s[0], terms: s[1].split(','), lowcost: true }; }
   for (i = 0; i < DOOR_NAMES.length; i++) if (qNorm(DOOR_NAMES[i]) === t) return doorHit(DOOR_NAMES[i]);
   for (i = 0; i < DOOR_HINTS.length; i++) if (DOOR_HINTS[i][0].test(raw)) return doorHit(DOOR_HINTS[i][1]);
@@ -391,7 +393,7 @@ function resolveQuery(text) {
 function newSearch() {
   var p = state.profile || {};
   return {
-    text: '', label: '', terms: [], door: null,
+    text: '', label: '', terms: [], door: null, procedure: null,
     zip: /^\d{5}$/.test(String(p.zip || '')) ? p.zip : '',
     miles: DEFAULT_RADIUS,
     payer: p.insurance_payer || '',
@@ -415,6 +417,7 @@ function runProviderSearch() {
     var c = res[0];
     if (!c) { s.loading = false; s.all = []; s.center = null; s.error = 'We couldn\'t find ZIP ' + s.zip + '. Check it and try again.'; paintFind(); return; }
     s.center = c;
+    if (s.procedure) return runProcedureSearch(s, seq);
     var box = milesBox(c, s.miles);
     // A specialty finds its listings by NUCC code (the reviewed table). Terms
     // that are not a specialty (a navigator suggestion) still match by name.
@@ -436,6 +439,93 @@ function runProviderSearch() {
   }).catch(function () {
     if (seq !== s.seq) return;
     s.loading = false; s.error = 'Search is unavailable right now. Please try again.'; paintFind();
+  });
+}
+
+// Procedure search (2026-10-25): who near the patient billed traditional
+// Medicare for this procedure in 2024 (cms_procedures_full, CMS's
+// by-provider-and-service file), most first. The ZIPs are every ZCTA whose
+// centre is inside the radius; rows load 10 ZIPs a request, four at a time,
+// filtered to the procedure's codes, and each NPI is placed at its directory
+// listing (else its ZIP's centre). A failed request marks the list partial,
+// never short.
+var PROC_SELECT = 'npi,entity_code,provider_name,first_name,credentials,specialty,address1,city,state,zip,hcpcs_cd,tot_benes,tot_srvcs';
+function zipsNear(c, miles) {
+  var b = milesBox(c, miles);
+  var url = SB_URL + '/rest/v1/cdc_places?measureid=eq.DENTAL&lat=gte.' + b.s.toFixed(4) + '&lat=lte.' + b.n.toFixed(4) +
+    '&lon=gte.' + b.w.toFixed(4) + '&lon=lte.' + b.e.toFixed(4) + '&select=zip,lat,lon&limit=1000';
+  return fetch(url, { headers: { apikey: SB_KEY, Accept: 'application/json' } })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (rows) {
+      if (!Array.isArray(rows)) return null;
+      var out = {};
+      rows.forEach(function (r) {
+        var lat = +r.lat, lng = +r.lon;
+        if (milesBetween(c.lat, c.lng, lat, lng) <= miles) out[String(r.zip).padStart(5, '0')] = { lat: lat, lng: lng };
+      });
+      return out;
+    })
+    .catch(function () { return null; });
+}
+function inBatches(items, size, parallel, fn) {
+  var groups = [];
+  for (var i = 0; i < items.length; i += size) groups.push(items.slice(i, i + size));
+  var out = [], next = 0, failed = false;
+  function worker() {
+    if (next >= groups.length) return Promise.resolve();
+    var g = groups[next++];
+    return fn(g).then(function (rows) { if (rows.failed) failed = true; out = out.concat(rows); return worker(); });
+  }
+  var ws = [];
+  for (var w = 0; w < Math.min(parallel, groups.length); w++) ws.push(worker());
+  return Promise.all(ws).then(function () { out.failed = failed; return out; });
+}
+function runProcedureSearch(s, seq) {
+  var proc = s.procedure, c = s.center;
+  return zipsNear(c, s.miles).then(function (zips) {
+    if (seq !== s.seq) return;
+    if (!zips) { s.loading = false; s.error = 'Search is unavailable right now. Please try again.'; paintFind(); return; }
+    if (!zips[s.zip]) zips[s.zip] = { lat: c.lat, lng: c.lng };
+    var list = Object.keys(zips);
+    return inBatches(list, 10, 4, function (g) {
+      return tableQuery('cms_procedures_full', PROC_SELECT, 'zip=in.(' + g.join(',') + ')&hcpcs_cd=in.(' + proc.codes.join(',') + ')' +
+        '&order=npi,hcpcs_cd,place_of_service,id');
+    }).then(function (rows) {
+      if (seq !== s.seq) return;
+      var who = ProcedureFinder.summarize(rows);
+      var npis = who.map(function (w) { return w.npi; });
+      // Where each one practises, its code and phone: the directory listing.
+      var sel = PROVIDER_ROW_SELECT + ',phone';
+      return Promise.all([
+        inBatches(npis, 80, 3, function (g) { return tableQuery('provider_individuals', sel, 'npi=in.(' + g.join(',') + ')'); }),
+        inBatches(npis, 80, 3, function (g) { return tableQuery('clinics', sel, 'npi=in.(' + g.join(',') + ')'); })
+      ]).then(function (dir) {
+        if (seq !== s.seq) return;
+        var at = {};
+        tagSrc(dir[0], 'individual').concat(tagSrc(dir[1], 'clinic')).forEach(function (r) { if (!at[r.npi] && r.latitude && r.longitude) at[r.npi] = r; });
+        s.all = who.map(function (w) {
+          var d = at[w.npi], z = zips[w.zip] || c;
+          var lat = d ? +d.latitude : z.lat, lng = d ? +d.longitude : z.lng;
+          var p = { npi: w.npi, name: displayName((d && d.name) || w.name) + (!d && !w.org && w.credentials ? ', ' + w.credentials : ''),
+            specialty: (d && d.primary_taxonomy) || titleCase(w.specialty), code: (d && d.taxonomy_code) || '',
+            phone: fmtPhone(d && d.phone), address: titleCase((d && d.address) || w.address), city: cityName((d && d.city) || w.city),
+            state: (d && d.state) || w.state, zip: (d && d.zip) || w.zip, lat: lat, lng: lng, src: d ? d._src : (w.org ? 'clinic' : 'individual'),
+            miles: milesBetween(c.lat, c.lng, lat, lng), sites: 1,
+            volume: { services: w.services, patients: w.patients, codes: w.codes, specialty: titleCase(w.specialty) } };
+          var reg = registeredNpis[w.npi];
+          if (reg) { p.registered = true; p.name = reg.name || p.name; p.accepting_new_patients = reg.accepting_new_patients; p.telehealth = reg.telehealth; p.payers = reg.payers || []; }
+          return p;
+        });
+        s.truncated = false;
+        s.partial = !!(rows.failed || dir[0].failed || dir[1].failed);
+        s.dense = false;
+        if (rows.failed && !s.all.length) { s.loading = false; s.error = 'Medicare\'s procedure records did not load. Please try again, or try a smaller distance.'; paintFind(); return; }
+        s.loading = false;
+        foldSearch();
+        paintFind(true);
+        logSearch(s);
+      });
+    });
   });
 }
 
@@ -551,17 +641,18 @@ function visibleResults() {
     if (f.lowcost && !isLowCost(p)) return false;
     return true;
   });
-  list.forEach(function (p) { p.tier = s.sort === 'best' ? tierOf(p, s) : 0; });
+  list.forEach(function (p) { p.tier = s.sort === 'best' && !s.procedure ? tierOf(p, s) : 0; });
   list.sort(function (a, b) {
     if (s.sort === 'verified' && !!a.registered !== !!b.registered) return a.registered ? -1 : 1;
     if (!!s.suggested[a.npi] !== !!s.suggested[b.npi]) return s.suggested[a.npi] ? -1 : 1;
+    if (s.procedure && s.sort === 'best') return b.volume.services - a.volume.services || a.miles - b.miles;
     if (a.tier !== b.tier) return a.tier - b.tier;
     return a.miles - b.miles;
   });
   var leads = [], byKey = {};
   list.forEach(function (p) {
     p.here = [];
-    var k = addrKey(p);
+    var k = s.procedure ? null : addrKey(p);
     if (k && byKey[k]) { byKey[k].here.push(p); return; }
     if (k) byKey[k] = p;
     leads.push(p);
@@ -617,7 +708,7 @@ function findView() {
     if (!hit) { state.askDraft = text; location.hash = '#/ask'; return; }
     if (hit.door === DOOR_DOCTORS) { location.hash = '#/specialties'; return; }
     s.text = hit.label; fWhat.value = hit.label;
-    s.label = hit.label; s.terms = hit.terms; s.door = hit.door || null; s.suggested = {};
+    s.label = hit.label; s.terms = hit.terms; s.door = hit.door || null; s.procedure = hit.procedure || null; s.suggested = {};
     s.filters.lowcost = !!hit.lowcost;
     runProviderSearch();
   }
@@ -701,7 +792,7 @@ function paintFind(refit) {
   clear(findEls.filters);
   function toggle(k) { return function () { f[k] = !f[k]; s.shown = RESULTS_PAGE; paintFind(); }; }
   var sort = h('select', { class: 'fsort', 'aria-label': 'Sort results', onchange: function (e) { s.sort = e.target.value; paintFind(); } },
-    h('option', { value: 'best', selected: s.sort === 'best' }, 'Best match'),
+    h('option', { value: 'best', selected: s.sort === 'best' }, s.procedure ? 'Most procedures' : 'Best match'),
     h('option', { value: 'near', selected: s.sort === 'near' }, 'Nearest first'),
     s.all.some(function (p) { return p.registered; }) ? h('option', { value: 'verified', selected: s.sort === 'verified' }, 'Verified first') : null);
   // These filters read what claimed listings say about themselves, so they
@@ -742,7 +833,8 @@ function paintFind(refit) {
     // "at least". A partial search once read "660" where the full one had 4,289.
     var floor = s.partial || s.truncated;
     r.appendChild(h('h2', { class: 'rhead' },
-      h('b', {}, (floor ? 'At least ' : '') + list.listings.toLocaleString() + ' ' + (s.label || 'providers')),
+      s.procedure ? h('b', {}, (floor ? 'At least ' : '') + list.listings.toLocaleString() + ' billed Medicare for ' + s.procedure.label.toLowerCase())
+        : h('b', {}, (floor ? 'At least ' : '') + list.listings.toLocaleString() + ' ' + (s.label || 'providers')),
       ' within ' + s.miles + ' mi of ' + s.zip,
       filtered ? h('span', { class: 'muted' }, ' · ' + (s.all.length - list.listings) + ' hidden by filters') : null));
     // Phones: the Map/List toggle rides in the pinned count row (find.css).
@@ -754,11 +846,13 @@ function paintFind(refit) {
       : 'Part of the directory did not answer in time, so this list is missing some providers. ',
       h('button', { class: 'linkbtn', type: 'button', onclick: function () { runProviderSearch(); } }, 'Try again')));
     else if (s.truncated) r.appendChild(h('div', { class: 'note' }, 'This area has more listings than we can show at once, so these are a sample. Try a shorter distance.'));
+    if (s.procedure) r.appendChild(procedureNote(s));
     if (s.door === 'Emergency rooms & hospitals' || s.door === 'Rides & transport') r.appendChild(h('div', { class: 'note urgent' },
       h('b', {}, 'In an emergency, call 911.'), s.door === 'Emergency rooms & hospitals' ? ' The registry does not say which hospitals have an emergency room, so call ahead if you can.' : ''));
     if (!list.length) {
       r.appendChild(h('div', { class: 'empty' },
-        h('h3', {}, s.all.length ? 'No matches with these filters' : 'No ' + (s.label || 'providers') + ' within ' + s.miles + ' miles'),
+        h('h3', {}, s.all.length ? 'No matches with these filters' : s.procedure ? 'No one within ' + s.miles + ' miles billed Medicare for this in 2024'
+          : 'No ' + (s.label || 'providers') + ' within ' + s.miles + ' miles'),
         h('p', {}, s.all.length && f.lowcost ? 'None of these is a low-cost clinic (an FQHC, community or rural health clinic, or health department). Try a wider distance, or turn off Low-cost clinics.'
           : s.all.length ? 'Filters like "Accepting new patients" only apply to practices verified on ProviderPulse. Try turning some off.'
           : 'Try a wider distance or a nearby ZIP.'),
@@ -791,6 +885,16 @@ var DOOR_BLURB = {
   'Community & support services': 'Meals, case management, day programs',
   'Surgery & procedure centers': 'Scheduled surgery and scopes'
 };
+// What a procedure list is and is not, and the way back to a specialty.
+function procedureNote(s) {
+  var sp = s.procedure.specialty, i = -1;
+  for (var k = 0; k < SPECIALTIES.length; k++) if (SPECIALTIES[k][0] === sp) i = k;
+  return h('div', { class: 'note info' },
+    'From Medicare\'s 2024 claims: how often each clinician or center billed traditional Medicare for this, most first. ' +
+    'Medicare covers mostly people 65 and over, and CMS leaves out anyone with fewer than 11 Medicare patients for a code, so a busy practice with younger or privately insured patients can be missing. ',
+    i >= 0 ? h('button', { class: 'linkbtn', type: 'button', onclick: function () { pickSpecialty(i); } }, 'See all ' + sp) : null);
+}
+
 function startEl() {
   var p = state.profile || {};
   var name = p.first_name ? String(p.first_name).trim().split(' ')[0] : '';
@@ -815,7 +919,7 @@ function pickSpecialty(i) {
   var sp = SPECIALTIES[i];
   if (!sp) return;
   var s = state.search;
-  s.text = sp[0]; s.label = sp[0]; s.terms = sp[1].split(','); s.door = null; s.suggested = {};
+  s.text = sp[0]; s.label = sp[0]; s.terms = sp[1].split(','); s.door = null; s.procedure = null; s.suggested = {};
   if (findEls) { findEls.what.value = sp[0]; takeZip(); }
   if (!/^\d{5}$/.test(s.zip)) { s.ran = true; s.error = 'Enter your ZIP code, then press Search.'; paintFind(); return; }
   runProviderSearch();
@@ -830,7 +934,7 @@ function takeZip() {
 function pickDoor(door) {
   if (door === DOOR_DOCTORS) { location.hash = '#/specialties'; return; }
   var s = state.search;
-  s.text = door; s.label = door; s.terms = [door]; s.door = door; s.suggested = {};
+  s.text = door; s.label = door; s.terms = [door]; s.door = door; s.procedure = null; s.suggested = {};
   if (findEls) { findEls.what.value = door; takeZip(); }
   if (!/^\d{5}$/.test(s.zip)) { s.ran = true; s.error = 'Enter your ZIP code, then press Search.'; paintFind(); return; }
   runProviderSearch();
@@ -900,6 +1004,8 @@ function resultCard(p, n) {
       h('div', { class: 'res-addr' }, [p.address, p.city].filter(Boolean).join(', '),
         p.sites > 1 ? h('span', { class: 'muted' }, ' · ' + (p.sites - 1) + ' more location' + (p.sites > 2 ? 's' : '')) : null,
         p.phone ? h('span', { class: 'res-phone' }, ' · ', h('a', { href: telHref(p.phone), onclick: function (e) { e.stopPropagation(); } }, p.phone)) : null),
+      p.volume ? h('div', { class: 'res-vol' }, 'Billed Medicare ' + p.volume.services.toLocaleString() + ' time' + (p.volume.services === 1 ? '' : 's') +
+        ' in 2024' + (p.volume.patients ? ' · at least ' + p.volume.patients.toLocaleString() + ' patients' : '')) : null,
       info.patientNote || info.safetyNet ? h('div', { class: 'res-note' }, info.safetyNet || info.patientNote) : null,
       badges.length ? h('div', { class: 'badges' }, badges) : null,
       p.office_hours ? h('div', { class: 'res-hours' }, 'Hours: ', summariseHours(p.office_hours)) : null,
@@ -1437,6 +1543,8 @@ function detailSheet(npi) {
     info.safetyNet || info.eligibility || info.patientNote ? h('div', { class: 'note', style: 'margin-top:12px' },
       [info.safetyNet, info.eligibility ? 'For: ' + info.eligibility : null, info.patientNote].filter(Boolean).join('. ') + '.') : null,
     p.bio ? h('p', { style: 'margin-top:14px;color:var(--muted);font-size:14px' }, p.bio) : null,
+    p.volume ? h('div', { class: 'note info', style: 'margin-top:12px' }, (state.search.procedure ? state.search.procedure.label : 'This procedure') + ': billed Medicare ' + p.volume.services.toLocaleString() +
+      ' times in 2024, at least ' + p.volume.patients.toLocaleString() + ' patients (' + Object.keys(p.volume.codes).map(function (k) { return k + ' ×' + p.volume.codes[k].toLocaleString(); }).join(', ') + ').') : null,
     h('dl', { class: 'f', style: 'margin-top:18px' },
       h('dt', {}, 'Specialty'), h('dd', {}, plainType(p) || '—'),
       h('dt', {}, 'NPI'), h('dd', { class: 'm' }, p.npi),

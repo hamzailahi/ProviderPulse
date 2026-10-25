@@ -102,6 +102,9 @@ jobs:
       - name: Listing names and cities
         run: node scripts/test-display-names.mjs
 
+      - name: Patient procedure finder
+        run: node scripts/test-procedure-finder.mjs
+
       - name: Stray ZIPs left out of a city search
         run: node scripts/test-area-zips.mjs
 

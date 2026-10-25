@@ -68,7 +68,8 @@ code. Results appear as cards next to a full-size map, limited to the
 chosen radius (5, 10, 25 or 50 miles), in "best match" order: the
 specialty's own clinicians and places first, sites only some people can
 use (VA, military, tribal) last. Listings at one street address fold into
-one card. Filters narrow by low-cost clinics (FQHCs, community and rural
+one card. Typing a procedure ("colonoscopy", "cataract surgery") ranks who
+nearby billed Medicare for it most in 2024. Filters narrow by low-cost clinics (FQHCs, community and rural
 health clinics, health departments), insurance and verified listings. Each result
 opens a detail sheet with hours, accepted insurance, and Medicare
 credentials pulled live from CMS for individual clinicians (organizations
@@ -558,6 +559,7 @@ node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bu
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 node scripts/test-providers-near.mjs      # the assistant's competitor lookup: codes in a location box, clinicians and organizations, failures never "none"
 node scripts/test-catchment.mjs           # the market score's area: every ZIP within 10 miles, ZIP groups, a failed load refuses to score
+node scripts/test-procedure-finder.mjs     # the patient procedure finder: real CMS codes, words to procedures, per-clinician counts
 node scripts/test-display-names.mjs       # listing names and cities as patients see them
 node scripts/test-org-phones.mjs          # organization phones from NPPES: usable numbers, which rows change, the parser end to end, the API pass on a fake API
 node scripts/test-procedures-tool.mjs     # the assistant's procedures tool on a fake database: averages, word search, failures reported, hospitals
@@ -615,6 +617,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-10-25
+
+- **Patients can search by procedure.** Typing "colonoscopy", "cataract
+  surgery", "mammogram", "knee replacement" or about 25 other procedures
+  lists the clinicians and centers nearby who billed traditional Medicare
+  for it in 2024, the busiest first ("Billed Medicare 468 times in 2024, at
+  least 98 patients"). A note says what the numbers leave out (mostly 65
+  and over; CMS hides anyone under 11 patients for a code) and links to the
+  whole specialty. Nearest first is one tap away.
 
 - **Patients start from what they need.** The start screen leads with 13
   kinds of care, and typed words go to them: "pharmacy" now lists
