@@ -15,6 +15,9 @@ on:
       tables:
         description: Space-separated tables to query
         default: clinics provider_individuals clinic_secondary_locations
+      show:
+        description: "Also print up to this many rows (public data only; 0 = counts only)"
+        default: "0"
 
 permissions:
   contents: read
@@ -28,6 +31,7 @@ jobs:
         env:
           Q: ${{ inputs.query }}
           T: ${{ inputs.tables }}
+          SHOW: ${{ inputs.show }}
         run: |
           U="https://khkmdultmrggpfvkbfzj.supabase.co/rest/v1"
           K="sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ"
@@ -38,5 +42,8 @@ jobs:
               n=$(python3 -c "import json;d=json.load(open('/tmp/body'));print(len(d) if isinstance(d,list) else 'error')" 2>/dev/null || echo 'not json')
               echo "- $t: HTTP/time $out, rows $n"
               [ "$n" = error ] || [ "$n" = "not json" ] && { echo '```'; head -c 600 /tmp/body; echo; echo '```'; }
+              if [ "${SHOW:-0}" != "0" ] && [ "$n" != error ] && [ "$n" != "not json" ]; then
+                echo '```'; python3 -c "import json,sys;d=json.load(open('/tmp/body'));[print(json.dumps(r)[:400]) for r in d[:int(sys.argv[1])]]" "$SHOW"; echo '```'
+              fi
             done
           } | tee -a "$GITHUB_STEP_SUMMARY"
