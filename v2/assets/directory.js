@@ -238,6 +238,40 @@ function zctaCentroid(zips) {
 }
 
 
+// Every ZCTA whose centre (cdc_places, as above) lies within `miles` of c:
+// {zip: {lat, lng}}, or null when the lookup failed (never an empty answer).
+// Shared by the patient procedure search and the portal's Medicare footprint.
+function zipsNear(c, miles) {
+  var b = milesBox(c, miles);
+  var url = SB_URL + '/rest/v1/cdc_places?measureid=eq.DENTAL&lat=gte.' + b.s.toFixed(4) + '&lat=lte.' + b.n.toFixed(4) +
+    '&lon=gte.' + b.w.toFixed(4) + '&lon=lte.' + b.e.toFixed(4) + '&select=zip,lat,lon&limit=1000';
+  return fetch(url, { headers: { apikey: SB_KEY, Accept: 'application/json' } })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (rows) {
+      if (!Array.isArray(rows)) return null;
+      var out = {};
+      rows.forEach(function (r) {
+        var lat = +r.lat, lng = +r.lon;
+        if (milesBetween(c.lat, c.lng, lat, lng) <= miles) out[String(r.zip).padStart(5, '0')] = { lat: lat, lng: lng };
+      });
+      return out;
+    })
+    .catch(function () { return null; });
+}
+function inBatches(items, size, parallel, fn) {
+  var groups = [];
+  for (var i = 0; i < items.length; i += size) groups.push(items.slice(i, i + size));
+  var out = [], next = 0, failed = false;
+  function worker() {
+    if (next >= groups.length) return Promise.resolve();
+    var g = groups[next++];
+    return fn(g).then(function (rows) { if (rows.failed) failed = true; out = out.concat(rows); return worker(); });
+  }
+  var ws = [];
+  for (var w = 0; w < Math.min(parallel, groups.length); w++) ws.push(worker());
+  return Promise.all(ws).then(function () { out.failed = failed; return out; });
+}
+
 function summariseHours(h) {
   var order = [['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat'],['sun','Sun']];
   var out = [], run = null;

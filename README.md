@@ -104,6 +104,10 @@ a pitch only; a signed-in provider is sent straight to the portal.
 - *Locations*: multiple practice addresses, one of them primary.
 - *Competition*: nearby listings in the same specialty on a map, and how
   many of them are missing hours or insurance.
+- *Medicare footprint* (on Overview): the provider's own top Medicare codes
+  for 2024, with services, patients and average payment, beside the same
+  codes within 10 miles: how many others bill them, the provider's share,
+  and the doctor's fee and the facility's fee shown apart.
 - *Market*: a link into the dashboard, opened on the provider's own ZIP
   and specialty.
 
@@ -620,6 +624,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-10-25
+
+- **Providers see their Medicare footprint.** The portal's Overview now
+  lists a provider's top Medicare codes for 2024 (services, patients,
+  average payment) next to the same codes within 10 miles: how many other
+  clinicians and centers bill them, the provider's share, and what doctors
+  and facilities were paid nearby, shown separately because a blended
+  figure mixes the two. If the nearby figures fail to load, only the
+  provider's own are shown.
 
 - **Patients can report a wrong listing.** Every provider's detail sheet has
   "Report a wrong listing": one tap says it is closed, moved, has the wrong

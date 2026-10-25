@@ -93,7 +93,52 @@
       .sort(function (a, b) { return b.services - a.services || (a.npi < b.npi ? -1 : 1); });
   }
 
-  var API = { PROCEDURES: PROCEDURES, match: match, summarize: summarize };
+  // A provider's own Medicare codes beside the area's (the portal's "Medicare
+  // footprint", 2026-10-25). mine: the provider's cms_procedures_full rows;
+  // area: rows for the same codes in the ZIPs around them (theirs included).
+  // Per code: what they billed (services, the largest place-of-service row's
+  // patients, service-weighted average paid), how many clinicians and
+  // centers in the area billed it and their services, the provider's share,
+  // and the area's average paid split into the doctor's fee (entity I) and
+  // the facility's (entity O), because a blended figure mixes them (45380:
+  // about $236 blended, about $103 for the doctor). Top `top` codes by the
+  // provider's services.
+  function footprint(mine, area, npi, top) {
+    var codes = {};
+    (mine || []).forEach(function (r) {
+      var k = String(r.hcpcs_cd || '').toUpperCase();
+      if (!k) return;
+      var c = codes[k] || (codes[k] = { code: k, description: r.hcpcs_desc || '', services: 0, patients: 0, paidSum: 0 });
+      var sv = num(r.tot_srvcs);
+      c.services += sv; c.paidSum += sv * num(r.avg_mdcr_pymt_amt);
+      if (num(r.tot_benes) > c.patients) c.patients = num(r.tot_benes);
+    });
+    var list = Object.keys(codes).map(function (k) { return codes[k]; })
+      .sort(function (a, b) { return b.services - a.services || (a.code < b.code ? -1 : 1); }).slice(0, top || 8);
+    var want = {};
+    list.forEach(function (c) { want[c.code] = { npis: {}, services: 0, iSv: 0, iPaid: 0, oSv: 0, oPaid: 0 }; });
+    (area || []).forEach(function (r) {
+      var a = want[String(r.hcpcs_cd || '').toUpperCase()];
+      if (!a || !r.npi) return;
+      var sv = num(r.tot_srvcs), paid = num(r.avg_mdcr_pymt_amt);
+      a.npis[String(r.npi)] = true; a.services += sv;
+      if (r.entity_code === 'O') { a.oSv += sv; a.oPaid += sv * paid; } else { a.iSv += sv; a.iPaid += sv * paid; }
+    });
+    return list.map(function (c) {
+      var a = want[c.code], others = Object.keys(a.npis).filter(function (n) { return n !== String(npi); }).length;
+      return {
+        code: c.code, description: c.description, services: c.services, patients: c.patients,
+        avg_paid: c.services ? c.paidSum / c.services : null,
+        area_billers: others, area_services: a.services,
+        // Their services can be in the area answer or not (a ZIP the lookup
+        // missed); the share is of whichever total is larger, never over 100%.
+        share: Math.max(a.services, c.services) ? c.services / Math.max(a.services, c.services) : null,
+        doctor_fee: a.iSv ? a.iPaid / a.iSv : null, facility_fee: a.oSv ? a.oPaid / a.oSv : null
+      };
+    });
+  }
+
+  var API = { PROCEDURES: PROCEDURES, match: match, summarize: summarize, footprint: footprint };
   if (root) root.ProcedureFinder = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : null);

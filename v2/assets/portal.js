@@ -309,8 +309,74 @@ VIEWS.overview = function () {
 
   // demand
   grid.appendChild(demandCard());
+  view.appendChild(footprintCard());
   return view;
 };
+
+// My Medicare footprint (2026-10-25): the provider's own 2024 Medicare codes
+// (cms_procedures_full by NPI, public) beside the same codes within 10 miles,
+// with the doctor's fee and the facility's fee apart (ProcedureFinder.footprint).
+var footprintCache = null;
+function money(v) { return v == null ? '—' : '$' + (v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(2)); }
+function footprintCard() {
+  var p = S.profile || {};
+  var body = h('div', { class: 'pad' }, h('p', { class: 'muted small' }, 'Loading your Medicare claims…'));
+  var card = h('div', { class: 'card fp' }, h('div', { class: 'card-h' }, h('h2', {}, 'Your Medicare footprint, 2024'),
+    h('a', { href: '/dashboard' }, 'Market dashboard →')), body);
+  if (!/^\d{10}$/.test(String(p.npi || ''))) { clear(body); body.appendChild(h('p', { class: 'muted small' }, 'Your NPI is not on this listing yet.')); return card; }
+  var npi = String(p.npi);
+  var sel = 'npi,entity_code,hcpcs_cd,hcpcs_desc,tot_benes,tot_srvcs,avg_mdcr_pymt_amt';
+  var job = footprintCache || tableQuery('cms_procedures_full', sel, 'npi=eq.' + npi + '&order=tot_srvcs.desc,hcpcs_cd,place_of_service,id').then(function (mine) {
+    if (mine.failed && !mine.length) return { failed: true };
+    var codes = ProcedureFinder.footprint(mine, [], npi, 8).map(function (c) { return c.code; });
+    if (!codes.length) return { mine: mine, rows: [] };
+    var locP = S.locations ? Promise.resolve() : loadLocations();
+    return locP.then(myCenter).then(function (c) {
+      if (!c) return { mine: mine, rows: ProcedureFinder.footprint(mine, [], npi, 8), areaFailed: true };
+      return zipsNear(c, 10).then(function (zips) {
+        if (!zips) return { mine: mine, rows: ProcedureFinder.footprint(mine, [], npi, 8), areaFailed: true };
+        return inBatches(Object.keys(zips), 10, 4, function (g) {
+          return tableQuery('cms_procedures_full', 'npi,entity_code,hcpcs_cd,tot_srvcs,avg_mdcr_pymt_amt',
+            'zip=in.(' + g.join(',') + ')&hcpcs_cd=in.(' + codes.join(',') + ')&order=npi,hcpcs_cd,place_of_service,id');
+        }).then(function (area) {
+          return { mine: mine, rows: ProcedureFinder.footprint(mine, area, npi, 8), areaFailed: !!area.failed, zips: Object.keys(zips).length };
+        });
+      });
+    });
+  });
+  footprintCache = job;
+  job.then(function (d) {
+    clear(body);
+    if (d.failed) { footprintCache = null; body.appendChild(h('p', { class: 'muted small' }, 'Medicare\'s claims did not load just now. Reload to try again.')); return; }
+    if (d.areaFailed) footprintCache = null;    // never keep a partial answer
+    if (!d.rows.length) {
+      body.appendChild(h('p', { class: 'muted small' }, 'No Medicare claims under NPI ' + npi + ' in CMS\'s 2024 file. That is common for new practices, ' +
+        'organizations whose clinicians bill under their own NPIs, practices that see few Medicare patients, and codes with fewer than 11 patients, which CMS leaves out.'));
+      return;
+    }
+    var area = !d.areaFailed;
+    body.appendChild(h('div', { class: 'fp-wrap' }, h('table', { class: 'fp-table' },
+      h('thead', {}, h('tr', {}, h('th', {}, 'Code'), h('th', {}, 'You'), h('th', {}, 'Patients'), h('th', {}, 'You were paid'),
+        h('th', {}, area ? 'Others nearby' : ''), h('th', {}, area ? 'Your share' : ''), h('th', {}, 'Doctor fee nearby'), h('th', {}, 'Facility fee nearby'))),
+      h('tbody', {}, d.rows.map(function (r) {
+        return h('tr', {},
+          h('td', {}, h('b', {}, r.code), h('div', { class: 'muted small' }, r.description)),
+          h('td', { class: 'n' }, r.services.toLocaleString()),
+          h('td', { class: 'n' }, r.patients ? r.patients.toLocaleString() + '+' : '—'),
+          h('td', { class: 'n' }, money(r.avg_paid)),
+          h('td', { class: 'n' }, area ? r.area_billers.toLocaleString() : ''),
+          h('td', { class: 'n' }, area && r.share != null ? Math.round(r.share * 100) + '%' : ''),
+          h('td', { class: 'n' }, area ? money(r.doctor_fee) : '—'),
+          h('td', { class: 'n' }, area ? money(r.facility_fee) : '—'));
+      })))));
+    body.appendChild(h('p', { class: 'muted small' },
+      'Traditional Medicare only, CMS\'s 2024 file. Services are times billed; patients are the most seen on any one line, so a floor. ' +
+      'Paid amounts are Medicare\'s average payment per service. "Nearby" is every ZIP whose centre is within 10 miles' +
+      (d.zips ? ' (' + d.zips + ' ZIPs)' : '') + '; the doctor fee is what clinicians were paid, the facility fee what surgery centers, labs and imaging centers were paid for the same code.' +
+      (d.areaFailed ? ' The nearby figures did not load, so only yours are shown.' : '')));
+  });
+  return card;
+}
 
 function stat(big, label, sub, href, cls) {
   return h('a', { class: 'stat ' + (cls || ''), href: href },

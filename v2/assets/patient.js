@@ -488,36 +488,6 @@ function runProviderSearch() {
 // listing (else its ZIP's centre). A failed request marks the list partial,
 // never short.
 var PROC_SELECT = 'npi,entity_code,provider_name,first_name,credentials,specialty,address1,city,state,zip,hcpcs_cd,tot_benes,tot_srvcs';
-function zipsNear(c, miles) {
-  var b = milesBox(c, miles);
-  var url = SB_URL + '/rest/v1/cdc_places?measureid=eq.DENTAL&lat=gte.' + b.s.toFixed(4) + '&lat=lte.' + b.n.toFixed(4) +
-    '&lon=gte.' + b.w.toFixed(4) + '&lon=lte.' + b.e.toFixed(4) + '&select=zip,lat,lon&limit=1000';
-  return fetch(url, { headers: { apikey: SB_KEY, Accept: 'application/json' } })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (rows) {
-      if (!Array.isArray(rows)) return null;
-      var out = {};
-      rows.forEach(function (r) {
-        var lat = +r.lat, lng = +r.lon;
-        if (milesBetween(c.lat, c.lng, lat, lng) <= miles) out[String(r.zip).padStart(5, '0')] = { lat: lat, lng: lng };
-      });
-      return out;
-    })
-    .catch(function () { return null; });
-}
-function inBatches(items, size, parallel, fn) {
-  var groups = [];
-  for (var i = 0; i < items.length; i += size) groups.push(items.slice(i, i + size));
-  var out = [], next = 0, failed = false;
-  function worker() {
-    if (next >= groups.length) return Promise.resolve();
-    var g = groups[next++];
-    return fn(g).then(function (rows) { if (rows.failed) failed = true; out = out.concat(rows); return worker(); });
-  }
-  var ws = [];
-  for (var w = 0; w < Math.min(parallel, groups.length); w++) ws.push(worker());
-  return Promise.all(ws).then(function () { out.failed = failed; return out; });
-}
 function runProcedureSearch(s, seq) {
   var proc = s.procedure, c = s.center;
   return zipsNear(c, s.miles).then(function (zips) {
