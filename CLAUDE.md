@@ -1467,7 +1467,10 @@ rate: none (0 sites), thin (< 0.5), below (< 0.8), typical (to 1.5), above.
 No US rate means no verdict, a truncated load is a floor with no verdict.
 It is a supply reading with no need or payer factor. market-score returns it
 as `model.facilities`; Insights shows "Places patients go"; the assistant's
-`get_market_insights` returns `places_patients_go`.
+`get_market_insights` returns `places_patients_go`. First live run (2026-10-25,
+`market-score-check.mjs`): 76117 low-cost clinics thin (0.32 vs 1.57 per 10k),
+labs above; 59601 urgent care none; 10001 truncated, so every verdict null;
+timings unchanged (2 to 3s, 10001 13.9s).
 
 HPSA county matching: `countyKey()` strips suffixes (County, Parish, Borough,
 City, Census Area, Municipality) and normalizes "St." on both sides. It reports

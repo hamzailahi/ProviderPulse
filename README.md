@@ -645,7 +645,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   and flags what is thin or missing ("Thin or missing here: urgent care,
   low-cost clinics"), with the nearest site for each. Ask AI reads the same
   figures. The national rates come from the quarterly benchmark job (new
-  migration 042).
+  migration 042; first written today, 101,251 pharmacies nationally, 3.9
+  per 10,000 adults). Live for Haltom City (76117): pharmacies typical (322),
+  labs above the US rate, mental health and addiction below, low-cost
+  clinics thin (25 sites, 0.32 per 10,000 adults against 1.57).
 - **Market scores reflect the re-filed care types.** Benchmarks were rebuilt
   after the change, so urgent care no longer counts surgery centers and
   ambulances, and pharmacy no longer counts pharmacies the public cannot use.
