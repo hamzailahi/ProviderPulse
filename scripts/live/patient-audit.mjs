@@ -166,7 +166,9 @@ async function readResults(page) {
     const specs = {}; info.forEach(c => { specs[c.spec] = (specs[c.spec] || 0) + 1; });
     const sheet = document.querySelector('.sheet');
     return { head: t(r.querySelector('.rhead')), notes: [...r.querySelectorAll('.note')].map(t), empty: t(r.querySelector('.empty')),
-      cards: cards.length, withPhone: info.filter(c => c.phone).length, first: info.slice(0, 5), specialties: Object.entries(specs).sort((a, b) => b[1] - a[1]).slice(0, 8),
+      cards: cards.length, withPhone: info.filter(c => c.phone).length,
+      // The reviewed hospital campus list (2026-10-25): is Baptist Collierville shown, and where.
+      campusAt: cards.findIndex(c => c.dataset.npi === 'campus-bmh-collierville'), first: info.slice(0, 5), specialties: Object.entries(specs).sort((a, b) => b[1] - a[1]).slice(0, 8),
       more: t(r.querySelector('.more')), hash: location.hash, sheet: sheet ? t(sheet).slice(0, 400) : '', whatValue: (document.querySelector('.sbar .what input') || {}).value || '' };
   }).catch(e => ({ error: String(e) }));
 }
@@ -240,6 +242,9 @@ await step('join page', async () => {
 const DESKTOP_SEARCHES = [
   { label: 'Start tile 1 (profile ZIP 76117)', tile: 0 },
   { label: 'Door "Pharmacies", 38017', door: 'Pharmacies', zip: '38017' },
+  { label: 'Door "Emergency rooms & hospitals", 38017 (Baptist Collierville campus expected)', door: 'Emergency rooms & hospitals', zip: '38017' },
+  { label: 'Street address as the place: "dentist" near 1500 W Poplar Ave, Collierville, TN 38017', what: 'dentist', zip: '1500 W Poplar Ave, Collierville, TN 38017' },
+  { label: 'Address not found: "dentist" near "zzzz nowhere street"', what: 'dentist', zip: 'zzzz nowhere street' },
   { label: 'Door "Labs & imaging", 76117', door: 'Labs & imaging', zip: '76117' },
   { label: 'Plain words "low cost clinic", 76117', what: 'low cost clinic', zip: '76117' },
   { label: 'Typed "dentist", 76117', what: 'dentist', zip: '76117' },
@@ -362,7 +367,8 @@ await step('phone', async () => {
   await shot(page, 'start-phone');
   report.phone.push(await layout(page, 'Start screen (phone)'));
   report.screens.push(await axe(page, 'Start screen (phone)'));
-  for (const s of [{ label: 'Phone: "knee pain", 76117', what: 'knee pain', zip: '76117' }, { label: 'Phone: "urgent care", 10001', what: 'urgent care', zip: '10001' }]) {
+  for (const s of [{ label: 'Phone: "knee pain", 76117', what: 'knee pain', zip: '76117' }, { label: 'Phone: "urgent care", 10001', what: 'urgent care', zip: '10001' },
+    { label: 'Phone: hospitals door by address, 1500 W Poplar Ave, Collierville', door: 'Emergency rooms & hospitals', zip: '1500 W Poplar Ave, Collierville, TN 38017' }]) {
     const r = await step(s.label, () => search(page, log, s));
     if (!r) continue;
     r.label = s.label; r.shot = await shot(page, 'search-' + s.label.replace(/[^A-Za-z0-9]+/g, '_').slice(0, 50));

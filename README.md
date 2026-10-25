@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   reviewed list adds those campuses to patient search, each with a note that
   it bills under its parent. A new read-only job lists likely campuses for
   review before any more are added.
+  The live patient app audit now also searches the hospitals door at 38017,
+  searches by street address, and tries an address that cannot be found.
 - **Listings that never appeared on the map now get placed.** A weekly job
   finds directory listings stored without coordinates (mostly ones added by
   the searched-ZIP backfill) and gives each an exact location from the
