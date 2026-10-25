@@ -657,7 +657,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   finds directory listings stored without coordinates (mostly ones added by
   the searched-ZIP backfill) and gives each an exact location from the
   Census geocoder, up to 60,000 a week. Addresses with no exact match stay
-  off the map rather than at a guessed point.
+  off the map rather than at a guessed point. Each run's summary says why
+  the rest did not match (no match, a fuzzy match, another ZIP).
 - **The server no longer writes searched addresses into its logs.** The
   geocoder used to log the address it looked up, and patient searches can
   contain a home address. It now logs only which service answered.

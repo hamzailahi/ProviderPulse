@@ -23,7 +23,7 @@ let items = rows.map((r, i) => ({ id: String(i), tbl: r[col.tbl], key: r[col.key
 const sample = Number(arg('sample', 0)) || 0;
 if (sample) items = items.slice(0, sample);
 
-const { coords, failed, stats } = await geocodeAll(items, { googleKey: process.env.GOOGLE_GEOCODING_KEY || null, log: m => console.error(m) });
+const { coords, failed, stats, examples } = await geocodeAll(items, { googleKey: process.env.GOOGLE_GEOCODING_KEY || null, log: m => console.error(m) });
 const out = ['tbl,key,lat,lng'];
 const per = {};
 for (const it of items) {
@@ -37,7 +37,10 @@ writeFileSync(arg('out'), out.join('\n') + '\n');
 const lines = [`## Geocoding${sample ? ` (a sample of ${fmt(sample)})` : ''}`, '',
   '| Table | Tried | Placed (exact) | Left unplaced | Geocoder failed |', '|---|---|---|---|---|',
   ...Object.entries(per).map(([t, v]) => `| ${t} | ${fmt(v.asked)} | ${fmt(v.placed)} | ${fmt(v.asked - v.placed - v.failed)} | ${fmt(v.failed)} |`), '',
-  `Census exact ${fmt(stats.census_exact)}, Google ${fmt(stats.google)} (off unless a key is passed); an address without an exact match keeps no coordinates.`];
+  `Census exact ${fmt(stats.census_exact)}, Google ${fmt(stats.google)} (off unless a key is passed); an address without an exact match keeps no coordinates.`, '',
+  `Why the rest were not placed: no match ${fmt(stats.census_no_match)}, a fuzzy (non-exact) match ${fmt(stats.census_non_exact)}, matched in another ZIP ${fmt(stats.census_other_zip)}, several equal matches ${fmt(stats.census_tie)}.`,
+  ...(examples.length ? ['', 'Examples (public listing addresses):', '', '| Why | Listed | Census matched |', '|---|---|---|',
+    ...examples.map(e => `| ${e.why} | ${e.input.replace(/\|/g, '/')} | ${e.matched.replace(/\|/g, '/')} |`)] : [])];
 writeFileSync(arg('summary'), lines.join('\n') + '\n');
 console.log(lines.join('\n'));
 // A geocoder outage is not "no match": say so, and fail the run so it shows red.

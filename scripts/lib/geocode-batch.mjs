@@ -36,7 +36,7 @@ export function parseCensus(text) {
     if (match !== 'Match') { out.set(id, { match }); continue; }
     const [lon, lat] = String(r[5] || '').split(',').map(Number);
     const zip = (/(\d{5})\s*$/.exec(String(r[4] || '')) || [])[1] || null;
-    out.set(id, { match, exact: String(r[3] || '').trim() === 'Exact', lat, lng: lon, zip });
+    out.set(id, { match, exact: String(r[3] || '').trim() === 'Exact', lat, lng: lon, zip, matched: String(r[4] || '') });
   }
   return out;
 }
@@ -69,7 +69,10 @@ export async function geocodeAll(items, opt = {}) {
   const coords = new Map();
   const failed = new Set();   // ids a geocoder outage left unanswered
   const stats = { asked: items.length, census_exact: 0, google: 0, unplaced: 0, census_service_failed: 0,
-    google_service_failed: 0, google_not_configured: 0 };
+    google_service_failed: 0, google_not_configured: 0,
+    // Why the Census did not count: none, fuzzy, another ZIP, several equal.
+    census_no_match: 0, census_non_exact: 0, census_other_zip: 0, census_tie: 0 };
+  const examples = [];
   const left = [];
 
   // 1. Census, in batches, a few at a time.
@@ -93,7 +96,14 @@ export async function geocodeAll(items, opt = {}) {
       for (const it of batch) {
         const hit = hits && hits.get(String(it.id));
         if (censusAccepts(hit, it.zip)) { coords.set(it.id, { lat: hit.lat, lng: hit.lng, how: 'census_exact' }); stats.census_exact++; }
-        else left.push({ it, censusDown: !hits });
+        else {
+          if (hit) {
+            const why = hit.match === 'Tie' ? 'tie' : hit.match !== 'Match' ? 'no_match' : !hit.exact ? 'non_exact' : 'other_zip';
+            stats['census_' + why]++;
+            if (examples.length < 12 && why !== 'no_match') examples.push({ why, input: `${it.address}, ${it.city}, ${it.state} ${it.zip}`, matched: hit.matched || '' });
+          }
+          left.push({ it, censusDown: !hits });
+        }
       }
     }
   };
@@ -127,5 +137,5 @@ export async function geocodeAll(items, opt = {}) {
   };
   await Promise.all(Array.from({ length: opt.googleConcurrency || 8 }, google));
   stats.service_failed = stats.census_service_failed + stats.google_service_failed;
-  return { coords, failed, stats };
+  return { coords, failed, stats, examples };
 }
