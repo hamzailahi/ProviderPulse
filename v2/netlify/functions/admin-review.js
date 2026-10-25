@@ -159,17 +159,29 @@ exports.handler = async (event) => {
   });
   if (!res.ok) return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Update failed' }) };
   let changed = await res.json().catch(() => []);
+  let removed = false;
   if (!Array.isArray(changed) || !changed.length) {
     kind = 'added';
-    const res2 = await fetch(`${env.SUPABASE_URL}/rest/v1/provider_npis?npi=eq.${npi}`, {
-      method: 'PATCH', headers: { ...svc, Prefer: 'return=representation' }, body: JSON.stringify(patch)
-    });
+    // Rejecting an added NPI takes it off the account instead of leaving a
+    // blocked row there: a blocked row would keep the NPI claimed (one owner
+    // per NPI, migration 044), so the real practice could never register it.
+    // Its insurance rows go with it (on delete cascade). The reason is kept in
+    // audit_log; adding it again runs every check afresh.
+    const res2 = action === 'block'
+      ? await fetch(`${env.SUPABASE_URL}/rest/v1/provider_npis?npi=eq.${npi}`, {
+          method: 'DELETE', headers: { ...svc, Prefer: 'return=representation' } })
+      : await fetch(`${env.SUPABASE_URL}/rest/v1/provider_npis?npi=eq.${npi}`, {
+          method: 'PATCH', headers: { ...svc, Prefer: 'return=representation' }, body: JSON.stringify(patch) });
     changed = res2.ok ? await res2.json().catch(() => []) : [];
+    removed = action === 'block' && Array.isArray(changed) && changed.length > 0;
   }
   if (!Array.isArray(changed) || !changed.length) {
     return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: 'No provider with that NPI' }) };
   }
 
-  await audit(env, { actor_role: 'admin', action: 'provider_review_' + action, target: npi, ip, detail: { kind } });
-  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, npi, action }) };
+  const reason = action === 'block'
+    ? String(body.note || (kind === 'added' ? 'Not the account holder\'s NPI' : 'Confirmed OIG exclusion')).slice(0, 300) : null;
+  await audit(env, { actor_role: 'admin', action: removed ? 'provider_npi_rejected_removed' : 'provider_review_' + action, target: npi, ip,
+    detail: { kind, ...(reason ? { reason } : {}), ...(removed ? { account: changed[0].account_id } : {}) } });
+  return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, npi, action, removed }) };
 };

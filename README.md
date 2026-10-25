@@ -643,6 +643,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **Rejecting an added NPI in admin review now takes it off the account.**
+  Before, a rejected NPI stayed attached as blocked, so the real practice
+  could never claim it. The rejection and its reason are kept in the audit
+  log, and the confirmation says what will happen.
 - **The retired medicalpracticemap site no longer rebuilds.** It was disabled
   in Netlify, and its build settings now skip every build, so pushes to the
   repo only deploy providerpulse-v2.

@@ -233,7 +233,11 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   removes it. Every write is service role after an ownership check here;
   the table has no write policy. At most 50 added NPIs. Pending ones appear
   in `admin-review` with the account that asked (kind `added`); approving
-  publishes them. `providers-public` publishes cleared added NPIs
+  publishes them, and rejecting **deletes** the row (2026-10-25, the user's
+  choice) rather than leaving it `blocked`, because a blocked row would keep
+  the NPI claimed and the real practice could never register it; the reason
+  and account go to `audit_log` (`provider_npi_rejected_removed`), and adding
+  it again reruns every check. Blocking an account's own NPI is unchanged. `providers-public` publishes cleared added NPIs
   (`ADDED_COLUMNS`, never `id` or `account_id`); `appointment-request`
   books them through their account and stores the booked `npi`; the portal
   has a My NPIs page and a listing switcher in My listing.
@@ -1985,7 +1989,7 @@ node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures o
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
 node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty), the API script against a local server, and the pacer on a fake clock
-node scripts/test-provider-npis.mjs       # 34: one account, many NPIs: the registry and OIG checks, live only when the registry's person is the account's, caller never sets npi/review_status/account_id, own rows only, published once cleared, bookable through the account, registration refuses an added NPI
+node scripts/test-provider-npis.mjs       # 39: one account, many NPIs: the registry and OIG checks, live only when the registry's person is the account's, caller never sets npi/review_status/account_id, own rows only, published once cleared, bookable through the account, registration refuses an added NPI, admin reject removes an added NPI (logged, claimable again) while approve publishes and an account's own NPI is still only blocked
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
 node scripts/test-nppes-refresh.mjs       # 60: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing

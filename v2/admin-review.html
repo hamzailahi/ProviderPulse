@@ -117,7 +117,9 @@ function row(p) {
 
   const msg = el('div', { class: 'msg' });
   const decide = async (action, btn) => {
-    const label = action === 'clear' ? 'publish this provider' : 'permanently block this provider';
+    const label = action === 'clear' ? 'publish this provider'
+      : added ? 'reject this NPI and remove it from the account (the practice can then claim it themselves)'
+      : 'permanently block this provider';
     if (!window.confirm('Are you sure you want to ' + label + '?')) return;
     btn.disabled = true;
     try {
@@ -128,7 +130,8 @@ function row(p) {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Failed');
       msg.className = 'msg ok';
-      msg.textContent = action === 'clear' ? 'Cleared — now visible to patients.' : 'Blocked — stays hidden.';
+      msg.textContent = action === 'clear' ? 'Cleared. Now visible to patients.'
+        : d.removed ? 'Rejected. Removed from the account; the NPI can be claimed again.' : 'Blocked. Stays hidden.';
       wrap.querySelectorAll('.btn').forEach(b => b.disabled = true);
     } catch (err) {
       msg.className = 'msg err'; msg.textContent = err.message; btn.disabled = false;

@@ -23,7 +23,7 @@ function reset() {
     provider_npis: [], provider_npi_insurance: [], leie_exclusions: [], audit_log: [], provider_insurance: [], provider_locations: [], appointment_requests: []
   };
   nppes = {}; calls = [];
-  users = { tokA: { id: ACC, email: 'a@x.org', user_metadata: { role: 'provider' } }, tokP: { id: 'cccccccc-0000-4000-8000-000000000003', email: 'p@x.org', user_metadata: { role: 'patient' } } };
+  users = { tokA: { id: ACC, email: 'a@x.org', user_metadata: { role: 'provider' } }, tokB: { id: OTHER, email: 'b@x.org', user_metadata: { role: 'provider' } }, tokP: { id: 'cccccccc-0000-4000-8000-000000000003', email: 'p@x.org', user_metadata: { role: 'patient' } } };
 }
 const J = (b, status = 200) => ({ ok: status < 300, status, json: async () => b, text: async () => JSON.stringify(b) });
 function match(row, params) {
@@ -63,7 +63,7 @@ globalThis.fetch = async (url, opts = {}) => {
   if (method === 'PATCH') {
     const body = JSON.parse(opts.body); const hit = rows.filter(r => match(r, params)); hit.forEach(r => Object.assign(r, body)); return J(hit);
   }
-  if (method === 'DELETE') { const keep = rows.filter(r => !match(r, params)); const n = rows.length - keep.length; db[table] = keep; return J([], n >= 0 ? 204 : 404); }
+  if (method === 'DELETE') { const gone = rows.filter(r => match(r, params)); db[table] = rows.filter(r => !match(r, params)); return J(gone); }
   return J({}, 405);
 };
 // NPPES records
@@ -165,6 +165,25 @@ const reg = require('../v2/netlify/functions/auth-register-provider.js');
 nppes[NPI_ORG_SAME] = org(NPI_ORG_SAME, 'LEE FAMILY CLINIC PLLC', 'Ann', 'Lee');
 r = await reg.handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ npi: NPI_ORG_SAME, first_name: 'Ann', last_name: 'Lee', email: 'z@x.org', password: 'a-long-password-1' }) });
 ok(r.statusCode === 409, 'registration refuses an NPI already added to an account');
+
+// Admin: rejecting an added NPI removes it from the account, so the real
+// practice can still claim it; approving publishes it; an account's own NPI
+// is blocked as before.
+process.env.ADMIN_PASSWORD = 'admin-test-pw';
+const admin = require('../v2/netlify/functions/admin-review.js');
+const decide = (npi, action) => admin.handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ password: 'admin-test-pw', npi, action }) })
+  .then(x => ({ status: x.statusCode, body: JSON.parse(x.body) }));
+r = await decide('1972641942', 'block');
+ok(r.status === 200 && r.body.removed === true && !db.provider_npis.some(x => x.npi === '1972641942'), 'rejecting an added NPI removes it from the account');
+const logged = db.audit_log.find(x => x.action === 'provider_npi_rejected_removed' && x.target === '1972641942');
+ok(logged && /account holder/.test(logged.detail.reason) && logged.detail.account === ACC, 'the rejection is logged with its reason and the account');
+nppes['1972641942'] = org('1972641942', 'HELD CLINIC LLC', 'Bob', 'Kim');
+r = await call('POST', { token: 'tokB', body: { npi: '1972641942' } });
+ok(r.status === 200, 'the NPI can be claimed again after a rejection');
+r = await decide('1972641942', 'clear');
+ok(r.status === 200 && !r.body.removed && db.provider_npis.find(x => x.npi === '1972641942').review_status === 'clear', 'approving an added NPI publishes it');
+r = await decide('1407942097', 'block');
+ok(r.status === 200 && !r.body.removed && db.provider_profiles.find(x => x.npi === '1407942097').review_status === 'blocked', 'blocking an account\'s own NPI still blocks, never deletes');
 
 // Removing own
 r = await call('DELETE', { qs: { id: id1 } });
