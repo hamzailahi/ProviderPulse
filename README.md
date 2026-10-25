@@ -666,7 +666,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   (hours, insurance, availability), edited in My listing through a switcher,
   shows on the patient map as a verified listing once approved, and can be
   booked; the provider sees which NPI each request was for. New tables
-  `provider_npis` and `provider_npi_insurance` (migration 044).
+  `provider_npis` and `provider_npi_insurance` (migration 044, applied
+  the same day, so adding NPIs is switched on).
 - **Security fix: signed-in users could change columns the app never lets
   them change.** Through the database's public API, a provider could clear
   their own OIG review hold or change their NPI, mark a location verified,
