@@ -1,0 +1,43 @@
+name: NPPES search
+
+# Manual, read only. Asks the public NPI Registry API (npiregistry.cms.hhs.gov)
+# one question and prints each result's NPI, name, status, primary taxonomy
+# and practice address, for checking what the registry holds when the
+# directory seems to be missing a listing. The cloud dev container cannot
+# reach the registry, so this runs in Actions.
+
+on:
+  workflow_dispatch:
+    inputs:
+      params:
+        description: "API parameters, e.g. organization_name=BAPTIST*&city=COLLIERVILLE&state=TN"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Search
+        env:
+          P: ${{ inputs.params }}
+        run: |
+          curl -s "https://npiregistry.cms.hhs.gov/api/?version=2.1&limit=200&$P" -o /tmp/r.json
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open('/tmp/r.json'))
+          if d.get('Errors'): print('Errors:', d['Errors'])
+          rs = d.get('results') or []
+          print(f"{len(rs)} result(s)")
+          for r in rs:
+              b = r.get('basic', {})
+              name = b.get('organization_name') or ' '.join(x for x in [b.get('first_name'), b.get('last_name')] if x)
+              tax = next((t for t in r.get('taxonomies', []) if t.get('primary')), (r.get('taxonomies') or [{}])[0])
+              loc = next((a for a in r.get('addresses', []) if a.get('address_purpose') == 'LOCATION'), {})
+              other = [f"{a.get('address_1')}, {a.get('city')} {a.get('postal_code','')[:5]}" for a in r.get('practiceLocations', [])][:5]
+              print(f"- {r.get('number')} {r.get('enumeration_type')} {name} | status {b.get('status')} | {tax.get('code')} {tax.get('desc')} | "
+                    f"{loc.get('address_1')}, {loc.get('city')} {loc.get('postal_code','')[:5]}" + (f" | other sites: {'; '.join(other)}" if other else ''))
+          PY
