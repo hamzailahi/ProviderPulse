@@ -775,7 +775,7 @@ function previewCard(p, ins) {
 VIEWS.npis = function () {
   var p = S.profile || {};
   var list = h('div', { class: 'npi-list' });
-  var msg = h('p', { class: 'muted small', 'aria-live': 'polite' });
+  var msg = h('p', { class: 'muted small npi-msg', 'aria-live': 'polite' });
   var fNpi = h('input', { inputmode: 'numeric', maxlength: '10', placeholder: '10-digit NPI', 'aria-label': 'NPI to add' });
   var addBtn = h('button', { class: 'btn primary', type: 'button' }, 'Add NPI');
   addBtn.onclick = function () {
@@ -817,9 +817,10 @@ VIEWS.npis = function () {
     pageHead('My NPIs', 'Add the NPIs of your other offices or clinicians, so they show as your practice in patient search. Each has its own listing.'),
     S.npisEnabled ? h('div', { class: 'card sec' },
       h('div', { class: 'card-h' }, h('div', {}, h('h2', {}, 'Add an NPI'),
-        h('p', { class: 'muted small' }, 'We check it against the federal registry. When the registry lists ' +
-          ([p.first_name, p.last_name].filter(Boolean).join(' ') || 'your name') + ' for it (as the clinician, or the organization\'s authorized official), it goes live at once; otherwise it waits for a short review.'))),
-      h('div', { class: 'form inline' }, fNpi, addBtn), msg)
+        h('p', { class: 'muted small' }, 'We check it against the federal registry. If the registry names you' +
+          ([p.first_name, p.last_name].filter(Boolean).length ? ' (' + titleCase([p.first_name, p.last_name].filter(Boolean).join(' ')) + ')' : '') +
+          ' as its clinician or the organization\'s authorized official, it goes live at once. Otherwise it waits for a short review.'))),
+      h('div', { class: 'npi-add' }, fNpi, addBtn), msg)
       : h('div', { class: 'banner warn' }, 'Adding NPIs is not switched on yet.'),
     list);
 };

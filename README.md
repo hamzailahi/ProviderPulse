@@ -643,6 +643,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **My NPIs reads more clearly.** The add form and its result now sit inside
+  their card, and a listing held for review says plainly whose name the
+  registry shows and whose name the account is in.
 - **The directory now refreshes itself from NPPES every week.** A new
   scheduled job reads NPPES's weekly files and adds new organizations,
   clinicians and secondary sites, updates listings that moved or changed

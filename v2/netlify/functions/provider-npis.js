@@ -138,8 +138,10 @@ exports.handler = async (event) => {
     const nameHits = await exclusionNameHits(env, { entityType: d.entityType, lastName: d.personLast, firstName: d.personFirst, orgName: d.orgName, state: d.state });
     const sameName = namesMatch(d.personFirst, d.personLast, primary.first_name, primary.last_name);
     const reasons = [];
-    if (!sameName) reasons.push(`Registry name ${[d.personFirst, d.personLast].filter(Boolean).join(' ') || 'unknown'}` +
-      `${d.entityType === 2 ? ' (authorized official)' : ''} differs from the account's ${[primary.first_name, primary.last_name].filter(Boolean).join(' ')}`);
+    const tc = s => String(s || '').toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+    if (!sameName) reasons.push(`The registry lists ${tc([d.personFirst, d.personLast].filter(Boolean).join(' ')) || 'no one'} as ` +
+      `${d.entityType === 2 ? 'its authorized official' : 'the clinician'}; this account is in the name of ` +
+      `${tc([primary.first_name, primary.last_name].filter(Boolean).join(' ')) || 'no one yet'}`);
     if (nameHits > 0) reasons.push(`OIG name match: ${nameHits} exclusion record(s) share this name and state`);
     const row = {
       account_id: user.id, npi, entity_type: d.entityType,
