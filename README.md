@@ -559,6 +559,7 @@ node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bu
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 node scripts/test-providers-near.mjs      # the assistant's competitor lookup: codes in a location box, clinicians and organizations, failures never "none"
 node scripts/test-catchment.mjs           # the market score's area: every ZIP within 10 miles, ZIP groups, a failed load refuses to score
+node scripts/test-npi-activity.mjs         # the public Medicare-activity lookup: published columns only, unknown never "inactive"
 node scripts/test-procedure-finder.mjs     # the patient procedure finder: real CMS codes, words to procedures, per-clinician counts
 node scripts/test-display-names.mjs       # listing names and cities as patients see them
 node scripts/test-org-phones.mjs          # organization phones from NPPES: usable numbers, which rows change, the parser end to end, the API pass on a fake API
@@ -617,6 +618,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-10-25
+
+- **Provider pages say whether a clinician still sees Medicare patients.**
+  The detail sheet now shows "Billed Medicare in 2024 (812 services)" or
+  "Last billed Medicare in 2019 ... call to check", and whether they are
+  enrolled in Medicare, from CMS's public claims and enrollment files. A new
+  public lookup, `npi-activity`, returns only those fields; a clinician with
+  no record shows nothing rather than "inactive".
 
 - **Patients can search by procedure.** Typing "colonoscopy", "cataract
   surgery", "mammogram", "knee replacement" or about 25 other procedures

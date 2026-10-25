@@ -1489,6 +1489,26 @@ function detailSheet(npi) {
     } else lookupCms();   // NPI-1, or NPPES unreachable: let CMS answer
   });
 
+  // Medicare activity (2026-10-25, npi-activity): whether this clinician still
+  // bills Medicare, from CMS's yearly claims file and PECOS. Organizations
+  // never render services, so they are not asked. No row means unknown, and
+  // says nothing.
+  var activity = h('div', { class: 'activity' });
+  if (kindOf(p) === 'person') {
+    api('/npi-activity?npis=' + encodeURIComponent(p.npi), { auth: false, timeout: 8000 }).then(function (d) {
+      var a = d && d.activity && d.activity[p.npi];
+      if (!a) return;
+      var recent = new Date().getFullYear() - 3;
+      var lines = [];
+      if (a.last_medicare_year && a.last_medicare_year >= recent) lines.push(h('p', { class: 'good' }, '✓ Billed Medicare in ' + a.last_medicare_year +
+        (a.medicare_services ? ' (' + a.medicare_services.toLocaleString() + ' services)' : '') + '.'));
+      else if (a.last_medicare_year) lines.push(h('p', { class: 'caution' }, 'Last billed Medicare in ' + a.last_medicare_year +
+        '. They may have retired, moved or stopped seeing Medicare patients, so call to check.'));
+      if (a.pecos_enrolled === true) lines.push(h('p', {}, 'Enrolled in Medicare, so they can order tests and make referrals for Medicare patients.'));
+      lines.forEach(function (l) { activity.appendChild(l); });
+    }).catch(function () {});
+  }
+
   // Unclaimed rows carry no phone. NPPES has the practice line, so fetch it
   // when someone actually opens the listing rather than for every result.
   var phoneDd = h('dd', { class: 'm' }, p.phone || 'Looking up…');
@@ -1553,7 +1573,7 @@ function detailSheet(npi) {
       h('dt', {}, 'Phone'), phoneDd,
       (p.registered && p.payers && p.payers.length) ? h('dt', {}, 'Accepts') : null,
       (p.registered && p.payers && p.payers.length) ? h('dd', {}, p.payers.join(', ')) : null),
-    h('div', { class: 'sec-label' }, 'From Medicare records'), cms,
+    h('div', { class: 'sec-label' }, 'From Medicare records'), activity, cms,
     p.lat && p.lng ? h('div', { class: 'sec-label' }, 'Also at this address') : null, p.lat && p.lng ? here : null,
     h('div', { class: 'actions' },
       p.registered ? h('button', { class: 'act primary', type: 'button',

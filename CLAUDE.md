@@ -325,6 +325,15 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   the patient sheet decides person vs organization from the NPPES
   `enumeration_type` (NPI-1 vs NPI-2), **not** from which table the row came
   from.
+- **npi-activity.js** (2026-10-25): public. `?npis=` (at most 50) returns,
+  per NPI, the last year it billed traditional Medicare, that year's
+  services and PECOS enrollment, read from `npi_activity` under the service
+  role; **`ACTIVITY_COLUMNS` is the security boundary**. An NPI with no row
+  is left out (unknown, never "inactive"); a failed read is
+  `{activity:{}, degraded:true}`. The patient detail sheet asks for
+  clinicians only (organizations never render services) and says "Billed
+  Medicare in 2024" for the last three years, else "Last billed Medicare in
+  2019 ... call to check".
 - **payers.js**: public list of insurance plans for a state (`?state=` or
   `?zip=`).
 - **provider-count.js**: count helper using `count=planned`.
@@ -1088,7 +1097,8 @@ Tables:
 `audit_findings`, `demand_log`) have RLS enabled and NO policies.** That is the
 access model: anon and authenticated are denied, the service role bypasses.
 Do not "fix the missing policies"; a policy on `demand_log` would publish
-search behavior.
+search behavior. `npi_activity` is published only through `npi-activity.js`'s
+column list.
 
 ## PHI handling rules
 
@@ -1099,7 +1109,7 @@ search behavior.
 - Roles are checked server-side (see access model), never read from
   `user_metadata`.
 - The published surface, to re-read before shipping any change to it:
-  `providers-public.js` (`PUBLIC_COLUMNS`), `demand-stats.js` (`MIN_GROUP`),
+  `providers-public.js` (`PUBLIC_COLUMNS`), `npi-activity.js` (`ACTIVITY_COLUMNS`), `demand-stats.js` (`MIN_GROUP`),
   `lib/query-plan.js` (`TABLES`), `appointment-briefing.js`
   (`BRIEFING_FIELDS`), `market-score.js` (aggregate public data only), and
   `market-assistant.js` (`TOOLS`: anything a tool returns reaches the model
@@ -1805,6 +1815,7 @@ node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures o
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
 node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty), the API script against a local server, and the pacer on a fake clock
+node scripts/test-npi-activity.mjs        # 15: the public Medicare-activity lookup: only its columns, a missing NPI left out, nulls stay null, failures degraded
 node scripts/test-procedure-finder.mjs    # 143: the patient procedure finder: every code a real CMS code, every specialty real, words to procedures, per-NPI counts never add patients across codes
 node scripts/test-display-names.mjs       # 16: listing names for patients: legal suffixes dropped, acronyms kept, "FT WORTH" as Fort Worth
 node scripts/test-catchment.mjs           # 11: the market score's catchment: every ZIP within 10 miles, the 10 nearest in sparse areas, 60 ZIPs or 1M adults at most, ZIP groups, a timed-out group one ZIP at a time, a failed load refuses to score
