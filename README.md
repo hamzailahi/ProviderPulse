@@ -478,7 +478,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`041_listing_reports.sql` (run by the "Apply migration" job, or in the editor); 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
+`042_benchmark_care_type.sql` (run by the "Apply migration" job, or in the editor); 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
 
 ## Environment variables
 
@@ -628,6 +628,18 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **Market Insights shows the places patients go.** A new card counts the
+  pharmacies, urgent cares, hospitals, labs, home and senior care agencies,
+  equipment suppliers, low-cost clinics and other facilities in the same
+  area the market score uses, per 10,000 adults, against the national rate,
+  and flags what is thin or missing ("Thin or missing here: urgent care,
+  low-cost clinics"), with the nearest site for each. Ask AI reads the same
+  figures. The national rates come from the quarterly benchmark job (new
+  migration 042).
+- **Market scores reflect the re-filed care types.** Benchmarks were rebuilt
+  after the change, so urgent care no longer counts surgery centers and
+  ambulances, and pharmacy no longer counts pharmacies the public cannot use.
+
 - **Providers can check their own listing's accuracy.** A "Listing accuracy
   check" card on the portal Overview runs the same engine as the Directory
   Accuracy audit on the provider's own NPI and address: the federal
@@ -701,8 +713,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   surgery centers), four pharmacy types the public cannot walk into left
   Pharmacy, and 13 facility types that belonged nowhere (adult mental health
   clinics, birth centers, MRI centers, pain clinics and others) now have a
-  specialty. Market scores for those specialties change once the benchmarks
-  are rebuilt.
+  specialty. The benchmarks were rebuilt the same day.
 
 - **The monthly Medicare enrollment import works again.** CMS started adding
   a release date to its dataset titles, so the import could no longer find

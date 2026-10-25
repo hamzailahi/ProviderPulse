@@ -411,9 +411,83 @@
   function roundAll(f) { var o = {}; Object.keys(f).forEach(function (k) { o[k] = f[k] == null ? null : Math.round(f[k]); }); return o; }
   function dedupe(a) { return a.filter(function (x, i) { return a.indexOf(x) === i; }); }
 
+  // ---- Places patients go: facility access by care type (2026-10-25) ------
+  // The specialty model above scores clinicians. This counts the places a
+  // patient walks into (pharmacies, urgent cares, hospitals, labs, home
+  // health agencies, ...) in the same catchment, by care type ("door") from
+  // the reviewed code table, organizations only, against the national rate
+  // per 10,000 adults (market_benchmarks kind 'care_type'). It is a supply
+  // reading, not an opportunity score: no need or payer factor, and a type
+  // with no national rate is reported without a verdict, never as average.
+  var FACILITY_TYPES = ['Pharmacies', 'Urgent care', 'Emergency rooms & hospitals', 'Labs & imaging',
+    'Mental health & addiction', 'Dental', 'Therapy & rehab', 'Home & senior care', 'Medical equipment & supplies',
+    'Rides & transport', 'Surgery & procedure centers', 'Community & support services', 'Low-cost clinics'];
+  function facilityVerdict(ratio, sites) {
+    if (!sites) return 'none';
+    if (ratio == null) return null;
+    if (ratio < 0.5) return 'thin';
+    if (ratio < 0.8) return 'below';
+    if (ratio <= 1.5) return 'typical';
+    return 'above';
+  }
+  // Each type's organization codes, from the reviewed table (taxonomy-map.js,
+  // passed in so this file stays free of it). Low-cost clinics are the
+  // safety-net codes; every other type is its door. Clinicians are left out:
+  // a pharmacist is not a pharmacy.
+  function facilityCodes(T) {
+    var out = {};
+    FACILITY_TYPES.forEach(function (t) {
+      var codes = t === 'Low-cost clinics' ? T.safetyNetCodes() : T.codesForCare(t);
+      out[t] = codes.filter(function (c) { var e = T.get(c); return e && !e.individual; });
+    });
+    return out;
+  }
+  // input: rows (catchment listings with taxonomy_code, latitude, longitude),
+  // codesByType {type: [codes]} (organization codes only), rates {type:
+  // rate_per_10k}, adults, center {lat, lng}, milesBetween, truncated.
+  function facilities(input) {
+    var i = input || {}, rows = i.rows || [], adults = Number(i.adults) || 0;
+    var types = Object.keys(i.codesByType || {});
+    var byCode = {};
+    types.forEach(function (t) { (i.codesByType[t] || []).forEach(function (c) { (byCode[c] = byCode[c] || []).push(t); }); });
+    var acc = {};
+    types.forEach(function (t) { acc[t] = { seen: {}, sites: 0, nearest: null }; });
+    rows.forEach(function (r) {
+      var ts = byCode[r && r.taxonomy_code];
+      if (!ts || !r.npi) return;
+      ts.forEach(function (t) {
+        var a = acc[t], key = String(r.npi) + '|' + (r.latitude || '') + '|' + (r.longitude || '');
+        if (a.seen[key]) return;
+        a.seen[key] = true; a.sites++;
+        // Presence, not truthiness: a coordinate can be 0.
+        if (i.center && i.milesBetween && r.latitude != null && r.latitude !== '' && r.longitude != null && r.longitude !== '') {
+          var d = i.milesBetween(i.center.lat, i.center.lng, +r.latitude, +r.longitude);
+          if (a.nearest === null || d < a.nearest) a.nearest = d;
+        }
+      });
+    });
+    return types.map(function (t) {
+      var a = acc[t], rate = i.rates && i.rates[t] != null ? Number(i.rates[t]) : null;
+      var per10k = adults > 0 ? a.sites / adults * 10000 : null;
+      var ratio = rate && per10k != null ? per10k / rate : null;
+      return {
+        type: t, sites: a.sites,
+        per_10k_adults: per10k == null ? null : round2(per10k),
+        national_per_10k: rate == null ? null : round2(rate),
+        ratio: ratio == null ? null : round2(ratio),
+        // A capped catchment load makes every count a floor: "above" could be
+        // true, "thin" might not be, so a truncated load gives no verdict.
+        verdict: i.truncated ? null : facilityVerdict(ratio, a.sites),
+        nearest_miles: a.nearest == null ? null : Math.round(a.nearest * 10) / 10,
+        floor: !!i.truncated
+      };
+    });
+  }
+
   var API = {
     VERSION: VERSION, WEIGHTS: WEIGHTS, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES,
-    score: score, classify: classify, pct: pct, rankIn: rankIn, measureIds: measureIds, MEASURE_NAME: MEASURE_NAME
+    score: score, classify: classify, pct: pct, rankIn: rankIn, measureIds: measureIds, MEASURE_NAME: MEASURE_NAME,
+    FACILITY_TYPES: FACILITY_TYPES, facilities: facilities, facilityCodes: facilityCodes
   };
   if (global) global.MarketModel = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;

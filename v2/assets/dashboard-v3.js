@@ -536,6 +536,8 @@ function paintInsights() {
     }))));
 
   p.appendChild(procCard(M));
+  var fac = facilitiesCard(d);
+  if (fac) p.appendChild(fac);
 
   p.appendChild(el('div', { class: 'ins-card' },
     el('div', { class: 'ins-eyebrow' }, 'Go deeper'),
@@ -674,6 +676,37 @@ function drawProc(card, s) {
       switchTab('ai');
       if (window.PPAssistant) window.PPAssistant.ask('What do ' + lower + ' clinicians here bill Medicare and Medicaid, and what do they get paid?');
     } }, '✦ Ask AI about these')));
+}
+
+/* ---------- 5a'. Places patients go (2026-10-25) --------------------------
+   market-score's model.facilities: organizations per care type (pharmacies,
+   urgent cares, hospitals, labs, home and senior care, low-cost clinics, ...)
+   in the same catchment, per 10,000 adults, against the national rate. A
+   supply reading only. No national rate means no verdict; a capped load is a
+   floor with no verdict. */
+var FAC_WORDS = { none: ['None here', 'good'], thin: ['Thin', 'good'], below: ['Below US', 'warm'], typical: ['Typical', 'neutral'], above: ['Above US', 'cool'] };
+function facilitiesCard(d) {
+  var f = d && d.model && d.model.facilities;
+  if (!f || !f.length) return null;
+  var gaps = f.filter(function (x) { return x.verdict === 'none' || x.verdict === 'thin'; });
+  return el('div', { class: 'ins-card' },
+    el('div', { class: 'ins-eyebrow' }, 'Places patients go · ' + catchWords(d)),
+    el('p', {}, gaps.length
+      ? 'Thin or missing here: ' + gaps.map(function (x) { return x.type.toLowerCase(); }).join(', ') + '. Patients in ' + catchWords(d) + ' travel further for these.'
+      : 'Every kind of place is at least half the national rate here.'),
+    el('div', { class: 'fac-wrap' }, el('table', { class: 'fac-table' },
+      el('thead', {}, el('tr', {}, el('th', {}, 'Kind of place'), el('th', {}, 'Sites'), el('th', {}, 'Per 10k adults'), el('th', {}, 'US'), el('th', {}, ''), el('th', {}, 'Nearest'))),
+      el('tbody', {}, f.map(function (x) {
+        var w = FAC_WORDS[x.verdict];
+        return el('tr', {},
+          el('td', {}, x.type),
+          el('td', { class: 'n' }, (x.floor ? '≥' : '') + fmtN(x.sites)),
+          el('td', { class: 'n' }, x.per_10k_adults == null ? '—' : String(x.per_10k_adults)),
+          el('td', { class: 'n' }, x.national_per_10k == null ? '—' : String(x.national_per_10k)),
+          el('td', {}, w ? el('span', { class: 'fac-chip ' + w[1] }, w[0]) : el('span', { class: 'fac-chip muted' }, x.floor ? 'At least' : 'No US rate')),
+          el('td', { class: 'n' }, x.nearest_miles == null ? '—' : x.nearest_miles + ' mi'));
+      })))),
+    el('p', { class: 'ins-src' }, 'Organizations listed in NPPES by their NUCC code, against all US listings per 10,000 adults. A listing is not opening hours: call before relying on one.'));
 }
 
 // What the market model counted: every ZIP within 10 miles (at least the 10

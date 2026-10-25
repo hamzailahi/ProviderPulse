@@ -895,7 +895,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-`041` (`listing_reports`) applied 2026-10-25 by `apply-migration.yml`.
+`041` (`listing_reports`) applied 2026-10-25 by `apply-migration.yml`; `042` (benchmark kind `care_type`) applied the same day the same way. Benchmarks rebuilt 2026-10-25 after the care-type re-filing (124 rows, then again for `care_type`).
 Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `039` (city and state indexes on `provider_individuals` and `clinic_secondary_locations`, concurrent, via `concurrent-indexes.yml`) applied 2026-10-20, all four valid (individuals 50 and 49 MB, secondary about 8 MB each); the next audit loaded Collierville, TN at 982 listings and RI at 36,823 with no failed request. `038` (location indexes `clinics_geo_idx`, `provider_individuals_geo_idx`, concurrent, via `concurrent-indexes.yml` / `scripts/build-indexes.sh`) applied 2026-10-13: clinics 74 MB, individuals 215 MB, both valid. The 38017 primary care box query went from timeouts at 3.2 to 3.4s to 0.9s (clinics, 143 rows) and 1.6s (individuals, 837 rows); a 50-mile box answers its first page in 1.0 to 1.5s. `037` (`medicare_hospitals`, one row per hospital at its ZIP's ZCTA centroid, for the panel's nearest-hospitals list) applied and loaded 2026-10-12 (3,084 hospitals, 2,977 with a centroid). `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
@@ -1117,7 +1117,7 @@ Tables:
   `cms_specialty_code` / `cms_specialty_name` (several joined with `; `),
   `patient_specialties text[]`, `show_on_map`, `nucc_version`. Public read.
 - `market_benchmarks`: benchmarks for the market model (021), keyed
-  `(kind, key)`: `measure`, `specialty`, and `state_density` (the last needs 022's widened check constraint; first written 2026-09-30, 114 rows). Public read,
+  `(kind, key)`: `measure`, `specialty`, `state_density` (needs 022; first written 2026-09-30, 114 rows) and `care_type` (needs 042, 2026-10-25). The live constraint also allows `demand_model`, so 025 was in fact applied. Public read,
   service-role write.
 
 **Migration 008's four tables (`npi_activity`, `directory_audits`,
@@ -1453,6 +1453,18 @@ Rules that must hold:
   premium if pay ≥ 60, else saturated; otherwise balanced.
 - **Reasons** are the top 3 factors by distance from 50 × weight, in words.
 - **An inverted need measure** (`COLON_SCREEN`, `CHECKUP`, `DENTAL`: low uptake is need) is labelled by what is missing, so its `parts[].value` is `100 - uptake` with `uptake` beside it. Until 2026-10-22 the raw uptake went out under the "missed" label (a report: "58.8% missed colon screening" when 58.8% were screened).
+
+**Places patients go (2026-10-25).** `MarketModel.facilities` counts the
+catchment's organizations per facility type (`FACILITY_TYPES`: every door but
+Doctors & clinics, plus Low-cost clinics; `facilityCodes(TaxonomyMap)` gives
+each type's organization codes only, so a pharmacist is never a pharmacy),
+per 10,000 adults, against `market_benchmarks` kind `care_type` (migration
+042; the builder writes one row per type). Verdict by the ratio to the US
+rate: none (0 sites), thin (< 0.5), below (< 0.8), typical (to 1.5), above.
+No US rate means no verdict, a truncated load is a floor with no verdict.
+It is a supply reading with no need or payer factor. market-score returns it
+as `model.facilities`; Insights shows "Places patients go"; the assistant's
+`get_market_insights` returns `places_patients_go`.
 
 HPSA county matching: `countyKey()` strips suffixes (County, Parish, Borough,
 City, Census Area, Municipality) and normalizes "St." on both sides. It reports
@@ -1834,7 +1846,7 @@ function, asset and script and a `require` of every function.
 node scripts/test-accuracy-signals.mjs    # 83: scoring, incl. the Number(null) case and patient reports
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 49: specialty gating (imports the real practisesAny), NPPES board-name results
-node scripts/test-market-model.mjs        # 34: the market opportunity model, incl. bucketing by code
+node scripts/test-market-model.mjs        # 45: the market opportunity model, incl. bucketing by code; places patients go (organizations only, verdicts, no rate no verdict, floors)
 node scripts/test-demand-model.mjs        # 45: the learned demand model, trainer end to end, and scoring
 node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick
 node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking
@@ -1843,7 +1855,7 @@ node scripts/test-market-assistant.mjs    # 68: the assistant, figure repair, tr
 node scripts/test-answer-check.mjs        # 38: which figures count as traced
 node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
-node scripts/test-market-benchmarks.mjs   # 8: the benchmark builder end to end, specialty rates by code
+node scripts/test-market-benchmarks.mjs   # 11: the benchmark builder end to end, specialty rates by code, care-type site counts
 node scripts/test-taxonomy-map.mjs        # 91: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage, care types (every organization decided, the review's key calls)
 node scripts/test-payers.mjs              # 40: insurance plan proposal: covered lives by label, Grand Total skipped, reviewed brand map exact only, Medicaid newest year and comprehensive plans, 1,000-member cutoff
 python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital procedure builder end to end on fixtures (needs duckdb; CI installs it)

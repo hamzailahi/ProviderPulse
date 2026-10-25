@@ -79,6 +79,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 039 | `039_city_state_indexes.sql` | `(state, city)` and `(city)` indexes on `provider_individuals` and `clinic_secondary_locations` (Explore city and state searches timed out without them); concurrent, run with `concurrent-indexes.yml` | applied 2026-10-20 by the workflow, all four valid |
 | 040 | `040_clinics_phone.sql` | `phone` column on `clinics` (organizations had none); filled from NPPES by `org-phone-backfill.yml`, which runs this file in apply mode | applied 2026-10-24 by the job's apply run (1,894,376 of 1,901,951 rows filled) |
 | 041 | `041_listing_reports.sql` | `listing_reports`: one row per patient "report a wrong listing" tap (NPI, issue from a fixed list, time; no free text, user or IP); RLS on, no policies, service role only | applied 2026-10-25 by `apply-migration.yml` |
+| 042 | `042_benchmark_care_type.sql` | allows kind `care_type` in `market_benchmarks` (organizations per facility type per 10,000 adults), keeping `demand_model`, which the live constraint already had | applied 2026-10-25 by `apply-migration.yml` |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

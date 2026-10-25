@@ -116,5 +116,32 @@ console.log('\n7. Specialty membership by NUCC code (phase 3b)');
   check('every scored specialty has codes', SPECIALTIES.every(s => TM.codesFor(s[0]).length > 0));
 }
 
+console.log('\nPlaces patients go: organizations per care type against the national rate');
+{
+  const T = require('../v2/assets/taxonomy-map.js');
+  const codes = M.facilityCodes(T);
+  check('every facility type has organization codes, and no clinician code', M.FACILITY_TYPES.every(t => codes[t].length > 0 && codes[t].every(c => !T.get(c).individual)));
+  check('a pharmacist is not a pharmacy', !codes.Pharmacies.includes('183500000X') && codes.Pharmacies.includes('3336C0003X'));
+  check('low-cost clinics are the safety-net codes', codes['Low-cost clinics'].includes('261QF0400X') && codes['Low-cost clinics'].length === T.safetyNetCodes().length);
+  const rows = [
+    { npi: 'p1', taxonomy_code: '3336C0003X', latitude: 0.01, longitude: 0 }, { npi: 'p1', taxonomy_code: '3336C0003X', latitude: 0.01, longitude: 0 },
+    { npi: 'p2', taxonomy_code: '3336C0003X', latitude: 0.05, longitude: 0 }, { npi: 'u1', taxonomy_code: '261QU0200X', latitude: 0.2, longitude: 0 },
+    { npi: 'x1', taxonomy_code: '183500000X', latitude: 0, longitude: 0 }
+  ];
+  const f = M.facilities({ rows, codesByType: codes, rates: { Pharmacies: 2, 'Urgent care': 0.2, Dental: 1 }, adults: 10000, center: { lat: 0, lng: 0 }, milesBetween });
+  const by = t => f.find(x => x.type === t);
+  check('a listing repeated in one place counts once', by('Pharmacies').sites === 2);
+  check('per 10,000 adults and the ratio to the national rate', by('Pharmacies').per_10k_adults === 2 && by('Pharmacies').ratio === 1 && by('Pharmacies').verdict === 'typical');
+  check('above the national rate reads above', by('Urgent care').ratio === 5 && by('Urgent care').verdict === 'above');
+  check('nearest site in miles', by('Pharmacies').nearest_miles === 0.7);
+  check('no sites reads none', by('Dental').sites === 0 && by('Dental').verdict === 'none');
+  check('no national rate: a count and no verdict, never average', by('Labs & imaging').national_per_10k === null && by('Labs & imaging').verdict === 'none' &&
+    M.facilities({ rows, codesByType: codes, rates: {}, adults: 10000 }).find(x => x.type === 'Pharmacies').verdict === null);
+  const thin = M.facilities({ rows, codesByType: codes, rates: { Pharmacies: 5 }, adults: 10000 }).find(x => x.type === 'Pharmacies');
+  check('under half the national rate reads thin', thin.ratio === 0.4 && thin.verdict === 'thin');
+  const capped = M.facilities({ rows, codesByType: codes, rates: { Pharmacies: 2 }, adults: 10000, truncated: true }).find(x => x.type === 'Pharmacies');
+  check('a capped load is a floor with no verdict', capped.floor === true && capped.verdict === null);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

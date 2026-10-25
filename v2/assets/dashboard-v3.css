@@ -306,3 +306,14 @@ body.filters-open #map-legend { left: 306px; }
 .ins-proc-list li { padding: 5px 0; border-top: 1px solid var(--hairline, #e5e7eb); line-height: 1.35; }
 .ins-proc-list li b { font-family: var(--mono, monospace); margin-right: 2px; }
 .ins-proc-num { display: block; color: var(--muted, #64748b); font-size: 11px; font-variant-numeric: tabular-nums; }
+/* Insights: places patients go (2026-10-25). */
+.fac-wrap { overflow-x: auto; margin-top: 8px; }
+.fac-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 520px; }
+.fac-table th { text-align: right; font-weight: 650; color: #64748b; font-size: 11.5px; padding: 6px; border-bottom: 1px solid #e3e8ef; }
+.fac-table th:first-child, .fac-table td:first-child { text-align: left; }
+.fac-table td { padding: 6px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.fac-table td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fac-chip { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 11.5px; font-weight: 650; background: #f1f5f9; color: #475569; white-space: nowrap; }
+.fac-chip.good { background: #ecfdf5; color: #047857; }
+.fac-chip.warm { background: #fffbeb; color: #b45309; }
+.fac-chip.cool { background: #eff6ff; color: #1d4ed8; }

@@ -688,10 +688,11 @@ exports.handler = async (event) => {
           // National benchmarks (scripts/build-market-benchmarks.mjs). Absent
           // until that job has run; the model then falls back and says so.
           const bmRows = await get('market_benchmarks?select=kind,key,data&limit=500', 4000);
-          const benchmarks = { measures: {}, specialties: {} }, demandModels = {};
+          const benchmarks = { measures: {}, specialties: {} }, demandModels = {}, careRates = {};
           (Array.isArray(bmRows) ? bmRows : []).forEach(r => {
             if (r.kind === 'measure') benchmarks.measures[r.key] = r.data;
             if (r.kind === 'specialty') benchmarks.specialties[r.key] = r.data;
+            if (r.kind === 'care_type' && r.data && r.data.rate_per_10k != null) careRates[r.key] = r.data.rate_per_10k;
             if (r.kind === 'demand_model') demandModels[r.key] = r.data;
           });
 
@@ -735,6 +736,17 @@ exports.handler = async (event) => {
             headline: scored.specialties.some(x => x.specialty === want) ? want : 'Primary care / family doctor',
             specialties: scored.specialties
           };
+
+          // Places patients go (2026-10-25): organizations per care type in the
+          // same catchment against the national rate (benchmark kind care_type).
+          // A supply reading with no opportunity score; no national rate, no verdict.
+          try {
+            model.facilities = MarketModel.facilities({
+              rows: clinicPage.rows.concat(individualPage.rows),
+              codesByType: MarketModel.facilityCodes(TaxonomyMap), rates: careRates,
+              adults: catchmentAdults, center: { lat: oLat, lng: oLon }, milesBetween, truncated: catchment.truncated
+            });
+          } catch (e) { model.facilities = null; }
 
           // "What if I open here?" (?add=N&specialty=...). Re-scores the same
           // catchment with N extra listings of that specialty at the centre of

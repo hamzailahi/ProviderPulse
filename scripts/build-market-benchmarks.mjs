@@ -20,6 +20,13 @@
 //                    compare with a hard-coded 5.8 built from organizations alone,
 //                    which overstated supply.)
 //
+//   kind 'care_type' key = a facility type (MarketModel.FACILITY_TYPES, 2026-10-25)
+//                    data = { rate_per_10k, sites, adults }
+//                    Organization listings nationally whose code is in that
+//                    care type (MarketModel.facilityCodes: the door's
+//                    organization codes, or the safety-net codes for Low-cost
+//                    clinics), per 10,000 US adults. Needs migration 042.
+//
 //   kind 'specialty' key = specialty label from assets/specialties.js
 //                    data = { rate_per_1k, clinicians, adults }
 //                    Listings nationally whose NUCC taxonomy_code the reviewed
@@ -191,6 +198,16 @@ async function main() {
     const data = { rate_per_1k: Number(((clinicians / adults) * 1000).toFixed(4)), clinicians, adults };
     console.log(`  ${label}: ${clinicians.toLocaleString()} listings, ${data.rate_per_1k}/1k`);
     if (clinicians > 0) rows.push({ kind: 'specialty', key: label, data });
+  }
+
+  // Places patients go: organizations per care type (market-score's facilities).
+  const facilityCodes = MarketModel.facilityCodes(TaxonomyMap);
+  for (const type of MarketModel.FACILITY_TYPES) {
+    let sites = 0;
+    for (const code of facilityCodes[type]) sites += merged.get(code) || 0;
+    const data = { rate_per_10k: Number(((sites / adults) * 10000).toFixed(4)), sites, adults };
+    console.log(`  ${type}: ${sites.toLocaleString()} sites, ${data.rate_per_10k} per 10k adults`);
+    if (sites > 0) rows.push({ kind: 'care_type', key: type, data });
   }
 
   console.log(`\n${rows.length} benchmark rows`);

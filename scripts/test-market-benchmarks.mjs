@@ -19,7 +19,8 @@ const individuals = [
   L('1500000006', null),                                   // no code: state density only
   L('1600000007', '363LF0000X', 'TN', 'Family Nurse Practitioner')
 ];
-const clinics = [L('1700000008', '261QP2300X', 'TN', 'Primary Care Clinic/Center')];
+const clinics = [L('1700000008', '261QP2300X', 'TN', 'Primary Care Clinic/Center'),
+  L('1710000009', '3336C0003X', 'TN', 'Community/Retail Pharmacy'), L('1720000010', '261QF0400X', 'TN', 'Federally Qualified Health Center (FQHC)')];
 
 const dir = mkdtempSync(join(tmpdir(), 'bench-'));
 const preload = join(dir, 'preload.mjs');
@@ -50,11 +51,16 @@ const listings = label => { const m = out.match(new RegExp('  ' + label.replace(
 check('the builder runs in dry-run mode', p.status === 0 && /dry run, nothing written/.test(out), out.slice(-800));
 check('cardiology counts its 3 coded listings, not the 6 that carry its name', listings('Heart / cardiology') === 3, String(listings('Heart / cardiology')));
 check('dermatology counts the listings whose code says dermatology', listings('Skin / dermatology') === 2);
-check('primary care counts the family NP and the primary care clinic by code', listings('Primary care / family doctor') === 2);
+check('primary care counts the family NP, the primary care clinic and the FQHC by code', listings('Primary care / family doctor') === 3);
 check('nursing and physician assistant are searchable but not scored', listings('Nursing (RN, LPN)') === null && listings('Physician assistant') === null);
 check('a category that is searchable but not scored gets no benchmark', listings('Other health services') === null && listings('Hospital-based clinicians') === null);
 check('the uncoded listing is reported', /provider_individuals: 7 rows, 4 distinct taxonomy codes, 1 without one/.test(out), out.match(/provider_individuals:.*/) && out.match(/provider_individuals:.*/)[0]);
-check('state density still counts every listing, coded or not', /TN: 7 listings/.test(out) && /AR: 1 listings/.test(out), (out.match(/  (TN|AR): .*/g) || []).join(' | '));
+// Places patients go (2026-10-25): organizations per care type, clinicians never.
+const sites = type => { const m = out.match(new RegExp('  ' + type.replace(/[/()&]/g, '\\$&') + ': (\\d+) sites')); return m ? Number(m[1]) : null; };
+check('a retail pharmacy counts as a pharmacy site', sites('Pharmacies') === 1, String(sites('Pharmacies')));
+check('an FQHC counts as a low-cost clinic', sites('Low-cost clinics') === 1, String(sites('Low-cost clinics')));
+check('a type with no sites anywhere is printed with 0 and gets no row', sites('Urgent care') === 0);
+check('state density still counts every listing, coded or not', /TN: 9 listings/.test(out) && /AR: 1 listings/.test(out), (out.match(/  (TN|AR): .*/g) || []).join(' | '));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -11,7 +11,7 @@ on:
       migration:
         description: Migration to run
         type: choice
-        options: [041_listing_reports.sql]
+        options: [042_benchmark_care_type.sql, 041_listing_reports.sql]
 
 permissions:
   contents: read

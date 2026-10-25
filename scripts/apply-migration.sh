@@ -26,5 +26,9 @@ case "$(basename "$FILE")" in
       select 'anon/authenticated grants: ' || count(*) from information_schema.role_table_grants
         where table_schema = 'public' and table_name = 'listing_reports' and grantee in ('anon', 'authenticated');"
     ;;
+  042_*)
+    echo "== market_benchmarks kinds"
+    psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -At -c "select pg_get_constraintdef(oid) from pg_constraint where conname = 'market_benchmarks_kind_check';"
+    ;;
 esac
 echo "== Done"

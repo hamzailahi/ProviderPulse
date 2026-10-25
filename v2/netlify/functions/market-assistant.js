@@ -445,7 +445,12 @@ async function getMarketInsights({ zip, specialty }, ctx) {
     specialty_detail: specialtySummary(specs.find(x => x.specialty === want)),
     benchmarks: d.model ? d.model.benchmarks : null,
     all_specialties_ranked: ranked.map(x => [x.specialty, x.score, x.archetype_name, x.confidence, x.clinicians]),
-    ranked_columns: ['specialty', 'score', 'archetype', 'confidence', 'clinicians']
+    ranked_columns: ['specialty', 'score', 'archetype', 'confidence', 'clinicians'],
+    // Organizations per care type in the same catchment vs the national rate
+    // (2026-10-25). A supply reading, not an opportunity score.
+    places_patients_go: d.model && Array.isArray(d.model.facilities)
+      ? d.model.facilities.map(x => [x.type, x.sites, x.per_10k_adults, x.national_per_10k, x.verdict, x.nearest_miles]) : null,
+    places_columns: ['kind_of_place', 'sites', 'per_10k_adults', 'us_per_10k_adults', 'verdict (none/thin/below/typical/above; null = no rate or a capped count)', 'nearest_miles']
   };
 }
 
