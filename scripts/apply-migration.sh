@@ -12,6 +12,10 @@ FILE="${1:?migration file}"
 if grep -qi 'concurrently' "$FILE"; then echo "$FILE builds indexes concurrently; use concurrent-indexes.yml"; exit 1; fi
 echo "== Applying $FILE"
 psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -q -f "$FILE"
+# The REST API caches the schema: a new table answers 404 (PGRST205) until it
+# reloads, so the functions could not write to 041's table straight after.
+psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -q -c "notify pgrst, 'reload schema';"
+sleep 3
 case "$(basename "$FILE")" in
   041_*)
     echo "== listing_reports"

@@ -58,4 +58,6 @@ jobs:
               -H "apikey: sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ")
             echo "anon read: HTTP $code $(head -c 200 /tmp/body)"
             if [ "$code" = "200" ] && [ "$(cat /tmp/body)" != "[]" ]; then echo "::error::listing_reports is readable with the public key"; exit 1; fi
+            # 404 PGRST205 means the API has not loaded the table, so the function cannot write either.
+            if [ "$code" = "404" ]; then echo "::error::The REST API does not see listing_reports yet (schema cache)"; exit 1; fi
           fi
