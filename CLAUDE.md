@@ -48,7 +48,9 @@ All functions live in `v2/netlify/functions/`.
 
 The repo root used to deploy a second Netlify site (`medicalpracticemap`), a
 v1 B2B access-request flow. **That site is retired.** The root holds only a
-forwarding `index.html` and a minimal `netlify.toml`; once that Netlify site is
+forwarding `index.html` and a minimal `netlify.toml` whose `ignore = "exit 0"`
+skips every build (the user disabled the site in Netlify, 2026-10-25, and
+asked that it never update again); once that Netlify site is
 deleted in the dashboard, both can go. The old rule about keeping identical
 copies of shared functions in two folders is **gone**. Do not reintroduce a
 second copy. The `access_requests` table still holds v1's data.

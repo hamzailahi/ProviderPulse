@@ -643,6 +643,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **The retired medicalpracticemap site no longer rebuilds.** It was disabled
+  in Netlify, and its build settings now skip every build, so pushes to the
+  repo only deploy providerpulse-v2.
 - **My NPIs reads more clearly.** The add form and its result now sit inside
   their card, and a listing held for review says plainly whose name the
   registry shows and whose name the account is in.

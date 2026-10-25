@@ -10,3 +10,7 @@
 
 [build]
   publish = "."
+  # Never build this site again (the user disabled it, 2026-10-25). Netlify
+  # runs this command before each build and skips the build when it exits 0.
+  # providerpulse-v2 reads v2/netlify.toml, so this does not touch it.
+  ignore = "exit 0"
