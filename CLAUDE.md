@@ -334,6 +334,14 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   clinicians only (organizations never render services) and says "Billed
   Medicare in 2024" for the last three years, else "Last billed Medicare in
   2019 ... call to check".
+- **listing-report.js** (2026-10-25): public. `POST {npi, issue}` with
+  `issue` from `ISSUES` (closed, moved, wrong_phone, wrong_specialty,
+  not_accepting, other) inserts one `listing_reports` row (migration 041)
+  under the service role: the NPI, the issue, the source, the time, and
+  **nothing else** (no free text, no user, no IP). The caller's address is
+  used only in memory to throttle (same NPI once per 10 minutes, 20 an hour
+  per warm instance); never written or logged. A failed insert is 503, never
+  ok. The patient detail sheet's "Report a wrong listing" posts here.
 - **payers.js**: public list of insurance plans for a state (`?state=` or
   `?zip=`).
 - **provider-count.js**: count helper using `count=planned`.
@@ -879,6 +887,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
+`041` (`listing_reports`) applied 2026-10-25 by `apply-migration.yml`.
 Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `039` (city and state indexes on `provider_individuals` and `clinic_secondary_locations`, concurrent, via `concurrent-indexes.yml`) applied 2026-10-20, all four valid (individuals 50 and 49 MB, secondary about 8 MB each); the next audit loaded Collierville, TN at 982 listings and RI at 36,823 with no failed request. `038` (location indexes `clinics_geo_idx`, `provider_individuals_geo_idx`, concurrent, via `concurrent-indexes.yml` / `scripts/build-indexes.sh`) applied 2026-10-13: clinics 74 MB, individuals 215 MB, both valid. The 38017 primary care box query went from timeouts at 3.2 to 3.4s to 0.9s (clinics, 143 rows) and 1.6s (individuals, 837 rows); a 50-mile box answers its first page in 1.0 to 1.5s. `037` (`medicare_hospitals`, one row per hospital at its ZIP's ZCTA centroid, for the panel's nearest-hospitals list) applied and loaded 2026-10-12 (3,084 hospitals, 2,977 with a centroid). `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
@@ -919,6 +928,10 @@ Tables:
 - `patient_documents` / `patient_document_facts`: **PHI**, migration 002, not
   applied.
 - `audit_log`: service role only.
+- `listing_reports` (041, 2026-10-25): one row per patient "report a wrong
+  listing" tap (`npi`, `issue` from a fixed list, `source`, `created_at`).
+  RLS on, no policies, anon/authenticated revoked: service role only, like
+  008's tables. Do not add a policy.
 - `access_requests`, `access_codes`: v1 leftovers (names, emails, one-time
   codes). Unused by any code. Until 028 they had `USING (true)` select
   policies, readable with the publishable key; 028 drops them and revokes
@@ -1695,6 +1708,12 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   nothing. `push_branch` (tmp/ only) like the code report; delete after use.
   `PW_CHROMIUM` runs it on the dev container's Chromium (`--headless=new`)
   against a local copy, which checks the script but not the data.
+- **Apply migration** (`apply-migration.yml`, manual, `scripts/apply-migration.sh`,
+  2026-10-25): runs one ordinary migration chosen from the workflow's list
+  through psql and prints what it made (for 041: the table, RLS, zero
+  policies, zero anon/authenticated grants), then checks the public key
+  cannot read it. Refuses concurrent-index files. The file must be in git
+  first.
 - **Tests** (`tests.yml`): every pull request and push to main.
 
 Shared helpers live in `scripts/lib/bulk.mjs`; `import-leie.mjs` is
@@ -1709,6 +1728,12 @@ not at all).
 
 **Unknown is never clean.** A missing input contributes zero weight and is
 listed in `signals` as `unknown`.
+
+**Patient reports** (signal 7, 2026-10-25): `audit-run` counts the last
+365 days of `listing_reports` per NPI. Two or more closed/moved reports are
+moderate negative, one is weak, two wrong-detail reports are weak; none
+weighs nothing (most listings are never reported) and a missing table is
+`unknown`. Reports are anonymous taps, so they never decide a verdict alone.
 
 **Two findings override the arithmetic**: a deactivated NPI forces
 `likely_inactive`; an open OIG name+state flag forces `unverifiable`.
@@ -1798,7 +1823,7 @@ non-zero on failure. All run in CI (`tests.yml`) after a syntax check of every
 function, asset and script and a `require` of every function.
 
 ```bash
-node scripts/test-accuracy-signals.mjs    # 76: scoring, incl. the Number(null) case
+node scripts/test-accuracy-signals.mjs    # 83: scoring, incl. the Number(null) case and patient reports
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 49: specialty gating (imports the real practisesAny), NPPES board-name results
 node scripts/test-market-model.mjs        # 34: the market opportunity model, incl. bucketing by code
@@ -1821,6 +1846,7 @@ node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures o
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
 node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty), the API script against a local server, and the pacer on a fake clock
+node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
 node scripts/test-npi-activity.mjs        # 15: the public Medicare-activity lookup: only its columns, a missing NPI left out, nulls stay null, failures degraded
 node scripts/test-procedure-finder.mjs    # 143: the patient procedure finder: every code a real CMS code, every specialty real, words to procedures, per-NPI counts never add patients across codes
 node scripts/test-display-names.mjs       # 16: listing names for patients: legal suffixes dropped, acronyms kept, "FT WORTH" as Fort Worth

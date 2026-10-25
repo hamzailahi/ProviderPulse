@@ -314,3 +314,9 @@ main { min-height: 0; }
   .related-lbl, .rel { flex: none; white-space: nowrap; }
   .rel { min-height: 44px; }
 }
+/* Detail sheet: report a wrong listing (2026-10-25). */
+.report { margin-top: 16px; padding-top: 10px; border-top: 1px solid #e3e8ef; }
+.report-open { font-size: 13px; color: #64748b; }
+.report-opts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.report-done { font-size: 13.5px; color: #166534; }
+@media (max-width: 900px) { .report-opts .chip { min-height: 44px; } }

@@ -130,12 +130,21 @@ const inList = npis => `(${npis.map(n => `"${n}"`).join(',')})`;
  * write it and would have made a 25-NPI audit issue 75 round trips.
  */
 async function loadContext(env, npis) {
-  const [activity, leieNpi, clinics, profiles] = await Promise.all([
+  const since = new Date(Date.now() - 365 * 86400000).toISOString();
+  const [activity, leieNpi, clinics, profiles, reports] = await Promise.all([
     sbGet(env, `npi_activity?npi=in.${inList(npis)}&select=*`),
     sbGet(env, `leie_exclusions?npi=in.${inList(npis)}&select=npi,last_name,first_name,business_name,state,excl_type`),
     sbGet(env, `clinics?npi=in.${inList(npis)}&select=npi,name,address,city,state,zip,latitude,longitude`),
-    sbGet(env, `provider_profiles?npi=in.${inList(npis)}&select=id,npi,address_line,city,state,zip,review_status`)
+    sbGet(env, `provider_profiles?npi=in.${inList(npis)}&select=id,npi,address_line,city,state,zip,review_status`),
+    // Patient "report a wrong listing" taps (migration 041), last 365 days.
+    sbGet(env, `listing_reports?npi=in.${inList(npis)}&created_at=gte.${encodeURIComponent(since)}&select=npi,issue&limit=1000`)
   ]);
+  const reportsByNpi = new Map();
+  for (const r of (reports || [])) {
+    const k = String(r.npi), e = reportsByNpi.get(k) || { closed: 0, moved: 0, wrong_phone: 0, other: 0 };
+    e[r.issue in e ? r.issue : 'other']++;
+    reportsByNpi.set(k, e);
+  }
 
   const byNpi = (rows, key = 'npi') => {
     const m = new Map();
@@ -161,12 +170,14 @@ async function loadContext(env, npis) {
     clinics: byNpi(clinics),
     profiles: byNpi(profiles),
     locsByProvider,
+    reports: reportsByNpi,
     // A null table read means the source is unavailable. Distinguish that from
     // "queried and found nothing", or absence would read as a clean result.
     have: {
       activity: activity !== null,
       leie: leieNpi !== null,
-      claimed: profiles !== null
+      claimed: profiles !== null,
+      reports: reports !== null
     }
   };
 }
@@ -237,7 +248,9 @@ async function auditOne(npi, ctx, directoryAddress, deadline) {
     activity: activityRow,
     ndf: null,                       // not wired yet; scores as unknown
     geocode: geocodeSignal,
-    claimed: claimedSignal
+    claimed: claimedSignal,
+    // A missing table reads as not consulted; a queried NPI with no reports is zeros.
+    reports: ctx.have.reports ? (ctx.reports.get(npi) || { closed: 0, moved: 0, wrong_phone: 0, other: 0 }) : null
   });
 
   return {

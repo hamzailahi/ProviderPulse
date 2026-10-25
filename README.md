@@ -472,7 +472,7 @@ live schema) are the only record. To build a fresh project, run
 `supabase/schema/public.sql` once it exists; otherwise the migrations, after
 the core tables. `supabase/migrations/README.md` lists every file's status. There's no migration runner: run each file in order, by
 hand, in the Supabase SQL editor. The latest is
-`040_clinics_phone.sql` (run by the "Organization phone backfill" job in apply mode, or in the editor); 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
+`041_listing_reports.sql` (run by the "Apply migration" job, or in the editor); 031 and 032 are marked do-not-run, and `030_taxonomy_code_indexes.sql` runs after the taxonomy backfill.
 
 ## Environment variables
 
@@ -528,6 +528,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `nppes-terms-check.yml` | manual, read only | sends every specialty's registry search term to NPPES and records what comes back |
 | `db-size-report.yml` | manual only | read-only report of table, index and write-ahead-log sizes and dead rows, written to `supabase/reference/db-size-report.md` |
 | `live-patient-audit.yml` | manual, read only | drives the deployed patient app on desktop and phone with real searches and records timings, results, accessibility (axe-core) and layout problems; `push_branch` (tmp/ only) copies the results for a cloud session |
+| `apply-migration.yml` | manual only | runs one ordinary migration from a fixed list through psql and prints what it made, then checks the public key cannot read a private table (041) |
 | `org-phone-backfill.yml` | manual only | fills organizations' phone numbers from the NPPES monthly file (`source: file`) or the NPI Registry API, ZIP by ZIP (`source: api`, while CMS's download site is down). `dry_run` writes nothing and reports how many would change; `apply` adds the column (migration 040), writes in batches and refuses unless the free disk entered covers the rewrite; `from_run` reuses an api dry run's results |
 | `taxonomy-backfill.yml` | manual only | gives every listing its official NUCC taxonomy code from the NPPES monthly file and loads the `taxonomy_map` table. `dry_run` writes nothing and reports coverage and exceptions; `apply` refuses unless the free disk entered covers the rewrite |
 | `schema-snapshot.yml` | weekly, Mondays | dumps the live database's structure (tables, indexes, policies, grants; no data) to `supabase/schema/public.sql` and commits it only when it changed, so every such commit records a schema change |
@@ -559,6 +560,7 @@ node scripts/test-taxonomy-map.mjs        # the NUCC taxonomy map: no default bu
 node scripts/test-patient-query.mjs       # what a patient's typed words resolve to, and that every specialty finds listings by code
 node scripts/test-providers-near.mjs      # the assistant's competitor lookup: codes in a location box, clinicians and organizations, failures never "none"
 node scripts/test-catchment.mjs           # the market score's area: every ZIP within 10 miles, ZIP groups, a failed load refuses to score
+node scripts/test-listing-report.mjs       # report a wrong listing: only the NPI and issue are stored, repeats throttled
 node scripts/test-npi-activity.mjs         # the public Medicare-activity lookup: published columns only, unknown never "inactive"
 node scripts/test-procedure-finder.mjs     # the patient procedure finder: real CMS codes, words to procedures, per-clinician counts
 node scripts/test-display-names.mjs       # listing names and cities as patients see them
@@ -618,6 +620,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-10-25
+
+- **Patients can report a wrong listing.** Every provider's detail sheet has
+  "Report a wrong listing": one tap says it is closed, moved, has the wrong
+  phone or specialty, or is not taking patients. Nothing else is collected
+  (no text, no account, no IP address). The Directory Accuracy audit now
+  counts the last year's reports as weak evidence, never a verdict on its
+  own. New table `listing_reports` (migration 041), applied by a new manual
+  "Apply migration" job.
 
 - **Searching a condition offers the rest of the care that goes with it.**
   "Diabetes" still lists diabetes specialists, with a row of one-tap

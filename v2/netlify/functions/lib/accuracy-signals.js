@@ -74,6 +74,7 @@ const round2 = n => Math.round(n * 100) / 100;
  * @param {object|null} inputs.ndf      { present: bool, address }
  * @param {object|null} inputs.geocode  { directory_geocoded: bool, distance_km: number|null }
  * @param {object|null} inputs.claimed  { claimed: bool, verified_location: bool, address_matches: bool }
+ * @param {object|null} inputs.reports  patient reports of a wrong listing in the last year: { closed, moved, wrong_phone, other } counts
  * @param {number} [inputs.asOfYear]    year to reckon staleness against; pass it in tests
  * @returns {{confidence:number, verdict:string, signals:Array}}
  */
@@ -249,6 +250,27 @@ function scoreProvider(inputs) {
   } else {
     add('cms_ndf', 'absent', W.weak, 'negative',
       'Not found in the CMS National Downloadable File.');
+  }
+
+  // ---- 7. Patient reports (listing_reports, migration 041) -----------------
+  // People who went or called and found the practice closed or moved. Each
+  // report is one anonymous tap, so one is weak evidence and two or more are
+  // moderate, never strong: a competitor or a bad day can file one. No report
+  // is not evidence of anything (most listings are never reported).
+  const rp = i.reports || null;
+  if (!rp) {
+    unknown('patient_reports', 'Patient reports not consulted.');
+  } else {
+    const gone = (Number(rp.closed) || 0) + (Number(rp.moved) || 0);
+    const other = (Number(rp.wrong_phone) || 0) + (Number(rp.other) || 0);
+    if (gone >= 2) add('patient_reports', 'closed_or_moved', W.moderate, 'negative',
+      `${gone} patient reports in the last year say this practice closed or moved. Reports are anonymous, so they are checked, not taken as fact.`);
+    else if (gone === 1) add('patient_reports', 'closed_or_moved', W.weak, 'negative',
+      'One patient report in the last year says this practice closed or moved.');
+    else if (other >= 2) add('patient_reports', 'details_wrong', W.weak, 'negative',
+      `${other} patient reports in the last year say the phone or other details are wrong.`);
+    else add('patient_reports', 'none', W.none, 'none',
+      other ? 'One patient report of a wrong detail; not enough to weigh.' : 'No patient reports in the last year. Most listings are never reported, so this carries no weight.');
   }
 
   // ---- Combine -------------------------------------------------------------

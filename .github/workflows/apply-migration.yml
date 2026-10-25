@@ -1,0 +1,61 @@
+name: Apply migration
+
+# Manual. Runs one ordinary migration from supabase/migrations/ through psql
+# and prints what it created (scripts/apply-migration.sh). Only files listed
+# below can be chosen; add a file here when it should be applied this way.
+# Concurrent index migrations use concurrent-indexes.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: Migration to run
+        type: choice
+        options: [041_listing_reports.sql]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apply-migration
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "::error::Add the repository secret SUPABASE_DB_URL."; exit 1; fi
+
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Apply
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/apply-migration.sh "supabase/migrations/${{ inputs.migration }}"
+
+      - name: Check the public key cannot read it
+        env:
+          MIGRATION: ${{ inputs.migration }}
+        run: |
+          if [ "$MIGRATION" = "041_listing_reports.sql" ]; then
+            code=$(curl -s -o /tmp/body -w '%{http_code}' "https://khkmdultmrggpfvkbfzj.supabase.co/rest/v1/listing_reports?select=npi&limit=1" \
+              -H "apikey: sb_publishable_20jR_VjWJuUyj2_oiaHeZg_8VWHlJbQ")
+            echo "anon read: HTTP $code $(head -c 200 /tmp/body)"
+            if [ "$code" = "200" ] && [ "$(cat /tmp/body)" != "[]" ]; then echo "::error::listing_reports is readable with the public key"; exit 1; fi
+          fi

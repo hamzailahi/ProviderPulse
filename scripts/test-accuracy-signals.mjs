@@ -28,7 +28,8 @@ const clean = {
   activity: { last_medicare_activity_year: YEAR - 1, medicare_services_count: 1200, pecos_enrolled: true },
   ndf: { present: true },
   geocode: { directory_geocoded: true, distance_km: 0.2 },
-  claimed: { claimed: true, verified_location: true, address_matches: true }
+  claimed: { claimed: true, verified_location: true, address_matches: true },
+  reports: { closed: 0, moved: 0, wrong_phone: 0, other: 0 }
 };
 
 console.log('1. LEIE NPI match short-circuits');
@@ -233,6 +234,22 @@ console.log('\n14. Output contract');
     JSON.stringify(scoreProvider(clean)) === JSON.stringify(scoreProvider(clean)));
   check('tolerates an empty object', (() => { try { scoreProvider({}); return true; } catch { return false; } })());
   check('tolerates undefined', (() => { try { scoreProvider(); return true; } catch { return false; } })());
+}
+
+console.log('\nPatient reports (migration 041): weak to moderate, never decisive, absence is no evidence');
+{
+  const sig = r => r.signals.find(x => x.name === 'patient_reports');
+  const none = scoreProvider(clean), one = scoreProvider({ ...clean, reports: { closed: 1, moved: 0, wrong_phone: 0, other: 0 } });
+  const two = scoreProvider({ ...clean, reports: { closed: 1, moved: 1, wrong_phone: 0, other: 0 } });
+  const phones = scoreProvider({ ...clean, reports: { closed: 0, moved: 0, wrong_phone: 2, other: 0 } });
+  check('no reports weighs nothing', sig(none).weight === 0 && sig(none).direction === 'none');
+  check('one closed report is weak negative', sig(one).direction === 'negative' && sig(one).weight === 0.05);
+  check('two closed or moved reports are moderate negative', sig(two).weight === 0.15 && sig(two).value === 'closed_or_moved');
+  check('every report lowers the score', one.confidence < none.confidence && two.confidence < one.confidence, `${none.confidence} ${one.confidence} ${two.confidence}`);
+  check('two wrong-phone reports are weak', sig(phones).value === 'details_wrong' && sig(phones).weight === 0.05);
+  check('reports alone never make a verified listing inactive', two.verdict !== 'likely_inactive' && two.verdict !== 'excluded', two.verdict);
+  const missing = scoreProvider({ ...clean, reports: null });
+  check('a missing reports table is unknown, not clean', sig(missing).value === 'unknown' && sig(missing).weight === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -1647,8 +1647,41 @@ function detailSheet(npi) {
       callSlot,
       (p.lat && p.lng) ? h('button', { class: 'act', type: 'button', onclick: function () {
         location.hash = ''; setTimeout(function () { focusResult(p.npi, false); }, 0);
-      } }, 'Show on map') : null)
+      } }, 'Show on map') : null),
+    reportEl(p)
   ]);
+}
+
+// "Report a wrong listing" (2026-10-25, listing-report): one tap from a fixed
+// list, no free text, no account. Reports feed the Directory Accuracy audit.
+var REPORT_ISSUES = [['closed', 'Closed'], ['moved', 'Moved'], ['wrong_phone', 'Wrong phone'],
+  ['wrong_specialty', 'Wrong specialty'], ['not_accepting', 'Not taking patients'], ['other', 'Something else is wrong']];
+function reportEl(p) {
+  var box = h('div', { class: 'report' });
+  function opener() {
+    clear(box);
+    box.appendChild(h('button', { class: 'linkbtn report-open', type: 'button', onclick: choices }, 'Report a wrong listing'));
+  }
+  function choices() {
+    clear(box);
+    box.appendChild(h('p', { class: 'muted' }, 'What is wrong? We use reports to check listings; we don\'t ask who you are.'));
+    box.appendChild(h('div', { class: 'report-opts' }, REPORT_ISSUES.map(function (it) {
+      return h('button', { class: 'chip', type: 'button', onclick: function () { send(it[0]); } }, it[1]);
+    }), h('button', { class: 'linkbtn', type: 'button', onclick: opener }, 'Cancel')));
+  }
+  function send(issue) {
+    clear(box);
+    box.appendChild(h('p', { class: 'muted' }, h('span', { class: 'spin' }), ' Sending…'));
+    api('/listing-report', { method: 'POST', auth: false, timeout: 8000, body: { npi: p.npi, issue: issue } })
+      .then(function () { clear(box); box.appendChild(h('p', { class: 'report-done' }, '✓ Thanks. We\'ll check this listing.')); })
+      .catch(function (e) {
+        clear(box);
+        box.appendChild(h('p', { class: 'report-done' }, e && e.status === 429 ? '✓ Thanks, we already have your report for this listing.'
+          : 'That didn\'t go through. Please try again later.'));
+      });
+  }
+  opener();
+  return box;
 }
 
 var CONDITIONS = [
