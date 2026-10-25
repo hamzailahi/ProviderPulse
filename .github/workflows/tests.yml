@@ -81,6 +81,7 @@ jobs:
       - name: NUCC taxonomy map (and the generated file is in sync)
         run: |
           node scripts/build-taxonomy-map.mjs --check
+          node scripts/build-hospital-campuses.mjs --check
           node scripts/test-taxonomy-map.mjs
           node scripts/test-patient-query.mjs
 
@@ -113,6 +114,9 @@ jobs:
 
       - name: NPPES weekly refresh
         run: node scripts/test-nppes-refresh.mjs
+
+      - name: Hospital campuses
+        run: node scripts/test-hospital-campuses.mjs
 
       - name: Provider listing self-check
         run: node scripts/test-self-check.mjs

@@ -1,0 +1,60 @@
+name: Hospital campus candidates
+
+# Manual, read only. Lists addresses that look like hospital campuses missing
+# from patient search's Emergency rooms & hospitals door (an organization
+# named hospital or medical center under a non-hospital code, with no
+# hospital-coded listing within about 200 m), for review. Nothing is added
+# automatically: an approved campus goes into
+# supabase/reference/hospital-campuses.csv by hand. scripts/hospital-campus-candidates.sh
+# has the query; the results are committed to supabase/reference/.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  candidates:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Add the repository secret SUPABASE_DB_URL (Supabase, Connect, Session pooler string)."
+            exit 1
+          fi
+
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Find candidates
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/hospital-campus-candidates.sh
+
+      - name: Commit the list
+        run: |
+          git add supabase/reference/hospital-campus-candidates.csv supabase/reference/hospital-campus-candidates.md
+          if git diff --cached --quiet; then echo "Nothing to commit."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Hospital campus candidates $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

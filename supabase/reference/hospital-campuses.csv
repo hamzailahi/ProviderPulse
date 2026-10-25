@@ -1,0 +1,2 @@
+id,name,address,city,state,zip,latitude,longitude,phone,taxonomy_code,billing_npi,billing_name,emergency,source,verified_on
+bmh-collierville,Baptist Memorial Hospital-Collierville,1500 W Poplar Ave,Collierville,TN,38017,35.047776898653,-89.716383303348,9018619000,282N00000X,1578527172,Baptist Memorial Hospital (Memphis),yes,"baptistonline.org/collierville; NPPES lists the site only as pharmacy NPI 1184319667; the hospital bills under 1578527172",2026-10-25

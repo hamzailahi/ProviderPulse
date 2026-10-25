@@ -565,6 +565,13 @@ function runProviderSearch() {
     s.codeSet = codes.length ? codes.reduce(function (m, c) { m[c] = true; return m; }, {}) : null;
     return providerBoxQuery(box, s.codeSet ? codeFilter(codes) : taxonomyPrefilter(s.terms)).then(function (rows) {
       if (seq !== s.seq) return;
+      // Reviewed hospital campuses with no hospital NPI of their own
+      // (hospital-campuses.js); buildResults keeps them only when their code
+      // is in this search's set, as for any listing.
+      if (s.codeSet && window.HospitalCampuses) {
+        var extra = HospitalCampuses.inBox(box);
+        if (extra.length) { var merged = rows.concat(extra); merged.failed = rows.failed; merged.truncated = rows.truncated; merged.split = rows.split; rows = merged; }
+      }
       s.truncated = !!rows.truncated;
       s.all = buildResults(rows, s);
       // Part of the directory did not answer: never present that as "none here".
@@ -656,7 +663,7 @@ function buildResults(rows, s) {
     consider({
       npi: String(row.npi), name: displayName(row.name), specialty: row.primary_taxonomy || '', code: row.taxonomy_code || '', phone: fmtPhone(row.phone),
       address: titleCase(row.address), city: cityName(row.city), state: row.state, zip: row.zip,
-      lat: +row.latitude, lng: +row.longitude, src: row._src
+      lat: +row.latitude, lng: +row.longitude, src: row._src, campus: row.campus || null
     });
   });
   // Claimed listings publish sites the bulk tables never saw.
@@ -1661,7 +1668,10 @@ function detailSheet(npi) {
   // came from is NOT a reliable signal -- `clinics` holds individual NPIs too --
   // so the NPPES record decides, fetched once below and shared with the phone
   // lookup.
-  var nppes = api('/nppes-lookup?npi=' + encodeURIComponent(p.npi), { auth: false, timeout: 10000 })
+  // A hospital campus has no NPI of its own; the registry and Medicare know it
+  // under the hospital it bills as.
+  var regNpi = p.campus ? p.campus.billing_npi : p.npi;
+  var nppes = api('/nppes-lookup?npi=' + encodeURIComponent(regNpi), { auth: false, timeout: 10000 })
     .then(function (d) { return (d && d.results && d.results[0]) || null; })
     .catch(function () { return null; });
   function lookupCms() {
@@ -1671,7 +1681,7 @@ function detailSheet(npi) {
     // cms-provider timeout 20) because data.cms.gov is regularly slower than
     // 10s. The old 10s client timeout gave up first, so the first look at
     // almost any provider read "unavailable".
-    api('/cms-provider?npi=' + encodeURIComponent(p.npi), { auth: false, timeout: 22000 })
+    api('/cms-provider?npi=' + encodeURIComponent(regNpi), { auth: false, timeout: 22000 })
       .then(function (d) {
         clear(cms);
         if (d.unavailable) return unavailable();
@@ -1772,12 +1782,15 @@ function detailSheet(npi) {
     h('div', { class: 'badges', style: 'margin-top:0' }, badgesFor(p)),
     info.safetyNet || info.eligibility || info.patientNote ? h('div', { class: 'note', style: 'margin-top:12px' },
       [info.safetyNet, info.eligibility ? 'For: ' + info.eligibility : null, info.patientNote].filter(Boolean).join('. ') + '.') : null,
+    p.campus ? h('div', { class: 'note info', style: 'margin-top:12px' }, 'A campus of ' + p.campus.billing_name +
+      (p.campus.emergency ? ', with an emergency room' : '') + '. The federal registry lists only its parent hospital, so we added this site by hand. Call ahead to confirm services.') : null,
     p.bio ? h('p', { style: 'margin-top:14px;color:var(--muted);font-size:14px' }, p.bio) : null,
     p.volume ? h('div', { class: 'note info', style: 'margin-top:12px' }, (state.search.procedure ? state.search.procedure.label : 'This procedure') + ': billed Medicare ' + p.volume.services.toLocaleString() +
       ' times in 2024, at least ' + p.volume.patients.toLocaleString() + ' patients (' + Object.keys(p.volume.codes).map(function (k) { return k + ' ×' + p.volume.codes[k].toLocaleString(); }).join(', ') + ').') : null,
     h('dl', { class: 'f', style: 'margin-top:18px' },
       h('dt', {}, 'Specialty'), h('dd', {}, plainType(p) || '—'),
-      h('dt', {}, 'NPI'), h('dd', { class: 'm' }, p.npi),
+      h('dt', {}, 'NPI'), p.campus ? h('dd', {}, 'None of its own. It bills under NPI ' + p.campus.billing_npi + ', ' + p.campus.billing_name + '.')
+        : h('dd', { class: 'm' }, p.npi),
       h('dt', {}, 'Address'), h('dd', {}, [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ') || '—'),
       p.miles != null ? h('dt', {}, 'Distance') : null, p.miles != null ? h('dd', {}, fmtMiles(p.miles) + ' from ' + placeWords(state.search) + (state.search.origin ? ' (straight line)' : '')) : null,
       h('dt', {}, 'Phone'), phoneDd,
@@ -1792,7 +1805,7 @@ function detailSheet(npi) {
       (p.lat && p.lng) ? h('button', { class: 'act', type: 'button', onclick: function () {
         location.hash = ''; setTimeout(function () { focusResult(p.npi, false); }, 0);
       } }, 'Show on map') : null),
-    reportEl(p)
+    p.campus ? null : reportEl(p)
   ]);
 }
 

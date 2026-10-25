@@ -522,6 +522,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
 | `nppes-refresh.yml` | weekly, Wednesdays | NPPES weekly files: adds new organizations, clinicians and secondary sites, updates moved or changed listings, and removes deactivated NPIs across the directory. New and moved addresses are placed only by an exact Census match; anything else is stored unplaced, never at a guessed point (a Google tier is built in but off). Falls back to the NPI Registry API when CMS's download site is down, refuses to write when a week's totals look abnormal, and commits its summary to `supabase/reference/nppes-refresh/`. a daily check starts the one-time March-to-now catch-up from the monthly file the day CMS offers it again (`mode: full` runs it by hand) |
 | `place-unmapped.yml` | weekly, Thursdays | gives listings that have no map coordinates an exact location from the Census geocoder (up to 60,000 a week), filling in only what is missing; an address without an exact match stays off the map |
+| `hospital-campus-candidates.yml` | manual, read only | lists likely hospital campuses missing from patient search (a hospital-named organization under a pharmacy, lab or similar code, no hospital listing nearby) for review before any are added |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched |
 | `taxonomy-inventory.yml` | manual only | lists every taxonomy name stored in the directory tables with row counts, plus the newest official NUCC code set and the CMS Medicare specialty crosswalk, in `supabase/reference/`, and rebuilds the taxonomy map from them; read only against the database |
 | `taxonomy-indexes.yml` | manual only | builds the `taxonomy_code` indexes (migration 030) without locking the tables, then checks all three are valid |
@@ -574,6 +575,7 @@ node scripts/test-catchment.mjs           # the market score's area: every ZIP w
 node scripts/test-provider-npis.mjs        # one account, many NPIs: checks, review, own rows only, publishing and booking
 node scripts/test-self-check.mjs           # a provider's own listing check: their NPI only, nothing written
 node scripts/test-listing-report.mjs       # report a wrong listing: only the NPI and issue are stored, repeats throttled
+node scripts/test-hospital-campuses.mjs     # the reviewed hospital campus list and how patient search shows it
 node scripts/test-nppes-refresh.mjs        # weekly NPPES refresh: new, changed and deactivated NPIs, accurate geocoding only, limits, a rerun writes nothing
 node scripts/test-npi-activity.mjs         # the public Medicare-activity lookup: published columns only, unknown never "inactive"
 node scripts/test-procedure-finder.mjs     # the patient procedure finder: real CMS codes, words to procedures, per-clinician counts
@@ -644,6 +646,13 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **Baptist Memorial Hospital-Collierville now appears under Emergency rooms
+  & hospitals.** Some hospital campuses have no registry entry of their own:
+  they bill under a parent hospital's number at another address, so the
+  federal registry lists the site only as, say, its pharmacy. A short
+  reviewed list adds those campuses to patient search, each with a note that
+  it bills under its parent. A new read-only job lists likely campuses for
+  review before any more are added.
 - **Listings that never appeared on the map now get placed.** A weekly job
   finds directory listings stored without coordinates (mostly ones added by
   the searched-ZIP backfill) and gives each an exact location from the
