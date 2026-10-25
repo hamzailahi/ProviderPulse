@@ -979,7 +979,10 @@ function procedureNote(s) {
 function startEl() {
   var p = state.profile || {};
   var name = p.first_name ? String(p.first_name).trim().split(' ')[0] : '';
-  var picks = [0, 3, 4, 10, 5, 1, 9, 27, 8, 2];
+  // Under the doors, only specialties no door already offers (2026-10-25):
+  // a second grid repeated Dental, mental health and urgent care.
+  var picks = ['Primary care / family doctor', 'Skin / dermatology', 'Eye care', 'Pediatrics (children)',
+    'Heart / cardiology', 'Orthopedics & sports injury', "Women's health / OB-GYN"];
   return h('div', { class: 'start' },
     h('h2', {}, name ? 'Hi ' + name + ', what kind of care do you need?' : 'What kind of care do you need?'),
     h('p', {}, 'Pick a kind of care, or describe what you need in your own words. We show every match within your distance, with verified practices you can request an appointment from.'),
@@ -987,13 +990,14 @@ function startEl() {
       return h('button', { class: 'tile door', type: 'button', onclick: function () { pickDoor(d); } },
         h('span', { class: 'tile-name' }, d), h('span', { class: 'tile-sub' }, DOOR_BLURB[d] || ''));
     })),
-    h('h3', { class: 'start-sub' }, 'Popular specialties'),
-    h('div', { class: 'tiles' }, picks.map(function (i) {
-      var sp = SPECIALTIES[i];
-      if (!sp) return null;
-      return h('button', { class: 'tile', type: 'button', onclick: function () { pickSpecialty(i); } }, sp[0]);
-    })),
-    h('button', { class: 'ask-link', type: 'button', onclick: function () { location.hash = '#/specialties'; } }, 'Browse all ' + SPECIALTIES.length + ' specialties →'));
+    h('h3', { class: 'start-sub' }, 'Or go straight to a doctor'),
+    h('div', { class: 'spec-chips' }, picks.map(function (label) {
+      var i = -1;
+      for (var k = 0; k < SPECIALTIES.length; k++) if (SPECIALTIES[k][0] === label) i = k;
+      if (i < 0) return null;
+      return h('button', { class: 'spec-chip', type: 'button', onclick: function () { pickSpecialty(i); } }, label);
+    }),
+      h('button', { class: 'spec-chip more-specs', type: 'button', onclick: function () { location.hash = '#/specialties'; } }, 'All ' + SPECIALTIES.length + ' specialties →')));
 }
 
 function pickSpecialty(i, keepRelated) {

@@ -628,6 +628,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **The start screen no longer lists care twice.** Under the 13 kinds of
+  care, a second grid repeated dental, mental health and urgent care. It is
+  now one line of specialties no door already covers (primary care, skin,
+  eyes, children, heart, orthopedics, women's health) plus a link to all 44.
+
 - **Search understands more of what patients type.** Misspelled specialties
   ("dermotologist", "cardiolgist") now find the right one, as do
   "obstetrician", "midwife", "opthamologist", pharmacy names such as
