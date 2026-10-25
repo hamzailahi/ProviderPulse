@@ -431,3 +431,8 @@ exports.handler = async (event) => {
     })
   };
 };
+
+// Shared with listing-self-check.js (a provider checking their own listing):
+// the same reads and the same scoring, without an audit row.
+exports.loadContext = loadContext;
+exports.auditOne = auditOne;

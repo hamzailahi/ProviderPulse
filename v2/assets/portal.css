@@ -241,3 +241,15 @@ a:hover { text-decoration: underline; }
 .fp-table td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
 .fp-table td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fp-table td .small { max-width: 34ch; }
+/* Overview: listing accuracy self-check (2026-10-25). */
+.chip.bad { background: #fef2f2; color: #b91c1c; }
+.btn.ghost { border-color: transparent; color: #475569; margin-top: 8px; }
+.sc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.sc-h { font: 650 13.5px var(--sans); margin: 8px 0 4px; }
+.sc-fixes { margin: 0 0 8px 18px; font-size: 13.5px; }
+.sc-fixes li { margin-bottom: 4px; }
+.sc-all summary { cursor: pointer; font-size: 13px; color: #334155; margin: 6px 0; }
+.sc-all ul { list-style: none; margin: 0; padding: 0; font-size: 13px; color: #334155; }
+.sc-all li { padding: 4px 0; border-bottom: 1px solid #f1f5f9; }
+.sc-all li.sc-negative b { color: #b45309; }
+.sc-all li.sc-positive b { color: #047857; }

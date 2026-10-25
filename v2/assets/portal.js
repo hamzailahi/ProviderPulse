@@ -310,8 +310,50 @@ VIEWS.overview = function () {
   // demand
   grid.appendChild(demandCard());
   view.appendChild(footprintCard());
+  view.appendChild(selfCheckCard());
   return view;
 };
+
+// Listing accuracy self-check (2026-10-25, listing-self-check): the same
+// engine a payer's directory audit uses, run on the provider's own NPI and
+// listed address, with what to do about each finding. Run on request only:
+// it calls NPPES and may geocode.
+var VERDICT_WORDS = {
+  likely_accurate: ['Looks current', 'ok'], likely_stale: ['May look out of date', 'warn'],
+  likely_inactive: ['Looks inactive', 'bad'], unverifiable: ['Not enough to confirm it', 'warn'], excluded: ['Excluded', 'bad']
+};
+function selfCheckCard() {
+  var body = h('div', { class: 'pad' });
+  function idle() {
+    clear(body);
+    body.appendChild(h('p', { class: 'muted small' }, 'See your listing the way a directory accuracy audit does: the federal registry, Medicare activity, your saved locations and patient reports, and what to fix.'));
+    body.appendChild(h('button', { class: 'btn', type: 'button', onclick: run }, 'Run the check'));
+  }
+  function run() {
+    clear(body);
+    body.appendChild(h('p', { class: 'muted small' }, 'Checking NPPES, Medicare and your locations… this takes up to 20 seconds.'));
+    api('/listing-self-check', { timeout: 24000 }).then(function (d) {
+      clear(body);
+      var v = VERDICT_WORDS[d.verdict] || [d.verdict, 'warn'];
+      body.appendChild(h('div', { class: 'sc-head' }, h('span', { class: 'chip ' + v[1] }, v[0]),
+        h('span', { class: 'muted small' }, 'Confidence ' + Math.round(d.confidence * 100) + '%' + (d.address_checked ? ' · checked ' + d.address_checked : ''))));
+      if (d.fixes && d.fixes.length) body.appendChild(h('div', {}, h('h3', { class: 'sc-h' }, 'What to fix'),
+        h('ul', { class: 'sc-fixes' }, d.fixes.map(function (f) { return h('li', {}, f.text); }))));
+      else body.appendChild(h('p', { class: 'small' }, 'Nothing for you to fix.'));
+      body.appendChild(h('details', { class: 'sc-all' }, h('summary', {}, 'All findings'),
+        h('ul', {}, (d.signals || []).map(function (s) {
+          return h('li', { class: 'sc-' + s.direction }, h('b', {}, s.direction === 'positive' ? '✓ ' : s.direction === 'negative' ? '! ' : '· '), s.detail);
+        }))));
+      body.appendChild(h('button', { class: 'btn ghost', type: 'button', onclick: run }, 'Run again'));
+    }).catch(function (e) {
+      clear(body);
+      body.appendChild(h('p', { class: 'muted small' }, (e && e.message) || 'The check did not finish.'));
+      body.appendChild(h('button', { class: 'btn', type: 'button', onclick: run }, 'Try again'));
+    });
+  }
+  idle();
+  return h('div', { class: 'card fp' }, h('div', { class: 'card-h' }, h('h2', {}, 'Listing accuracy check')), body);
+}
 
 // My Medicare footprint (2026-10-25): the provider's own 2024 Medicare codes
 // (cms_procedures_full by NPI, public) beside the same codes within 10 miles,
