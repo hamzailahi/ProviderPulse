@@ -56,9 +56,11 @@ async function geocodeNominatim(query) {
 async function geocode(query) {
   if (!query || !query.trim()) return null;
   const hit = await geocodeGoogle(query);
-  if (hit) { console.log('[geocode] google hit:', query); return hit; }
+  // Log which tier answered, never the address: patient searches can hold a
+  // home address, and function logs are not a place for it.
+  if (hit) { console.log('[geocode] google hit'); return hit; }
   const fallback = await geocodeNominatim(query);
-  console.log(fallback ? '[geocode] nominatim hit:' : '[geocode] no hit at all:', query);
+  console.log(fallback ? '[geocode] nominatim hit' : '[geocode] no hit at all');
   return fallback;
 }
 

@@ -385,9 +385,9 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
 - **lib/auth.js**: `getUser`, `isProvider`, `isStaff` (see access model).
 - **lib/geocode.js**: the one geocoding chain. Google Geocoding
   (`GOOGLE_GEOCODING_KEY`) first, Nominatim as the free fallback. Photon was
-  dropped so worst-case latency stayed within budget. Its `console.log` lines
-  print the queried address; patient searches can contain home addresses, so
-  trim or remove that logging.
+  dropped so worst-case latency stayed within budget. Its logs name only the
+  tier that answered, never the address (patient searches can hold a home
+  address; the address was printed until 2026-10-25). Keep it that way.
 - **lib/accuracy-signals.js**, **lib/query-plan.js**, **lib/audit-report.js**,
   **lib/zip-enrichment.js**, **lib/answer-check.js**: pure logic, see their sections.
 
@@ -1692,6 +1692,20 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   addresses, writes nothing, keeps the state. State, `latest.md` and
   `history.csv` are committed to `supabase/reference/nppes-refresh/` with
   `[skip netlify]` (an exception to the README rule, like the snapshot).
+- **Place unmapped listings** (`place-unmapped.yml`, Thursdays 08:47 UTC,
+  apply on schedule, a manual run defaults to `dry_run`;
+  `scripts/place-unmapped.sh` / `place-unmapped.mjs`; 2026-10-25): rows with
+  null coordinates in the three directory tables (the hourly ZIP job's, the
+  refresh's unplaced) get a location only from a Census Exact match in the
+  same ZIP (`geocode-batch.mjs`, Google off); psql reads them in an order
+  that changes every ISO week (`md5(key || week)`, so unmatched addresses do
+  not block the queue), at most `max_rows` (60,000), and the update touches
+  only coordinates that are still null (secondary rows get
+  `geocode_precision = 'address'`). A dry run counts and geocodes 300. Over
+  5% geocoder failures turns the run red; what was placed is still written.
+  Summary in `supabase/reference/unmapped-listings.md` (`[skip netlify]`).
+  The SQL was checked on a local Postgres 16 before shipping (no CI test:
+  CI has no database).
 - **Schema snapshot** (`schema-snapshot.yml`, weekly Mondays): see Supabase
   schema. It commits to `main` itself (`[skip netlify]`); those bot commits
   and `nppes-refresh.yml`'s are the exceptions to the README-per-push rule.
@@ -1908,7 +1922,8 @@ A search queues its ZIP (`zip-enrich-request.js`, `lib/zip-enrichment.js`,
 doesn't fit a search's budget. `scripts/enrich-npi-zips.mjs` fetches NPI-1 and
 NPI-2 per queued ZIP, drops deactivated NPIs, diffs, and inserts what's
 missing: NPI-2 into `clinics`, NPI-1 into `provider_individuals`. **No
-geocoding here**; rows without coordinates are never drawn.
+geocoding here**; rows without coordinates are never drawn until the
+weekly `place-unmapped.yml` pass gives them an exact location.
 
 ## Individual physicians and secondary locations on the map
 

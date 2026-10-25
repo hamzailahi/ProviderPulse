@@ -521,6 +521,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `market-benchmarks.yml` | quarterly, the 27th of Jan/Apr/Jul/Oct | builds the market model's benchmarks from CDC PLACES and the provider tables: national health-measure percentiles, national listings per specialty, and each state's listings per 1,000 residents |
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
 | `nppes-refresh.yml` | weekly, Wednesdays | NPPES weekly files: adds new organizations, clinicians and secondary sites, updates moved or changed listings, and removes deactivated NPIs across the directory. New and moved addresses are placed only by an exact Census match; anything else is stored unplaced, never at a guessed point (a Google tier is built in but off). Falls back to the NPI Registry API when CMS's download site is down, refuses to write when a week's totals look abnormal, and commits its summary to `supabase/reference/nppes-refresh/`. a daily check starts the one-time March-to-now catch-up from the monthly file the day CMS offers it again (`mode: full` runs it by hand) |
+| `place-unmapped.yml` | weekly, Thursdays | gives listings that have no map coordinates an exact location from the Census geocoder (up to 60,000 a week), filling in only what is missing; an address without an exact match stays off the map |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched |
 | `taxonomy-inventory.yml` | manual only | lists every taxonomy name stored in the directory tables with row counts, plus the newest official NUCC code set and the CMS Medicare specialty crosswalk, in `supabase/reference/`, and rebuilds the taxonomy map from them; read only against the database |
 | `taxonomy-indexes.yml` | manual only | builds the `taxonomy_code` indexes (migration 030) without locking the tables, then checks all three are valid |
@@ -643,6 +644,14 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-10-25
 
+- **Listings that never appeared on the map now get placed.** A weekly job
+  finds directory listings stored without coordinates (mostly ones added by
+  the searched-ZIP backfill) and gives each an exact location from the
+  Census geocoder, up to 60,000 a week. Addresses with no exact match stay
+  off the map rather than at a guessed point.
+- **The server no longer writes searched addresses into its logs.** The
+  geocoder used to log the address it looked up, and patient searches can
+  contain a home address. It now logs only which service answered.
 - **Rejecting an added NPI in admin review now takes it off the account.**
   Before, a rejected NPI stayed attached as blocked, so the real practice
   could never claim it. The rejection and its reason are kept in the audit

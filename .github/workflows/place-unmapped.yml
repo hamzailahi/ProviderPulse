@@ -1,0 +1,78 @@
+name: Place unmapped listings
+
+# Listings with no coordinates (rows the hourly ZIP job inserted, rows the
+# weekly NPPES refresh could not place) are never drawn on any map. This gives
+# them a location only from an exact Census match in the same ZIP, up to
+# max_rows a run, in an order that changes every week; scripts/place-unmapped.sh
+# has the flow. It fills in coordinates that are still null and nothing else.
+# The summary is committed to supabase/reference/unmapped-listings.md.
+on:
+  schedule:
+    - cron: '47 8 * * 4'   # Thursdays, the day after the NPPES weekly refresh
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry_run (count and geocode a sample of 300, write nothing) or apply'
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+      max_rows:
+        description: 'Most rows to geocode in an apply run'
+        default: '60000'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: place-unmapped
+  cancel-in-progress: false
+
+jobs:
+  place:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Add the repository secret SUPABASE_DB_URL (Supabase, Connect, Session pooler string)."
+            exit 1
+          fi
+
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Place
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # The weekly schedule applies; a manual run defaults to a dry run.
+          MODE: ${{ github.event_name == 'schedule' && 'apply' || inputs.mode }}
+          MAX_ROWS: ${{ inputs.max_rows || '60000' }}
+        run: bash scripts/place-unmapped.sh
+
+      - name: Commit the summary
+        if: always()
+        run: |
+          git add supabase/reference/unmapped-listings.md 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Nothing to commit."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Unmapped listings $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main
