@@ -652,6 +652,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   street in Oklahoma. Typed text now has to fit the match (house number,
   ZIP, and street or town names); otherwise the patient is asked to pick
   from the suggestions or enter a ZIP.
+  A number that is not a 5-digit ZIP ("1234") now says so instead of
+  searching around some street number.
 - **Baptist Memorial Hospital-Collierville now appears under Emergency rooms
   & hospitals.** Some hospital campuses have no registry entry of their own:
   they bill under a parent hospital's number at another address, so the

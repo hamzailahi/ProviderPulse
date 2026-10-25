@@ -897,6 +897,9 @@ function findView() {
     if (/^\d{5}$/.test(v)) { s.zip = v; s.origin = null; return Promise.resolve(true); }
     if (s.origin && v === s.origin.label) return Promise.resolve(true);
     if (!v) { s.origin = null; s.zip = ''; return Promise.resolve(true); }
+    // Digits alone are a mistyped ZIP, never an address: "1234" once searched
+    // around a street number in Virginia.
+    if (/^[\d\s-]+$/.test(v)) { s.origin = null; s.ran = true; s.error = '"' + v + '" is not a ZIP code. Enter 5 digits, or a street address.'; paintFind(); return Promise.resolve(false); }
     return geocodeAddress(v).then(function (list) {
       var fit = list.filter(function (o) { return fitsQuery(v, o); });
       if (!fit.length) {
