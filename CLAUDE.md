@@ -1653,8 +1653,10 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   ZIP; never removed for being absent). Formats follow the national load:
   capitals, "FIRST LAST", the first address line, 10-digit phones, the NUCC
   display name. **Geocoding is accurate or nothing** (no ZIP centres): Census
-  batch Exact in the same ZIP, then Google (`GOOGLE_GEOCODING_KEY` GitHub
-  secret) ROOFTOP or RANGE_INTERPOLATED, not partial, same ZIP; else stored
+  batch Exact in the same ZIP, then Google ROOFTOP or RANGE_INTERPOLATED, not
+  partial, same ZIP, **off for now** (the user's choice, 2026-10-25: the
+  workflow passes no `GOOGLE_GEOCODING_KEY`; add it to the Refresh step's
+  env to turn it on); else stored
   with null coordinates (not drawn). An unmoved row keeps its coordinates; a
   moved one with no accurate result loses them rather than keep the old pin.
   A geocoder outage is not "no match": over 5% failed in a chunk stops the

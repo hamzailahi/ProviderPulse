@@ -489,7 +489,7 @@ hand, in the Supabase SQL editor. The latest is
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | every function |
 | `ANTHROPIC_API_KEY` | care navigator, market assistant (including reports), audit narration, briefings. This is the project's own Anthropic API account, separate from any personal account, so all AI usage bills there |
-| `GOOGLE_GEOCODING_KEY` | primary geocoder; without it, geocoding falls back to Nominatim. Also a GitHub secret for `nppes-refresh.yml`, which sends it the addresses the Census cannot match exactly; without it those stay unplaced |
+| `GOOGLE_GEOCODING_KEY` | primary geocoder; without it, geocoding falls back to Nominatim. |
 | `STAFF_EMAILS` | comma-separated emails allowed into the dashboard for demos without a provider profile |
 | `ADMIN_PASSWORD` | the OIG review queue (`admin-review.html`) |
 | `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, and `report-generate`, which now only renders audits) |
@@ -520,7 +520,7 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `import-census-acs.yml` | yearly, January 15 (the ACS 5-year release lands each December) | ACS 5-year detail by ZIP into `census_acs_zcta`: household income in 16 bands, median income, poverty, age by sex, race and ethnicity, education |
 | `market-benchmarks.yml` | quarterly, the 27th of Jan/Apr/Jul/Oct | builds the market model's benchmarks from CDC PLACES and the provider tables: national health-measure percentiles, national listings per specialty, and each state's listings per 1,000 residents |
 | `cdc-places-import.yml` | yearly, September 20 | CDC PLACES health measures by ZCTA |
-| `nppes-refresh.yml` | weekly, Wednesdays | NPPES weekly files: adds new organizations, clinicians and secondary sites, updates moved or changed listings, and removes deactivated NPIs across the directory. New and moved addresses are geocoded accurately (Census exact match, then Google street level); anything else is stored unplaced, never at a guessed point. Falls back to the NPI Registry API when CMS's download site is down, refuses to write when a week's totals look abnormal, and commits its summary to `supabase/reference/nppes-refresh/`. `mode: full` is a one-time catch-up from the monthly file |
+| `nppes-refresh.yml` | weekly, Wednesdays | NPPES weekly files: adds new organizations, clinicians and secondary sites, updates moved or changed listings, and removes deactivated NPIs across the directory. New and moved addresses are placed only by an exact Census match; anything else is stored unplaced, never at a guessed point (a Google tier is built in but off). Falls back to the NPI Registry API when CMS's download site is down, refuses to write when a week's totals look abnormal, and commits its summary to `supabase/reference/nppes-refresh/`. `mode: full` is a one-time catch-up from the monthly file |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched |
 | `taxonomy-inventory.yml` | manual only | lists every taxonomy name stored in the directory tables with row counts, plus the newest official NUCC code set and the CMS Medicare specialty crosswalk, in `supabase/reference/`, and rebuilds the taxonomy map from them; read only against the database |
 | `taxonomy-indexes.yml` | manual only | builds the `taxonomy_code` indexes (migration 030) without locking the tables, then checks all three are valid |
@@ -631,7 +631,8 @@ The weekly NPPES refresh only covers weeks NPPES still offers. The
 directory was loaded from the March 2026 file, so changes between then and
 the oldest weekly file on offer need one `mode: full` run of
 `nppes-refresh.yml` (the monthly file, while CMS's download site is up). A
-listing the geocoders could not place accurately is stored without
+listing the Census could not match exactly (Google geocoding is built in
+but switched off for now) is stored without
 coordinates and stays off the map until its address changes.
 
 The appointment and briefing flows are verified by hand and in the
@@ -645,12 +646,11 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   scheduled job reads NPPES's weekly files and adds new organizations,
   clinicians and secondary sites, updates listings that moved or changed
   name, phone or specialty, and removes NPIs that NPPES deactivated. New and
-  moved addresses get accurate coordinates (Census exact match first, Google
-  street level second); an address neither can place is kept off the map
-  rather than pinned at a guess. When CMS's download site is down it falls
+  moved addresses get coordinates only from an exact Census match; an
+  address the Census cannot match exactly is kept off the map rather than
+  pinned at a guess. When CMS's download site is down it falls
   back to the NPI Registry API, it refuses to write a week whose numbers look
-  abnormal, and each run's summary is committed to the repo. Add a
-  `GOOGLE_GEOCODING_KEY` GitHub secret so more addresses get placed.
+  abnormal, and each run's summary is committed to the repo.
 - **Patients can search from a street address or their current location.**
   The Near box now takes a ZIP, an address (with suggestions as you type) or
   the location button. Distances on results and in the detail sheet are

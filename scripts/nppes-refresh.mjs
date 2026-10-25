@@ -341,7 +341,7 @@ function report() {
     `- Added: ${s('new_organizations')} organizations, ${s('new_clinicians')} clinicians, ${s('new_secondary_sites')} secondary sites`,
     `- Updated: ${s('updated_organizations')} organizations, ${s('updated_clinicians')} clinicians (name ${s('changed_name')}, address ${s('changed_address')}, phone ${s('changed_phone')}, taxonomy ${s('changed_taxonomy')}); unchanged ${s('unchanged')}`,
     `- Removed (deactivated): ${s('deactivated_listed')} NPIs from every directory table; ${s('deactivated_not_listed')} other deactivations were not listed${stats.removed_claimed ? `; ${s('removed_claimed')} of the removed NPIs belong to claimed accounts (check them in admin review)` : ''}`,
-    `- Geocoded: ${s('geo_asked')} addresses${dryRun ? ' (a dry-run sample)' : ''}: ${s('geo_census_exact')} Census exact, ${s('geo_google')} Google street level, ${s('geo_unplaced')} unplaced (stored without coordinates, not drawn)${stats.geo_google_not_configured ? `; ${s('geo_google_not_configured')} of those would have gone to Google, which is not configured (GOOGLE_GEOCODING_KEY secret)` : ''}`,
+    `- Geocoded: ${s('geo_asked')} addresses${dryRun ? ' (a dry-run sample)' : ''}: ${s('geo_census_exact')} Census exact, ${s('geo_google')} Google street level, ${s('geo_unplaced')} unplaced (stored without coordinates, not drawn)${stats.geo_google_not_configured ? `; Census only (Google is off), so ${s('geo_google_not_configured')} addresses without an exact Census match were left unplaced` : ''}`,
     `- Held back for a geocoder outage: ${fmt(held.length)} (looked up again next run)`,
     `- Skipped: ${s('no_practice_address')} with no practice address, ${s('type_changed_skipped')} whose entity type changed`
   ];
