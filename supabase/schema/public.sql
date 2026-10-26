@@ -32,6 +32,99 @@ COMMENT ON SCHEMA public IS 'standard public schema';
 
 
 --
+-- Name: appointment_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.appointment_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+declare
+  uid uuid := auth.uid();
+begin
+  if current_user not in ('anon', 'authenticated') then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.status is distinct from 'requested' then
+      raise exception 'A new appointment request starts as requested' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+  if new.status is distinct from old.status then
+    if uid is not null and uid = old.patient_id then
+      if not (old.status in ('requested', 'confirmed') and new.status = 'cancelled') then
+        raise exception 'A patient may only cancel a request' using errcode = '42501';
+      end if;
+    elsif uid is not null and uid = old.provider_id then
+      if not ((old.status = 'requested' and new.status in ('confirmed', 'declined'))
+           or (old.status = 'confirmed' and new.status in ('completed', 'declined'))) then
+        raise exception 'Cannot move an appointment from % to %', old.status, new.status using errcode = '42501';
+      end if;
+    else
+      raise exception 'Not a party to this appointment' using errcode = '42501';
+    end if;
+  end if;
+  -- Only the provider sets a time, and only when confirming a request.
+  if new.requested_time is distinct from old.requested_time
+     and not (uid is not null and uid = old.provider_id and old.status = 'requested' and new.status = 'confirmed') then
+    raise exception 'Only the provider confirming a request can set its time' using errcode = '42501';
+  end if;
+  return new;
+end $$;
+
+
+--
+-- Name: appointment_npi_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.appointment_npi_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  if current_user in ('anon', 'authenticated') and new.npi is not null
+     and not public.npi_belongs_to(new.npi, new.provider_id) then
+    raise exception 'That NPI is not one of this provider''s listings' using errcode = '42501';
+  end if;
+  return new;
+end $$;
+
+
+--
+-- Name: npi_belongs_to(text, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.npi_belongs_to(p_npi text, p_account uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (select 1 from public.provider_profiles where id = p_account and npi = p_npi)
+      or exists (select 1 from public.provider_npis where account_id = p_account and npi = p_npi)
+$$;
+
+
+--
+-- Name: npi_claimed_once(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.npi_claimed_once() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if tg_table_name = 'provider_profiles' then
+    if exists (select 1 from public.provider_npis where npi = new.npi) then
+      raise exception 'NPI % is already part of another account', new.npi using errcode = '23505';
+    end if;
+  else
+    if exists (select 1 from public.provider_profiles where npi = new.npi) then
+      raise exception 'NPI % is already registered as an account', new.npi using errcode = '23505';
+    end if;
+  end if;
+  return new;
+end $$;
+
+
+--
 -- Name: touch_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -144,7 +237,8 @@ CREATE TABLE public.appointment_requests (
     requested_time timestamp with time zone,
     reason text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    npi text
 );
 
 
@@ -293,8 +387,16 @@ CREATE TABLE public.clinics (
     primary_taxonomy character varying(255),
     created_at timestamp without time zone DEFAULT now(),
     taxonomy_code text,
-    taxonomy_code_source text
+    taxonomy_code_source text,
+    phone text
 );
+
+
+--
+-- Name: COLUMN clinics.phone; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.clinics.phone IS 'Practice phone from NPPES (10 digits), filled by org-phone-backfill';
 
 
 --
@@ -737,6 +839,43 @@ ALTER TABLE public.leie_exclusions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENT
 
 
 --
+-- Name: listing_reports; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.listing_reports (
+    id bigint NOT NULL,
+    npi text NOT NULL,
+    issue text NOT NULL,
+    source text DEFAULT 'patient_app'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT listing_reports_issue_check CHECK ((issue = ANY (ARRAY['closed'::text, 'moved'::text, 'wrong_phone'::text, 'wrong_specialty'::text, 'not_accepting'::text, 'other'::text]))),
+    CONSTRAINT listing_reports_npi_check CHECK ((npi ~ '^[0-9]{10}$'::text)),
+    CONSTRAINT listing_reports_source_check CHECK ((source = 'patient_app'::text))
+);
+
+
+--
+-- Name: TABLE listing_reports; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.listing_reports IS 'Patient reports of a wrong listing (no free text, no user, no IP); service role only';
+
+
+--
+-- Name: listing_reports_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.listing_reports ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.listing_reports_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: market_benchmarks; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -745,7 +884,7 @@ CREATE TABLE public.market_benchmarks (
     key text NOT NULL,
     data jsonb NOT NULL,
     refreshed_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT market_benchmarks_kind_check CHECK ((kind = ANY (ARRAY['measure'::text, 'specialty'::text, 'state_density'::text, 'demand_model'::text])))
+    CONSTRAINT market_benchmarks_kind_check CHECK ((kind = ANY (ARRAY['measure'::text, 'specialty'::text, 'state_density'::text, 'demand_model'::text, 'care_type'::text])))
 );
 
 
@@ -938,6 +1077,69 @@ CREATE TABLE public.provider_locations (
     is_primary boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: provider_npi_insurance; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.provider_npi_insurance (
+    id bigint NOT NULL,
+    npi_id uuid NOT NULL,
+    payer_name text NOT NULL,
+    plan_type text
+);
+
+
+--
+-- Name: provider_npi_insurance_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.provider_npi_insurance ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.provider_npi_insurance_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: provider_npis; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.provider_npis (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    account_id uuid NOT NULL,
+    npi character(10) NOT NULL,
+    entity_type smallint,
+    first_name text,
+    last_name text,
+    org_name text,
+    phone text,
+    address_line text,
+    city text,
+    state character(2),
+    zip text,
+    taxonomy_code text,
+    taxonomy_desc text,
+    accepting_new_patients boolean,
+    telehealth boolean,
+    bio text,
+    office_hours jsonb,
+    appointment_minutes integer,
+    booking_mode text DEFAULT 'phone'::text,
+    booking_url text,
+    hours_note text,
+    review_status text DEFAULT 'pending'::text NOT NULL,
+    review_reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT provider_npis_entity_type_check CHECK ((entity_type = ANY (ARRAY[1, 2]))),
+    CONSTRAINT provider_npis_npi_check CHECK ((npi ~ '^[0-9]{10}$'::text)),
+    CONSTRAINT provider_npis_review_status_check CHECK ((review_status = ANY (ARRAY['clear'::text, 'pending'::text, 'blocked'::text])))
 );
 
 
@@ -1307,6 +1509,14 @@ ALTER TABLE ONLY public.leie_exclusions
 
 
 --
+-- Name: listing_reports listing_reports_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.listing_reports
+    ADD CONSTRAINT listing_reports_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: market_benchmarks market_benchmarks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1400,6 +1610,38 @@ ALTER TABLE ONLY public.provider_insurance
 
 ALTER TABLE ONLY public.provider_locations
     ADD CONSTRAINT provider_locations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: provider_npi_insurance provider_npi_insurance_npi_id_payer_name_plan_type_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.provider_npi_insurance
+    ADD CONSTRAINT provider_npi_insurance_npi_id_payer_name_plan_type_key UNIQUE (npi_id, payer_name, plan_type);
+
+
+--
+-- Name: provider_npi_insurance provider_npi_insurance_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.provider_npi_insurance
+    ADD CONSTRAINT provider_npi_insurance_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: provider_npis provider_npis_npi_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.provider_npis
+    ADD CONSTRAINT provider_npis_npi_key UNIQUE (npi);
+
+
+--
+-- Name: provider_npis provider_npis_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.provider_npis
+    ADD CONSTRAINT provider_npis_pkey PRIMARY KEY (id);
 
 
 --
@@ -1515,6 +1757,13 @@ CREATE INDEX census_acs_zcta_state_idx ON public.census_acs_zcta USING btree (st
 
 
 --
+-- Name: clinic_secondary_locations_city_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX clinic_secondary_locations_city_idx ON public.clinic_secondary_locations USING btree (city);
+
+
+--
 -- Name: clinic_secondary_locations_geo_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1526,6 +1775,13 @@ CREATE INDEX clinic_secondary_locations_geo_idx ON public.clinic_secondary_locat
 --
 
 CREATE INDEX clinic_secondary_locations_parent_npi_idx ON public.clinic_secondary_locations USING btree (parent_npi);
+
+
+--
+-- Name: clinic_secondary_locations_state_city_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX clinic_secondary_locations_state_city_idx ON public.clinic_secondary_locations USING btree (state, city);
 
 
 --
@@ -1683,6 +1939,13 @@ CREATE INDEX leie_npi_idx ON public.leie_exclusions USING btree (npi) WHERE (npi
 
 
 --
+-- Name: listing_reports_npi_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX listing_reports_npi_created_idx ON public.listing_reports USING btree (npi, created_at);
+
+
+--
 -- Name: medicare_county_enrollment_state_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1718,10 +1981,24 @@ CREATE INDEX provider_individuals_affiliated_clinic_idx ON public.provider_indiv
 
 
 --
+-- Name: provider_individuals_city_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX provider_individuals_city_idx ON public.provider_individuals USING btree (city);
+
+
+--
 -- Name: provider_individuals_geo_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX provider_individuals_geo_idx ON public.provider_individuals USING btree (latitude, longitude) WHERE ((latitude IS NOT NULL) AND (longitude IS NOT NULL));
+
+
+--
+-- Name: provider_individuals_state_city_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX provider_individuals_state_city_idx ON public.provider_individuals USING btree (state, city);
 
 
 --
@@ -1774,6 +2051,13 @@ CREATE INDEX provider_locations_zip_idx ON public.provider_locations USING btree
 
 
 --
+-- Name: provider_npis_account_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX provider_npis_account_idx ON public.provider_npis USING btree (account_id);
+
+
+--
 -- Name: provider_review_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1802,10 +2086,45 @@ CREATE INDEX zip_enrichment_queue_status_idx ON public.zip_enrichment_queue USIN
 
 
 --
+-- Name: appointment_requests trg_appointment_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_appointment_guard BEFORE INSERT OR UPDATE ON public.appointment_requests FOR EACH ROW EXECUTE FUNCTION public.appointment_guard();
+
+
+--
+-- Name: appointment_requests trg_appointment_npi_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_appointment_npi_guard BEFORE INSERT ON public.appointment_requests FOR EACH ROW EXECUTE FUNCTION public.appointment_npi_guard();
+
+
+--
+-- Name: provider_npis trg_npi_claimed_once; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_npi_claimed_once BEFORE INSERT OR UPDATE OF npi ON public.provider_npis FOR EACH ROW EXECUTE FUNCTION public.npi_claimed_once();
+
+
+--
+-- Name: provider_profiles trg_npi_claimed_once; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_npi_claimed_once BEFORE INSERT OR UPDATE OF npi ON public.provider_profiles FOR EACH ROW EXECUTE FUNCTION public.npi_claimed_once();
+
+
+--
 -- Name: patient_profiles trg_patient_touch; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER trg_patient_touch BEFORE UPDATE ON public.patient_profiles FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+
+--
+-- Name: provider_npis trg_provider_npis_touch; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_provider_npis_touch BEFORE UPDATE ON public.provider_npis FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
 
 
 --
@@ -1877,6 +2196,22 @@ ALTER TABLE ONLY public.provider_insurance
 
 ALTER TABLE ONLY public.provider_locations
     ADD CONSTRAINT provider_locations_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: provider_npi_insurance provider_npi_insurance_npi_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.provider_npi_insurance
+    ADD CONSTRAINT provider_npi_insurance_npi_id_fkey FOREIGN KEY (npi_id) REFERENCES public.provider_npis(id) ON DELETE CASCADE;
+
+
+--
+-- Name: provider_npis provider_npis_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.provider_npis
+    ADD CONSTRAINT provider_npis_account_id_fkey FOREIGN KEY (account_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -2136,6 +2471,12 @@ CREATE POLICY insurance_self_insert ON public.provider_insurance FOR INSERT WITH
 ALTER TABLE public.leie_exclusions ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: listing_reports; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.listing_reports ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: market_benchmarks; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2242,6 +2583,22 @@ CREATE POLICY "own locations update" ON public.provider_locations FOR UPDATE USI
 
 
 --
+-- Name: provider_npi_insurance own npi insurance select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "own npi insurance select" ON public.provider_npi_insurance FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM public.provider_npis n
+  WHERE ((n.id = provider_npi_insurance.npi_id) AND (n.account_id = auth.uid())))));
+
+
+--
+-- Name: provider_npis own npis select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "own npis select" ON public.provider_npis FOR SELECT USING ((account_id = auth.uid()));
+
+
+--
 -- Name: provider_profiles own profile select; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -2314,6 +2671,18 @@ ALTER TABLE public.provider_insurance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.provider_locations ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: provider_npi_insurance; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.provider_npi_insurance ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: provider_npis; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.provider_npis ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: provider_profiles; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2382,6 +2751,43 @@ GRANT USAGE ON SCHEMA public TO service_role;
 
 
 --
+-- Name: FUNCTION appointment_guard(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.appointment_guard() TO anon;
+GRANT ALL ON FUNCTION public.appointment_guard() TO authenticated;
+GRANT ALL ON FUNCTION public.appointment_guard() TO service_role;
+
+
+--
+-- Name: FUNCTION appointment_npi_guard(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.appointment_npi_guard() TO anon;
+GRANT ALL ON FUNCTION public.appointment_npi_guard() TO authenticated;
+GRANT ALL ON FUNCTION public.appointment_npi_guard() TO service_role;
+
+
+--
+-- Name: FUNCTION npi_belongs_to(p_npi text, p_account uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.npi_belongs_to(p_npi text, p_account uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.npi_belongs_to(p_npi text, p_account uuid) TO anon;
+GRANT ALL ON FUNCTION public.npi_belongs_to(p_npi text, p_account uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.npi_belongs_to(p_npi text, p_account uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION npi_claimed_once(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.npi_claimed_once() TO anon;
+GRANT ALL ON FUNCTION public.npi_claimed_once() TO authenticated;
+GRANT ALL ON FUNCTION public.npi_claimed_once() TO service_role;
+
+
+--
 -- Name: FUNCTION touch_updated_at(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -2435,9 +2841,58 @@ GRANT ALL ON TABLE public.appointment_briefings TO service_role;
 -- Name: TABLE appointment_requests; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.appointment_requests TO anon;
-GRANT ALL ON TABLE public.appointment_requests TO authenticated;
+GRANT SELECT,MAINTAIN ON TABLE public.appointment_requests TO anon;
+GRANT SELECT,MAINTAIN ON TABLE public.appointment_requests TO authenticated;
 GRANT ALL ON TABLE public.appointment_requests TO service_role;
+
+
+--
+-- Name: COLUMN appointment_requests.patient_id; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(patient_id) ON TABLE public.appointment_requests TO authenticated;
+
+
+--
+-- Name: COLUMN appointment_requests.provider_id; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(provider_id) ON TABLE public.appointment_requests TO authenticated;
+
+
+--
+-- Name: COLUMN appointment_requests.status; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(status) ON TABLE public.appointment_requests TO authenticated;
+
+
+--
+-- Name: COLUMN appointment_requests.requested_time; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(requested_time),UPDATE(requested_time) ON TABLE public.appointment_requests TO authenticated;
+
+
+--
+-- Name: COLUMN appointment_requests.reason; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(reason) ON TABLE public.appointment_requests TO authenticated;
+
+
+--
+-- Name: COLUMN appointment_requests.updated_at; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(updated_at) ON TABLE public.appointment_requests TO authenticated;
+
+
+--
+-- Name: COLUMN appointment_requests.npi; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(npi) ON TABLE public.appointment_requests TO authenticated;
 
 
 --
@@ -2666,6 +3121,22 @@ GRANT ALL ON SEQUENCE public.leie_exclusions_id_seq TO service_role;
 
 
 --
+-- Name: TABLE listing_reports; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.listing_reports TO service_role;
+
+
+--
+-- Name: SEQUENCE listing_reports_id_seq; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON SEQUENCE public.listing_reports_id_seq TO anon;
+GRANT ALL ON SEQUENCE public.listing_reports_id_seq TO authenticated;
+GRANT ALL ON SEQUENCE public.listing_reports_id_seq TO service_role;
+
+
+--
 -- Name: TABLE market_benchmarks; Type: ACL; Schema: public; Owner: -
 --
 
@@ -2768,18 +3239,260 @@ GRANT ALL ON SEQUENCE public.provider_insurance_id_seq TO service_role;
 -- Name: TABLE provider_locations; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.provider_locations TO anon;
-GRANT ALL ON TABLE public.provider_locations TO authenticated;
+GRANT SELECT,MAINTAIN ON TABLE public.provider_locations TO anon;
+GRANT SELECT,DELETE,MAINTAIN ON TABLE public.provider_locations TO authenticated;
 GRANT ALL ON TABLE public.provider_locations TO service_role;
+
+
+--
+-- Name: COLUMN provider_locations.provider_id; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(provider_id) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.npi; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(npi),UPDATE(npi) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.label; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(label),UPDATE(label) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.address_line; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(address_line),UPDATE(address_line) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.city; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(city),UPDATE(city) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.state; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(state),UPDATE(state) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.zip; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(zip),UPDATE(zip) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.latitude; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(latitude),UPDATE(latitude) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.longitude; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(longitude),UPDATE(longitude) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.geocoded; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(geocoded),UPDATE(geocoded) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.phone; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(phone),UPDATE(phone) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.accepting_new_patients; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(accepting_new_patients),UPDATE(accepting_new_patients) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.telehealth; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(telehealth),UPDATE(telehealth) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.office_hours; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(office_hours),UPDATE(office_hours) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.hours_note; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(hours_note),UPDATE(hours_note) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.is_primary; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT INSERT(is_primary),UPDATE(is_primary) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: COLUMN provider_locations.updated_at; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(updated_at) ON TABLE public.provider_locations TO authenticated;
+
+
+--
+-- Name: TABLE provider_npi_insurance; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.provider_npi_insurance TO service_role;
+GRANT SELECT ON TABLE public.provider_npi_insurance TO authenticated;
+
+
+--
+-- Name: SEQUENCE provider_npi_insurance_id_seq; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON SEQUENCE public.provider_npi_insurance_id_seq TO anon;
+GRANT ALL ON SEQUENCE public.provider_npi_insurance_id_seq TO authenticated;
+GRANT ALL ON SEQUENCE public.provider_npi_insurance_id_seq TO service_role;
+
+
+--
+-- Name: TABLE provider_npis; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.provider_npis TO service_role;
+GRANT SELECT ON TABLE public.provider_npis TO authenticated;
 
 
 --
 -- Name: TABLE provider_profiles; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON TABLE public.provider_profiles TO anon;
-GRANT ALL ON TABLE public.provider_profiles TO authenticated;
+GRANT SELECT,MAINTAIN ON TABLE public.provider_profiles TO anon;
+GRANT SELECT,MAINTAIN ON TABLE public.provider_profiles TO authenticated;
 GRANT ALL ON TABLE public.provider_profiles TO service_role;
+
+
+--
+-- Name: COLUMN provider_profiles.org_name; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(org_name) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.phone; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(phone) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.address_line; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(address_line) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.city; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(city) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.state; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(state) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.zip; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(zip) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.accepting_new_patients; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(accepting_new_patients) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.telehealth; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(telehealth) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.bio; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(bio) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.office_hours; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(office_hours) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.appointment_minutes; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(appointment_minutes) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.booking_mode; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(booking_mode) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.booking_url; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(booking_url) ON TABLE public.provider_profiles TO authenticated;
+
+
+--
+-- Name: COLUMN provider_profiles.hours_note; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT UPDATE(hours_note) ON TABLE public.provider_profiles TO authenticated;
 
 
 --
