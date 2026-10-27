@@ -39,6 +39,10 @@ ok(await get({}, { password: 'wrong' }) === 401 && await get({}) === 401, 'a wro
 
 const patient = readFileSync('v2/assets/patient.js', 'utf8');
 ok(/if \(s\.admin\) return null;/.test(patient), 'the patient app browses as a guest for the admin');
+const portal = readFileSync('v2/assets/portal.js', 'utf8');
+ok(/session && session\.admin\) \{ S\.demo = true; S\.profile = DEMO_PROFILE/.test(portal), 'an admin with no listing gets the demo listing');
+ok(/S\.demo && \(\(opts\.method && opts\.method !== 'GET'\)/.test(portal), 'the demo listing stops every write before it leaves the browser');
+ok(/Demo Family Practice/.test(portal) && !/DEMO_PROFILE = \{[^}]*npi: '\d/.test(portal), 'the demo practice is fictional and carries no real NPI');
 const sw = readFileSync('v2/assets/admin-switch.js', 'utf8');
 ok(/!s\.admin/.test(sw) && !/innerHTML/.test(sw), 'the switch shows only for admin sessions and builds no HTML from strings');
 for (const p of ['app.html', 'portal.html', 'index.html', 'admin-review.html'])

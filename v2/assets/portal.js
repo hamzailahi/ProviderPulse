@@ -71,8 +71,22 @@ function refresh() {
   return refreshing;
 }
 
+// The admin's read-only demo listing (2026-10-25, the user's choice): an
+// admin account (ADMIN_EMAILS) with no listing of its own sees this fictional
+// practice so every view can be looked at. Nothing about it is stored. Writes
+// stop here, before a request leaves the browser; the server would refuse
+// them anyway (profile.js never creates a provider row).
+var DEMO_PROFILE = { org_name: 'Demo Family Practice', first_name: '', last_name: '', npi: null, npi_verified: false,
+  taxonomy_desc: 'Family Medicine', address_line: '1 Demo Way', city: 'Collierville', state: 'TN', zip: '38017',
+  phone: null, accepting_new_patients: true, telehealth: false, bio: 'A fictional practice for looking around the portal.',
+  booking_mode: 'phone', review_status: 'clear' };
+var DEMO_BLOCKED = /^\/(listing-self-check)/;
 function api(path, opts) {
   opts = opts || {};
+  if (S.demo && ((opts.method && opts.method !== 'GET') || DEMO_BLOCKED.test(path))) {
+    var de = new Error('This is a read-only demo listing. Nothing is saved.'); de.status = 409; de.demo = true;
+    return Promise.reject(de);
+  }
   var pre = (session && session.expiresAt && session.expiresAt - 60000 < Date.now()) ? refresh() : Promise.resolve(true);
   return pre.then(function () {
     var headers = { 'Content-Type': 'application/json' };
@@ -109,7 +123,7 @@ function toast(text, isErr) {
 
 /* ---------- state --------------------------------------------------------- */
 var S = {
-  profile: null, insurance: [], appointments: null, locations: null,
+  profile: null, insurance: [], appointments: null, locations: null, demo: false,
   demand: null, payers: null, comp: null, noListing: false,
   // NPIs added to the account (provider-npis, migration 044) and which listing
   // My listing is editing: null is the account's own.
@@ -193,6 +207,8 @@ function render() {
   var main = $('pmain');
   clear(main);
   if (S.noListing) { main.appendChild(noListingEl()); return; }
+  if (S.demo) main.appendChild(h('div', { class: 'banner warn demo-banner', role: 'note' },
+    'Demo listing, read only. You are signed in as the admin; this fictional practice lets you look around. Nothing you change is saved.'));
   main.appendChild(VIEWS[r]());
   main.focus({ preventScroll: true });
   window.scrollTo(0, 0);
@@ -212,9 +228,15 @@ function pageHead(title, sub, right) {
 /* ---------- data loading -------------------------------------------------- */
 function loadProfile() {
   return api('/profile').then(function (d) {
-    if (d.role !== 'provider' || !d.profile) { S.noListing = true; return; }
+    if (d.role !== 'provider' || !d.profile) {
+      if (session && session.admin) { S.demo = true; S.profile = DEMO_PROFILE; S.insurance = ['Medicare', 'TennCare', 'BlueCross BlueShield of Tennessee']; return; }
+      S.noListing = true; return;
+    }
     S.profile = d.profile; S.insurance = (d.insurance || []).map(function (i) { return i.payer_name; });
-  }).catch(function (e) { if (e.status === 403) S.noListing = true; else throw e; });
+  }).catch(function (e) {
+    if (session && session.admin) { S.demo = true; S.profile = DEMO_PROFILE; S.insurance = ['Medicare']; return; }
+    if (e.status === 403) S.noListing = true; else throw e;
+  });
 }
 function loadAppointments() {
   return api('/appointment-request').then(function (d) { S.appointments = d.appointments || []; })

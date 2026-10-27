@@ -203,7 +203,11 @@ too.
   menu and nothing else. The patient app treats an admin session as a guest
   (`loadSession`), since the admin has no patient profile. `admin-review`
   accepts the admin's session (checked with Supabase) or the shared
-  `ADMIN_PASSWORD`. Create the account in Supabase (Authentication, Add
+  `ADMIN_PASSWORD`. In the portal an admin with no listing gets a read-only
+  demo (`DEMO_PROFILE` in `portal.js`: "Demo Family Practice", 38017,
+  Family Medicine, no NPI, nothing stored) under a banner; `api()` refuses
+  every non-GET call and the self-check before a request leaves the browser,
+  and the server would refuse them anyway. Create the account in Supabase (Authentication, Add
   user); it is never a sign-up path.
 - **The dashboard is provider-only.** `market-assistant` requires
   `isProvider`. `index.html`'s `requireSession()` also sends patients back to
@@ -2030,7 +2034,7 @@ node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi
 node scripts/test-nppes-refresh.mjs       # 60: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
 node scripts/test-hospital-campuses.mjs   # 15: the reviewed hospital campus list: every row checked (hospital code, NPI check digit, US point, source), the asset current, campuses only inside the search box, under their own id, the sheet looks up the billing NPI
 node scripts/test-address-fit.mjs         # 16: which geocoder matches a typed address accepts (house number, ZIP, distinctive words; gibberish and a neighbouring number refused)
-node scripts/test-admin.mjs               # 16: the admin account: only ADMIN_EMAILS, counts as staff, sign-in reports it, opens the review queue (staff and patients refused, the shared password still works), guest in the patient app, the switch on four pages
+node scripts/test-admin.mjs               # 19: the admin account: only ADMIN_EMAILS, counts as staff, sign-in reports it, opens the review queue (staff and patients refused, the shared password still works), guest in the patient app, the switch on four pages
 node scripts/test-npi-activity.mjs        # 15: the public Medicare-activity lookup: only its columns, a missing NPI left out, nulls stay null, failures degraded
 node scripts/test-procedure-finder.mjs    # 152: the patient procedure finder: every code a real CMS code, every specialty real, words to procedures, per-NPI counts never add patients across codes; the portal footprint (share, doctor vs facility fee)
 node scripts/test-display-names.mjs       # 16: listing names for patients: legal suffixes dropped, acronyms kept, "FT WORTH" as Fort Worth

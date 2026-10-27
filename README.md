@@ -654,7 +654,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
   patient app (seen as a guest), the provider portal, the market dashboard
   and the review queue, which it opens without the shared password. The
   switch only moves between pages; each page still checks on the server what
-  the account may do.
+  the account may do. In the provider portal the admin sees a read-only
+  demo practice, so every view can be looked at; nothing it changes is saved.
 
 ### 2026-10-25
 
