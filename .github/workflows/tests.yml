@@ -121,6 +121,9 @@ jobs:
       - name: Typed addresses only match what was typed
         run: node scripts/test-address-fit.mjs
 
+      - name: Admin account and view switch
+        run: node scripts/test-admin.mjs
+
       - name: Provider listing self-check
         run: node scripts/test-self-check.mjs
 

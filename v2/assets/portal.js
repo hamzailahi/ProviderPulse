@@ -63,6 +63,7 @@ function refresh() {
     if (!d || !d.access_token) return false;
     // Supabase rotates the refresh token: always store the new pair.
     session = { access_token: d.access_token, refresh_token: d.refresh_token, role: d.role || session.role,
+                staff: !!d.staff, admin: !!d.admin,
                 expiresAt: Date.now() + (d.expires_in || 3600) * 1000 };
     try { store.setItem(SESSION_KEY, JSON.stringify(session)); } catch (e) {}
     return true;

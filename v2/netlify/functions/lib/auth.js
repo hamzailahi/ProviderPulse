@@ -33,10 +33,22 @@ async function getUser(env, event) {
 // tools so the dashboard can be demoed to prospective clients without an NPI.
 // STAFF_EMAILS is a comma-separated allowlist set in Netlify. The email comes
 // from Supabase's verified auth record, not from anything the user can edit.
-function isStaff(env, user) {
-  const list = String(env.STAFF_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+function inList(value, user) {
+  const list = String(value || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
   const email = String((user && user.email) || '').toLowerCase();
   return !!email && list.includes(email);
+}
+// The operator's own account (2026-10-25, the user's choice: its own email
+// and password). ADMIN_EMAILS is a separate Netlify allowlist; an admin is
+// also staff, so every staff check lets it in. What it adds is the "View as"
+// switch between the patient app, the portal, the dashboard and the review
+// queue; the switch only moves between pages, and each page's server checks
+// still decide what the account may do.
+function isAdmin(env, user) {
+  return inList(env.ADMIN_EMAILS, user);
+}
+function isStaff(env, user) {
+  return inList(env.STAFF_EMAILS, user) || isAdmin(env, user);
 }
 
 // True when this user owns a provider listing. Checked against
@@ -62,4 +74,4 @@ async function isProvider(env, user) {
   }
 }
 
-module.exports = { getUser, isProvider, isStaff };
+module.exports = { getUser, isProvider, isStaff, isAdmin };

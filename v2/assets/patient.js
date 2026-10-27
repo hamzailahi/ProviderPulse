@@ -97,6 +97,10 @@ function loadSession() {
     // it, keep the session and let doRefresh() revive it on load. Only discard
     // when there is nothing left to refresh with.
     if (s.expiresAt - 60000 < Date.now() && !s.refresh_token) { clearSession(); return null; }
+    // The admin account browses the patient app as a guest (admin-switch.js):
+    // it has no patient profile, and its session stays untouched for the
+    // other views.
+    if (s.admin) return null;
     state.persist = (localStorage.getItem(SESSION_KEY) !== null);
     return s;
   } catch (e) { clearSession(); return null; }
@@ -144,6 +148,7 @@ function doRefresh() {
       access_token: d.access_token,
       refresh_token: d.refresh_token,
       role: d.role || state.session.role,
+      staff: !!d.staff, admin: !!d.admin,
       expiresAt: Date.now() + (d.expires_in || 3600) * 1000
     };
     saveSession(state.session, state.persist);

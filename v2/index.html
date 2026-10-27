@@ -474,7 +474,7 @@
                     if (r.ok) {
                         const d = await r.json();
                         s = { access_token: d.access_token, refresh_token: d.refresh_token,
-                              role: d.role || s.role, staff: !!(d.staff || s.staff),
+                              role: d.role || s.role, staff: !!(d.staff || s.staff), admin: !!d.admin,
                               expiresAt: Date.now() + (d.expires_in || 3600) * 1000 };
                         (store || sessionStorage).setItem(KEY, JSON.stringify(s));
                     }
@@ -4649,5 +4649,6 @@
 
     </script>
     <script src="assets/dashboard-v3.js"></script>
+<script src="assets/admin-switch.js"></script>
 </body>
 </html>

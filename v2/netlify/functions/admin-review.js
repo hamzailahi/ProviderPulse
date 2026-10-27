@@ -52,7 +52,7 @@ exports.handler = async (event) => {
 
   const env = process.env;
   const ip = event.headers['x-nf-client-connection-ip'] || event.headers['x-forwarded-for'] || '';
-  if (!env.ADMIN_PASSWORD) {
+  if (!env.ADMIN_PASSWORD && !env.ADMIN_EMAILS) {
     return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Admin review is not configured' }) };
   }
 
@@ -63,7 +63,16 @@ exports.handler = async (event) => {
     catch { return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
   }
   const supplied = event.httpMethod === 'POST' ? body.password : q.password;
-  if (!safeEqual(supplied, env.ADMIN_PASSWORD)) {
+  // The shared password, or the signed-in admin account (ADMIN_EMAILS,
+  // lib/auth.js isAdmin; 2026-10-25). The session is checked with Supabase,
+  // never taken from anything the browser says about itself.
+  let byAccount = false;
+  if (!(env.ADMIN_PASSWORD && supplied && safeEqual(supplied, env.ADMIN_PASSWORD))) {
+    const { getUser, isAdmin } = require('./lib/auth');
+    const user = await getUser(env, event);
+    byAccount = !!user && isAdmin(env, user);
+  }
+  if (!byAccount && !(env.ADMIN_PASSWORD && supplied && safeEqual(supplied, env.ADMIN_PASSWORD))) {
     await audit(env, { action: 'admin_review_bad_password', ip });
     return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Not authorised' }) };
   }

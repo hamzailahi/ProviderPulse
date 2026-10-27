@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-25. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-27. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -490,6 +490,7 @@ hand, in the Supabase SQL editor. The latest is
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | every function |
 | `ANTHROPIC_API_KEY` | care navigator, market assistant (including reports), audit narration, briefings. This is the project's own Anthropic API account, separate from any personal account, so all AI usage bills there |
 | `GOOGLE_GEOCODING_KEY` | primary geocoder; without it, geocoding falls back to Nominatim. |
+| `ADMIN_EMAILS` | the operator's own account (create it in Supabase: Authentication, Add user). It counts as staff, gets a "View as" switch between the patient app, portal, dashboard and review queue, and opens the review queue without the shared password |
 | `STAFF_EMAILS` | comma-separated emails allowed into the dashboard for demos without a provider profile |
 | `ADMIN_PASSWORD` | the OIG review queue (`admin-review.html`) |
 | `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, and `report-generate`, which now only renders audits) |
@@ -575,6 +576,7 @@ node scripts/test-catchment.mjs           # the market score's area: every ZIP w
 node scripts/test-provider-npis.mjs        # one account, many NPIs: checks, review, own rows only, publishing and booking
 node scripts/test-self-check.mjs           # a provider's own listing check: their NPI only, nothing written
 node scripts/test-listing-report.mjs       # report a wrong listing: only the NPI and issue are stored, repeats throttled
+node scripts/test-admin.mjs                 # the admin account and its view switch
 node scripts/test-address-fit.mjs          # typed addresses only match places that fit what was typed
 node scripts/test-hospital-campuses.mjs     # the reviewed hospital campus list and how patient search shows it
 node scripts/test-nppes-refresh.mjs        # weekly NPPES refresh: new, changed and deactivated NPIs, accurate geocoding only, limits, a rerun writes nothing
@@ -644,6 +646,15 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-10-27
+
+- **An admin account with a "View as" switch.** One account, set by the new
+  `ADMIN_EMAILS` setting, gets a small menu on every page to move between the
+  patient app (seen as a guest), the provider portal, the market dashboard
+  and the review queue, which it opens without the shared password. The
+  switch only moves between pages; each page still checks on the server what
+  the account may do.
 
 ### 2026-10-25
 

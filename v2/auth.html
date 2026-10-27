@@ -290,6 +290,7 @@ $('formSignin').onsubmit = async e => {
         refresh_token: data.refresh_token,
         role: data.role,
         staff: !!data.staff,
+        admin: !!data.admin,
         expiresAt: Date.now() + (data.expires_in || 3600) * 1000
       });
       (stay ? localStorage : sessionStorage).setItem(SESSION_KEY, payload);
