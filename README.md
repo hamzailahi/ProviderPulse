@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-27. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-28. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -495,6 +495,7 @@ hand, in the Supabase SQL editor. The latest is
 | `ADMIN_PASSWORD` | the OIG review queue (`admin-review.html`) |
 | `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, and `report-generate`, which now only renders audits) |
 | `PATIENT_SIGNUP_ENABLED` | opens patient registration. **Closed unless set to exactly `true`**, since patient PHI storage isn't live until a Supabase BAA is in place. Existing patients can still sign in |
+| `PATIENT_SIGNUP_EMAILS` | comma-separated emails allowed to register as patients while sign-up is otherwise closed, for internal testing with the tester's own information. Everyone else still gets "not open yet" |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
 | `CENSUS_API_KEY` | `import-census-acs.yml` and `import-sahie.yml`; a free Census API key (https://api.census.gov/data/key_signup.html, activate it from the email) stored as a GitHub secret. Required: the Census answers data requests without one with "Missing Key" |
 | `SUPABASE_DB_URL` | `schema-snapshot.yml`, `taxonomy-inventory.yml`, `taxonomy-backfill.yml`, `taxonomy-indexes.yml` and `db-size-report.yml` only; the Session pooler connection string from Supabase's Connect button (port 5432, with the database password), stored as a GitHub secret. The direct connection string won't work from GitHub's runners |
@@ -646,6 +647,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-10-28
+
+- Patient sign-up can now be opened to named testers only (`PATIENT_SIGNUP_EMAILS`), so the operator can try the patient account with their own information while sign-up stays closed to everyone else. Document uploads stay off.
 
 ### 2026-10-27
 

@@ -6,6 +6,9 @@
 // "true", the same rule the document endpoints use for DOCUMENT_UPLOAD_ENABLED.
 // Until 2026-09-30 this was an opt-out ("false" closed it), so an unset variable
 // left PHI sign-up open. Set it to "true" in Netlify only once the BAA is signed.
+// PATIENT_SIGNUP_EMAILS (2026-10-28, the user's internal sign-off to test with
+// their own information): a comma-separated list of emails that may sign up
+// while the endpoint is otherwise closed. Everyone else still gets the 503.
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -33,9 +36,9 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'POST only' }) };
 
   const env = process.env;
-  if (env.PATIENT_SIGNUP_ENABLED !== 'true') {
-    return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Patient accounts are not open yet. You can still search for care without an account.' }) };
-  }
+  const closed = { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Patient accounts are not open yet. You can still search for care without an account.' }) };
+  const testers = String(env.PATIENT_SIGNUP_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  if (env.PATIENT_SIGNUP_ENABLED !== 'true' && !testers.length) return closed;
   const ip = event.headers['x-nf-client-connection-ip'] || event.headers['x-forwarded-for'] || '';
 
   let body;
@@ -53,6 +56,7 @@ exports.handler = async (event) => {
     .slice(0, 30).map(c => String(c).trim().slice(0, 120)).filter(Boolean);
   const concernDescription = String(body.concern_description || '').trim().slice(0, 1000);
 
+  if (env.PATIENT_SIGNUP_ENABLED !== 'true' && !testers.includes(email)) return closed;
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Invalid email' }) };
   if (password.length < 12) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Password must be at least 12 characters' }) };
   if (!firstName || !lastName) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'First and last name are required' }) };

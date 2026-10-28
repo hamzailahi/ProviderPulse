@@ -259,7 +259,9 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   has a My NPIs page and a listing switcher in My listing.
 - **auth-register-patient.js**: stores PHI (DOB, conditions, concern) in
   `patient_profiles`. **Closed by default**: it runs only when `PATIENT_SIGNUP_ENABLED` is exactly
-  `true`, otherwise 503 (this was an opt-out until 2026-09-30, which left it
+  `true`, otherwise 503, except for emails listed in `PATIENT_SIGNUP_EMAILS`
+  (2026-10-28: internal sign-off for the operator to test with their own
+  information; not a BAA, so keep the list to testers) (this was an opt-out until 2026-09-30, which left it
   open when unset; keep it opt-in, like `DOCUMENT_UPLOAD_ENABLED`). Do not
   enable in production until a Supabase BAA is in place. Passwords are at
   least 12 characters on both flows.
@@ -2015,7 +2017,7 @@ node scripts/test-acs.mjs                 # 46: the ACS import and the richer in
 node scripts/test-scenario.mjs            # 18: the what-if re-score changes supply only; no six-group breakdown, clinicians by code section, shortage per specialty
 node scripts/test-market-assistant.mjs    # 68: the assistant, figure repair, tracing, reports in parts (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced
-node scripts/test-signup-gate.mjs         # 9: patient sign-up is closed unless "true"
+node scripts/test-signup-gate.mjs         # 12: patient sign-up is closed unless "true", or only for listed testers
 node scripts/test-density-benchmark.mjs   # 13: the state density comparison is like for like
 node scripts/test-market-benchmarks.mjs   # 11: the benchmark builder end to end, specialty rates by code, care-type site counts
 node scripts/test-taxonomy-map.mjs        # 91: NUCC map, no default bucket, primary-code choice, exact-name fallback, reviewed ambiguous names, patient specialty coverage, care types (every organization decided, the review's key calls)

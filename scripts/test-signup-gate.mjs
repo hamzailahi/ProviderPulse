@@ -7,9 +7,9 @@ const { handler } = require('../v2/netlify/functions/auth-register-patient.js');
 let pass = 0, fail = 0;
 const check = (l, c, d) => { if (c) { pass++; console.log(`  PASS  ${l}`); } else { fail++; console.log(`  FAIL  ${l}${d ? '\n        ' + d : ''}`); } };
 const CLOSED = /not open yet/;
-const run = async (value) => {
+const run = async (value, body = {}) => {
   if (value === undefined) delete process.env.PATIENT_SIGNUP_ENABLED; else process.env.PATIENT_SIGNUP_ENABLED = value;
-  const r = await handler({ httpMethod: 'POST', headers: {}, body: '{}' });
+  const r = await handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify(body) });
   return { status: r.statusCode, error: (JSON.parse(r.body || '{}').error) || '' };
 };
 
@@ -22,6 +22,14 @@ for (const v of ['false', '', 'TRUE', '1', 'yes', ' true']) {
 }
 r = await run('true');
 check('"true" gets past the gate', !CLOSED.test(r.error), JSON.stringify(r));
+process.env.PATIENT_SIGNUP_EMAILS = ' Tester@Example.com , other@example.com';
+r = await run(undefined, { email: 'someone@example.com' });
+check('a tester list does not open sign-up to anyone else', r.status === 503 && CLOSED.test(r.error), JSON.stringify(r));
+r = await run(undefined, {});
+check('a tester list with no email given stays closed', r.status === 503 && CLOSED.test(r.error), JSON.stringify(r));
+r = await run(undefined, { email: 'tester@example.com' });
+check('a listed tester gets past the gate (case and spaces ignored)', !CLOSED.test(r.error), JSON.stringify(r));
+delete process.env.PATIENT_SIGNUP_EMAILS;
 r = await run(undefined);
 check('OPTIONS is still answered while closed (CORS preflight)', (await handler({ httpMethod: 'OPTIONS', headers: {} })).statusCode === 200);
 
