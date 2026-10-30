@@ -487,3 +487,4 @@ form.zipform { background: none; border: 0; box-shadow: none; padding: 0; }
 .zipform button:hover:not(:disabled) { filter: none; background: var(--pp-teal-strong); }
 .readout { font-size: 15px; }
 .verdict .chip { font: 600 14px/20px var(--sans); letter-spacing: 0; text-transform: none; border-radius: var(--pp-radius); }
+.auth-swap a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; }

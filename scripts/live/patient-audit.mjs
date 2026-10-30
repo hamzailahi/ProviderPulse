@@ -191,7 +191,7 @@ async function search(page, log, { what, zip, miles, tile, door }) {
     await page.click('.sbar .sgo');
   } else if (tile != null) {
     // Specialty tiles sit under the doors.
-    await page.locator('.start .tiles:not(.doors) .tile').nth(tile).click();
+    await page.locator('.start .spec-chips .spec-chip:not(.more-specs)').nth(tile).click();
   } else {
     if (zip != null) await page.fill('.sbar .zip input', zip);
     if (miles) await page.selectOption('.sbar .miles select', String(miles));   // re-runs only when a search exists

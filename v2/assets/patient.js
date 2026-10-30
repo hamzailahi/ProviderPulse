@@ -838,7 +838,7 @@ function findView() {
     placeholder: 'Specialty, condition or procedure', 'aria-label': 'Specialty, condition or procedure' });
   var dl = h('datalist', { id: 'specList' }, SPECIALTIES.map(function (x) { return h('option', { value: x[0] }); }));
   var fZip = h('input', { id: 'nearIn', value: s.origin ? s.origin.label : s.zip, maxlength: '120', autocomplete: 'off', placeholder: 'ZIP, address or my location',
-    'aria-label': 'ZIP code or address', 'aria-autocomplete': 'list', 'aria-controls': 'nearList', 'aria-expanded': 'false' });
+    'aria-label': 'ZIP code or address', role: 'combobox', 'aria-autocomplete': 'list', 'aria-controls': 'nearList', 'aria-expanded': 'false' });
   var nearList = h('div', { class: 'near-list', id: 'nearList', role: 'listbox', hidden: true });
   var nearSeq = 0, nearTimer = null;
   function closeNear() { nearList.hidden = true; fZip.setAttribute('aria-expanded', 'false'); clear(nearList); }

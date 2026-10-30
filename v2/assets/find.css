@@ -512,3 +512,6 @@ dl.f dt { color: var(--pp-muted); font-size: 14px; }
 .call-slot { display: contents; }
 .sum-icon { width: 18px; height: 18px; flex: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23115E59' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E") center no-repeat; }
 dl.f dd { font-variant-numeric: tabular-nums; }
+/* live audit, 2026-10-30: the pass above shrank these under the phone rules */
+.rel, .spec-chip { min-height: 44px; }
+.fsort { font-size: 16px; }
