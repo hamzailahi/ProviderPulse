@@ -657,6 +657,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 - Sign in and sign up: a two-column page with a short pitch beside the form that changes with the Patient / Provider tab (it folds to a headline on phones), underlined role tabs and sentence-case labels. The provider pitch page, the review queue and the not-found page share the new form styling.
 - Market dashboard: restyled to the same palette (teal actions and selected tabs, ink text, 8px corners) without changing its layout or density, and its status messages and buttons no longer start with emoji. The live dashboard audit now treats a status line that does not end in "..." as a finished result.
 - Fixes from the first live audit of the new design: the Near box is announced as a combobox (an accessibility error), the specialty and related-search chips are back to 44px tap targets on phones, the Sort menu is 16px so iOS no longer zooms, and the "Sign in" link under the sign-up form is a full-size target. The patient audit script now taps the start screen's specialty chips, which replaced the old tiles.
+- The dashboard's state and city status line no longer starts with a check mark (it was written as an escape code, so the first pass missed it); a load with failed parts now reads "Partly loaded" instead of a warning sign.
 
 ### 2026-10-28
 

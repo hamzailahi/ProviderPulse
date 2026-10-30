@@ -793,12 +793,12 @@
                     };
                 });
 
-                statusEl.textContent = (clinicData.failed.length ? '\u26a0\ufe0f' : '\u2705') + ' Loaded ' + clinicData.length.toLocaleString() + ' providers';
+                statusEl.textContent = (clinicData.failed.length ? 'Partly loaded ' : 'Loaded ') + clinicData.length.toLocaleString() + ' providers';
                 document.getElementById('welcome-overlay').style.opacity = '0';
                 setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
                 processData(converted);
             } catch (err) {
-                statusEl.textContent = '\u274c ' + err.message;
+                statusEl.textContent = err.message;
             }
         });
 
