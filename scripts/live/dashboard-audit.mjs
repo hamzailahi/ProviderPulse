@@ -62,12 +62,14 @@ async function fresh() {
 }
 
 async function settle(page, ms = 90000) {
-  // Done when the status line reports a result (✅ / ❌) and requests go quiet.
+  // Done when the status line reports a result and requests go quiet. Results
+  // carried a ✅ / ❌ prefix until 2026-10-30 (the design system drops emoji);
+  // progress lines end in an ellipsis, results do not.
   const t0 = Date.now();
   let last = '';
   while (Date.now() - t0 < ms) {
     const s = await page.evaluate(() => (document.getElementById('dbStatus') || {}).textContent || '').catch(() => '');
-    if (/^[✅❌]/.test(s.trim()) && s === last) break;
+    if (s.trim() && !/(…|\.\.\.)\s*$/.test(s.trim()) && s === last) break;
     last = s;
     await page.waitForTimeout(1500);
   }

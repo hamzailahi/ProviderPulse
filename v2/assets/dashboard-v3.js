@@ -210,7 +210,7 @@ function applySpecialty(label, quiet) {
     if (typeof updateLegend === 'function') updateLegend();
     renderMap();
     var st = $('dbStatus');
-    if (st) st.textContent = '✅ Showing all ' + visibleCount().toLocaleString() + ' providers in this area';
+    if (st) st.textContent = 'Showing all ' + visibleCount().toLocaleString() + ' providers in this area';
     return;
   }
   var s = null;
@@ -328,7 +328,7 @@ var insightsPanel = null, lastScore = null, lastZip = null, anchorNote = '';
     base(tab);
   };
   var select = $('dashboard-select');
-  if (select) select.insertBefore(el('option', { value: 'insights' }, '✦ Insights'), select.firstChild);
+  if (select) select.insertBefore(el('option', { value: 'insights' }, 'Insights'), select.firstChild);
   switchTab('insights');
   paintInsights();
 })();
@@ -545,7 +545,7 @@ function paintInsights() {
       el('button', { type: 'button', class: 'ins-btn primary', onclick: function () {
         switchTab('ai');
         if (window.PPAssistant) window.PPAssistant.ask('Walk me through this market: what drives the score, and what would you do here?');
-      } }, '✦ Ask AI about this market'),
+      } }, 'Ask AI about this market'),
       el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('reports'); } }, 'Generate a report'),
       el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('demographics'); } }, 'Demographics'),
       el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('health'); } }, 'Health data')),
@@ -675,7 +675,7 @@ function drawProc(card, s) {
     el('button', { type: 'button', class: 'ins-btn', onclick: function () {
       switchTab('ai');
       if (window.PPAssistant) window.PPAssistant.ask('What do ' + lower + ' clinicians here bill Medicare and Medicaid, and what do they get paid?');
-    } }, '✦ Ask AI about these')));
+    } }, 'Ask AI about these')));
 }
 
 /* ---------- 5a'. Places patients go (2026-10-25) --------------------------
@@ -946,7 +946,7 @@ if (isProviderAcct) {
   var input = el('textarea', { id: 'ai-input', class: 'as-input', rows: '1', placeholder: 'Ask about this market…', 'aria-label': 'Ask the market assistant' });
   var send = el('button', { type: 'button', class: 'as-send', 'aria-label': 'Send', onclick: function () { ask(input.value); } }, '↑');
   panel.appendChild(el('div', { class: 'as-head' },
-    el('div', {}, el('b', {}, '✦ Market assistant'), el('span', { class: 'as-sub', id: 'as-sub' })),
+    el('div', {}, el('b', {}, 'Market assistant'), el('span', { class: 'as-sub', id: 'as-sub' })),
     el('button', { type: 'button', class: 'as-new', onclick: function () { if (busy) return; chat = { api: [], ui: [] }; save(); draw(); } }, 'New chat')));
   panel.appendChild(list);
   panel.appendChild(el('div', { class: 'as-compose' }, input, send));
@@ -1314,7 +1314,7 @@ if (isProviderAcct) {
   focus.addEventListener('input', function () { focusCount.textContent = focus.value.length.toLocaleString() + ' / ' + FOCUS_MAX.toLocaleString() + (focus.value.length >= FOCUS_MAX ? ' (limit reached)' : ''); });
   var market = el('div', { class: 'rp-market' });
   var note = el('p', { class: 'rp-note', role: 'status' });
-  var go = el('button', { type: 'button', class: 'ins-btn primary rp-go', onclick: generate }, '✦ Write it');
+  var go = el('button', { type: 'button', class: 'ins-btn primary rp-go', onclick: generate }, 'Write it');
   var library = el('div', { class: 'rp-library' });
 
   panel.appendChild(el('div', { class: 'rp-wrap' },

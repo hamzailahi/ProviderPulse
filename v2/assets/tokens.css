@@ -76,7 +76,7 @@
   :root {
     --ground: #F5F8F8; --ground-2: #EDF2F3;
     --surface: #FFFFFF; --surface-2: #F5F8F8;
-    --hairline: #D3DCDF; --hairline-2: #74858C;
+    --hairline: #D3DCDF; --hairline-2: #A9B6BB;
     --text: #14232A; --muted: #4D5D64; --faint: #5E6E75;
     --a1: #0F766E; --a2: #4338CA;
     --glow-1: transparent; --glow-2: transparent;
@@ -89,7 +89,7 @@
 :root[data-theme="light"] {
   --ground: #F5F8F8; --ground-2: #EDF2F3;
   --surface: #FFFFFF; --surface-2: #F5F8F8;
-  --hairline: #D3DCDF; --hairline-2: #74858C;
+  --hairline: #D3DCDF; --hairline-2: #A9B6BB;
   --text: #14232A; --muted: #4D5D64; --faint: #5E6E75;
   --a1: #0F766E; --a2: #4338CA;
   --glow-1: transparent; --glow-2: transparent;

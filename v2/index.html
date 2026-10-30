@@ -154,14 +154,14 @@
                     <div style="flex:1;max-width:700px;">
                         <div style="display:flex;gap:8px;align-items:center;">
                             <input type="text" id="addressInput" placeholder="Search a ZIP, city or state to load the market — or an address to jump there" style="flex:1;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:9px 14px;color:var(--text-primary);font-size:13px;outline:none;font-family:'DM Sans',sans-serif;" onkeydown="if(event.key==='Enter')omniSearch(this.value)" />
-                            <button class="control-btn" id="addressGoBtn" style="padding:9px 16px;font-size:13px;background:var(--accent);color:#fff;border-color:var(--accent);">📍 Go</button>
+                            <button class="control-btn" id="addressGoBtn" style="padding:9px 16px;font-size:13px;background:var(--accent);color:#fff;border-color:var(--accent);">Go</button>
                         </div>
                         <div id="addressStatus" style="font-size:10px;color:var(--text-muted);margin-top:3px;display:none;"></div>
                     </div>
                     <!-- hidden search input kept for JS compatibility -->
                     <input type="text" id="searchInput" style="display:none;" />
-                    <span id="zip-loading">⏳ Loading ZIP Boundaries…</span>
-                    <span id="county-loading" style="display:none;color:var(--orange);font-size:11px;font-family:'DM Mono',monospace;background:rgba(240,136,62,0.08);border:1px solid rgba(240,136,62,0.2);padding:4px 10px;border-radius:4px;">⏳ Loading County Boundaries…</span>
+                    <span id="zip-loading">Loading ZIP Boundaries…</span>
+                    <span id="county-loading" style="display:none;color:var(--orange);font-size:11px;font-family:'DM Mono',monospace;background:rgba(240,136,62,0.08);border:1px solid rgba(240,136,62,0.2);padding:4px 10px;border-radius:4px;">Loading County Boundaries…</span>
                 </div>
             </div>
 
@@ -198,11 +198,11 @@
                     <span class="width-badge" id="sidebar-width-badge">440px</span>
                     <div id="sidebar-select-row" style="display:none;">
                         <select id="dashboard-select" onchange="switchTab(this.value)">
-                            <option value="demographics">📊 Demographics</option>
-                            <option value="health">🏥 Health Data</option>
-                            <option value="procedures">💊 Procedures</option>
-                            <option value="reports">📄 Reports</option>
-                            <option value="ai">🤖 AI</option>
+                            <option value="demographics">Demographics</option>
+                            <option value="health">Health Data</option>
+                            <option value="procedures">Procedures</option>
+                            <option value="reports">Reports</option>
+                            <option value="ai">AI</option>
                         </select>
                     </div>
 
@@ -702,7 +702,7 @@
             const searchUpper = searchTerm.toUpperCase();
             const statusEl = document.getElementById('dbStatus');
             if (!searchTerm) { statusEl.textContent = 'Enter ZIP, State, or City'; return; }
-            statusEl.textContent = '🔄 Searching...';
+            statusEl.textContent = 'Searching...';
             setLoadWarning('');
             strayAreaZips = new Set();
 
@@ -739,11 +739,11 @@
                 // locations (clinic_secondary_locations), paginated per table.
                 let clinicData = await fetchProviderRows(
                     () => filter,
-                    n => statusEl.textContent = '🔄 Loaded ' + n + ' providers...'
+                    n => statusEl.textContent = 'Loaded ' + n + ' providers...'
                 );
 
                 if (clinicData.length === 0) {
-                    statusEl.textContent = clinicData.failed.length ? '❌ The directory did not answer in time. Try again, or search a ZIP.' : '❌ No providers found';
+                    statusEl.textContent = clinicData.failed.length ? 'The directory did not answer in time. Try again, or search a ZIP.' : 'No providers found';
                     return;
                 }
                 let strayNote = '';
@@ -752,7 +752,7 @@
 
                 // Fetch demographics for these ZIPs from demographics_raw table in batches
                 const zips = [...new Set(clinicData.map(c => c.zip).filter(z => z && !strayAreaZips.has(String(z).split('-')[0].trim())))];
-                statusEl.textContent = '🔄 Loading demographics for ' + zips.length + ' ZIPs...';
+                statusEl.textContent = 'Loading demographics for ' + zips.length + ' ZIPs...';
 
                 const demByZip = {};
                 const ZIP_BATCH_SIZE = 50;
@@ -952,7 +952,7 @@
 
         async function searchMultipleZips(zips) {
             const statusEl = document.getElementById('dbStatus');
-            statusEl.textContent = `🔄 Loading ${zips.length} ZIPs...`;
+            statusEl.textContent = `Loading ${zips.length} ZIPs...`;
             setLoadWarning('');
             strayAreaZips = new Set();
             requestZipEnrichment(zips);
@@ -961,10 +961,10 @@
                 const zipVariants = [...new Set(zips.flatMap(z => [z, String(parseInt(z, 10))]))];
                 const clinicData = await fetchProviderRows(
                     () => `zip=in.(${zipVariants.join(',')})`,
-                    n => statusEl.textContent = `🔄 Loaded ${n} providers...`
+                    n => statusEl.textContent = `Loaded ${n} providers...`
                 );
 
-                if (!clinicData.length) { statusEl.textContent = clinicData.failed.length ? '❌ The directory did not answer in time. Try again.' : '❌ No providers found'; return; }
+                if (!clinicData.length) { statusEl.textContent = clinicData.failed.length ? 'The directory did not answer in time. Try again.' : 'No providers found'; return; }
                 setLoadWarning(loadWarningFor(clinicData));
 
                 // Fetch demographics in batches of 50, all batches in flight together --
@@ -998,18 +998,18 @@
                         !['zip','state','id','created_at','ZIP Code','State','Latitude','Longitude'].includes(k)))
                 }));
 
-                statusEl.textContent = `✅ Loaded ${clinicData.length} providers across ${zips.length} ZIPs`;
+                statusEl.textContent = `Loaded ${clinicData.length} providers across ${zips.length} ZIPs`;
                 document.getElementById('welcome-overlay').style.opacity = '0';
                 setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
                 processData(converted);
             } catch(e) {
-                statusEl.textContent = `❌ ${e.message}`;
+                statusEl.textContent = `${e.message}`;
             }
         }
 
         async function searchMultipleCities(cityStateList) {
             const statusEl = document.getElementById('dbStatus');
-            statusEl.textContent = `🔄 Loading ${cityStateList.length} cities...`;
+            statusEl.textContent = `Loading ${cityStateList.length} cities...`;
             setLoadWarning('');
             try {
                 // Same fix as fetchProviderRows: one city's fetch doesn't depend on
@@ -1025,14 +1025,14 @@
                         () => `or=(${cityEqOr(parts[0])})` + (stateUpper ? `&state=eq.${stateUpper}` : ''),
                         (n) => {
                             progressPerCity[idx] = n;
-                            statusEl.textContent = `🔄 Loaded ${progressPerCity.reduce((a, b) => a + b, 0)} providers...`;
+                            statusEl.textContent = `Loaded ${progressPerCity.reduce((a, b) => a + b, 0)} providers...`;
                         }
                     );
                 }));
                 let clinicData = perCity.flat();
                 clinicData.failed = perCity.flatMap(r => r.failed || []);
                 clinicData.capped = perCity.flatMap(r => r.capped || []);
-                if (!clinicData.length) { statusEl.textContent = clinicData.failed.length ? '❌ The directory did not answer in time. Try again.' : '❌ No providers found'; return; }
+                if (!clinicData.length) { statusEl.textContent = clinicData.failed.length ? 'The directory did not answer in time. Try again.' : 'No providers found'; return; }
                 const trimmed = await dropStrayZips(clinicData);
                 clinicData = trimmed.rows;
                 setLoadWarning([loadWarningFor(clinicData), trimmed.note].filter(Boolean).join(' '));
@@ -1061,12 +1061,12 @@
                     ...Object.fromEntries(Object.entries(demByZip[c.zip] || {}).filter(([k]) =>
                         !['zip','state','id','created_at','ZIP Code','State','Latitude','Longitude'].includes(k)))
                 }));
-                statusEl.textContent = `✅ Loaded ${clinicData.length} providers across ${cityStateList.length} cities`;
+                statusEl.textContent = `Loaded ${clinicData.length} providers across ${cityStateList.length} cities`;
                 document.getElementById('welcome-overlay').style.opacity = '0';
                 setTimeout(() => document.getElementById('welcome-overlay').style.display = 'none', 500);
                 processData(converted);
             } catch(e) {
-                statusEl.textContent = `❌ ${e.message}`;
+                statusEl.textContent = `${e.message}`;
             }
         }
 
@@ -1464,7 +1464,7 @@
 
             const statusEl = document.getElementById('dbStatus');
             const prevStatus = statusEl ? statusEl.textContent : null;
-            if (statusEl) statusEl.textContent = '🔄 Loading boundaries for catchment area...';
+            if (statusEl) statusEl.textContent = 'Loading boundaries for catchment area...';
             ensureCircleStatesLoaded(circleCenter).then(() => {
                 if (statusEl) statusEl.textContent = prevStatus || 'Type a city, state, or ZIP';
                 if (searchCircle) updateDemographics();
@@ -2117,13 +2117,13 @@
             });
 
             if (!seedBounds) {
-                statusEl.textContent = '❌ ZIP boundary not visible';
+                statusEl.textContent = 'ZIP boundary not visible';
                 document.getElementById('neighborsBtn').style.display = 'inline-block';
                 return;
             }
 
             // Detect seed state from Supabase
-            statusEl.textContent = '🔄 Detecting state and loading neighboring boundaries...';
+            statusEl.textContent = 'Detecting state and loading neighboring boundaries...';
             try {
                 const stateRes = await fetch(
                     `${SUPABASE_URL}/rest/v1/clinics?zip=eq.${seedPadded}&select=state&limit=1`,
@@ -2140,19 +2140,19 @@
                     .filter(st => !loadedStates.has(st))
                     .map(st => loadState(st));
                 if (loadPromises.length > 0) {
-                    statusEl.textContent = `🔄 Loading boundaries for neighboring states...`;
+                    statusEl.textContent = `Loading boundaries for neighboring states...`;
                     await Promise.all(loadPromises);
                 }
             }
 
-            statusEl.textContent = '🔄 Finding neighboring ZIPs...';
+            statusEl.textContent = 'Finding neighboring ZIPs...';
 
             const foundNeighbors = touchingZips(sources) || [];
             if (foundNeighbors.length === 0) {
                 // Not an error when an area is already loaded: say what's true.
                 statusEl.textContent = neighborZipSet.size
                     ? 'ℹ️ Every ZIP bordering this area is already loaded'
-                    : '❌ No bordering ZIP boundaries found for ' + seedPadded;
+                    : 'No bordering ZIP boundaries found for ' + seedPadded;
                 if (neighborZipSet.size) document.getElementById('clearZipsBtn').style.display = 'inline-block';
                 return;
             }
@@ -2164,7 +2164,7 @@
             });
 
             const neighborZipList = foundNeighbors.map(n => n.zip);
-            statusEl.textContent = `🔄 Loading providers for ${neighborZipList.length} neighboring ZIPs...`;
+            statusEl.textContent = `Loading providers for ${neighborZipList.length} neighboring ZIPs...`;
 
             // Remember the filter as it was before new taxonomies arrive.
             const taxBefore = new Set(taxonomies);
@@ -2270,14 +2270,14 @@
                 fetchProceduresData(allNeighborZips);
                 fetchPLACESData(allNeighborZips);
 
-                statusEl.textContent = `✅ Added ${neighborZipList.length} bordering ZIP${neighborZipList.length === 1 ? '' : 's'} (${clinicData.length} listings). Area: ${allZips.length} ZIPs`;
+                statusEl.textContent = `Added ${neighborZipList.length} bordering ZIP${neighborZipList.length === 1 ? '' : 's'} (${clinicData.length} listings). Area: ${allZips.length} ZIPs`;
                 document.getElementById('clearZipsBtn').style.display = 'inline-block';
                 const nb = document.getElementById('neighborsBtn');
                 nb.textContent = '+ Add next ring';
                 nb.style.display = 'inline-block';
 
             } catch(e) {
-                statusEl.textContent = `❌ ${e.message}`;
+                statusEl.textContent = `${e.message}`;
                 document.getElementById('neighborsBtn').style.display = 'inline-block';
             }
         }
@@ -2631,7 +2631,7 @@
                                 ${geoDesig.length > 0 ? `<span style="color:${color};">●</span> ${geoDesig.length} Geographic Area designation${geoDesig.length > 1 ? 's' : ''}<br>` : ''}
                                 ${popDesig.length > 0 ? `<span style="color:${color};">●</span> ${popDesig.length} Population Group designation${popDesig.length > 1 ? 's' : ''}<br>` : ''}
                                 ${facDesig.length > 0 ? `<span style="color:${color};">●</span> ${facDesig.length} Facility designation${facDesig.length > 1 ? 's' : ''}<br>` : ''}
-                                ${rows[0]?.designation_population ? `<span style="color:var(--text-secondary);">👥 ${Math.round(rows[0].designation_population).toLocaleString()} designated population</span>` : ''}
+                                ${rows[0]?.designation_population ? `<span style="color:var(--text-secondary);">${Math.round(rows[0].designation_population).toLocaleString()} designated population</span>` : ''}
                             </div>
                         </div>
                     </div>`;
@@ -3112,10 +3112,10 @@
             if (!el || !data) return;
             const badges = [];
             if (data.medicare_participant) badges.push('<span style="background:#1a3a1a;color:#3fb950;padding:1px 5px;border-radius:3px;font-size:10px;">✓ Medicare</span>');
-            if (data.telehealth) badges.push('<span style="background:#1a2a3a;color:var(--accent);padding:1px 5px;border-radius:3px;font-size:10px;">📹 Telehealth</span>');
+            if (data.telehealth) badges.push('<span style="background:#1a2a3a;color:var(--accent);padding:1px 5px;border-radius:3px;font-size:10px;">Telehealth</span>');
             let html = badges.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:3px;">${badges.join('')}</div>` : '';
-            if (data.facility) html += `<span style="color:var(--text-secondary);font-size:10px;">🏥 ${data.facility}</span><br/>`;
-            if (data.medical_school) html += `<span style="color:var(--text-secondary);font-size:10px;">🎓 ${data.medical_school}${data.graduation_year ? ' (' + data.graduation_year + ')' : ''}</span><br/>`;
+            if (data.facility) html += `<span style="color:var(--text-secondary);font-size:10px;">${data.facility}</span><br/>`;
+            if (data.medical_school) html += `<span style="color:var(--text-secondary);font-size:10px;">${data.medical_school}${data.graduation_year ? ' (' + data.graduation_year + ')' : ''}</span><br/>`;
             if (data.secondary_specialties?.length) html += `<span style="color:var(--text-muted);font-size:10px;">Also: ${data.secondary_specialties.slice(0,2).join(', ')}</span><br/>`;
             if (html) el.innerHTML = html;
         }
@@ -3173,9 +3173,9 @@
         function renderNPPESData(el, info) {
             if (!el) return;
             let html = '';
-            if (info.phone) html += `📞 <a href="tel:${info.phone}" style="color:var(--accent);text-decoration:none;">${info.phone}</a><br/>`;
-            if (info.fax) html += `🖷 ${info.fax}<br/>`;
-            if (info.authorized_official) html += `👤 ${info.authorized_official}${info.authorized_title ? ` · ${info.authorized_title}` : ''}<br/>`;
+            if (info.phone) html += `<a href="tel:${info.phone}" style="color:var(--accent);text-decoration:none;">${info.phone}</a><br/>`;
+            if (info.fax) html += `${info.fax}<br/>`;
+            if (info.authorized_official) html += `${info.authorized_official}${info.authorized_title ? ` · ${info.authorized_title}` : ''}<br/>`;
             if (info.type) html += `<span style="color:var(--text-muted);font-size:10px;">${info.type}${info.status ? ' · ' + info.status : ''}</span>`;
             if (!html) html = '<em style="color:var(--text-muted);font-size:10px;">No additional contact info</em>';
             el.innerHTML = html;
@@ -3358,7 +3358,7 @@
             document.getElementById('dbSearchInput').value = zip;
             // Say what is happening straight away. Without this the visitor sees an
             // apparently idle page for several seconds and assumes the link did nothing.
-            if (statusEl) statusEl.textContent = '🔗 Opening your results for ' + zip + '…';
+            if (statusEl) statusEl.textContent = 'Opening your results for ' + zip + '…';
             document.getElementById('dbSearchBtn').click();
 
             // The search is an async Supabase fetch (clinics, then demographics per ZIP),
@@ -3375,7 +3375,7 @@
             if (!loaded) {
                 console.warn('[deeplink] clinics never loaded for ZIP', zip);
                 // Never fail silently: the ZIP is already in the box, so tell them to retry
-                if (statusEl) statusEl.textContent = '⚠️ Could not load ' + zip + ' — press Search to try again';
+                if (statusEl) statusEl.textContent = 'Could not load ' + zip + '. Press Search to try again.';
                 return;
             }
 
@@ -3411,7 +3411,7 @@
             if (!wanted.length) {
                 renderMap();
                 const el = document.getElementById('dbStatus');
-                if (el) el.textContent = '✅ ' + Object.keys(groupedData).length + ' locations loaded';
+                if (el) el.textContent = '' + Object.keys(groupedData).length + ' locations loaded';
                 return;
             }
             const matched = specialtyCodeSet ? namesWithCodes(specialtyCodeSet) : new Set();
@@ -3438,7 +3438,7 @@
                 if (statusEl) {
                     statusEl.textContent = pins.length
                         ? `Showing the ${pins.length} recommended provider${pins.length === 1 ? '' : 's'} — no other ${wantTax[0] || 'matching'} clinics in this ZIP`
-                        : `⚠️ No ${wantTax[0] || 'matching'} providers found in this ZIP`;
+                        : `No ${wantTax[0] || 'matching'} providers found in this ZIP`;
                 }
             } else {
                 selectedTaxonomies = matched;
@@ -3446,7 +3446,7 @@
                 boxes.forEach(chk => { chk.checked = matched.has(chk.value); });
                 document.getElementById('chk-all').checked = matched.size === boxes.length;
                 updateDropdownLabel(); updateLegend();
-                if (statusEl) statusEl.textContent = `✅ Showing ${matched.size} matching provider type${matched.size === 1 ? '' : 's'} in this area`;
+                if (statusEl) statusEl.textContent = `Showing ${matched.size} matching provider type${matched.size === 1 ? '' : 's'} in this area`;
             }
 
             renderMap();
@@ -3565,7 +3565,7 @@
 
             statusEl.style.display = 'block';
             statusEl.style.color = 'var(--text-muted)';
-            statusEl.textContent = '⏳ Searching...';
+            statusEl.textContent = 'Searching...';
             btn.disabled = true;
 
             try {
@@ -3603,20 +3603,20 @@
                 // Drop a pin and fly to it
                 const pinIcon = L.divIcon({
                     className: '',
-                    html: `<div style="font-size:24px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">📍</div>`,
+                    html: `<div class="addr-pin"></div>`,
                     iconSize: [24, 24],
                     iconAnchor: [12, 24]
                 });
 
                 addressPin = L.marker([lat, lng], { icon: pinIcon })
                     .addTo(map)
-                    .bindPopup(`<div style="font-size:11px;max-width:200px;"><strong>📍 Address</strong><br>${escHtml(label)}</div>`)
+                    .bindPopup(`<div style="font-size:11px;max-width:200px;"><strong>Address</strong><br>${escHtml(label)}</div>`)
                     .openPopup();
 
                 map.flyTo([lat, lng], 16, { animate: true, duration: 1.2 });
 
                 statusEl.style.color = 'var(--accent)';
-                statusEl.textContent = `📍 ${label}`;
+                statusEl.textContent = label;
 
             } catch(e) {
                 statusEl.style.color = 'var(--orange)';
@@ -3772,7 +3772,7 @@
                 el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">No ZIPs loaded.</em>';
                 return;
             }
-            el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">⏳ Loading Medicare procedure data...</em>';
+            el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">Loading Medicare procedure data...</em>';
             const r = await procLoad('medicare');
             if (procSource !== 'medicare') return;          // switched while loading
             if (r.error) { el.innerHTML = `<em style="color:var(--orange);font-size:12px;">Error: ${escHtml(r.error)}</em>`; return; }
@@ -4004,7 +4004,7 @@
                     el.innerHTML = `<em style="color:var(--orange);font-size:12px;">The map holds ${procZips.length.toLocaleString()} ZIPs; a code list covers up to ${CODE_LIST_MAX_ZIPS}. Search a city or a ZIP and add neighbor rings.</em>`;
                     return;
                 }
-                el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">⏳ Loading ${list.codes.length} codes across ${procZips.length} ZIP${procZips.length === 1 ? '' : 's'}...</em>`;
+                el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">Loading ${list.codes.length} codes across ${procZips.length} ZIP${procZips.length === 1 ? '' : 's'}...</em>`;
                 let r;
                 try { r = await loadCodeList(list.codes, procZips); } catch (e) { r = { error: (e && e.message) || String(e) }; }
                 if (seq !== codeListSeq) return;   // the box changed while loading
@@ -4198,7 +4198,7 @@
             const el = document.getElementById('proceduresContent');
             otherProcData = null; groupOrder = {}; hospitalRadius = null;
             if (!procZips.length) { el.innerHTML = '<em style="color:var(--text-muted);font-size:12px;">No ZIPs loaded.</em>'; return; }
-            el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">⏳ Loading ${escHtml(cfg.label)} procedure data...</em>`;
+            el.innerHTML = `<em style="color:var(--text-muted);font-size:12px;">Loading ${escHtml(cfg.label)} procedure data...</em>`;
             const r = await procLoad(src);
             if (procSource !== src) return;                   // switched while loading
             if (r.error) {
