@@ -654,6 +654,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 - Patient search: labelled fields ("What do you need?", "Near", distance, insurance) instead of one fused bar, white result cards with numbered markers that match the map pins (indigo circle for a clinician, teal square for a place), and calmer loading, empty and error states.
 - The provider detail opens as a right-hand panel on desktop and a bottom sheet on phones, with Call (or Request appointment, for claimed listings) at the top instead of the bottom. Emoji icons are gone from the patient app.
 - Provider portal: the same look, with line icons in the side menu, serif page titles and a new **Next steps** card at the top of Overview. Its ring tracks four things: a complete listing, insurance added, the accuracy check run (remembered in this browser), and any other NPIs added.
+- Sign in and sign up: a two-column page with a short pitch beside the form that changes with the Patient / Provider tab (it folds to a headline on phones), underlined role tabs and sentence-case labels. The provider pitch page, the review queue and the not-found page share the new form styling.
 
 ### 2026-10-28
 

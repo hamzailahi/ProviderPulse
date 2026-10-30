@@ -27,7 +27,7 @@
   <h2 class="pitch-head">The registry proves you exist.<br>It can't tell a patient <em>you're taking them</em>.</h2>
 
   <p class="pitch-sub">
-    Every NPI in the federal registry is already on our map — including yours. What
+    Every NPI in the federal registry is already on our map, yours included. What
     the registry cannot say is whether you're accepting new patients, which plans you
     take, or when you're open. Only you can, and until you do, that's blank next to
     your name.
@@ -250,7 +250,7 @@ $('formZip').onsubmit = async e => {
       // it has no population for, and inventing a verdict would defeat that.
       out.innerHTML = demandHtml(demand) + '<div class="note">' +
         esc(((scoreRes && scoreRes.reason) || 'No data for that ZIP').replace(/\.?$/, '.')) +
-        ' You can still register — the ZIP only changes what we can show you here.</div>';
+        ' You can still register: the ZIP only changes what we can show you here.</div>';
       return;
     }
 

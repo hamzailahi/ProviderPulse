@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="color-scheme" content="dark light">
+<meta name="color-scheme" content="light">
 <title>ProviderPulse · Sign in</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,6 +14,29 @@
 <body>
 <div class="aurora" aria-hidden="true"></div>
 
+<div class="auth-split">
+<!-- The design system's sign-in (2026-10-30): a pitch panel beside the form,
+     its copy following the role tab. Static literals only. -->
+<aside class="auth-pitch" aria-label="About ProviderPulse">
+  <a class="auth-logo" href="/"><span class="auth-mark sm" aria-hidden="true">✚</span> ProviderPulse</a>
+  <div class="pitch-body" data-for="patient">
+    <h2>Find care you can trust.</h2>
+    <ul>
+      <li>Search clinicians, clinics, pharmacies and more near you</li>
+      <li>See which plans a practice takes, once the practice confirms them</li>
+      <li>Request appointments without phone tag</li>
+    </ul>
+  </div>
+  <div class="pitch-body" data-for="provider">
+    <h2>Keep your listing accurate.</h2>
+    <ul>
+      <li>Claim and correct your public listing</li>
+      <li>See your Medicare footprint and local market</li>
+      <li>Answer appointment requests in one place</li>
+    </ul>
+  </div>
+  <p class="pitch-foot">Searching for care never needs an account.</p>
+</aside>
 <main class="auth">
   <div class="auth-head">
     <div class="auth-mark" aria-hidden="true">✚</div>
@@ -120,6 +143,7 @@
     <b id="providerCount">9,000,000+</b> providers mapped · insurance and hours come from the providers themselves
   </div>
 </main>
+</div>
 
 <script>
 const FN = '/.netlify/functions';
@@ -166,6 +190,7 @@ function mode() {
 
 function paint() {
   const joining = mode() === 'join';
+  document.body.setAttribute('data-role', role);
   $('tabPatient').classList.toggle('is-on', role === 'patient');
   $('tabProvider').classList.toggle('is-on', role === 'provider');
   $('tabPatient').setAttribute('aria-selected', String(role === 'patient'));
