@@ -40,6 +40,26 @@ function h(tag, attrs) {
   return el;
 }
 function $(id) { return document.getElementById(id); }
+// Stroke icons from the design system (2026-10-30), drawn as SVG so the nav
+// carries no emoji. Paths are literals; nothing from the API reaches them.
+var ICONS = {
+  overview: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M3 14h7v7H3z', 'M14 14h7v7h-7z'],
+  appointments: ['M3 5h18v16H3z', 'M3 10h18', 'M8 3v4', 'M16 3v4'],
+  listing: ['M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6'],
+  locations: ['M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z', 'M12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'],
+  npis: ['M3 5h18v14H3z', 'M7 10h4', 'M7 14h7'],
+  competition: ['M4 20V10', 'M10 20V4', 'M16 20v-7', 'M22 20H2'],
+  market: ['M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z', 'M9 4v14', 'M15 6v14'],
+  check: ['M5 12l5 5 9-10']
+};
+function icon(name, size) {
+  var NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('width', size || 20); svg.setAttribute('height', size || 20); svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round'); svg.setAttribute('aria-hidden', 'true');
+  (ICONS[name] || []).forEach(function (d) { var path = document.createElementNS(NS, 'path'); path.setAttribute('d', d); svg.appendChild(path); });
+  return svg;
+}
 function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
 
 /* ---------- session + API ------------------------------------------------- */
@@ -171,13 +191,13 @@ function mySpecialty() {
 
 /* ---------- shell --------------------------------------------------------- */
 var NAV = [
-  ['overview', 'Overview', '◎'],
-  ['appointments', 'Appointments', '📅'],
-  ['listing', 'My listing', '✎'],
-  ['locations', 'Locations', '📍'],
-  ['npis', 'My NPIs', '#'],
-  ['competition', 'Competition', '◉'],
-  ['market', 'Market', '📈']
+  ['overview', 'Overview'],
+  ['appointments', 'Appointments'],
+  ['listing', 'My listing'],
+  ['locations', 'Locations'],
+  ['npis', 'My NPIs'],
+  ['competition', 'Competition'],
+  ['market', 'Market']
 ];
 function paintNav(active) {
   var nav = $('pnav');
@@ -186,7 +206,7 @@ function paintNav(active) {
     var count = n[0] === 'appointments' ? newRequests().length : 0;
     var href = n[0] === 'market' ? '/dashboard' : '#/' + n[0];
     nav.appendChild(h('a', { href: href, class: 'nav-item' + (active === n[0] ? ' on' : ''), 'aria-current': active === n[0] ? 'page' : null },
-      h('span', { class: 'ni', 'aria-hidden': 'true' }, n[2]), h('span', { class: 'nl' }, n[1]),
+      h('span', { class: 'ni', 'aria-hidden': 'true' }, icon(n[0])), h('span', { class: 'nl' }, n[1]),
       count ? h('span', { class: 'nbadge', 'aria-label': count + ' new' }, String(count)) : null));
   });
   $('who').textContent = S.profile ? displayName() : '';
@@ -279,6 +299,54 @@ function strength() {
   return { items: items, pct: Math.round(done / items.length * 100) };
 }
 
+// Next steps (2026-10-30, the design system's Overview): four things that
+// make a listing useful to patients, as a ring. The accuracy check has no
+// stored result, so a run is remembered in this browser only (per NPI);
+// clearing site data just shows the step again.
+var CHECK_KEY = 'pp.portal.selfcheck';
+function checkedOn() {
+  try { var m = JSON.parse(localStorage.getItem(CHECK_KEY) || '{}'); return m[(S.profile || {}).npi || 'demo'] || null; } catch (e) { return null; }
+}
+function rememberCheck() {
+  try { var m = JSON.parse(localStorage.getItem(CHECK_KEY) || '{}'); m[(S.profile || {}).npi || 'demo'] = new Date().toISOString().slice(0, 10);
+    localStorage.setItem(CHECK_KEY, JSON.stringify(m)); } catch (e) {}
+}
+function nextStepsCard() {
+  var st = strength();
+  var steps = [
+    ['Complete your listing', st.pct === 100, st.pct === 100 ? 'Every detail patients filter on is set.' : st.pct + '% done. Hours, phone and a short bio help most.', '#/listing', 'Finish listing'],
+    ['Add insurance', S.insurance.length > 0, S.insurance.length ? S.insurance.length + ' plan' + (S.insurance.length === 1 ? '' : 's') + ' listed. Patients see these.' : 'Powers the "Takes my insurance" filter.', '#/listing/insurance', 'Add plans'],
+    ['Run the accuracy check', !!checkedOn(), checkedOn() ? 'Last run ' + checkedOn() + '.' : 'Compares your listing to the NPPES registry and Medicare.', '#selfcheck', 'Run check'],
+    ['Add other NPIs', (S.npis || []).length > 0, (S.npis || []).length ? (S.npis || []).length + ' more listed on this account.' : 'Group or facility NPIs you also practise under.', '#/npis', 'Add NPI']
+  ];
+  var done = steps.filter(function (x) { return x[1]; }).length, first = true;
+  var C = 188.5, NS = 'http://www.w3.org/2000/svg';
+  var ring = document.createElementNS(NS, 'svg');
+  ring.setAttribute('width', 72); ring.setAttribute('height', 72); ring.setAttribute('viewBox', '0 0 72 72'); ring.setAttribute('aria-hidden', 'true');
+  [['#E3F3F1', 0], ['#0F766E', C * (1 - done / 4)]].forEach(function (c, i) {
+    var el = document.createElementNS(NS, 'circle');
+    el.setAttribute('cx', 36); el.setAttribute('cy', 36); el.setAttribute('r', 30); el.setAttribute('fill', 'none');
+    el.setAttribute('stroke', c[0]); el.setAttribute('stroke-width', 8);
+    if (i) { el.setAttribute('stroke-linecap', 'round'); el.setAttribute('stroke-dasharray', C); el.setAttribute('stroke-dashoffset', c[1].toFixed(1)); el.setAttribute('transform', 'rotate(-90 36 36)'); }
+    ring.appendChild(el);
+  });
+  return h('section', { class: 'card next-steps', 'aria-labelledby': 'ns-h' },
+    h('div', { class: 'ns-ring' }, h('div', { class: 'ring' }, ring, h('span', { class: 'ring-n' }, done + '/4')),
+      h('div', {}, h('h2', { id: 'ns-h' }, 'Next steps'),
+        h('p', { class: 'muted small' }, done === 4 ? 'All set. Your listing is complete.' : done + ' of 4 done. A complete listing helps patients reach the right place.'))),
+    h('ol', { class: 'ns-list' }, steps.map(function (x) {
+      var isNext = !x[1] && first; if (isNext) first = false;
+      return h('li', { class: 'ns-step' + (isNext ? ' next' : '') + (x[1] ? ' done' : '') },
+        h('span', { class: 'ns-dot', 'aria-hidden': 'true' }, x[1] ? icon('check', 14) : null),
+        h('div', { class: 'ns-body' },
+          h('b', {}, x[0], h('span', { class: 'sr-only' }, x[1] ? ' (done)' : ' (to do)')),
+          h('span', { class: 'muted small' }, x[2]),
+          x[1] ? null : h('a', { class: 'btn sm' + (isNext ? ' primary' : ''), href: x[3], onclick: x[3] === '#selfcheck' ? function (e) {
+            e.preventDefault(); var b = document.querySelector('.selfcheck-run'); if (b) { b.scrollIntoView({ behavior: 'smooth', block: 'center' }); b.click(); }
+          } : null }, x[4])));
+    })));
+}
+
 /* ======================================================================== */
 /*  OVERVIEW                                                                */
 /* ======================================================================== */
@@ -293,8 +361,9 @@ VIEWS.overview = function () {
   var view = h('section', { class: 'view' },
     pageHead(hello + ', ' + displayName(), null,
       h('div', { class: 'chips' },
-        p.npi_verified ? h('span', { class: 'chip ok' }, '✓ NPI verified') : null,
+        p.npi_verified ? h('span', { class: 'chip ok' }, 'NPI verified') : null,
         p.review_status === 'pending' ? h('span', { class: 'chip warn' }, 'Listing under review') : null)),
+    nextStepsCard(),
     p.review_status === 'pending' ? h('div', { class: 'banner warn' },
       'Your listing is held for a short verification review before patients can see it. You can finish setting it up meanwhile.') : null,
     h('div', { class: 'stats' },
@@ -360,13 +429,15 @@ function selfCheckCard() {
   function idle() {
     clear(body);
     body.appendChild(h('p', { class: 'muted small' }, 'See your listing the way a directory accuracy audit does: the federal registry, Medicare activity, your saved locations and patient reports, and what to fix.'));
-    body.appendChild(h('button', { class: 'btn', type: 'button', onclick: run }, 'Run the check'));
+    body.appendChild(h('button', { class: 'btn selfcheck-run', type: 'button', onclick: run }, 'Run the check'));
   }
   function run() {
     clear(body);
     body.appendChild(h('p', { class: 'muted small' }, 'Checking NPPES, Medicare and your locations… this takes up to 20 seconds.'));
     api('/listing-self-check', { timeout: 24000 }).then(function (d) {
       clear(body);
+      var first = !checkedOn(); rememberCheck();
+      if (first) { var ns = document.querySelector('.next-steps'); if (ns) ns.replaceWith(nextStepsCard()); }
       var v = VERDICT_WORDS[d.verdict] || [d.verdict, 'warn'];
       body.appendChild(h('div', { class: 'sc-head' }, h('span', { class: 'chip ' + v[1] }, v[0]),
         h('span', { class: 'muted small' }, 'Confidence ' + Math.round(d.confidence * 100) + '%' + (d.address_checked ? ' · checked ' + d.address_checked : ''))));
@@ -891,7 +962,7 @@ VIEWS.locations = function () {
     } }, 'Remove') : null;
     var badge = !l.id ? null : l.verified ? h('span', { class: 'chip ok' }, '✓ NPPES verified')
       : h('span', { class: 'chip' }, 'Self-reported');
-    var pin = !l.id ? null : (l.latitude && l.longitude) ? h('span', { class: 'chip ok' }, '📍 On the map')
+    var pin = !l.id ? null : (l.latitude && l.longitude) ? h('span', { class: 'chip ok' }, 'On the map')
       : h('span', { class: 'chip warn' }, 'Not on the map yet');
     return h('div', { class: 'card sec' },
       h('div', { class: 'card-h' }, h('div', { class: 'chips' }, badge, pin, l.is_primary ? h('span', { class: 'chip' }, 'Primary') : null)),
