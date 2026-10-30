@@ -72,7 +72,7 @@ second copy. The `access_requests` table still holds v1's data.
 
 | File | Used by |
 |---|---|
-| `tokens.css` | every page: palette, both themes, reset, `.sr-only`, `.hidden` |
+| `tokens.css` | every page: palette, both themes, reset, `.sr-only`, `.hidden`; since 2026-10-30 the design system from the user's canvas ("ProviderPulse Design System", a claude.ai Design artifact): `--pp-*` tokens (teal places and actions, indigo clinicians, Inter body with Source Serif 4 headings from Google Fonts linked in every page's head, 8px radius, two shadows, a 4px spacing scale) and `pp-` components (button, chip, badge, input, card, tab). Every page is light only (`data-theme="light"`). Pages adopt it one at a time, layered last in their own sheet (find.css's "Design system pass" block); no emoji icons |
 | `patient.css`, `find.css`, `patient.js` | `app.html` |
 | `portal.css`, `portal.js` | `portal.html`. Overview carries the Medicare footprint card (2026-10-25): the provider's top 8 codes in `cms_procedures_full` by NPI beside the same codes in every ZIP within 10 miles (others billing them, share, doctor fee and facility fee apart, `ProcedureFinder.footprint`); a failed nearby lookup shows only their own figures and is not cached |
 | `dashboard.css`, `dashboard-v3.css`, `dashboard-v3.js` | `index.html` (v3 files layer the redesign over the original dashboard) |

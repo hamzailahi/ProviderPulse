@@ -52,7 +52,7 @@ h2 { display: none; }               /* superseded by the topbar brand */
 #topbar-v2 .brand { display: flex; align-items: center; gap: 10px; }
 #topbar-v2 .brand .logo-mark {
   width: 27px; height: 27px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--a1), var(--a2));
+  background: var(--a1);
   display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px;
 }
 #topbar-v2 .brand .logo-text { font-weight: 660; font-size: 15px; letter-spacing: -.018em; }
@@ -74,7 +74,7 @@ h2 { display: none; }               /* superseded by the topbar brand */
 }
 #icon-rail .rail-logo {
   width: 34px; height: 34px; border-radius: 10px; margin-bottom: 12px;
-  background: linear-gradient(135deg, var(--a1), var(--a2));
+  background: var(--a1);
   display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px;
 }
 .rail-btn {
@@ -135,7 +135,7 @@ input[type="file"]::-webkit-file-upload-button {
 }
 .control-btn:hover, .filter-rail-btn:hover { background: var(--surface-2); color: var(--text); }
 .control-btn.active, .filter-rail-btn.active {
-  background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff; border-color: transparent;
+  background: var(--a1); color: #fff; border-color: transparent;
 }
 .filter-rail-btn { width: 100%; text-align: left; }
 .filter-row .filter-rail-btn { width: auto; flex-shrink: 0; text-align: center; }
@@ -233,7 +233,7 @@ input[type="file"]::-webkit-file-upload-button {
 #welcome-overlay h1 {
   font-family: var(--serif); font-weight: 400; font-size: clamp(26px, 4vw, 38px);
   letter-spacing: -.02em; margin-bottom: 4px;
-  background: linear-gradient(100deg, var(--a1), var(--a2));
+  background: var(--a1);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 #welcome-overlay p { color: var(--muted); font-size: 14.5px; max-width: 46ch; line-height: 1.6; }
@@ -289,7 +289,7 @@ input[type="file"]::-webkit-file-upload-button {
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .tab-btn-v2:hover:not(.active) { color: var(--text); }
-.tab-btn-v2.active { background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff; }
+.tab-btn-v2.active { background: var(--a1); color: #fff; }
 
 /* --------------------------------------------------------- dashboard body -- */
 #dashboard-panel, #reports-panel, #ai-panel, #health-panel, #procedures-panel {
@@ -303,7 +303,7 @@ input[type="file"]::-webkit-file-upload-button {
 #dashboard-title {
   font-family: var(--mono); font-size: 15px; font-weight: 600;
   margin: 0 0 5px; text-transform: uppercase; letter-spacing: .02em;
-  background: linear-gradient(100deg, var(--a1), var(--a2));
+  background: var(--a1);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 #dashboard-context { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
@@ -348,7 +348,7 @@ input[type="file"]::-webkit-file-upload-button {
 /* ------------------------------------------------------------------- AI ---- */
 #ai-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 .ai-msg-user {
-  align-self: flex-end; background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff;
+  align-self: flex-end; background: var(--a1); color: #fff;
   border-radius: 14px 14px 3px 14px; padding: 9px 13px; font-size: 12.5px; max-width: 85%; line-height: 1.45;
 }
 .ai-msg-ai {
@@ -376,7 +376,7 @@ input[type="file"]::-webkit-file-upload-button {
   font-family: var(--sans);
 }
 #ai-send {
-  padding: 9px 15px; background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff;
+  padding: 9px 15px; background: var(--a1); color: #fff;
   border: none; border-radius: var(--r-sm); font-size: 12.5px; font-weight: 620;
   cursor: pointer; font-family: var(--sans); white-space: nowrap;
   transition: filter var(--dur) var(--ease);
@@ -399,7 +399,7 @@ input[type="file"]::-webkit-file-upload-button {
   border-radius: var(--r-sm); padding: 11px 13px;
 }
 #generateReportBtn {
-  width: 100%; background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff;
+  width: 100%; background: var(--a1); color: #fff;
   border: none; border-radius: var(--r-md); padding: 13px; font-size: 13.5px; font-weight: 650;
   font-family: var(--sans); cursor: pointer; margin-bottom: 14px;
   transition: filter var(--dur) var(--ease);
@@ -462,7 +462,7 @@ input[type="file"]::-webkit-file-upload-button {
 
   #sheet-toggle-btn {
     display: flex !important; position: absolute; bottom: 66px; right: 16px; z-index: 600;
-    background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff; border: none;
+    background: var(--a1); color: #fff; border: none;
     border-radius: 50%; width: 52px; height: 52px; align-items: center; justify-content: center;
     font-size: 22px; box-shadow: 0 6px 24px rgba(0,0,0,.5); cursor: pointer;
   }
@@ -571,7 +571,7 @@ input[type="file"]::-webkit-file-upload-button {
 #ai-command:hover { color: var(--text); }
 #ai-command .ai-mark {
   width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px; display: grid; place-items: center;
-  background: linear-gradient(135deg, var(--a1), var(--a2)); color: #fff; font-size: 13px;
+  background: var(--a1); color: #fff; font-size: 13px;
   animation: aipulse 3s var(--ease) infinite;
 }
 @keyframes aipulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }

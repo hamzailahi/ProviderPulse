@@ -835,9 +835,9 @@ var findMap = { map: null, layer: null, ring: null, markers: {} };
 function findView() {
   var s = state.search;
   var fWhat = h('input', { type: 'search', list: 'specList', value: s.text || s.label, autocomplete: 'off',
-    placeholder: 'Specialty or condition, e.g. dermatology, back pain', 'aria-label': 'Specialty or condition' });
+    placeholder: 'Specialty, condition or procedure', 'aria-label': 'Specialty, condition or procedure' });
   var dl = h('datalist', { id: 'specList' }, SPECIALTIES.map(function (x) { return h('option', { value: x[0] }); }));
-  var fZip = h('input', { id: 'nearIn', value: s.origin ? s.origin.label : s.zip, maxlength: '120', autocomplete: 'off', placeholder: 'ZIP or address',
+  var fZip = h('input', { id: 'nearIn', value: s.origin ? s.origin.label : s.zip, maxlength: '120', autocomplete: 'off', placeholder: 'ZIP, address or my location',
     'aria-label': 'ZIP code or address', 'aria-autocomplete': 'list', 'aria-controls': 'nearList', 'aria-expanded': 'false' });
   var nearList = h('div', { class: 'near-list', id: 'nearList', role: 'listbox', hidden: true });
   var nearSeq = 0, nearTimer = null;
@@ -876,8 +876,8 @@ function findView() {
       useOrigin(o);
       if (s.terms.length) submit(); else toast('Using your location. Pick a kind of care or type what you need.');
     }).catch(function (e) { toast(e.message, true); })
-      .then(function () { locBtn.disabled = false; locBtn.textContent = '📍'; });
-  } }, '📍');
+      .then(function () { locBtn.disabled = false; locBtn.textContent = ''; });
+  } });
   var fMiles = h('select', { 'aria-label': 'Distance' }, RADIUS_CHOICES.map(function (m) {
     return h('option', { value: String(m), selected: m === s.miles }, 'Within ' + m + ' mi');
   }));
@@ -944,21 +944,21 @@ function findView() {
   });
 
   var form = h('form', { class: 'sbar', onsubmit: submit },
-    h('label', { class: 'sfield what' }, h('span', { class: 'slbl' }, 'Find'), fWhat, dl),
+    h('label', { class: 'sfield what' }, h('span', { class: 'slbl' }, 'What do you need?'), fWhat, dl),
     h('div', { class: 'sfield zip' }, h('label', { class: 'slbl', for: 'nearIn' }, 'Near'), h('div', { class: 'near-row' }, fZip, locBtn), nearList),
     h('label', { class: 'sfield miles' }, h('span', { class: 'slbl' }, 'Distance'), fMiles),
     h('label', { class: 'sfield payer' }, h('span', { class: 'slbl' }, 'Insurance'), fPayer),
     h('button', { class: 'sgo', type: 'submit' }, 'Search'));
 
   var helper = h('button', { class: 'ask-link', type: 'button', onclick: function () { state.askDraft = fWhat.value.trim(); location.hash = '#/ask'; } },
-    '✦ Not sure who to see? Describe it and we\'ll pick the specialty');
+    'Not sure who to see? Describe it and we\'ll pick the specialty');
 
   var filters = h('div', { class: 'fbar' });
   var results = h('div', { class: 'results', id: 'results' });
   var mapEl = h('div', { id: 'findMap' });
   var toggle = h('button', { class: 'map-toggle', type: 'button', onclick: function () {
     var on = body.classList.toggle('show-map');
-    toggle.textContent = on ? '☰ List' : '🗺 Map';
+    toggle.textContent = on ? 'List' : 'Map';
     // On the map the toggle floats; in the list it sits in the count row.
     if (on) body.appendChild(toggle); else paintFind();
     // The map was laid out while hidden (zero size), so re-measure it and
@@ -967,7 +967,7 @@ function findView() {
       findMap.map.invalidateSize(); paintMarkers(visibleResults(), true);
       body.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }, 50);
-  } }, '🗺 Map');
+  } }, 'Map');
   var mapKey = h('div', { class: 'map-key', 'aria-hidden': 'true' },
     h('span', { class: 'k place' }), 'Places (clinics, pharmacies)', h('span', { class: 'k person' }), 'Clinicians');
   var body = h('div', { class: 'find-body' }, results, h('div', { class: 'mapwrap' }, mapEl, mapKey), toggle);
@@ -978,7 +978,7 @@ function findView() {
   var sumText = h('span', { class: 'sum-text' });
   var summary = h('button', { class: 'sbar-sum', type: 'button', 'aria-label': 'Edit search', onclick: function () {
     top.classList.remove('folded'); fWhat.focus();
-  } }, h('span', { class: 'sum-icon', 'aria-hidden': 'true' }, '⌕'), sumText, h('span', { class: 'sum-edit' }, 'Edit'));
+  } }, h('span', { class: 'sum-icon', 'aria-hidden': 'true' }), sumText, h('span', { class: 'sum-edit' }, 'Edit'));
   var top = h('div', { class: 'find-top' }, summary, form, helper, filters);
   findEls = { filters: filters, results: results, map: mapEl, what: fWhat, zip: fZip, resolveNear: resolveNear, toggle: toggle, body: body, top: top, sumText: sumText };
   var view = h('section', { class: 'find' }, top, body);
@@ -1234,7 +1234,7 @@ function addrLine(p) {
 function resultCard(p, n) {
   var s = state.search;
   var badges = [];
-  if (s.suggested[p.npi]) badges.push(h('span', { class: 'badge sug' }, '✦ Suggested for you'));
+  if (s.suggested[p.npi]) badges.push(h('span', { class: 'badge sug' }, 'Suggested for you'));
   if (p.registered) badges.push(h('span', { class: 'badge verified' }, '✓ Verified'));
   if (p.accepting_new_patients === true) badges.push(h('span', { class: 'badge good' }, 'Accepting new patients'));
   if (p.takes_your_insurance === true) badges.push(h('span', { class: 'badge good' }, 'Takes ' + s.payer));
@@ -1657,7 +1657,7 @@ function appointmentsSheet() {
           a.provider_city ? ' · ' + a.provider_city : ''),
         a.reason ? h('div', { class: 'payers' }, 'Reason: ', h('b', {}, a.reason)) : null,
         h('div', { class: 'actions' },
-          a.provider_phone ? h('a', { class: 'act', href: 'tel:' + a.provider_phone }, '📞 Call') : null,
+          a.provider_phone ? h('a', { class: 'act', href: 'tel:' + a.provider_phone }, 'Call') : null,
           canCancel ? h('button', { class: 'act danger', type: 'button', onclick: function () { cancel(a.id); } }, 'Cancel request') : null)));
     });
   }
@@ -1780,8 +1780,11 @@ function detailSheet(npi) {
 
   // Unclaimed rows carry no phone. NPPES has the practice line, so fetch it
   // when someone actually opens the listing rather than for every result.
-  var phoneDd = h('dd', { class: 'm' }, p.phone || 'Looking up…');
-  var callSlot = h('span', {}, p.phone ? h('a', { class: 'act primary', href: telHref(p.phone) }, '📞 Call') : null);
+  var phoneDd = h('dd', {}, p.phone || 'Looking up…');
+  // Call is the main action unless the listing can be booked (the design
+  // system's detail panel: Request appointment first, Call beside it).
+  var callCls = p.registered ? 'act' : 'act primary';
+  var callSlot = h('span', { class: 'call-slot' }, p.phone ? h('a', { class: callCls, href: telHref(p.phone) }, 'Call') : null);
   if (!p.phone) {
     nppes.then(function (rec) {
       var addrs = (rec && rec.addresses) || [];
@@ -1789,7 +1792,7 @@ function detailSheet(npi) {
       if (loc.telephone_number) {
         p.phone = fmtPhone(loc.telephone_number);
         phoneDd.textContent = p.phone;
-        callSlot.appendChild(h('a', { class: 'act primary', href: telHref(p.phone) }, '📞 Call'));
+        callSlot.appendChild(h('a', { class: callCls, href: telHref(p.phone) }, 'Call'));
       } else phoneDd.textContent = 'Not listed';
     }).catch(function () { phoneDd.textContent = 'Not listed'; });
   }
@@ -1829,6 +1832,13 @@ function detailSheet(npi) {
   var info = codeInfo(p);
   return sheet(p.name || 'Provider', [
     h('div', { class: 'badges', style: 'margin-top:0' }, badgesFor(p)),
+    h('div', { class: 'actions sheet-acts' },
+      p.registered ? h('button', { class: 'act primary', type: 'button',
+        onclick: function () { location.hash = '#/book/' + p.npi; } }, 'Request appointment') : null,
+      callSlot,
+      (p.lat && p.lng) ? h('button', { class: 'act', type: 'button', onclick: function () {
+        location.hash = ''; setTimeout(function () { focusResult(p.npi, false); }, 0);
+      } }, 'Show on map') : null),
     info.safetyNet || info.eligibility || info.patientNote ? h('div', { class: 'note', style: 'margin-top:12px' },
       [info.safetyNet, info.eligibility ? 'For: ' + info.eligibility : null, info.patientNote].filter(Boolean).join('. ') + '.') : null,
     p.campus ? h('div', { class: 'note info', style: 'margin-top:12px' }, 'A campus of ' + p.campus.billing_name +
@@ -1839,7 +1849,7 @@ function detailSheet(npi) {
     h('dl', { class: 'f', style: 'margin-top:18px' },
       h('dt', {}, 'Specialty'), h('dd', {}, plainType(p) || '—'),
       h('dt', {}, 'NPI'), p.campus ? h('dd', {}, 'None of its own. It bills under NPI ' + p.campus.billing_npi + ', ' + p.campus.billing_name + '.')
-        : h('dd', { class: 'm' }, p.npi),
+        : h('dd', {}, p.npi),
       h('dt', {}, 'Address'), h('dd', {}, [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ') || '—'),
       p.miles != null ? h('dt', {}, 'Distance') : null, p.miles != null ? h('dd', {}, fmtMiles(p.miles) + ' from ' + placeWords(state.search) + (state.search.origin ? ' (straight line)' : '')) : null,
       h('dt', {}, 'Phone'), phoneDd,
@@ -1847,13 +1857,6 @@ function detailSheet(npi) {
       (p.registered && p.payers && p.payers.length) ? h('dd', {}, p.payers.join(', ')) : null),
     h('div', { class: 'sec-label' }, 'From Medicare records'), activity, cms,
     p.lat && p.lng ? h('div', { class: 'sec-label' }, 'Also at this address') : null, p.lat && p.lng ? here : null,
-    h('div', { class: 'actions' },
-      p.registered ? h('button', { class: 'act primary', type: 'button',
-        onclick: function () { location.hash = '#/book/' + p.npi; } }, '📅 Request appointment') : null,
-      callSlot,
-      (p.lat && p.lng) ? h('button', { class: 'act', type: 'button', onclick: function () {
-        location.hash = ''; setTimeout(function () { focusResult(p.npi, false); }, 0);
-      } }, 'Show on map') : null),
     p.campus ? null : reportEl(p)
   ]);
 }
@@ -1999,7 +2002,7 @@ function accountSheet() {
     h('div', { class: 'field', style: 'margin-top:14px' }, h('label', {}, 'Anything else to note'), fDesc),
     saveBtn, msg,
     h('div', { class: 'sec-label' }, 'Appointments'),
-    h('button', { class: 'act', type: 'button', onclick: function () { location.hash = '#/appointments'; } }, '📅 Your appointment requests'),
+    h('button', { class: 'act', type: 'button', onclick: function () { location.hash = '#/appointments'; } }, 'Your appointment requests'),
     h('div', { class: 'sec-label' }, 'Documents'),
     h('button', { class: 'act', type: 'button', onclick: function () { location.hash = '#/documents'; } }, '📄 Manage your documents'),
     h('div', { class: 'sec-label' }, 'Session'),

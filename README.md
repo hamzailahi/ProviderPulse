@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-28. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-10-30. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -647,6 +647,12 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-10-30
+
+- New look, from the design system the operator drew up: Inter for reading, a serif for headings, solid teal for actions and places, indigo for clinicians, 8px corners and soft shadows. Every page is now light only, and body text is 16px.
+- Patient search: labelled fields ("What do you need?", "Near", distance, insurance) instead of one fused bar, white result cards with numbered markers that match the map pins (indigo circle for a clinician, teal square for a place), and calmer loading, empty and error states.
+- The provider detail opens as a right-hand panel on desktop and a bottom sheet on phones, with Call (or Request appointment, for claimed listings) at the top instead of the bottom. Emoji icons are gone from the patient app.
 
 ### 2026-10-28
 
