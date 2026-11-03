@@ -15,7 +15,7 @@ codes=$(node -e "const T=require('./v2/assets/taxonomy-map.js');console.log(T.co
 vals=$(python3 - "$REF/hospital-campus-shortlist.csv" <<'PY'
 import csv, sys
 rows = list(csv.DictReader(open(sys.argv[1])))
-print(',\n'.join(f"({i},{float(r['latitude'])},{float(r['longitude'])})" for i, r in enumerate(rows, 1)))
+print(','.join(f"({i},{float(r['latitude'])},{float(r['longitude'])})" for i, r in enumerate(rows, 1)))
 PY
 )
 psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X > /dev/null <<SQL
