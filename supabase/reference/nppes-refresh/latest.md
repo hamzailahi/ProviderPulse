@@ -3,9 +3,9 @@ CMS's monthly file is available: starting the March-to-now catch-up from NPPES_D
 
 - Source: NPPES_Data_Dissemination_November_2026_V2.zip (full monthly file)
 - Records read: 9,891,116
-- Added: 82,943 organizations, 355,424 clinicians, 0 secondary sites
-- Updated: 59 organizations, 218 clinicians (name 0, address 0, phone 275, taxonomy 8); unchanged 9,091,225
+- Added: 82,067 organizations, 350,303 clinicians, 0 secondary sites
+- Updated: 59 organizations, 215 clinicians (name 0, address 0, phone 272, taxonomy 8); unchanged 9,097,225
 - Removed (deactivated): 0 NPIs from every directory table; 360,013 other deactivations were not listed
-- Geocoded: 7,996 addresses: 5,439 Census exact, 0 Google street level, 1,557 unplaced (stored without coordinates, not drawn); Census only (Google is off), so 1,557 addresses without an exact Census match were left unplaced
+- Geocoded: 39,975 addresses: 29,688 Census exact, 0 Google street level, 8,287 unplaced (stored without coordinates, not drawn); Census only (Google is off), so 8,287 addresses without an exact Census match were left unplaced
 - Held back for a geocoder outage: 0 (looked up again next run)
 - Skipped: 1,234 with no practice address, 0 whose entity type changed
