@@ -1,12 +1,11 @@
-No NPPES weekly file could be downloaded; using the NPI Registry API sweep instead.
-## NPPES refresh, 2026-10-28
+CMS's monthly file is available: starting the March-to-now catch-up from NPPES_Data_Dissemination_November_2026_V2.zip.
+## NPPES refresh, 2026-11-03
 
-- Source: NPI Registry API (fallback)
-- Records read: 5,104
-- Added: 39 organizations, 165 clinicians, 0 secondary sites
-- Updated: 15 organizations, 136 clinicians (name 39, address 129, phone 103, taxonomy 16); unchanged 4,749
-- Removed (deactivated): 0 NPIs from every directory table; 0 other deactivations were not listed
-- Geocoded: 333 addresses: 299 Census exact, 0 Google street level, 34 unplaced (stored without coordinates, not drawn); Census only (Google is off), so 34 addresses without an exact Census match were left unplaced
+- Source: NPPES_Data_Dissemination_November_2026_V2.zip (full monthly file)
+- Records read: 9,891,116
+- Added: 92,413 organizations, 410,836 clinicians, 0 secondary sites
+- Updated: 37,222 organizations, 259,030 clinicians (name 45,432, address 258,934, phone 203,095, taxonomy 24,206); unchanged 8,730,368
+- Removed (deactivated): 23,143 NPIs from every directory table; 336,870 other deactivations were not listed
+- Geocoded: 325,815 addresses: 243,580 Census exact, 0 Google street level, 81,235 unplaced (stored without coordinates, not drawn); Census only (Google is off), so 81,235 addresses without an exact Census match were left unplaced
 - Held back for a geocoder outage: 0 (looked up again next run)
-- Skipped: 0 with no practice address, 0 whose entity type changed
-- ZIPs crawled: 0 of 0 (failed 0, over the API's 1,200-record ceiling 0); next run starts at ZIP index 0. The API cannot report deactivations.
+- Skipped: 1,234 with no practice address, 0 whose entity type changed
