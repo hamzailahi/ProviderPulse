@@ -54,7 +54,7 @@ jobs:
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
       - name: Find candidates
-        if: inputs.step != 'parents'
+        if: inputs.step == 'candidates' || inputs.step == ''
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: bash scripts/hospital-campus-candidates.sh
