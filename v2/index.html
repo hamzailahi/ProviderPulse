@@ -227,7 +227,7 @@
                     <button class="zip-close-btn" id="closePanelBtn" style="display:none;">Clear ZIP ✕</button>
                 </div>
 
-                <div class="kpi-grid">
+                <div class="kpi-grid" id="legacy-kpis">
                     <div class="kpi-box">
                         <div class="kpi-val" id="kpi-pop">--</div>
                         <div class="kpi-label">Population</div>
@@ -248,7 +248,53 @@
                     </div>
                 </div>
 
-                                                <div class="chart-card">
+                <div id="acs-detail" class="dm" hidden>
+                    <div class="dm-head"><h3 class="dm-h">Area summary</h3><p class="pp-help" id="acs-title"></p></div>
+                    <div class="dm-card" id="acs-error" hidden>
+                        <p class="pp-body" id="acs-error-text">Census figures did not load.</p>
+                        <button class="dm-btn" type="button" onclick="acsRetry()">Try again</button>
+                    </div>
+                    <div id="acs-body">
+                        <article class="dm-card" aria-label="Key counts"><div class="dm-tiles" id="dm-tiles"></div></article>
+                        <article class="dm-card" aria-labelledby="dm-pyr-h">
+                            <div><h4 class="dm-h" id="dm-pyr-h">Age by sex</h4><p class="pp-help">Share of all residents in each 5-year band</p></div>
+                            <div class="dm-legend" aria-hidden="true"><span><span class="dm-sw" style="background:#115E59"></span>Men</span><span><span class="dm-sw" style="background:#8FCFC6"></span>Women</span></div>
+                            <ul class="dm-pyr" id="dm-pyr"></ul>
+                            <div class="dm-axis" id="dm-axis" aria-hidden="true"></div>
+                        </article>
+                        <article class="dm-card" aria-labelledby="dm-cov-h" id="dm-cov-card">
+                            <div><h4 class="dm-h" id="dm-cov-h">Coverage signals</h4><p class="pp-help">Who might need specific billing or access</p></div>
+                            <ul class="dm-cov" id="dm-cov"></ul>
+                        </article>
+                        <article class="dm-card" aria-labelledby="dm-inc-h">
+                            <div class="dm-split"><div><h4 class="dm-h" id="dm-inc-h">Household income</h4><p class="pp-help">Share of households in each of the 16 Census bands</p></div><p class="dm-median" id="dm-median"></p></div>
+                            <ol class="dm-inc" id="dm-inc"></ol>
+                            <p class="pp-help">Thousands of dollars, lower bound of each band. Bands widen at higher incomes, so the right side looks taller. The dark bar holds the median.</p>
+                        </article>
+                        <article class="dm-card" aria-labelledby="dm-econ-h">
+                            <div><h4 class="dm-h" id="dm-econ-h">Income and education</h4></div>
+                            <ul class="dm-cov" id="dm-econ"></ul>
+                        </article>
+                        <article class="dm-card" aria-labelledby="dm-zip-h" id="dm-zip-card">
+                            <div class="dm-split"><h4 class="dm-h" id="dm-zip-h">By ZIP</h4><p class="pp-help" role="status" id="dm-zip-count"></p></div>
+                            <div class="dm-scroll"><div role="table" aria-labelledby="dm-zip-h" aria-describedby="dm-zip-note" id="dm-zip-table"></div></div>
+                            <div class="dm-split"><button class="dm-btn dm-btn--quiet" type="button" id="dm-zip-all" aria-expanded="false"></button>
+                                <p class="pp-help" id="dm-zip-note">Select a row to see that ZIP alone. $250,000+ means the Census caps that median at its top value.</p></div>
+                        </article>
+                        <div class="chart-card">
+                            <h4>Race and Ethnicity (people)</h4>
+                            <div class="chart-wrapper" style="height: 200px;"><canvas id="acsRaceChart"></canvas></div>
+                        </div>
+                        <div class="chart-card">
+                            <h4>Education, Adults 25 and Over (people)</h4>
+                            <div class="chart-wrapper" style="height: 170px;"><canvas id="acsEduChart"></canvas></div>
+                        </div>
+                        <p class="pp-help dm-note" id="acs-note"></p>
+                    </div>
+                </div>
+
+                <div id="legacy-charts">
+                <div class="chart-card">
                     <h4>Insured and Uninsured People by Age</h4>
                     <div class="chart-wrapper"><canvas id="ageChart"></canvas></div>
                 </div>
@@ -262,29 +308,6 @@
                     <h4>Total vs Insured by Race / Ethnicity</h4>
                     <div class="chart-wrapper" style="height: 220px;"><canvas id="raceChart"></canvas></div>
                 </div>
-
-                <div id="acs-detail" hidden>
-                    <div class="chart-card">
-                        <h4 id="acs-title">Census detail</h4>
-                        <div class="kpi-grid" id="acs-kpis"></div>
-                        <div id="acs-note" style="font-size:10.5px;color:var(--text-muted);line-height:1.45;"></div>
-                    </div>
-                    <div class="chart-card">
-                        <h4>Households by Income, Detailed</h4>
-                        <div class="chart-wrapper" style="height: 170px;"><canvas id="acsIncomeChart"></canvas></div>
-                    </div>
-                    <div class="chart-card">
-                        <h4>Age by Sex, 5-Year Bands</h4>
-                        <div class="chart-wrapper" style="height: 200px;"><canvas id="acsAgeChart"></canvas></div>
-                    </div>
-                    <div class="chart-card">
-                        <h4>Race and Ethnicity (people)</h4>
-                        <div class="chart-wrapper" style="height: 200px;"><canvas id="acsRaceChart"></canvas></div>
-                    </div>
-                    <div class="chart-card">
-                        <h4>Education, Adults 25 and Over (people)</h4>
-                        <div class="chart-wrapper" style="height: 170px;"><canvas id="acsEduChart"></canvas></div>
-                    </div>
                 </div>
             </div>
 
@@ -2752,7 +2775,7 @@
                 if(dashCharts.age) dashCharts.age.destroy(); 
                 if(dashCharts.inc) dashCharts.inc.destroy(); 
                 if(dashCharts.race) dashCharts.race.destroy();
-                acsView = []; renderAcsDetail();
+                renderAcsDetail();   // the Census rows do not depend on demographics_raw
                 return;
             }
 
@@ -2788,8 +2811,6 @@
            summed, so for an area it is the household-weighted average of ZIP medians
            and says so. Hidden when the table is absent or has nothing for the view. */
         let acsView = [], acsReq = 0, acsCharts = {};
-        const ACS_INCOME_GROUPS = [['<$25k', 0, 3], ['$25-50k', 4, 8], ['$50-75k', 9, 10], ['$75-100k', 11, 11],
-            ['$100-125k', 12, 12], ['$125-150k', 13, 13], ['$150-200k', 14, 14], ['$200k+', 15, 15]];
         const ACS_AGE = ['<5', '5-9', '10-14', '15-19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '85+'];
         const ACS_RACE = [['White', 'white'], ['Black', 'black'], ['Asian', 'asian'], ['Native American', 'aian'], ['Pacific Islander', 'nhpi'],
             ['Other', 'other'], ['Two or more', 'two_plus'], ['Hispanic (any race)', 'hispanic']];
@@ -2797,55 +2818,230 @@
             ['Associate', 'associate'], ['Bachelor', 'bachelor'], ['Graduate', 'graduate']];
 
         function acsDestroy() { Object.values(acsCharts).forEach(c => c && c.destroy()); acsCharts = {}; }
-        function acsFmtMoney(n) { return n == null ? '--' : '$' + Math.round(n).toLocaleString(); }
 
+        /* Rows are cached per ZIP for the visit (a ZIP with no row is cached as
+           null); a failed request is never cached, so Try again asks again.
+           acsAreaView is the area's ZIP list, kept while one ZIP is selected so
+           the By ZIP table still lists the whole area with that row marked. */
+        let acsRowCache = new Map(), acsAreaView = [], dmSort = { k: 'pop', dir: 'desc' }, dmShowAll = false;
+        function acsRetry() { renderAcsDetail(); }
         function renderAcsDetail() {
             const card = document.getElementById('acs-detail');
             if (!card) return;
             const mine = ++acsReq;
             const zips = [...new Set(acsView)].slice(0, 600);
-            if (!zips.length) { card.hidden = true; acsDestroy(); return; }
+            if (!zips.length) { card.hidden = true; acsDestroy(); dmPanelState(false); return; }
+            if (!lockedZip) acsAreaView = zips.slice();
+            const lz = lockedZip ? String(lockedZip).padStart(5, '0') : null;
+            const area = lz && acsAreaView.includes(lz) ? acsAreaView : zips;
+            const need = [...new Set([...zips, ...area])].filter(z => !acsRowCache.has(z));
             const chunks = [];
-            for (let i = 0; i < zips.length; i += 100) chunks.push(zips.slice(i, i + 100));
+            for (let i = 0; i < need.length; i += 100) chunks.push(need.slice(i, i + 100));
+            const failed = new Set();
             Promise.all(chunks.map(c => fetch(SUPABASE_URL + '/rest/v1/census_acs_zcta?zip=in.(' + c.join(',') + ')&select=*',
-                { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }).then(r => r.ok ? r.json() : [])))
-                .then(parts => {
-                    if (mine !== acsReq) return;                          // a newer view won
-                    const rows = [].concat(...parts).filter(x => x && Array.isArray(x.income_bands));
-                    if (!rows.length) { card.hidden = true; acsDestroy(); return; }
-                    paintAcs(card, rows, zips.length);
+                { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' }, signal: AbortSignal.timeout(12000) })
+                .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+                .then(rows => {
+                    if (!Array.isArray(rows)) throw new Error('not a list');
+                    const got = new Map(rows.filter(x => x && x.zip).map(x => [String(x.zip).padStart(5, '0'), x]));
+                    c.forEach(z => acsRowCache.set(z, got.get(z) || null));
                 })
-                .catch(() => { if (mine === acsReq) { card.hidden = true; } });
+                .catch(() => c.forEach(z => failed.add(z)))))
+                .then(() => {
+                    if (mine !== acsReq) return;                          // a newer view won
+                    const rowsFor = list => list.map(z => acsRowCache.get(z)).filter(x => x && Array.isArray(x.income_bands));
+                    const rows = rowsFor(zips);
+                    const viewFailed = zips.filter(z => failed.has(z)).length;
+                    if (!rows.length) {
+                        acsDestroy();
+                        if (viewFailed) {
+                            card.hidden = false; dmPanelState(false);
+                            document.getElementById('acs-body').hidden = true;
+                            document.getElementById('acs-error').hidden = false;
+                            document.getElementById('acs-error-text').textContent = 'Census figures for ' + (zips.length === 1 ? 'ZIP ' + zips[0] : 'these ' + zips.length + ' ZIPs') + ' did not load. This is a failed lookup, not an empty area.';
+                        } else { card.hidden = true; dmPanelState(false); }
+                        return;
+                    }
+                    document.getElementById('acs-body').hidden = false;
+                    document.getElementById('acs-error').hidden = true;
+                    paintAcs(card, rows, zips.length, { failed: viewFailed, areaRows: rowsFor(area), areaAsked: area.length, areaFailed: area.filter(z => failed.has(z)).length, selected: lz });
+                });
         }
+        function dmPanelState(on) { const p = document.getElementById('dashboard-panel'); if (p) p.classList.toggle('acs-on', !!on); }
 
-        /* Market signals (migration 026). Each needs every row in view to carry
-           it; a partial sum would read as a smaller area, so it is left out. */
-        const SIGNAL_BOXES = [['disability', 'With a disability'], ['employer', 'Employer insurance'], ['direct', 'Individual-purchase insurance'],
-            ['tricare', 'TRICARE (military)'], ['va', 'VA health care'], ['seniors_alone', 'Seniors living alone (of 65+)']];
-        function signalBoxes(rows, asked) {
+        /* Coverage signals (migration 026). Each needs every row in view to carry
+           it; a partial sum would read as a smaller area, so it is left out.
+           Universes: civilian non-institutionalized residents, except seniors
+           living alone (people 65+ in households). */
+        const SIGNAL_BOXES = [['disability', 'With a disability', 'civilian residents'], ['employer', 'Employer coverage', 'civilian residents'],
+            ['direct', 'Direct-purchase coverage', 'civilian residents'], ['tricare', 'TRICARE', 'civilian residents'],
+            ['va', 'VA health care', 'civilian residents'], ['seniors_alone', 'Seniors living alone', 'residents 65+ at home']];
+        function coverageSignals(rows, asked) {
             const N = v => Number(v) || 0, out = [];
             if (rows.length !== asked) return out;
-            // Growth: only when every ZIP has both counts, and never on a swing big
-            // enough to be a ZIP boundary change rather than people moving.
-            const now = rows.reduce((a, r) => a + N(r.pop_total), 0), then = rows.reduce((a, r) => a + N(r.pop_prior), 0);
-            if (rows.every(r => r.pop_prior != null && r.pop_total != null) && then > 0) {
-                const ch = (now - then) / then * 100;
-                if (Math.abs(ch) <= 50) out.push(['Population change since ' + rows[0].pop_prior_year, (now >= then ? '+' : '') + fmtCount(now - then), (ch >= 0 ? '+' : '') + ch.toFixed(1) + '%']);
-            }
-            SIGNAL_BOXES.forEach(([k, label]) => {
+            SIGNAL_BOXES.forEach(([k, label, ofWhat]) => {
                 if (!rows.every(r => r.signals && r.signals[k] && r.signals[k].n != null && r.signals[k].of > 0)) return;
                 const n = rows.reduce((a, r) => a + N(r.signals[k].n), 0), of = rows.reduce((a, r) => a + N(r.signals[k].of), 0);
-                out.push([label, fmtCount(n), (of ? (n / of * 100).toFixed(1) : '--') + '% of ' + fmtCount(of)]);
+                if (of > 0) out.push({ label, n, of, ofWhat });
             });
             return out;
         }
 
-        function paintAcs(card, rows, asked) {
+        // The design's labels for the 16 Census household income bands.
+        const DM_INC_SHORT = ['<10', '10', '15', '20', '25', '30', '35', '40', '45', '50', '60', '75', '100', '125', '150', '200+'];
+        const DM_INC_LONG = ['Under $10k', '$10-15k', '$15-20k', '$20-25k', '$25-30k', '$30-35k', '$35-40k', '$40-45k', '$45-50k', '$50-60k', '$60-75k', '$75-100k', '$100-125k', '$125-150k', '$150-200k', '$200k+'];
+        const DM_INC_LB = [0, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 100, 125, 150, 200, null];
+        const DM_AGE_LB = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, null];
+        // The band holding the middle household (or person), and a straight-line
+        // estimate inside it. An open top band has no width, so no estimate.
+        function bandMedian(counts, lb) {
+            const tot = counts.reduce((a, b) => a + b, 0);
+            if (!tot) return null;
+            let cum = 0;
+            for (let i = 0; i < counts.length; i++) {
+                if (cum + counts[i] >= tot / 2) {
+                    const lo = lb[i], hi = lb[i + 1];
+                    return { idx: i, value: hi == null || !counts[i] ? null : lo + (tot / 2 - cum) / counts[i] * (hi - lo) };
+                }
+                cum += counts[i];
+            }
+            return null;
+        }
+        function dmEl(tag, cls, text, attrs) {
+            const e = document.createElement(tag);
+            if (cls) e.className = cls;
+            if (text != null) e.textContent = text;
+            if (attrs) Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+            return e;
+        }
+        function dmClear(id) { const e = document.getElementById(id); while (e.firstChild) e.removeChild(e.firstChild); return e; }
+        function dmPct(v) { return v == null || !isFinite(v) ? '--' : (Math.abs(v) < 10 ? v.toFixed(1) : v.toFixed(0)) + '%'; }
+        function dmBarList(id, items) {
+            const ul = dmClear(id);
+            items.forEach(c => {
+                const p = c.of ? c.n / c.of * 100 : null;
+                const li = dmEl('li');
+                const top = dmEl('div', 'dm-cov-top');
+                top.appendChild(dmEl('span', 'dm-strong', c.label));
+                top.appendChild(dmEl('span', 'dm-num dm-strong', c.value != null ? c.value : dmPct(p)));
+                li.appendChild(top);
+                if (p != null) { const bar = dmEl('div', 'dm-bar', null, { 'aria-hidden': 'true' }); const f = dmEl('span'); f.style.width = Math.min(100, p).toFixed(1) + '%'; bar.appendChild(f); li.appendChild(bar); }
+                li.appendChild(dmEl('span', 'pp-help', c.sub != null ? c.sub : fmtCount(c.n) + ' of ' + fmtCount(c.of) + ' ' + c.ofWhat));
+                ul.appendChild(li);
+            });
+            return ul;
+        }
+
+        /* One ZIP's line for the By ZIP table, from its own row only. */
+        function dmZipLine(r, places) {
+            const N = v => Number(v) || 0;
+            const t = (r.age_male || []).map((v, i) => N(v) + N((r.age_female || [])[i]));
+            const tot = t.reduce((a, b) => a + b, 0);
+            const am = bandMedian(t, DM_AGE_LB);
+            const p65 = tot ? t.slice(13).reduce((a, b) => a + b, 0) / tot * 100 : null;
+            const growth = r.pop_prior != null && r.pop_total != null && N(r.pop_prior) > 0 ? (N(r.pop_total) - N(r.pop_prior)) / N(r.pop_prior) * 100 : null;
+            return {
+                zip: String(r.zip).padStart(5, '0'), place: places[String(r.zip).padStart(5, '0')] || '',
+                pop: r.pop_total != null ? N(r.pop_total) : null,
+                g: growth != null && Math.abs(growth) <= 50 ? growth : null,
+                age: am && am.value != null ? am.value : null,
+                inc: r.median_hh_income != null ? N(r.median_hh_income) : null,
+                unins: r.ins_universe != null && r.ins_uninsured != null && N(r.ins_universe) > 0 ? N(r.ins_uninsured) / N(r.ins_universe) * 100 : null,
+                p65
+            };
+        }
+        // The city most of a ZIP's listings name, for the table's second line.
+        function dmPlaces() {
+            const by = {};
+            (typeof currentlyVisiblePractices !== 'undefined' ? currentlyVisiblePractices : []).forEach(p => {
+                const z = String(p['ZIP Code'] || p['Zipcode'] || '').trim().split('-')[0].padStart(5, '0');
+                const c = String(p['City'] || '').trim();
+                if (!c || z === '00000') return;
+                (by[z] = by[z] || {})[c] = (by[z][c] || 0) + 1;
+            });
+            const out = {};
+            Object.entries(by).forEach(([z, m]) => {
+                const top = Object.entries(m).sort((a, b) => b[1] - a[1])[0][0];
+                out[z] = top.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+            });
+            return out;
+        }
+        const DM_COLS = [{ k: 'zip', l: 'ZIP', num: false }, { k: 'pop', l: 'Population', num: true }, { k: 'g', l: '5-yr change', num: true },
+            { k: 'age', l: 'Median age', num: true }, { k: 'inc', l: 'Median income', num: true }, { k: 'unins', l: 'Uninsured', num: true }, { k: 'p65', l: 'Age 65+', num: true }];
+        let dmZipLines = [], dmSelected = null;
+        function dmPaintZips() {
+            const card = document.getElementById('dm-zip-card');
+            const lines = dmZipLines;
+            card.hidden = lines.length < 2;
+            if (card.hidden) return;
+            const { k, dir } = dmSort;
+            // Unknown values sort last whichever way the column runs.
+            const sorted = lines.slice().sort((a, b) => {
+                const x = a[k], y = b[k];
+                if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+                const c = typeof x === 'string' ? x.localeCompare(y) : x - y;
+                return dir === 'asc' ? c : -c;
+            });
+            const shown = dmShowAll ? sorted : sorted.slice(0, 5);
+            if (!dmShowAll && dmSelected && !shown.some(z => z.zip === dmSelected)) { const sel = sorted.find(z => z.zip === dmSelected); if (sel) shown.push(sel); }
+            const tbl = dmClear('dm-zip-table');
+            const head = dmEl('div', null, null, { role: 'rowgroup' }), hr = dmEl('div', 'dm-tr dm-th', null, { role: 'row' });
+            DM_COLS.forEach(c => {
+                const on = c.k === k;
+                const th = dmEl('div', c.num ? 'dm-n' : '', null, { role: 'columnheader', 'aria-sort': on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none' });
+                const b = dmEl('button', 'dm-sort', c.l, { type: 'button' });
+                b.appendChild(dmEl('span', 'dm-arrow', on ? (dir === 'asc' ? '▲' : '▼') : '↕', { 'aria-hidden': 'true' }));
+                b.onclick = () => { dmSort = { k: c.k, dir: on ? (dir === 'asc' ? 'desc' : 'asc') : (c.num ? 'desc' : 'asc') }; dmPaintZips(); };
+                th.appendChild(b); hr.appendChild(th);
+            });
+            head.appendChild(hr); tbl.appendChild(head);
+            const body = dmEl('div', null, null, { role: 'rowgroup' });
+            const money = v => v == null ? '--' : v > 250000 ? '$250,000+' : '$' + Math.round(v).toLocaleString();
+            shown.forEach(z => {
+                const isSel = z.zip === dmSelected;
+                const row = dmEl('div', 'dm-tr dm-row' + (isSel ? ' is-sel' : ''), null, { role: 'row' });
+                const rh = dmEl('div', 'dm-zipcell', null, { role: 'rowheader' });
+                const pick = dmEl('button', 'dm-zipbtn', null, { type: 'button', 'aria-pressed': isSel ? 'true' : 'false' });
+                pick.appendChild(dmEl('span', 'dm-strong', z.zip));
+                if (isSel) pick.appendChild(dmEl('span', 'pp-help', ' · Selected'));
+                pick.title = isSel ? 'Back to the whole area' : 'Show ZIP ' + z.zip + ' alone';
+                pick.onclick = () => dmSelectZip(z.zip);
+                rh.appendChild(pick);
+                if (z.place) rh.appendChild(dmEl('span', 'pp-help', z.place));
+                row.appendChild(rh);
+                [z.pop == null ? '--' : fmtCount(z.pop), z.g == null ? '--' : (z.g >= 0 ? '+' : '−') + Math.abs(z.g).toFixed(1) + '%',
+                 z.age == null ? '--' : z.age.toFixed(1), money(z.inc), z.unins == null ? '--' : z.unins.toFixed(1) + '%', z.p65 == null ? '--' : z.p65.toFixed(1) + '%']
+                    .forEach(v => row.appendChild(dmEl('div', 'dm-n', v, { role: 'cell' })));
+                body.appendChild(row);
+            });
+            tbl.appendChild(body);
+            const col = DM_COLS.find(c => c.k === k);
+            document.getElementById('dm-zip-count').textContent = 'Showing ' + Math.min(shown.length, lines.length) + ' of ' + lines.length + ' · sorted by ' + col.l.toLowerCase() + (dir === 'asc' ? ', low to high' : ', high to low');
+            const all = document.getElementById('dm-zip-all');
+            all.hidden = lines.length <= 5;
+            all.textContent = dmShowAll ? 'Show top 5' : 'Show all ' + lines.length + ' ZIPs';
+            all.setAttribute('aria-expanded', dmShowAll ? 'true' : 'false');
+            all.onclick = () => { dmShowAll = !dmShowAll; dmPaintZips(); };
+        }
+        // A row acts like a click on that ZIP's outline on the map (the same
+        // toggle: selecting the selected ZIP goes back to the whole area).
+        function dmSelectZip(zip) {
+            let hit = null;
+            if (zipGeoJSONLayer) zipGeoJSONLayer.eachLayer(l => { if (String(l.feature.properties.ZCTA5CE10).padStart(5, '0') === zip) hit = l; });
+            if (hit) { hit.fire('click'); return; }
+            if (lockedZip && String(lockedZip).padStart(5, '0') === zip) { lockedZip = null; lockedLayer = null; }
+            else { lockedZip = zip; lockedLayer = null; }
+            updateDemographics();
+        }
+
+        function paintAcs(card, rows, asked, opt) {
+            opt = opt || {};
             const N = v => Number(v) || 0;
             const sumArr = (key, len) => { const a = new Array(len).fill(0); rows.forEach(r => (r[key] || []).forEach((v, i) => { a[i] += N(v); })); return a; };
             const sumObj = (key) => { const o = {}; rows.forEach(r => Object.entries(r[key] || {}).forEach(([k, v]) => { o[k] = (o[k] || 0) + N(v); })); return o; };
             const income = sumArr('income_bands', 16), male = sumArr('age_male', 18), female = sumArr('age_female', 18);
             const race = sumObj('race'), edu = sumObj('education');
+            const whole = rows.length === asked;
             const hh = rows.reduce((a, r) => a + N(r.households), 0);
             const popTotal = rows.reduce((a, r) => a + N(r.pop_total), 0);
             const povU = rows.reduce((a, r) => a + N(r.poverty_universe), 0), povB = rows.reduce((a, r) => a + N(r.poverty_below), 0);
@@ -2854,17 +3050,7 @@
             // (2026-10-22: a report printed 76092's median as $250,001).
             const INCOME_CAP = 250000;
             const capped = rows.filter(r => N(r.median_hh_income) > INCOME_CAP).length;
-            let median = null;
-            if (single) median = rows[0].median_hh_income;
-            else {
-                const w = rows.filter(r => r.median_hh_income != null && N(r.households) > 0);
-                const tw = w.reduce((a, r) => a + N(r.households), 0);
-                median = tw ? w.reduce((a, r) => a + Math.min(N(r.median_hh_income), INCOME_CAP) * N(r.households), 0) / tw : null;
-            }
             const pct = (a, b) => (b ? (a / b * 100) : null);
-            const fmtPct = v => v == null ? '--' : v.toFixed(1) + '%';
-            const high100 = income.slice(12).reduce((a, b) => a + b, 0), high200 = income[15];
-            const bachPlus = N(edu.bachelor) + N(edu.graduate);
             // Insurance coverage (ACS B27001/B27006/B27007). Counts only when every
             // row in view has them; null means the import could not find them.
             const hasIns = rows.every(r => r.ins_universe != null && r.ins_uninsured != null);
@@ -2873,69 +3059,131 @@
             const hasMc = rows.every(r => r.ins_medicare != null), hasMd = rows.every(r => r.ins_medicaid != null);
             const insMc = hasMc ? rows.reduce((a, r) => a + N(r.ins_medicare), 0) : null;
             const insMd = hasMd ? rows.reduce((a, r) => a + N(r.ins_medicaid), 0) : null;
-            // The top boxes use the Census's own uninsured count when it covers the whole view.
-            if (hasIns && insU > 0 && rows.length === asked) {
+            // The legacy top boxes still use the Census's own counts when they cover the view.
+            if (hasIns && insU > 0 && whole) {
                 document.getElementById('kpi-uninsured').textContent = fmtCount(insNo);
                 document.getElementById('kpi-uninsured-sub').textContent = (insNo / insU * 100).toFixed(1) + '% of residents';
                 document.getElementById('kpi-rate').textContent = fmtCount(insU - insNo);
                 document.getElementById('kpi-rate-sub').textContent = ((1 - insNo / insU) * 100).toFixed(1) + '% of residents';
             }
+            const zipCount = opt.areaRows && opt.areaRows.length > 1 && opt.selected ? opt.areaAsked : asked;
+            document.getElementById('acs-title').textContent = (single ? 'ZIP ' + rows[0].zip : rows.length + ' ZIPs on the map') +
+                (opt.selected && zipCount > 1 ? ' (one of ' + zipCount + ' ZIPs)' : '') + ' · Census ACS ' + (rows[0].acs_year ? (rows[0].acs_year - 4) + '–' + String(rows[0].acs_year).slice(2) + ', ' : '') + '5-year estimates';
 
-            document.getElementById('acs-title').textContent = 'Census detail' + (single ? ' · ZIP ' + rows[0].zip : ' · ' + rows.length + ' ZIPs') +
-                ' (ACS ' + (rows[0].acs_year || '') + ' 5-year)';
-            const kp = document.getElementById('acs-kpis');
-            while (kp.firstChild) kp.removeChild(kp.firstChild);
-            const share = (a, b, of) => b ? fmtPct(pct(a, b)) + ' ' + of : '';
-            [[single ? 'Median household income' : 'Median income (avg. of ZIPs)', single && capped ? '$250,000+' : acsFmtMoney(median)],
-             ['Below poverty line', povU ? fmtCount(povB) : '--', share(povB, povU, 'of residents')],
-             ['Households $100k+', hh ? fmtCount(high100) : '--', share(high100, hh, 'of households')],
-             ['Households $200k+', hh ? fmtCount(high200) : '--', share(high200, hh, 'of households')],
-             ["Bachelor's or higher", N(edu.universe) ? fmtCount(bachPlus) : '--', share(bachPlus, N(edu.universe), 'of adults 25+')],
-             ...(hasIns ? [['Uninsured', fmtCount(insNo), share(insNo, insU, 'of residents')]] : []),
-             ...(insMc != null && insU ? [['On Medicare', fmtCount(insMc), share(insMc, insU, 'of residents')]] : []),
-             ...(insMd != null && insU ? [['On Medicaid', fmtCount(insMd), share(insMd, insU, 'of residents')]] : []),
-             ...signalBoxes(rows, asked),
-             ['Median age band', (() => { const t = male.map((v, i) => v + female[i]), tot = t.reduce((a, b) => a + b, 0); let c = 0; for (let i = 0; i < t.length; i++) { c += t[i]; if (c >= tot / 2) return tot ? ACS_AGE[i] : '--'; } return '--'; })()]]
-                .forEach(([label, val, sub]) => {
-                    const b = document.createElement('div'); b.className = 'kpi-box';
-                    const v = document.createElement('div'); v.className = 'kpi-val'; v.textContent = val;
-                    const l = document.createElement('div'); l.className = 'kpi-label'; l.textContent = label;
-                    b.appendChild(v); b.appendChild(l);
-                    if (sub) { const sm = document.createElement('div'); sm.className = 'kpi-sub'; sm.textContent = sub; b.appendChild(sm); }
-                    kp.appendChild(b);
-                });
+            // ---- Area summary tiles (only whole-view sums; a partial sum reads as a smaller area)
+            const tiles = dmClear('dm-tiles');
+            const tile = (label, value, sub) => { const t = dmEl('div', 'dm-tile'); t.appendChild(dmEl('p', 'pp-help', label)); t.appendChild(dmEl('p', 'dm-big', value)); t.appendChild(dmEl('p', 'dm-sub', sub || ' ')); tiles.appendChild(t); };
+            let growth = '';
+            const then = rows.reduce((a, r) => a + N(r.pop_prior), 0);
+            if (whole && rows.every(r => r.pop_prior != null && r.pop_total != null) && then > 0) {
+                const ch = (popTotal - then) / then * 100;
+                if (Math.abs(ch) <= 50) growth = (ch >= 0 ? '+' : '−') + Math.abs(ch).toFixed(1) + '% since ' + rows[0].pop_prior_year;
+            }
+            tile('Population', fmtCount(popTotal), growth || 'residents');
+            tile('Households', hh ? fmtCount(hh) : '--', hh && popTotal ? (popTotal / hh).toFixed(1) + ' people per household' : '');
+            if (hasIns && insU) {
+                tile('Insured', fmtCount(insU - insNo), (100 - insNo / insU * 100).toFixed(1) + '% of civilian residents');
+                tile('Uninsured', fmtCount(insNo), (insNo / insU * 100).toFixed(1) + '% of civilian residents');
+            }
+            if (insMc != null && insMd != null && insU) {
+                tile('Medicare', fmtCount(insMc), dmPct(insMc / insU * 100) + ' of civilian residents');
+                tile('Medicaid', fmtCount(insMd), dmPct(insMd / insU * 100) + ' of civilian residents');
+                const ov = dmEl('p', 'dm-overlap');
+                ov.appendChild(dmEl('span', 'dm-brace', null, { 'aria-hidden': 'true' }));
+                ov.appendChild(dmEl('span', null, 'Medicare and Medicaid overlap. Some people have both, so don\'t add these two.'));
+                tiles.appendChild(ov);
+            }
+
+            // ---- Age by sex: share of all residents per band, men left, women right
+            const ageTot = male.reduce((a, b) => a + b, 0) + female.reduce((a, b) => a + b, 0);
+            const maxShare = ageTot ? Math.max(...male, ...female) / ageTot * 100 : 0;
+            const axisMax = Math.max(1, Math.ceil(maxShare));               // whole percent, never 0
+            const pyr = dmClear('dm-pyr');
+            for (let i = ACS_AGE.length - 1; i >= 0; i--) {
+                const m = ageTot ? male[i] / ageTot * 100 : 0, f = ageTot ? female[i] / ageTot * 100 : 0;
+                const label = ACS_AGE[i] === '<5' ? '0–4' : ACS_AGE[i].replace('-', '–');
+                const li = dmEl('li');
+                li.appendChild(dmEl('span', 'sr-only', 'Ages ' + label + ': men ' + m.toFixed(1) + '% (' + fmtCount(male[i]) + '), women ' + f.toFixed(1) + '% (' + fmtCount(female[i]) + ')'));
+                const ms = dmEl('span', 'dm-side dm-m', null, { 'aria-hidden': 'true' }), mb = dmEl('span'); mb.style.width = (m / axisMax * 100).toFixed(1) + '%'; ms.appendChild(mb);
+                const fs = dmEl('span', 'dm-side', null, { 'aria-hidden': 'true' }), fb = dmEl('span'); fb.style.width = (f / axisMax * 100).toFixed(1) + '%'; fs.appendChild(fb);
+                ms.title = 'Men ' + label + ': ' + fmtCount(male[i]) + ' (' + m.toFixed(1) + '%)'; fs.title = 'Women ' + label + ': ' + fmtCount(female[i]) + ' (' + f.toFixed(1) + '%)';
+                li.appendChild(ms); li.appendChild(dmEl('span', 'dm-age', label, { 'aria-hidden': 'true' })); li.appendChild(fs);
+                pyr.appendChild(li);
+            }
+            const ax = dmClear('dm-axis'), half = axisMax / 2;
+            const lbl = v => (Number.isInteger(v) ? v : v.toFixed(1)) + '%';
+            const l = dmEl('span'); [lbl(axisMax), lbl(half), '0'].forEach(t => l.appendChild(dmEl('span', null, t)));
+            const r = dmEl('span'); ['0', lbl(half), lbl(axisMax)].forEach(t => r.appendChild(dmEl('span', null, t)));
+            ax.appendChild(l); ax.appendChild(dmEl('span')); ax.appendChild(r);
+
+            // ---- Coverage signals
+            const cov = coverageSignals(rows, asked);
+            document.getElementById('dm-cov-card').hidden = !cov.length;
+            dmBarList('dm-cov', cov);
+
+            // ---- Household income: 16 bands, the median's band dark
+            const incTot = income.reduce((a, b) => a + b, 0);
+            const med = bandMedian(income, DM_INC_LB);
+            const incMax = incTot ? Math.max(...income) / incTot * 100 : 0;
+            const ol = dmClear('dm-inc');
+            income.forEach((v, i) => {
+                const p = incTot ? v / incTot * 100 : 0, isMed = med && med.idx === i;
+                const li = dmEl('li', isMed ? 'is-med' : '');
+                li.appendChild(dmEl('span', 'sr-only', DM_INC_LONG[i] + ': ' + fmtCount(v) + ' households, ' + p.toFixed(1) + '%' + (isMed ? ', holds the median' : '')));
+                const c = dmEl('span', 'dm-col', null, { 'aria-hidden': 'true' }), b = dmEl('span');
+                b.style.height = (incMax ? p / incMax * 100 : 0).toFixed(1) + '%';
+                c.title = DM_INC_LONG[i] + ': ' + fmtCount(v) + ' households (' + p.toFixed(1) + '%)';
+                c.appendChild(b); li.appendChild(c);
+                li.appendChild(dmEl('span', 'dm-lab' + (i % 2 && i !== 15 ? ' dm-lab--odd' : ''), DM_INC_SHORT[i], { 'aria-hidden': 'true' }));
+                ol.appendChild(li);
+            });
+            // One ZIP: the Census's own median. An area: the median household of
+            // the summed bands, estimated inside its band (the Census publishes no
+            // area median, and an average of ZIP medians is not one).
+            let medTxt = '';
+            if (single && rows[0].median_hh_income != null) medTxt = 'Median ' + (capped ? '$250,000+' : '$' + Math.round(N(rows[0].median_hh_income)).toLocaleString());
+            else if (med) medTxt = med.value == null ? 'Median $200,000+' : 'Median about $' + (Math.round(med.value) * 1000).toLocaleString();
+            document.getElementById('dm-median').textContent = medTxt;
+
+            // ---- Income and education
+            const bachPlus = N(edu.bachelor) + N(edu.graduate);
+            const high100 = income.slice(12).reduce((a, b) => a + b, 0);
+            const econ = [];
+            if (povU) econ.push({ label: 'Below the poverty line', n: povB, of: povU, ofWhat: 'residents' });
+            if (hh) econ.push({ label: 'Households $100k+', n: high100, of: hh, ofWhat: 'households' });
+            if (hh) econ.push({ label: 'Households $200k+', n: income[15], of: hh, ofWhat: 'households' });
+            if (N(edu.universe)) econ.push({ label: "Bachelor's or higher", n: bachPlus, of: N(edu.universe), ofWhat: 'adults 25+' });
+            dmBarList('dm-econ', econ);
+
+            // ---- By ZIP (the whole area, even while one ZIP is selected)
+            const areaRows = (opt.areaRows && opt.areaRows.length ? opt.areaRows : rows);
+            const places = dmPlaces();
+            dmSelected = opt.selected || null;
+            dmZipLines = areaRows.map(x => dmZipLine(x, places));
+            dmPaintZips();
+
             document.getElementById('acs-note').textContent =
                 'American Community Survey 5-year estimates. The Census does not publish ZIP-level household income above $200,000.' +
-                (asked > rows.length ? ' ' + (asked - rows.length) + ' of ' + asked + ' ZIPs in view have no ACS row yet and are left out.' : '') +
-                (rows.some(r => r.signals) ? ' Insurance types overlap (people can have more than one), so the counts do not add up to the population.' : '') +
-                (hasIns ? ' Insurance counts cover the civilian non-institutionalized population. Medicare and Medicaid overlap (people with both are in each), so do not add them. The Insured and Uninsured boxes above use these Census counts.' : '') +
-                (single ? '' : ' Area medians are household-weighted averages of ZIP medians, not true medians.') +
-                (capped ? (single ? ' The Census caps this ZIP\'s median household income at $250,000 or more.' : ' ' + capped + ' ZIP' + (capped === 1 ? '\'s median is' : 's\' medians are') + ' capped by the Census at $250,000 or more and count as $250,000, so the average is a floor.') : '');
+                (asked > rows.length ? ' ' + (asked - rows.length) + ' of ' + asked + ' ZIPs in view ' + (opt.failed ? '(' + opt.failed + ' did not load; reload to try again)' : 'have no ACS row yet') + ' and are left out: totals cover the rest, and growth and coverage signals, which need every ZIP, are hidden.' : '') +
+                (cov.length ? ' Coverage types overlap (people can have more than one), so they do not add up to the population.' : '') +
+                (hasIns ? ' Insurance counts cover the civilian non-institutionalized population.' : '') +
+                ' Median age in the By ZIP table is estimated from the 5-year bands.' +
+                (capped ? (single ? ' The Census caps this ZIP\'s median household income at $250,000 or more.' : ' ' + capped + ' ZIP' + (capped === 1 ? '\'s median is' : 's\' medians are') + ' capped by the Census at $250,000 or more.') : '');
 
             card.hidden = false;
+            dmPanelState(true);
             acsDestroy();
-            const axis = { grid: { color: 'rgba(100,116,139,.2)' }, ticks: { font: { size: 9 } } };
-            const noGrid = { grid: { display: false }, ticks: { font: { size: 9 } } };
-            const incGroups = ACS_INCOME_GROUPS.map(g => income.slice(g[1], g[2] + 1).reduce((a, b) => a + b, 0));
-            acsCharts.income = new Chart(document.getElementById('acsIncomeChart'), {
-                type: 'bar',
-                data: { labels: ACS_INCOME_GROUPS.map(g => g[0]), datasets: [{ label: 'Households', data: incGroups, backgroundColor: CHART.good, borderRadius: 3 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: countTip(() => hh) } } }, scales: { x: noGrid, y: { ...axis, ticks: { ...axis.ticks, callback: countTicks } } } }
-            });
-            acsCharts.age = new Chart(document.getElementById('acsAgeChart'), {
-                type: 'bar',
-                data: { labels: ACS_AGE, datasets: [{ label: 'Male', data: male, backgroundColor: CHART.a2, borderRadius: 2 }, { label: 'Female', data: female, backgroundColor: CHART.a1, borderRadius: 2 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } }, scales: { x: noGrid, y: axis } }
-            });
+            const axis = { grid: { color: 'rgba(100,116,139,.2)' }, ticks: { font: { size: 11 } } };
+            const noGrid = { grid: { display: false }, ticks: { font: { size: 11 } } };
             const raceData = ACS_RACE.map(r => ({ l: r[0], v: N(race[r[1]]) })).sort((a, b) => b.v - a.v);
             acsCharts.race = new Chart(document.getElementById('acsRaceChart'), {
                 type: 'bar',
-                data: { labels: raceData.map(r => r.l), datasets: [{ label: 'People', data: raceData.map(r => r.v), backgroundColor: CHART.a1, borderRadius: 3 }] },
+                data: { labels: raceData.map(r => r.l), datasets: [{ label: 'People', data: raceData.map(r => r.v), backgroundColor: '#115E59', borderRadius: 3 }] },
                 options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: countTip(() => N(race.total)) } } }, scales: { x: { ...axis, ticks: { ...axis.ticks, callback: countTicks } }, y: noGrid } }
             });
             acsCharts.edu = new Chart(document.getElementById('acsEduChart'), {
                 type: 'bar',
-                data: { labels: ACS_EDU.map(e => e[0]), datasets: [{ label: 'Adults 25+', data: ACS_EDU.map(e => N(edu[e[1]])), backgroundColor: CHART.a2, borderRadius: 3 }] },
+                data: { labels: ACS_EDU.map(e => e[0]), datasets: [{ label: 'Adults 25+', data: ACS_EDU.map(e => N(edu[e[1]])), backgroundColor: '#4FA89D', borderRadius: 3 }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: countTip(() => N(edu.universe)) } } }, scales: { x: noGrid, y: { ...axis, ticks: { ...axis.ticks, callback: countTicks } } } }
             });
         }
