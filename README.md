@@ -650,7 +650,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-03
 
-- Hospital campus review: a shortlist of 165 likely campuses (a hospital-named organization at a hospital department code, 50+ clinicians at the address) is saved beside the full candidate list, and the read-only candidates job has a new "parents" step that lists the hospital-coded listings within about 20 miles of each, so the hospital NPI a campus bills under can be found before it is checked and added by hand.
+- Hospital campus review: a shortlist of 165 likely campuses (a hospital-named organization at a hospital department code, 50+ clinicians at the address) is saved beside the full candidate list, and the read-only candidates job has a new "parents" step that lists the hospital-coded listings within about 20 miles of each, so the hospital NPI a campus bills under can be found before it is checked and added by hand. A third step, "lookup", prints what the directory holds for a list of NPIs.
+- Three hospitals now show under Emergency rooms & hospitals where patient search had none: Ascension Via Christi St. Joseph (Wichita), Harris Health LBJ Hospital (Houston) and Kaiser Permanente Ontario. Each bills under a parent hospital's NPI registered elsewhere, so the registry listed only pharmacies or units at the site. The review of the rest of the shortlist is in `supabase/reference/hospital-campus-review.md`.
 
 ### 2026-10-30
 

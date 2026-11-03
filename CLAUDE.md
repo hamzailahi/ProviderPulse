@@ -1737,7 +1737,12 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   organization, a hospital department code there, 50+ clinicians at the
   address) and writes `hospital-campus-parents.csv`: every hospital-coded
   organization within about 20 miles of each, nearest first, to find the NPI
-  a campus bills under. Still read only; rows reach the campus list by hand.
+  a campus bills under. Still read only; rows reach the campus list by hand. Step `lookup` (input
+  `npis`) prints what `clinics`, `provider_individuals` and
+  `clinic_secondary_locations` hold for those NPIs (npi columns are text).
+  First review, 2026-11-03 (`hospital-campus-review.md`): three added (Via
+  Christi St. Joseph, LBJ, Kaiser Ontario); a campus with a hospital-coded
+  **secondary location** at its address is already findable and is not a gap.
 - **Schema snapshot** (`schema-snapshot.yml`, weekly Mondays): see Supabase
   schema. It commits to `main` itself (`[skip netlify]`); those bot commits
   and `nppes-refresh.yml`'s are the exceptions to the README-per-push rule.

@@ -18,6 +18,51 @@
     "billing_npi": "1578527172",
     "billing_name": "Baptist Memorial Hospital (Memphis)",
     "emergency": true
+  },
+  {
+    "id": "avc-st-joseph",
+    "name": "Ascension Via Christi St. Joseph",
+    "address": "3600 E Harry St",
+    "city": "Wichita",
+    "state": "KS",
+    "zip": "67218",
+    "lat": 37.664675,
+    "lng": -97.29363,
+    "phone": "3162685000",
+    "taxonomy_code": "282N00000X",
+    "billing_npi": "1154314789",
+    "billing_name": "Ascension Via Christi Hospitals Wichita (listed at the St. Francis campus)",
+    "emergency": true
+  },
+  {
+    "id": "lbj-houston",
+    "name": "Harris Health Lyndon B. Johnson Hospital",
+    "address": "5656 Kelley St",
+    "city": "Houston",
+    "state": "TX",
+    "zip": "77026",
+    "lat": 29.812911,
+    "lng": -95.310905,
+    "phone": "7135665100",
+    "taxonomy_code": "282N00000X",
+    "billing_npi": "1205900370",
+    "billing_name": "Harris County Hospital District (Harris Health; listed at Ben Taub)",
+    "emergency": true
+  },
+  {
+    "id": "kp-ontario",
+    "name": "Kaiser Permanente Ontario Medical Center",
+    "address": "2295 S Vineyard Ave",
+    "city": "Ontario",
+    "state": "CA",
+    "zip": "91761",
+    "lat": 34.032728,
+    "lng": -117.61095,
+    "phone": "9097245000",
+    "taxonomy_code": "282N00000X",
+    "billing_npi": "1356496772",
+    "billing_name": "Kaiser Foundation Hospital Fontana/Ontario",
+    "emergency": true
   }
 ];
   // Campuses inside a {s, n, w, e} box, shaped like directory rows.
