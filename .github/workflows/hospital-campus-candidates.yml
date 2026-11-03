@@ -73,12 +73,14 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           NPIS: ${{ inputs.npis }}
         run: |
+          set -o pipefail
           list=$(echo "$NPIS" | tr -cd '0-9,' | sed 's/,,*/,/g; s/^,//; s/,$//')
           [ -n "$list" ] || { echo "::error::Give npis"; exit 1; }
+          list=$(echo "$list" | sed "s/[0-9][0-9]*/'&'/g")   # npi columns are text
           for t in clinics provider_individuals; do
-            psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -c "set default_transaction_read_only = on" -c "select '$t' as tbl, npi, name, address, city, state, zip, taxonomy_code, primary_taxonomy, latitude, longitude from public.$t where npi in ($list) order by npi" | tee -a "$GITHUB_STEP_SUMMARY"
+            psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -c "set default_transaction_read_only = on" -c "select '$t' as tbl, npi, name, address, city, state, zip, taxonomy_code, primary_taxonomy, latitude, longitude from public.$t where npi::text in ($list) order by npi" | tee -a "$GITHUB_STEP_SUMMARY"
           done
-          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -c "set default_transaction_read_only = on" -c "select 'secondary' as tbl, parent_npi, name, address, city, zip, taxonomy_code from public.clinic_secondary_locations where parent_npi in ($list) order by parent_npi" | tee -a "$GITHUB_STEP_SUMMARY"
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -c "set default_transaction_read_only = on" -c "select 'secondary' as tbl, parent_npi, name, address, city, zip, taxonomy_code from public.clinic_secondary_locations where parent_npi::text in ($list) order by parent_npi" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Commit the list
         if: inputs.step != 'lookup'
