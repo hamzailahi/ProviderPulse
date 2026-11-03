@@ -143,6 +143,11 @@ if (!ONLY) {
     }), 3000);
     await step('add neighbors', () => page.evaluate(() => loadNeighboringZips()), 30000);
     for (const tab of ['insights', 'dashboard', 'health', 'procedures']) await step('tab ' + tab, () => page.evaluate(t => switchTab(t), tab), 6000);
+    // The redesigned Demographics and Health tabs (2026-11-03): what they say, in the log.
+    r.tabText = await page.evaluate(() => ({
+      demographics: ((document.getElementById('acs-detail') || {}).innerText || '').slice(0, 1800),
+      health: ((document.getElementById('hl-root') || {}).innerText || '').slice(0, 2400) }));
+    console.log('== Demographics tab text\n' + r.tabText.demographics + '\n== Health tab text\n' + r.tabText.health);
     for (const src of ['outpatient', 'inpatient', 'medicaid', 'medicare']) await step('procedures ' + src, () => page.click(`#procSourceToggle [data-src="${src}"]`), 8000);
     await step('click a ZIP boundary', async () => {
       const box = await page.locator('#map').boundingBox();
