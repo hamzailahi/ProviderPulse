@@ -501,3 +501,46 @@ body.filters-open #map-legend { left: 306px; }
 .rp-go:hover { background: #115E59; }
 .rp-go:disabled { opacity: .5; cursor: default; }
 .rp-go:focus-visible { outline: 3px solid #1D4ED8; outline-offset: 2px; }
+
+/* Insights (2026-11-03, same canvas): the verdict card in three columns,
+   numbered reasons, a stacked bar over Places patients go, procedures as
+   a table. Flat white cards; colour only on the archetype badge. */
+.ins-model.ins-v { background: #fff !important; border: 1px solid #E8EDEF !important; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.ins-vhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.ins-vhead h3 { margin: 0; }
+.ins-vmeta { font: 400 13px/18px Inter, sans-serif; color: #4D5D64; }
+.ins-vgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; align-items: start; }
+.ins-vcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ins-arch { align-self: flex-start; display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 8px; background: #115E59; color: #fff;
+  font: 600 17px/24px Inter, sans-serif; }
+.ins-arch.t-warm { background: #92400E; }
+.ins-arch.t-bad { background: #9F1239; }
+.ins-arch.t-neutral, .ins-arch.t-muted { background: #4D5D64; }
+.ins-arch.t-cool { background: #0F766E; }
+.ins-help { margin: 0; font: 400 13px/18px Inter, sans-serif; color: #4D5D64; }
+.ins-bigscore { margin: 0; display: flex; align-items: baseline; gap: 6px; }
+.ins-bigscore b { font: 600 36px/40px "Source Serif 4", Georgia, serif; color: #14232A; }
+.ins-bigscore span { font: 400 13px/18px Inter, sans-serif; color: #4D5D64; }
+.ins-sbar { height: 8px; border-radius: 4px; background: #E8EDEF; }
+.ins-sbar i { display: block; height: 8px; border-radius: 4px; background: #115E59; }
+.ins-confl { margin: 0; display: flex; align-items: center; gap: 10px; font: 600 15px/22px Inter, sans-serif; color: #14232A; }
+.ins-sig { display: inline-flex; gap: 3px; align-items: flex-end; }
+.ins-sig span { width: 6px; border-radius: 2px; background: #D3DCDF; }
+.ins-sig span.on { background: #14232A; }
+.ins-reasons2 { margin: 0; padding: 14px 0 0; border-top: 1px solid #E8EDEF; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.ins-reasons2 li { display: flex; gap: 12px; }
+.ins-reasons2 p { margin: 0; font: 400 14px/21px Inter, sans-serif; color: #14232A; }
+.ins-num { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #E3F3F1; color: #115E59; font: 700 13px/24px Inter, sans-serif; text-align: center; }
+.ins-reasons2 li.down .ins-num { background: #FDF3E3; color: #92400E; }
+.fac-sum { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 8px; }
+.fac-bar { display: flex; height: 12px; border-radius: 4px; overflow: hidden; gap: 2px; }
+.fac-key { display: flex; gap: 6px 16px; flex-wrap: wrap; align-items: center; font: 400 13px/18px Inter, sans-serif; color: #14232A; }
+.fac-key > span { display: inline-flex; gap: 6px; align-items: center; }
+.fac-sw { width: 12px; height: 12px; border-radius: 3px; }
+.ins-ptable { width: 100%; border-collapse: collapse; font: 400 13px/18px Inter, sans-serif; min-width: 380px; }
+.ins-ptable th { text-align: left; font: 600 12px/16px Inter, sans-serif; color: #4D5D64; padding: 0 8px 6px 0; }
+.ins-ptable td { padding: 8px 8px 8px 0; border-top: 1px solid #E8EDEF; vertical-align: middle; color: #14232A; }
+.ins-ptable .n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ins-code { font: 600 13px/18px ui-monospace, Menlo, monospace; white-space: nowrap; }
+.ins-pcell { display: flex; gap: 8px; align-items: center; }
+.ins-pbar { display: inline-block; height: 8px; border-radius: 4px; background: #115E59; }

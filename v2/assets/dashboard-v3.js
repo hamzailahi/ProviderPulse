@@ -1,5 +1,5 @@
 /* ============================================================================
-   dashboard-v3.js — the market dashboard's insight layer (index.html, served
+   dashboard-v3.js: the market dashboard's insight layer (index.html, served
    at /dashboard, the provider portal's Market tab).
 
    Loaded after index.html's main script and built on its globals (map,
@@ -54,7 +54,7 @@ function taxMatches(stored, terms) {
   for (var i = 0; i < terms.length; i++) if (nt.indexOf(' ' + taxNorm(terms[i])) !== -1) return true;
   return false;
 }
-function fmtN(n) { return n == null ? '—' : Number(n).toLocaleString(); }
+function fmtN(n) { return n == null ? '--' : Number(n).toLocaleString(); }
 
 /* ---------- session ------------------------------------------------------- */
 var session = null;
@@ -657,10 +657,16 @@ function drawProc(card, s) {
   } else {
     card.appendChild(el('p', {}, el('b', {}, fmtN(m.clinicians)), ' of the ' + fmtN(m.onMap) + ' ' + lower + ' listings on the map billed traditional Medicare in 2024: ',
       el('b', {}, fmtN(Math.round(m.services))), ' services across ', el('b', {}, fmtN(m.codes)), ' codes, and Medicare paid about ', el('b', {}, money(m.paid)), '.'));
-    card.appendChild(el('ul', { class: 'ins-proc-list' }, m.top.map(function (c) {
-      return el('li', {}, el('b', {}, c.code), ' ', clip(c.desc, 72),
-        el('span', { class: 'ins-proc-num' }, fmtN(Math.round(c.patients)) + ' patients · avg Medicare paid $' + (c.services ? (c.paid / c.services).toFixed(2) : '--')));
-    })));
+    var topMax = Math.max.apply(null, m.top.map(function (c) { return c.patients || 0; }).concat([1]));
+    card.appendChild(el('div', { class: 'fac-wrap' }, el('table', { class: 'ins-ptable' },
+      el('caption', { class: 'sr-only' }, 'Top codes: Medicare patients and average Medicare payment'),
+      el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, 'Code'), el('th', { scope: 'col' }, 'Procedure'), el('th', { scope: 'col' }, 'Patients'), el('th', { scope: 'col', class: 'n' }, 'Avg paid'))),
+      el('tbody', {}, m.top.map(function (c) {
+        var w = el('span', { class: 'ins-pbar' }); w.style.width = Math.max(4, Math.round((c.patients || 0) / topMax * 96)) + 'px';
+        return el('tr', {}, el('td', { class: 'ins-code' }, c.code), el('td', {}, clip(c.desc, 72)),
+          el('td', {}, el('span', { class: 'ins-pcell' }, w, el('span', { class: 'n' }, fmtN(Math.round(c.patients))))),
+          el('td', { class: 'n' }, c.services ? '$' + Math.round(c.paid / c.services).toLocaleString() : '--'));
+      })))));
   }
   var d = s.medicaid;
   if (d && d.claims > 0) {
@@ -694,6 +700,7 @@ function facilitiesCard(d) {
     el('p', {}, gaps.length
       ? 'Thin or missing here: ' + gaps.map(function (x) { return x.type.toLowerCase(); }).join(', ') + '. Patients in ' + catchWords(d) + ' travel further for these.'
       : 'Every kind of place is at least half the national rate here.'),
+    facBar(f),
     el('div', { class: 'fac-wrap' }, el('table', { class: 'fac-table' },
       el('thead', {}, el('tr', {}, el('th', {}, 'Kind of place'), el('th', {}, 'Sites'), el('th', {}, 'Per 10k adults'), el('th', {}, 'US'), el('th', {}, ''), el('th', {}, 'Nearest'))),
       el('tbody', {}, f.map(function (x) {
@@ -701,12 +708,26 @@ function facilitiesCard(d) {
         return el('tr', {},
           el('td', {}, x.type),
           el('td', { class: 'n' }, (x.floor ? '≥' : '') + fmtN(x.sites)),
-          el('td', { class: 'n' }, x.per_10k_adults == null ? '—' : String(x.per_10k_adults)),
-          el('td', { class: 'n' }, x.national_per_10k == null ? '—' : String(x.national_per_10k)),
+          el('td', { class: 'n' }, x.per_10k_adults == null ? '--' : String(x.per_10k_adults)),
+          el('td', { class: 'n' }, x.national_per_10k == null ? '--' : String(x.national_per_10k)),
           el('td', {}, w ? el('span', { class: 'fac-chip ' + w[1] }, w[0]) : el('span', { class: 'fac-chip muted' }, x.floor ? 'At least' : 'No US rate')),
-          el('td', { class: 'n' }, x.nearest_miles == null ? '—' : x.nearest_miles + ' mi'));
+          el('td', { class: 'n' }, x.nearest_miles == null ? '--' : x.nearest_miles + ' mi'));
       })))),
     el('p', { class: 'ins-src' }, 'Organizations listed in NPPES by their NUCC code, against all US listings per 10,000 adults. A listing is not opening hours: call before relying on one.'));
+}
+
+// How many kinds of place fall in each verdict, as one stacked bar.
+function facBar(f) {
+  var ORDER = [['none', 'None here', '#D9E3E5'], ['thin', 'Thin', '#B8DDD7'], ['below', 'Below US', '#8FCFC6'], ['typical', 'Typical', '#4FA89D'], ['above', 'Above US', '#115E59']];
+  var n = {}, tot = 0; f.forEach(function (x) { if (x.verdict) { n[x.verdict] = (n[x.verdict] || 0) + 1; tot++; } });
+  if (!tot) return null;
+  var parts = ORDER.filter(function (o) { return n[o[0]]; });
+  var bar = el('div', { class: 'fac-bar', role: 'img', 'aria-label': 'Of ' + tot + ' kinds of place: ' + parts.map(function (o) { return n[o[0]] + ' ' + o[1].toLowerCase(); }).join(', ') });
+  parts.forEach(function (o) { var sp = el('span'); sp.style.flex = String(n[o[0]]); sp.style.background = o[2]; bar.appendChild(sp); });
+  return el('div', { class: 'fac-sum' }, bar, el('div', { class: 'fac-key', 'aria-hidden': 'true' }, parts.map(function (o) {
+    var sw = el('span', { class: 'fac-sw' }); sw.style.background = o[2];
+    return el('span', {}, sw, o[1] + ' ', el('b', {}, String(n[o[0]])));
+  }), el('span', { class: 'ins-help' }, 'of ' + tot + ' kinds of place')));
 }
 
 // What the market model counted: every ZIP within 10 miles (at least the 10
@@ -785,19 +806,29 @@ function paintModel(p, d, M) {
   sw.value = h.specialty;
   sw.addEventListener('change', function () { focusSpec = sw.value; paintInsights(); });
 
-  p.appendChild(el('div', { class: 'ins-model t-' + tn },
-    el('div', { class: 'ins-eyebrow' }, 'Opportunity · ZIP ' + d.zip + (d.state ? ', ' + d.state : '')),
+  // The user's canvas (2026-11-03): verdict, score and confidence side by
+  // side, then the model's own reasons, numbered.
+  var sc = h.score == null ? null : Math.max(0, Math.min(100, h.score));
+  var confN = h.confidence === 'high' ? 3 : h.confidence === 'medium' ? 2 : 1;
+  var bars = el('span', { class: 'ins-sig', 'aria-hidden': 'true' }, [10, 15, 20].map(function (ht, i) {
+    return el('span', { class: i < confN ? 'on' : '', style: 'height:' + ht + 'px' });
+  }));
+  var scoreBar = el('div', { class: 'ins-sbar', role: 'img', 'aria-label': sc == null ? 'No score' : 'Score ' + sc + ' out of 100' });
+  if (sc != null) { var fillEl = el('i'); fillEl.style.width = sc + '%'; scoreBar.appendChild(fillEl); }
+  p.appendChild(el('article', { class: 'ins-model ins-v t-' + tn, 'aria-labelledby': 'ins-verdict-h' },
+    el('div', { class: 'ins-vhead' }, el('h3', { class: 'ins-eyebrow', id: 'ins-verdict-h' }, 'Opportunity verdict'),
+      el('span', { class: 'ins-vmeta' }, 'ZIP ' + d.zip + (d.state ? ', ' + d.state : ''))),
     sw,
-    el('div', { class: 'ins-mtop' },
-      el('div', { class: 'ins-ring', style: '--p:' + Math.max(0, Math.min(100, h.score || 0)) },
-        el('b', {}, h.score == null ? '—' : String(h.score)), el('span', {}, 'of 100')),
-      el('div', { class: 'ins-verdict' },
-        el('h3', {}, h.archetype_name),
-        el('span', { class: 'ins-conf c-' + h.confidence, title: 'How much of the model is backed by local data' },
-          h.confidence.charAt(0).toUpperCase() + h.confidence.slice(1) + ' confidence'))),
-    el('p', { class: 'ins-strategy' }, h.strategy),
-    h.reasons.length ? el('ul', { class: 'ins-reasons' }, h.reasons.map(function (r) {
-      return el('li', { class: r.direction === 'up' ? 'up' : 'down' }, el('i', { 'aria-hidden': 'true' }, r.direction === 'up' ? '▲' : '▼'), el('span', {}, r.text));
+    el('div', { class: 'ins-vgrid' },
+      el('div', { class: 'ins-vcol' }, el('span', { class: 'ins-arch t-' + tn }, h.archetype_name), el('p', { class: 'ins-help' }, h.strategy)),
+      el('div', { class: 'ins-vcol' },
+        el('p', { class: 'ins-bigscore' }, el('b', {}, sc == null ? '--' : String(sc)), el('span', {}, '/ 100 opportunity score')), scoreBar),
+      el('div', { class: 'ins-vcol' },
+        el('p', { class: 'ins-confl', title: 'How much of the model is backed by local data' }, bars, h.confidence.charAt(0).toUpperCase() + h.confidence.slice(1) + ' confidence'),
+        el('p', { class: 'ins-help' }, h.caveats.length ? h.caveats.length + ' data note' + (h.caveats.length === 1 ? '' : 's') + ' under How the score is built.' : 'Every factor is backed by local data.'))),
+    h.reasons.length ? el('ol', { class: 'ins-reasons2' }, h.reasons.map(function (r, i) {
+      return el('li', { class: r.direction === 'up' ? 'up' : 'down' }, el('span', { class: 'ins-num', 'aria-hidden': 'true' }, String(i + 1)),
+        el('p', {}, el('span', { class: 'sr-only' }, r.direction === 'up' ? 'Raises the score: ' : 'Lowers the score: '), r.text));
     })) : null));
   if (anchorNote) p.appendChild(el('p', { class: 'ins-note' }, anchorNote));
 
@@ -832,7 +863,7 @@ function paintModel(p, d, M) {
         onclick: function () { focusSpec = x.specialty; paintInsights(); insightsPanel.scrollTop = 0; } },
         el('span', { class: 'ins-rname' }, x.specialty),
         el('span', { class: 'ins-achip t-' + (ARCH_TONE[x.archetype] || 'neutral') }, x.archetype_name),
-        el('b', {}, x.score == null ? '—' : String(x.score))));
+        el('b', {}, x.score == null ? '--' : String(x.score))));
     })),
     ranked.length > 8 ? el('button', { type: 'button', class: 'ins-more', onclick: function () { showAllSpecs = !showAllSpecs; paintInsights(); } },
       showAllSpecs ? 'Show top 8' : 'Show all ' + ranked.length) : null,
