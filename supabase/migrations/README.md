@@ -82,6 +82,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 042 | `042_benchmark_care_type.sql` | allows kind `care_type` in `market_benchmarks` (organizations per facility type per 10,000 adults), keeping `demand_model`, which the live constraint already had | applied 2026-10-25 by `apply-migration.yml` |
 | 043 | `043_column_grants.sql` | anon and authenticated lose INSERT/UPDATE/DELETE on `provider_profiles`, `provider_locations`, `appointment_requests` and get back only the columns the functions write; `trg_appointment_guard` enforces status transitions by party (a provider could clear their own review hold, a patient confirm their own request) | applied 2026-10-25 by `apply-migration.yml` |
 | 044 | `044_provider_npis.sql` | `provider_npis` and `provider_npi_insurance` (one account, many NPIs), one-owner trigger across both listing tables, `appointment_requests.npi` with its guard, explicit service-role grants (incl. 041's table) | applied 2026-10-25 in the SQL editor; confirmed the same day: the public key gets permission denied (42501) on both new tables |
+| 045 | `045_deaconess_midtown_pin.sql` | Deaconess Midtown Hospital's listings at 600 Mary St, Evansville moved from a point 3.5 miles west onto the hospital; one-shot data fix that refuses a second run | applied 2026-11-03 by `apply-migration.yml` |
 
 Only 014 depends on another file (013). Everything else is creation order.
 
@@ -106,4 +107,3 @@ values ('Some Regional Plan', 'TN', 'commercial', 60);
 Plan names, Medicaid brands and Blue Cross licensees change. A missing plan
 degrades gracefully (both forms offer "Other"), but a wrong name looks worse
 than a missing one, so review the list before launch.
-| `045_deaconess_midtown_pin.sql` | Moves Deaconess Midtown Hospital's listings at 600 Mary St, Evansville from a point 3.5 miles west onto the hospital (2026-11-03). One-shot: a second run refuses. Applied by `apply-migration.yml`. |
