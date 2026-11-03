@@ -333,22 +333,31 @@
             </div>
 
             <div id="procedures-panel" style="display:none;flex:1;overflow-y:auto;padding:14px;background:var(--bg-base);">
-                <div style="margin-bottom:10px;position:sticky;top:0;background:var(--bg-base);padding-bottom:8px;z-index:10;border-bottom:1px solid var(--border);">
-                    <div id="procSourceToggle" role="group" aria-label="Procedure data source" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
-                        <button type="button" class="proc-src" data-src="medicare" aria-pressed="true">Medicare clinicians</button>
-                        <button type="button" class="proc-src" data-src="outpatient" aria-pressed="false">Medicare hospital outpatient</button>
-                        <button type="button" class="proc-src" data-src="inpatient" aria-pressed="false">Medicare hospital inpatient</button>
-                        <button type="button" class="proc-src" data-src="medicaid" aria-pressed="false">Medicaid</button>
+                <div class="pr-head">
+                    <div class="dm-head"><h3 class="dm-h">Procedures in the area</h3><p class="pp-help" id="proc-sub">Search an area to load what its providers bill</p></div>
+                    <div class="dm-card pr-search" aria-label="Source and search">
+                        <div id="procSourceToggle" class="pr-seg" role="group" aria-label="Data source">
+                            <button type="button" class="proc-src" data-src="medicare" aria-pressed="true">Medicare clinicians</button>
+                            <button type="button" class="proc-src" data-src="outpatient" aria-pressed="false">Hospital outpatient</button>
+                            <button type="button" class="proc-src" data-src="inpatient" aria-pressed="false">Hospital inpatient</button>
+                            <button type="button" class="proc-src" data-src="medicaid" aria-pressed="false">Medicaid</button>
+                        </div>
+                        <p class="pp-help" id="proc-meta"></p>
+                        <div class="pr-field">
+                            <label class="pr-label" for="proceduresSearch">Search procedures</label>
+                            <div class="pr-inputwrap">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4D5D64" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+                                <input id="proceduresSearch" type="search" autocomplete="off" placeholder="colonoscopy, or codes: 11102, 99213"
+                                    oninput="filterProcedures(this.value)">
+                            </div>
+                        </div>
+                        <div class="pr-try"><span class="pp-help">Try</span>
+                            <button type="button" class="pr-chip" data-q="colonoscopy">colonoscopy</button>
+                            <button type="button" class="pr-chip" data-q="skin biopsy">skin biopsy</button>
+                            <button type="button" class="pr-chip" data-q="11102, 17311, 99213">11102, 17311, 99213</button>
+                            <button type="button" class="pr-chip" data-q="office visit">office visit</button>
+                        </div>
                     </div>
-                    <style>
-                        .proc-src{font:500 11px 'DM Sans',sans-serif;padding:5px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-secondary);cursor:pointer;}
-                        .proc-src[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;}
-                        .proc-src:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-                        @media (max-width:640px){.proc-src{font-size:12px;padding:7px 10px;}}
-                    </style>
-                    <input id="proceduresSearch" type="text" placeholder="Search a code, word or specialty, or paste a list of codes..." 
-                        style="width:100%;box-sizing:border-box;padding:7px 10px;font-size:11px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:'DM Sans',sans-serif;outline:none;"
-                        oninput="filterProcedures(this.value)">
                 </div>
                 <div id="proceduresContent">
                     <em style="color:var(--text-muted);font-size:12px;">Click a ZIP boundary or search a ZIP to load Medicare procedure data.</em>
@@ -3900,8 +3909,8 @@
         function renderProceduresHTML(bySpec, filter) {
             if (filter && CodeList.parse(filter).isList) { runCodeList(CodeList.parse(filter), true); return; }
             const el = document.getElementById('proceduresContent');
-            const fmt  = v => v != null ? Math.round(v).toLocaleString() : '—';
-            const fmtD = v => v != null ? '$' + Number(v).toFixed(2) : '—';
+            const fmt  = v => v != null ? Math.round(v).toLocaleString() : '--';
+            const fmtD = v => v != null ? '$' + Number(v).toFixed(2) : '--';
 
             let html = '';
             let totalShown = 0;
@@ -3931,7 +3940,7 @@
                 if (!procs.length) return;
                 totalShown += procs.length;
 
-                const color = getSpecColor(specialty);
+                const color = "#115E59";   // one ink for every specialty (design system, 2026-11-03)
                 const maxBenes = procs[0]?.tot_benes || 1;
 
                 html += `
@@ -3963,7 +3972,7 @@
                             return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg-elevated)'" onmouseout="this.style.background=''">
                                 <td style="padding:5px 4px;max-width:180px;">
                                     <div style="color:var(--text-muted);font-size:9px;${cdHighlight}">${escHtml(p.hcpcs_cd)}</div>
-                                    <div style="color:var(--text-secondary);line-height:1.3;">${p.hcpcs_desc ? escHtml(p.hcpcs_desc) : '—'}</div>
+                                    <div style="color:var(--text-secondary);line-height:1.3;">${p.hcpcs_desc ? escHtml(p.hcpcs_desc) : '--'}</div>
                                     <div style="background:var(--bg-elevated);border-radius:2px;height:2px;margin-top:3px;overflow:hidden;">
                                         <div style="width:${barW}%;height:100%;background:${color};border-radius:2px;"></div>
                                     </div>
@@ -3988,7 +3997,7 @@
             }
 
             const summary = filter
-                ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${totalShown} results for "${escHtml(filter)}" — <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div>` +
+                ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${totalShown} results for "${escHtml(filter)}". <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div>` +
                   procNoteFor('medicare', filter) + '<div id="procCross"></div>'
                 : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">${totalShown.toLocaleString()} procedures across ${Object.keys(bySpec).length} specialties · 2024 Medicare FFS Part B</div>` +
                   (procPartial ? `<div style="font-size:10px;color:var(--orange);margin-bottom:10px;">${escHtml(procPartial)}</div>` : '');
@@ -4009,6 +4018,7 @@
             proceduresRawData = {};
             procPartial = '';
             procZips = zips || [];
+            procMeta();
             // A code list needs only its own rows, not the whole area's load.
             const pendingList = CodeList.parse(procPendingFilter);
             if (pendingList.isList && procZips.length) { procPendingFilter = ''; runCodeList(pendingList, true); return; }
@@ -4263,9 +4273,9 @@
             const el = document.getElementById('proceduresContent');
             if (r.error) { el.innerHTML = `<em style="color:var(--orange);font-size:12px;">The code list did not load: ${escHtml(r.error)}</em>`; return; }
             const s = r.summary;
-            const n = v => v != null && v !== 0 ? Math.round(v).toLocaleString() : (v === 0 ? '0' : '—');
-            const d0 = v => v ? '$' + Math.round(v).toLocaleString() : '—';
-            const d2 = v => v != null ? '$' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+            const n = v => v != null && v !== 0 ? Math.round(v).toLocaleString() : (v === 0 ? '0' : '--');
+            const d0 = v => v ? '$' + Math.round(v).toLocaleString() : '--';
+            const d2 = v => v != null ? '$' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
             const th = t => `<th style="text-align:right;padding:4px 6px;font-weight:600;color:var(--text-secondary);white-space:nowrap;border-bottom:1px solid var(--border);">${t}</th>`;
             const thL = t => `<th style="text-align:left;padding:4px 6px;font-weight:600;color:var(--text-secondary);white-space:nowrap;border-bottom:1px solid var(--border);">${t}</th>`;
             const td = v => `<td style="text-align:right;padding:4px 6px;white-space:nowrap;border-bottom:1px solid var(--border);">${v}</td>`;
@@ -4285,7 +4295,7 @@
             if (codeListView === 'code') {
                 html += table(thL('Code') + thL('Description') + th('Billers') + th('Patients') + th('Services') + th('Office / facility') + th('Avg allowed') + th('Avg paid') + th('Doctor fee') + th('Facility fee') + th('Est. Medicare paid') + th('Medicaid claims') + th('Medicaid paid'),
                     s.codes.map(c => '<tr>' + tdL(`<b>${escHtml(c.code)}</b>`) + tdL(escHtml(c.description || ''), 180) + td(n(c.billers)) + td(n(c.patients)) + td(n(c.services)) +
-                        td(c.services ? `${n(c.office)} / ${n(c.facility)}` : '—') + td(d2(c.avgAllowed)) + td(d2(c.avgPaid)) + td(d2(c.clinicianAvgPaid)) + td(d2(c.orgAvgPaid)) + td(d0(c.paid)) + td(c.inMedicaid ? n(c.mcdClaims) : '—') + td(c.inMedicaid ? d0(c.mcdPaid) : '—') + '</tr>').join(''));
+                        td(c.services ? `${n(c.office)} / ${n(c.facility)}` : '--') + td(d2(c.avgAllowed)) + td(d2(c.avgPaid)) + td(d2(c.clinicianAvgPaid)) + td(d2(c.orgAvgPaid)) + td(d0(c.paid)) + td(c.inMedicaid ? n(c.mcdClaims) : '--') + td(c.inMedicaid ? d0(c.mcdPaid) : '--') + '</tr>').join(''));
             } else if (codeListView === 'clinician') {
                 const shown = s.clinicians.slice(0, 200);
                 html += (s.clinicians.length > shown.length ? `<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;">Showing the top ${shown.length} of ${s.clinicians.length.toLocaleString()} by estimated Medicare paid. Copy as CSV has them all.</div>` : '') +
@@ -4378,9 +4388,10 @@
             const searchEl = document.getElementById('proceduresSearch');
             if (searchEl) {
                 searchEl.value = procPendingFilter;
-                searchEl.placeholder = src === 'medicare' ? 'Search a code, word or specialty, or paste a list of codes...'
-                    : src === 'medicaid' ? 'Search a code, word or specialty, or paste a list of codes...' : 'Search by code, description, or hospital...';
+                searchEl.placeholder = src === 'medicare' || src === 'medicaid' ? 'colonoscopy, or codes: 11102, 99213'
+                    : 'A word, a payment group, or a hospital';
             }
+            procMeta();
             if (procZips.length) fetchProceduresData(procZips);
             else document.getElementById('proceduresContent').innerHTML =
                 `<em style="color:var(--text-muted);font-size:12px;">Click a ZIP boundary or search a ZIP to load ${escHtml(src === 'medicare' ? 'Medicare' : PROC_SOURCES[src].label)} procedure data.</em>`;
@@ -4389,6 +4400,26 @@
             b.addEventListener('click', () => setProcSource(b.dataset.src, (document.getElementById('proceduresSearch') || {}).value || ''));
             b.setAttribute('aria-pressed', String(b.dataset.src === procSource));
         });
+        // The design's source note and "Try" examples (2026-11-03). What each
+        // source covers, in one line; the examples fill the box and search.
+        const PROC_META = {
+            medicare: 'What clinicians billed traditional Medicare, by the clinician\'s practice ZIP (CMS, 2024). Codes with fewer than 11 patients are left out by CMS.',
+            outpatient: 'Hospital outpatient services billed to traditional Medicare, by payment group (APC), for the hospitals nearest the map. Fewer than 11 patients withheld.',
+            inpatient: 'Inpatient stays billed to traditional Medicare, by diagnosis group (DRG), for the hospitals nearest the map. Fewer than 11 stays withheld.',
+            medicaid: 'Medicaid and CHIP claims placed at each provider\'s listed ZIP (HHS, newest year). Cells under 12 patients are withheld.'
+        };
+        function procMeta() {
+            const m = document.getElementById('proc-meta'); if (m) m.textContent = PROC_META[procSource] || '';
+            const sub = document.getElementById('proc-sub');
+            if (sub) sub.textContent = procZips && procZips.length ? 'Billed by providers in the ' + procZips.length.toLocaleString() + ' ZIP' + (procZips.length === 1 ? '' : 's') + ' on the map' : 'Search an area to load what its providers bill';
+        }
+        document.querySelectorAll('.pr-chip').forEach(b => b.addEventListener('click', () => {
+            const box = document.getElementById('proceduresSearch');
+            if (!box) return;
+            box.value = b.dataset.q;
+            filterProcedures(box.value);
+        }));
+        procMeta();
 
         async function procPaged(path) {
             let all = [], offset = 0;
@@ -4521,9 +4552,9 @@
             if (!otherProcData || otherProcData.source !== procSource) return;
             const cfg = PROC_SOURCES[otherProcData.source];
             const sortKey = cfg.cols[0][0];
-            const fmtN = v => v != null ? Math.round(v).toLocaleString() : '—';
-            const fmtD = v => v != null ? '$' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
-            const fmtD0 = v => v != null ? '$' + Math.round(v).toLocaleString() : '—';
+            const fmtN = v => v != null ? Math.round(v).toLocaleString() : '--';
+            const fmtD = v => v != null ? '$' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
+            const fmtD0 = v => v != null ? '$' + Math.round(v).toLocaleString() : '--';
             const cell = (t, v) => t === '$' ? fmtD(v) : t === '$0' ? fmtD0(v) : fmtN(v);
             let html = '', shown = 0;
             const names = cfg.group === 'hospital'
@@ -4538,7 +4569,7 @@
                     .sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0));
                 if (!procs.length) return;
                 shown += procs.length;
-                const color = cfg.group === 'specialty' ? getSpecColor(name) : 'var(--accent)';
+                const color = '#115E59';   // one ink for every group (design system, 2026-11-03)
                 const max = procs[0][sortKey] || 1;
                 html += `<div style="margin-bottom:18px;">
                     <div style="font-size:11px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -4561,7 +4592,7 @@
             if (!html) { el.innerHTML = procEmptyHtml(otherProcData.source, filter); paintCross(filter); return; }
             const groupWord = cfg.group === 'hospital' ? 'hospitals' : 'specialties';
             const summary = filter
-                ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${shown} results for "${escHtml(filter)}" — <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div><div id="procCross"></div>`
+                ? `<div style="font-size:10px;color:var(--accent);margin-bottom:10px;">Showing ${shown} results for "${escHtml(filter)}". <span style="cursor:pointer;text-decoration:underline;" onclick="document.getElementById('proceduresSearch').value='';filterProcedures('')">Clear</span></div><div id="procCross"></div>`
                 : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:10px;">${cfg.group === 'hospital' && hospitalRadius ? `Nearest hospitals within ${hospitalRadius} miles, closest first (distance from the centre of the area in view; a hospital is listed at the address it bills Medicare under). ` : ''}${shown.toLocaleString()} code${shown !== 1 ? 's' : ''} across ${names.length} ${names.length !== 1 ? groupWord : groupWord.replace(/ies$/, 'y').replace(/s$/, '')} · ${escHtml(otherProcData.year || '')} ${escHtml(cfg.unitNote)}</div>`;
             el.innerHTML = summary + html + `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;">${escHtml(cfg.foot)}</div>`;
             if (filter) paintCross(filter);
@@ -4696,7 +4727,7 @@
         /* ====================================================================
            REDESIGN WIRING
            Kept in one block at the end so it can be read (or reverted) as a
-           unit. It only adds behaviour — no existing function is replaced.
+           unit. It only adds behaviour no existing function is replaced.
            ==================================================================== */
 
         // 1. Relocate the omnibar into the topbar. Doing this in JS rather than

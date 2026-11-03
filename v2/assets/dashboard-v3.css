@@ -444,3 +444,36 @@ body.filters-open #map-legend { left: 306px; }
 .hl-all { margin-top: 12px; }
 .hl-all > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font: 600 14px/20px Inter, sans-serif; color: #115E59; }
 .hl-all[open] > summary { margin-bottom: 8px; }
+
+/* Procedures tab (2026-11-03, same canvas): heading, a source and search
+   card, and the existing result tables at the design's sizes. The tables
+   are built as HTML strings with inline sizes, so these rules lift them. */
+#procedures-panel { background: #fff !important; }
+.pr-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; font-family: Inter, system-ui, sans-serif; }
+.pr-search { gap: 12px; }
+.pr-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.pr-seg .proc-src { min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #D3DCDF; background: #fff; color: #14232A;
+  font: 500 14px/20px Inter, sans-serif; cursor: pointer; }
+.pr-seg .proc-src[aria-pressed="true"] { background: #115E59; border-color: #115E59; color: #fff; }
+.pr-seg .proc-src:focus-visible, .pr-chip:focus-visible { outline: 3px solid #1D4ED8; outline-offset: 2px; }
+.pr-field { display: flex; flex-direction: column; gap: 6px; }
+.pr-label { font: 600 14px/20px Inter, sans-serif; color: #14232A; }
+.pr-inputwrap { position: relative; }
+.pr-inputwrap svg { position: absolute; left: 14px; top: 14px; pointer-events: none; }
+#proceduresSearch { width: 100%; box-sizing: border-box; min-height: 48px; padding: 0 14px 0 44px; border-radius: 8px; border: 1px solid #74858C;
+  background: #fff; color: #14232A; font: 400 15px/22px Inter, sans-serif; }
+#proceduresSearch:focus { border-color: #0F766E; outline: 3px solid #1D4ED8; outline-offset: 2px; }
+.pr-try { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pr-chip { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid #D3DCDF; background: #F5F8F8; color: #14232A;
+  font: 500 13px/18px Inter, sans-serif; cursor: pointer; }
+.pr-chip:hover { border-color: #0F766E; background: #E3F3F1; }
+#proceduresContent { font-family: Inter, system-ui, sans-serif; color: #14232A; }
+#proceduresContent [style*="font-size:9px"] { font-size: 12px !important; }
+#proceduresContent [style*="font-size:10px"] { font-size: 13px !important; line-height: 1.45 !important; }
+#proceduresContent [style*="font-size:11px"] { font-size: 13px !important; }
+#proceduresContent [style*="font-size:12px"] { font-size: 14px !important; }
+#proceduresContent table { font-size: 13px !important; }
+#proceduresContent th { font: 600 12px/16px Inter, sans-serif !important; color: #4D5D64 !important; background: #fff !important; padding: 8px 6px !important;
+  border-bottom: 1px solid #D3DCDF !important; }
+#proceduresContent td { padding: 8px 6px !important; border-color: #E8EDEF !important; }
+#proceduresContent tr { border-color: #E8EDEF !important; }
