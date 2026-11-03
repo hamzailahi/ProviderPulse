@@ -1,3 +1,4 @@
 date,source,records,added_orgs,added_clinicians,added_sites,updated,removed,geocoded,census_exact,google,unplaced
 2026-10-28,api,5104,39,165,0,151,0,333,299,0,34
 2026-11-03,NPPES_Data_Dissemination_November_2026_V2.zip,9891116,92413,410836,0,296252,23143,325815,243580,0,81235
+2026-11-03,NPPES_Data_Dissemination_November_2026_V2.zip,9891116,82943,355424,0,277,0,7996,5439,0,1557
