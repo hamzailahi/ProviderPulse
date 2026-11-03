@@ -1732,6 +1732,12 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   `supabase/reference/hospital-campus-candidates.csv` / `.md` for review. One
   query, no temp tables (a read-only transaction refuses them; found on a
   local Postgres first).
+  Step `parents` (2026-11-03, `scripts/hospital-campus-parents.sh`) reads
+  `supabase/reference/hospital-campus-shortlist.csv` (165 rows: a hospital-named
+  organization, a hospital department code there, 50+ clinicians at the
+  address) and writes `hospital-campus-parents.csv`: every hospital-coded
+  organization within about 20 miles of each, nearest first, to find the NPI
+  a campus bills under. Still read only; rows reach the campus list by hand.
 - **Schema snapshot** (`schema-snapshot.yml`, weekly Mondays): see Supabase
   schema. It commits to `main` itself (`[skip netlify]`); those bot commits
   and `nppes-refresh.yml`'s are the exceptions to the README-per-push rule.

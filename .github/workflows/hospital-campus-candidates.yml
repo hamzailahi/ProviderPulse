@@ -9,6 +9,12 @@ name: Hospital campus candidates
 # has the query; the results are committed to supabase/reference/.
 on:
   workflow_dispatch:
+    inputs:
+      step:
+        description: 'candidates (the full list) or parents (hospital listings near each shortlisted campus)'
+        type: choice
+        options: [candidates, parents]
+        default: candidates
 
 permissions:
   contents: write
@@ -45,13 +51,20 @@ jobs:
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
       - name: Find candidates
+        if: inputs.step != 'parents'
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: bash scripts/hospital-campus-candidates.sh
 
+      - name: Find nearby hospital listings for the shortlist
+        if: inputs.step == 'parents'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/hospital-campus-parents.sh
+
       - name: Commit the list
         run: |
-          git add supabase/reference/hospital-campus-candidates.csv supabase/reference/hospital-campus-candidates.md
+          git add supabase/reference/hospital-campus-*
           if git diff --cached --quiet; then echo "Nothing to commit."; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-10-30. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-03. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -647,6 +647,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-03
+
+- Hospital campus review: a shortlist of 165 likely campuses (a hospital-named organization at a hospital department code, 50+ clinicians at the address) is saved beside the full candidate list, and the read-only candidates job has a new "parents" step that lists the hospital-coded listings within about 20 miles of each, so the hospital NPI a campus bills under can be found before it is checked and added by hand.
 
 ### 2026-10-30
 
