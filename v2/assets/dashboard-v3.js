@@ -1391,6 +1391,305 @@ if (isProviderAcct) {
   refresh();
 })();
 
+/* ---- Health tab (2026-11-03, the user's canvas "Market") ------------------
+   CDC PLACES from our own cdc_places table, every ZIP on the map, each
+   measure weighted by the ZIP's adults (the newest year per ZIP and
+   measure); the US figure is the median ZIP from market_benchmarks (kind
+   measure), so only measures the market model uses carry one. Then the
+   county Medicare card: utilization (Original Medicare) and enrollment for
+   the counties holding the map's residents (HUD crosswalk), with a picker.
+   No invented comparisons: a figure we do not hold is left out. A failed
+   lookup says so and offers Try again; it is never cached. */
+(function healthTab() {
+  var panel = $('health-panel');
+  if (!panel) return;
+  var SB = window.SUPABASE_URL || (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : null);
+  var KEY = window.SUPABASE_KEY || (typeof SUPABASE_KEY !== 'undefined' ? SUPABASE_KEY : null);
+  var CHRONIC = ['DIABETES', 'OBESITY', 'BPHIGH', 'DEPRESSION', 'CHD', 'COPD'];
+  var SUB = { DIABETES: 'Diagnosed', OBESITY: 'BMI 30 or higher', BPHIGH: 'Diagnosed', DEPRESSION: 'Ever diagnosed', CHD: 'Diagnosed',
+    COPD: 'Diagnosed', CSMOKING: 'Adults who smoke now', CHECKUP: 'Saw a doctor for a checkup in the past year', HIGHCHOL: 'Diagnosed, among those screened',
+    ARTHRITIS: 'Diagnosed', CASTHMA: 'Current asthma', STROKE: 'Ever had one', CANCER: 'Excluding skin cancer', TEETHLOST: 'Aged 65+, all teeth lost',
+    DENTAL: 'Saw a dentist in the past year', VISION: 'Vision disability', HEARING: 'Hearing disability', MOBILITY: 'Mobility disability',
+    COGNITION: 'Cognitive disability', SELFCARE: 'Self-care disability', INDEPLIVE: 'Independent living disability', MHLTH: '14+ poor mental health days a month',
+    PHLTH: '14+ poor physical health days a month', LPA: 'No leisure-time activity', SLEEP: 'Under 7 hours a night', BINGE: 'Binge drinking',
+    COLON_SCREEN: 'Screened, ages 45 to 75', ACCESS2: 'No health insurance, ages 18 to 64', FOODINSECU: 'In the past 12 months', LACKTRPT: 'In the past 12 months',
+    LONELINESS: 'Often or always', EMOTIONSPT: 'Lacks social and emotional support', KIDNEY: 'Chronic kidney disease' };
+  var state = { key: '', zips: [], loading: false, failed: 0, groups: 0, meas: null, adults: 0, zipsWith: 0, counties: [], county: null, countyCache: {} };
+  var bench = null;   // { id: p50 } once loaded; {} if it failed (no tick, said so)
+
+  var root = el('div', { id: 'hl-root', class: 'dm' });
+  panel.insertBefore(root, panel.firstChild);
+  // The old Medicare card is superseded by the county card here; the full
+  // PLACES list (CDC's own API) stays below, collapsed.
+  var oldCms = $('cmsMetrics'); if (oldCms && oldCms.parentNode) oldCms.parentNode.classList.add('v3-hidden');
+  var oldPlaces = $('placesMetrics');
+  if (oldPlaces && oldPlaces.parentNode) {
+    var card = oldPlaces.parentNode, h = card.querySelector('h4');
+    var det = el('details', { class: 'hl-all' }, el('summary', {}, 'Every CDC PLACES measure'));
+    card.parentNode.insertBefore(det, card); det.appendChild(card);
+    if (h) h.textContent = 'All measures (CDC PLACES, ZIP average)';
+  }
+
+  function get(path, ms) {
+    return fetch(SB + '/rest/v1/' + path, { headers: { apikey: KEY, Accept: 'application/json' }, signal: AbortSignal.timeout(ms || 8000) })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) { if (!Array.isArray(j)) throw new Error('not a list'); return j; });
+  }
+  // Groups of 10 ZIPs, offset pages, four groups in flight. A failed group
+  // is counted, never read as "no data".
+  function loadPlaces(zips) {
+    var groups = [], out = [], failed = 0;
+    for (var i = 0; i < zips.length; i += 10) groups.push(zips.slice(i, i + 10));
+    function one(g) {
+      function page(off) {
+        return get('cdc_places?zip=in.(' + g.join(',') + ')&select=zip,measureid,short_text,measure,categoryid,value,pop_18plus,data_year' +
+          '&order=zip,measureid,data_year&limit=1000&offset=' + off, 8000).then(function (rows) {
+          out = out.concat(rows);
+          if (rows.length === 1000 && off < 4000) return page(off + 1000);
+        });
+      }
+      return page(0).catch(function () { failed++; });
+    }
+    var idx = 0;
+    function worker() { if (idx >= groups.length) return Promise.resolve(); var g = groups[idx++]; return one(g).then(worker); }
+    return Promise.all([worker(), worker(), worker(), worker()]).then(function () { return { rows: out, failed: failed, groups: groups.length }; });
+  }
+  function loadBench() {
+    if (bench) return Promise.resolve(bench);
+    return get('market_benchmarks?kind=eq.measure&select=key,data', 6000).then(function (rows) {
+      bench = {}; rows.forEach(function (r) { if (r.data && r.data.p50 != null) bench[r.key] = Number(r.data.p50); });
+      return bench;
+    }).catch(function () { return {}; });   // not cached: the next area asks again
+  }
+  function summarize(rows) {
+    var newest = {}, adultsByZip = {};
+    rows.forEach(function (r) {
+      var k = r.zip + '|' + r.measureid, cur = newest[k];
+      if (!cur || String(r.data_year || '') >= String(cur.data_year || '')) newest[k] = r;
+      if (r.pop_18plus != null) adultsByZip[r.zip] = Number(r.pop_18plus) || 0;
+    });
+    var meas = {};
+    Object.keys(newest).forEach(function (k) {
+      var r = newest[k], v = Number(r.value), a = Number(r.pop_18plus) || 0;
+      if (r.value == null || !isFinite(v) || a <= 0) return;
+      var m = meas[r.measureid] || (meas[r.measureid] = { id: r.measureid, name: r.short_text || r.measure || r.measureid, w: 0, adults: 0, est: 0, zips: 0, year: r.data_year });
+      m.w += v * a; m.adults += a; m.est += v / 100 * a; m.zips++;
+    });
+    Object.keys(meas).forEach(function (k) { meas[k].value = meas[k].w / meas[k].adults; });
+    var adults = 0; Object.keys(adultsByZip).forEach(function (z) { adults += adultsByZip[z]; });
+    return { meas: meas, adults: adults, zips: Object.keys(adultsByZip).length };
+  }
+
+  function spec() {
+    var sel = $('specialty-select');
+    return focusSpec || (sel && sel.value) || (mySpec && mySpec.label) || null;
+  }
+  function round100(n) { return n >= 1000 ? Math.round(n / 100) * 100 : Math.round(n); }
+
+  function rowEl(m) {
+    var us = bench && bench[m.id] != null ? bench[m.id] : null;
+    var d = us != null ? m.value - us : null;
+    var sub = SUB[m.id] || '';
+    var li = el('li', { class: 'hl-row' },
+      el('span', { class: 'sr-only' }, m.name + ': ' + m.value.toFixed(1) + '% of adults here' + (us != null ? ', US median ZIP ' + us.toFixed(1) + '%' : '') + ', about ' + round100(m.est).toLocaleString() + ' adults'),
+      el('span', { class: 'hl-name', 'aria-hidden': 'true' }, m.name, sub ? el('span', {}, sub) : null));
+    var track = el('span', { class: 'hl-track', 'aria-hidden': 'true' });
+    var fill = el('span', { class: 'hl-fill' }); fill.style.width = Math.min(100, m.value / m.max * 100).toFixed(1) + '%'; track.appendChild(fill);
+    if (us != null) { var t = el('span', { class: 'hl-tick' }); t.style.left = Math.min(100, us / m.max * 100).toFixed(1) + '%'; track.appendChild(t); }
+    li.appendChild(track);
+    li.appendChild(el('span', { class: 'hl-rate', 'aria-hidden': 'true' }, m.value.toFixed(1) + '%',
+      el('span', {}, d == null ? 'no US figure' : (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(1) + ' vs. US')));
+    li.appendChild(el('span', { class: 'hl-count', 'aria-hidden': 'true' }, '≈ ' + round100(m.est).toLocaleString()));
+    return li;
+  }
+  function group(id, title, note, list) {
+    var art = el('article', { class: 'dm-card hl-card', 'aria-labelledby': id },
+      el('div', {}, el('h4', { class: 'dm-h', id: id }, title), note ? el('p', { class: 'pp-help' }, note) : null));
+    if (!list.length) return art;
+    var max = 0; list.forEach(function (m) { var us = bench && bench[m.id]; max = Math.max(max, m.value, us || 0); });
+    max = Math.min(100, Math.max(10, Math.ceil(max * 1.1 / 10) * 10));
+    list.forEach(function (m) { m.max = max; });
+    art.appendChild(el('div', { class: 'hl-row hl-head', 'aria-hidden': 'true' }, el('span', {}, 'Measure'), el('span', {}, 'Here vs. US median ZIP'), el('span', { class: 'hl-r' }, 'Here'), el('span', { class: 'hl-r' }, 'Est. adults')));
+    art.appendChild(el('ul', { class: 'hl-list' }, list.map(rowEl)));
+    art.appendChild(el('div', { class: 'hl-row hl-axisrow', 'aria-hidden': 'true' }, el('span'),
+      el('span', { class: 'hl-axis' }, [0, .5, 1].map(function (f) { return el('span', {}, Math.round(max * f) + '%'); })), el('span'), el('span')));
+    return art;
+  }
+
+  function paint() {
+    while (root.firstChild) root.removeChild(root.firstChild);
+    var head = el('div', { class: 'dm-head' }, el('h3', { class: 'dm-h' }, 'Health in the area'),
+      el('p', { class: 'pp-help' }, state.zips.length ? 'Adults 18+ across ' + (state.zipsWith || state.zips.length) + ' ZIP' + ((state.zipsWith || state.zips.length) === 1 ? '' : 's') + ', weighted by adult population' : 'Search an area to see its health measures'));
+    root.appendChild(head);
+    if (!state.zips.length) return;
+    if (state.loading) { root.appendChild(el('div', { class: 'dm-card' }, el('p', { class: 'pp-help' }, 'Reading CDC PLACES for these ZIPs…'))); return; }
+    if (!state.meas || !Object.keys(state.meas).length) {
+      var c = el('div', { class: 'dm-card' });
+      if (state.failed) {
+        c.appendChild(el('p', {}, 'Health measures for these ZIPs did not load. This is a failed lookup, not an area with no data.'));
+        c.appendChild(el('button', { type: 'button', class: 'dm-btn', onclick: function () { state.key = ''; load(state.zips); } }, 'Try again'));
+      } else c.appendChild(el('p', { class: 'pp-help' }, 'CDC PLACES has no estimates for these ZIPs (it does not cover Puerto Rico or the territories).'));
+      root.appendChild(c);
+    } else {
+      root.appendChild(el('div', { class: 'hl-key', 'aria-hidden': 'true' },
+        el('span', {}, el('span', { class: 'hl-swfill' }), 'Rate here'), el('span', {}, el('span', { class: 'hl-swtick' }), 'US median ZIP')));
+      if (state.failed) root.appendChild(el('p', { class: 'hl-warn' }, state.failed + ' of ' + state.groups + ' ZIP groups did not load, so these rates leave some ZIPs out. ',
+        el('button', { type: 'button', class: 'dm-btn dm-btn--quiet', onclick: function () { state.key = ''; load(state.zips); } }, 'Try again')));
+      var sp = spec(), prof = sp && window.MarketModel && MarketModel.PROFILES[sp];
+      var ids = prof ? prof.m.map(function (x) { return x[0]; }) : [];
+      var lead = ids.map(function (id) { return state.meas[id]; }).filter(Boolean);
+      var missing = ids.filter(function (id) { return !state.meas[id]; });
+      if (sp) {
+        var note = !ids.length ? 'CDC PLACES has no measure tied to ' + sp.toLowerCase() + ', so the market model scores its need on age alone, or not at all.'
+          : 'The measures the market model uses for this specialty\'s need.' + (missing.length ? ' Not published for these ZIPs: ' + missing.join(', ') + '.' : '');
+        root.appendChild(group('hl-lead', 'Most relevant to ' + sp.toLowerCase(), note, lead));
+      } else root.appendChild(el('p', { class: 'pp-help' }, 'Pick a specialty to see the measures that matter for it.'));
+      var chronic = CHRONIC.filter(function (id) { return ids.indexOf(id) < 0; }).map(function (id) { return state.meas[id]; }).filter(Boolean);
+      if (chronic.length) root.appendChild(group('hl-chronic', 'Chronic conditions', 'Common conditions that shape visit volume and complexity.', chronic));
+    }
+    root.appendChild(countyCard());
+    var yr = state.meas && Object.keys(state.meas).length ? state.meas[Object.keys(state.meas)[0]].year : null;
+    root.appendChild(el('p', { class: 'pp-help dm-note' }, 'Sources: CDC PLACES' + (yr ? ' (' + yr + ' estimates)' : '') + ', model-based rates for adults, weighted here by each ZIP\'s adults; the US figure is the median across US ZIPs (ZCTAs), not a national rate, and only the measures the market model uses carry one. CMS Medicare Geographic Variation (Original Medicare only) and CMS Medicare enrollment, by county.'));
+  }
+
+  // ---- county Medicare card
+  // A name before the county's own rows arrive: index.html's county list
+  // and the state from the FIPS prefix.
+  function countyGuess(fips) {
+    var n = null, st = null;
+    try { n = COUNTY_NAMES[fips]; } catch (e) {}
+    try { Object.keys(STATE_FIPS).forEach(function (k) { if (STATE_FIPS[k] === String(fips).slice(0, 2)) st = k; }); } catch (e) {}
+    return n ? n + (st ? ', ' + st : '') : null;
+  }
+  function countyLabel(c) { return c.name || (c.short ? c.short.replace(/, (\w\w)$/, ' County, $1') : 'County ' + c.fips); }
+  function countyCard() {
+    var art = el('article', { class: 'dm-card', 'aria-labelledby': 'hl-county' });
+    if (!state.counties.length) {
+      art.appendChild(el('h4', { class: 'dm-h', id: 'hl-county' }, 'Medicare use'));
+      art.appendChild(el('p', { class: 'pp-help' }, state.countyFailed ? 'The county lookup did not load. Click a county on the map to load its Medicare figures.' : 'Click a county on the map to load its Medicare figures.'));
+      return art;
+    }
+    var c = state.county || state.counties[0], d = state.countyCache[c.fips];
+    var top = el('div', { class: 'hl-ctop' },
+      el('div', { class: 'hl-ctitle' }, el('span', { class: 'hl-badge' }, 'County-wide'),
+        el('h4', { class: 'dm-h', id: 'hl-county' }, 'Medicare use, ' + countyLabel(c)),
+        el('p', { class: 'pp-help' }, (c.zips ? 'Home county of ' + c.zips + ' of ' + state.zipsTotal + ' ZIPs on the map. ' : '') + 'Covers the whole county, not just the ZIPs on the map.')));
+    if (state.counties.length > 1) {
+      top.appendChild(el('div', { class: 'hl-seg', role: 'group', 'aria-label': 'County' }, state.counties.slice(0, 6).map(function (o) {
+        return el('button', { type: 'button', 'aria-pressed': o.fips === c.fips ? 'true' : 'false', onclick: function () { pickCounty(o.fips); } }, o.short || countyLabel(o));
+      })));
+    }
+    art.appendChild(top);
+    if (!d || d.loading) { art.appendChild(el('p', { class: 'pp-help' }, 'Loading Medicare figures…')); return art; }
+    if (d.failed) {
+      art.appendChild(el('p', {}, 'Medicare figures for this county did not load.'));
+      art.appendChild(el('button', { type: 'button', class: 'dm-btn', onclick: function () { delete state.countyCache[c.fips]; pickCounty(c.fips); } }, 'Try again'));
+      return art;
+    }
+    var u = d.util, e = d.enroll, N = function (v) { return v == null ? null : Number(v); };
+    var stats = [];
+    if (u) {
+      var rr = N(u.readmission_rate); if (rr != null && rr <= 1) rr *= 100;
+      if (u.er_visits_per_1000 != null) stats.push(['ER visits per 1,000', Math.round(N(u.er_visits_per_1000)).toLocaleString(), 'Original Medicare, ' + u.year]);
+      if (u.ip_stays_per_1000 != null) stats.push(['Inpatient stays per 1,000', Math.round(N(u.ip_stays_per_1000)).toLocaleString(), 'Original Medicare, ' + u.year]);
+      if (rr != null) stats.push(['Readmission rate', rr.toFixed(1) + '%', 'Of inpatient stays']);
+      if (u.per_capita_payment != null) stats.push(['Medicare paid per person', '$' + Math.round(N(u.per_capita_payment)).toLocaleString(), 'Original Medicare, ' + u.year]);
+    }
+    if (e && e.total_benes != null) stats.push(['People on Medicare', N(e.total_benes).toLocaleString(), e.data_month + ' ' + e.data_year]);
+    if (stats.length) art.appendChild(el('div', { class: 'hl-stats' }, stats.map(function (s) { return el('div', { class: 'dm-tile' }, el('p', { class: 'pp-help' }, s[0]), el('p', { class: 'dm-big' }, s[1]), el('p', { class: 'dm-sub' }, s[2])); })));
+    else art.appendChild(el('p', { class: 'pp-help' }, 'CMS publishes no utilization row for this county.'));
+    if (e && N(e.total_benes) > 0 && e.ma_and_other_benes != null) {
+      var ma = N(e.ma_and_other_benes) / N(e.total_benes) * 100, ffs = 100 - ma;
+      var bar = el('div', { class: 'hl-mabar', role: 'img', 'aria-label': ma.toFixed(0) + '% in Medicare Advantage and other plans, ' + ffs.toFixed(0) + '% in Original Medicare' });
+      var a = el('span', { class: 'hl-ma' }); a.style.width = ma.toFixed(1) + '%'; bar.appendChild(a); bar.appendChild(el('span', { class: 'hl-ffs' }));
+      art.appendChild(el('div', { class: 'hl-mablock' },
+        el('div', { class: 'dm-split' }, el('span', { class: 'dm-strong' }, 'Medicare Advantage share'), el('span', { class: 'dm-strong dm-num' }, ma.toFixed(0) + '%')),
+        bar,
+        el('div', { class: 'hl-key', 'aria-hidden': 'true' }, el('span', {}, el('span', { class: 'dm-sw', style: 'background:#3730A3' }), 'Medicare Advantage and other'), el('span', {}, el('span', { class: 'dm-sw', style: 'background:#C9D1F2' }), 'Original Medicare')),
+        u ? el('p', { class: 'pp-help' }, 'The utilization figures above cover Original Medicare only, so they describe the ' + ffs.toFixed(0) + '% not in Medicare Advantage.') : null));
+    }
+    return art;
+  }
+  function pickCounty(fips, label) {
+    var c = state.counties.filter(function (x) { return x.fips === fips; })[0];
+    if (!c) { c = { fips: fips, name: label || null, zips: 0, short: countyGuess(fips) }; state.counties.unshift(c); }
+    else if (label && !c.name) c.name = label;
+    state.county = c;
+    var cached = state.countyCache[fips];
+    if (!cached) {
+      state.countyCache[fips] = { loading: true };
+      Promise.all([
+        get('cms_county_utilization?fips=eq.' + fips + '&select=fips,county_name,year,total_beneficiaries,er_visits_per_1000,ip_stays_per_1000,readmission_rate,per_capita_payment,er_visits,ip_stays,readmissions,dialysis_users,snf_users,home_health_users,hospice_users&order=year.desc&limit=1', 6000),
+        get('medicare_county_enrollment?fips=eq.' + fips + '&select=fips,state,county,data_year,data_month,total_benes,original_medicare_benes,ma_and_other_benes&limit=1', 6000)
+      ]).then(function (res) {
+        var u = res[0][0] || null, e = res[1][0] || null;
+        state.countyCache[fips] = { util: u, enroll: e };
+        if (e && !c.name) c.name = e.county + (/county|parish|borough/i.test(e.county) ? '' : ' County') + ', ' + e.state;
+        if (e) c.short = e.county.replace(/ (County|Parish|Borough|Census Area|Municipality)$/i, '') + ', ' + e.state;
+        if (u) window.cmsDataCache = { county: u.county_name, total_beneficiaries: u.total_beneficiaries, er_visits: u.er_visits, er_visits_per_1000: u.er_visits_per_1000,
+          ip_stays: u.ip_stays, readmissions: u.readmissions, readmission_rate: u.readmission_rate, dialysis_users: u.dialysis_users, snf_users: u.snf_users,
+          home_health_users: u.home_health_users, hospice_users: u.hospice_users, per_capita_payment: u.per_capita_payment };
+        if (state.county === c) paint();
+      }).catch(function () { state.countyCache[fips] = { failed: true }; if (state.county === c) paint(); });
+    }
+    paint();
+  }
+  // The counties holding the map's residents: each ZIP's adults split by the
+  // HUD residential ratio; 1% or more of the area's residents; most first.
+  function loadCounties(zips, adultsByZip) {
+    var groups = []; for (var i = 0; i < zips.length; i += 100) groups.push(zips.slice(i, i + 100));
+    return Promise.all(groups.map(function (g) { return get('zip_county_crosswalk?zip=in.(' + g.join(',') + ')&select=zip,fips,res_ratio&limit=1000', 6000); }))
+      .then(function (parts) {
+        var rows = [].concat.apply([], parts), w = {}, home = {}, best = {}, tot = 0;
+        rows.forEach(function (x) {
+          var r = Number(x.res_ratio) || 0, a = (adultsByZip[x.zip] != null ? adultsByZip[x.zip] : 1) * r;   // no adult count (PLACES failed): weigh ZIPs alike
+          w[x.fips] = (w[x.fips] || 0) + a; tot += a;
+          if (!best[x.zip] || r > best[x.zip].r) best[x.zip] = { fips: x.fips, r: r };
+        });
+        Object.keys(best).forEach(function (z) { home[best[z].fips] = (home[best[z].fips] || 0) + 1; });
+        state.zipsTotal = zips.length;
+        state.counties = Object.keys(w).filter(function (f) { return tot && w[f] / tot >= 0.01; })
+          .sort(function (a, b) { return w[b] - w[a]; })
+          .map(function (f) { return { fips: f, zips: home[f] || 0, name: null, short: countyGuess(f) }; });
+        state.countyFailed = false;
+      }).catch(function () { state.counties = []; state.countyFailed = true; });
+  }
+
+  function load(zips) {
+    zips = (zips || []).map(function (z) { return String(z).split('-')[0].trim().padStart(5, '0'); })
+      .filter(function (z, i, a) { return /^\d{5}$/.test(z) && z !== '00000' && a.indexOf(z) === i; }).slice(0, 300);
+    var key = zips.slice().sort().join(',');
+    if (key === state.key && !state.loading) { paint(); return; }
+    state.key = key; state.zips = zips; state.loading = !!zips.length; state.meas = null; state.failed = 0;
+    paint();
+    if (!zips.length) return;
+    var mine = key;
+    Promise.all([loadPlaces(zips), loadBench()]).then(function (res) {
+      if (state.key !== mine) return;                   // a newer area won
+      var p = res[0], sum = summarize(p.rows);
+      state.failed = p.failed; state.groups = p.groups; state.meas = sum.meas; state.zipsWith = sum.zips;
+      if (p.failed) state.key = '';                     // never keep a partial load
+      var adultsByZip = {}; p.rows.forEach(function (r) { if (r.pop_18plus != null) adultsByZip[r.zip] = Number(r.pop_18plus) || 0; });
+      var keepCounty = state.county && state.county.fips;
+      return loadCounties(zips, adultsByZip).then(function () {
+        if (state.key !== mine && state.key !== '') return;
+        state.loading = false;
+        var still = keepCounty && state.counties.filter(function (c) { return c.fips === keepCounty; })[0];
+        if (state.counties.length) pickCounty(still ? keepCounty : state.counties[0].fips);
+        else { state.county = null; paint(); }
+      });
+    }).catch(function () { state.loading = false; state.failed = 1; state.key = ''; paint(); });
+  }
+
+  window.ppHealth = { load: load, pickCounty: pickCounty, repaint: function () { if (!state.loading) paint(); } };
+  paint();
+  // The lead group follows the specialty filter, like the Insights headline.
+  var specSel = $('specialty-select');
+  if (specSel) specSel.addEventListener('change', function () { setTimeout(window.ppHealth.repaint, 0); });
+  var baseSwitch = window.switchTab;
+  window.switchTab = function (tab) { baseSwitch(tab); if (tab === 'health') window.ppHealth.repaint(); };
+})();
+
 function authHeadersSync() {
   return session && session.access_token ? { Authorization: 'Bearer ' + session.access_token } : {};
 }

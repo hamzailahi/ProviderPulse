@@ -400,3 +400,47 @@ body.filters-open #map-legend { left: 306px; }
 /* 16 columns in a 416px panel: every other band is labelled (each column's
    screen-reader text and tooltip still name its band). */
 .dm-lab--odd { visibility: hidden; }
+
+/* Health tab (2026-11-03, the same canvas): local rate as a bar, the US
+   median ZIP as a tick, the estimated adults beside it; then the county
+   Medicare card. */
+#health-panel { background: #fff !important; }
+#hl-root { margin-bottom: 14px; }
+.hl-key { display: flex; gap: 16px; flex-wrap: wrap; font: 400 13px/18px Inter, sans-serif; color: #4D5D64; align-items: center; }
+.hl-key > span { display: inline-flex; gap: 6px; align-items: center; }
+.hl-swfill { display: inline-block; width: 24px; height: 10px; border-radius: 3px; background: #4FA89D; }
+.hl-swtick { display: inline-block; width: 2px; height: 18px; background: #14232A; }
+.hl-card { gap: 8px; }
+.hl-list { list-style: none; margin: 0; padding: 0; }
+.hl-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(70px, 1.2fr) 66px 66px; column-gap: 10px; align-items: center;
+  min-height: 52px; border-top: 1px solid #E8EDEF; }
+.hl-head { min-height: 28px; border-top: 0; font: 600 12px/16px Inter, sans-serif; color: #4D5D64; }
+.hl-r { text-align: right; }
+.hl-name { display: flex; flex-direction: column; min-width: 0; font: 600 14px/19px Inter, sans-serif; color: #14232A; padding: 6px 0; }
+.hl-name span { font: 400 12px/16px Inter, sans-serif; color: #4D5D64; }
+.hl-track { position: relative; height: 10px; border-radius: 3px; background: #E8EDEF; }
+.hl-fill { position: absolute; left: 0; top: 0; height: 10px; border-radius: 3px; background: #4FA89D; }
+.hl-tick { position: absolute; top: -5px; width: 2px; height: 20px; margin-left: -1px; background: #14232A; border-radius: 1px; }
+.hl-rate { text-align: right; display: flex; flex-direction: column; font: 700 15px/20px Inter, sans-serif; font-variant-numeric: tabular-nums; color: #14232A; }
+.hl-rate span { font: 400 12px/16px Inter, sans-serif; color: #4D5D64; white-space: nowrap; }
+.hl-count { text-align: right; font: 400 13px/18px Inter, sans-serif; font-variant-numeric: tabular-nums; color: #14232A; white-space: nowrap; }
+.hl-axisrow { border-top: 0; min-height: 18px; }
+.hl-axis { display: flex; justify-content: space-between; font: 400 12px/16px Inter, sans-serif; color: #4D5D64; }
+.hl-warn { margin: 0; font: 400 13px/18px Inter, sans-serif; color: #92400E; background: #FFFBEB; border-radius: 8px; padding: 8px 12px; }
+.hl-ctop { display: flex; flex-direction: column; gap: 10px; }
+.hl-ctitle { display: flex; flex-direction: column; gap: 6px; }
+.hl-badge { align-self: flex-start; display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 8px; background: #EEF2F3;
+  color: #4D5D64; font: 600 12px/16px Inter, sans-serif; }
+.hl-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.hl-seg button { min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #D3DCDF; background: #fff; color: #14232A;
+  font: 500 14px/20px Inter, sans-serif; cursor: pointer; }
+.hl-seg button[aria-pressed="true"] { background: #115E59; border-color: #115E59; color: #fff; }
+.hl-seg button:focus-visible { outline: 3px solid #1D4ED8; outline-offset: 2px; }
+.hl-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; }
+.hl-mablock { display: flex; flex-direction: column; gap: 8px; }
+.hl-mabar { display: flex; gap: 2px; height: 12px; border-radius: 4px; overflow: hidden; }
+.hl-ma { background: #3730A3; }
+.hl-ffs { flex: 1; background: #C9D1F2; }
+.hl-all { margin-top: 12px; }
+.hl-all > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font: 600 14px/20px Inter, sans-serif; color: #115E59; }
+.hl-all[open] > summary { margin-bottom: 8px; }

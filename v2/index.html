@@ -2325,6 +2325,9 @@
 
         // --- PLACES HEALTH METRICS ---
         async function fetchPLACESData(zips) {
+            // The Health tab's summary (dashboard-v3.js) reads our own cdc_places
+            // for the same ZIPs; this function keeps filling the full list below it.
+            if (window.ppHealth) window.ppHealth.load(zips || []);
             if (!zips || zips.length === 0) {
                 document.getElementById('placesMetrics').innerHTML = '<em style="color: var(--text-muted);">No ZIPs found for this county.</em>';
                 return;
@@ -2476,6 +2479,7 @@
 
         // --- CMS COUNTY UTILIZATION ---
         async function fetchCMSCountyData(fips, countyName) {
+            if (window.ppHealth && fips) window.ppHealth.pickCounty(String(fips).padStart(5, '0'), countyName);
             const el = document.getElementById('cmsMetrics');
             el.innerHTML = '<em style="color:var(--text-muted);">Loading Medicare utilization data...</em>';
 
@@ -2599,11 +2603,6 @@
                     'Dental Health': '#79c0ff'
                 };
 
-                const DISC_ICONS = {
-                    'Primary Care': '🏥',
-                    'Mental Health': '🧠',
-                    'Dental Health': '🦷'
-                };
 
                 // Medicare bonus badge — Primary Care Geographic HPSA = 10% Medicare bonus
                 const hasMedicareBonus = data.some(r =>
@@ -2614,7 +2613,7 @@
 
                 if (hasMedicareBonus) {
                     html += `<div style="background:rgba(63,185,80,0.1);border:1px solid #3fb950;border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:11px;">
-                        <span style="color:#3fb950;font-weight:600;">✓ Medicare Bonus Payment Eligible</span><br>
+                        <span style="color:#15803D;font-weight:600;">Medicare bonus payment area</span><br>
                         <span style="color:var(--text-muted);font-size:10px;">Providers in this area qualify for a 10% Medicare bonus payment on outpatient services</span>
                     </div>`;
                 }
@@ -2622,7 +2621,6 @@
                 Object.keys(byDisc).sort().forEach(disc => {
                     const rows = byDisc[disc];
                     const color = DISC_COLORS[disc] || '#8b949e';
-                    const icon = DISC_ICONS[disc] || '📋';
                     const avgScore = rows.reduce((s, r) => s + (r.hpsa_score || 0), 0) / rows.length;
                     const maxScore = Math.max(...rows.map(r => r.hpsa_score || 0));
                     const geoDesig = rows.filter(r => r.hpsa_type === 'Geographic Area');
@@ -2632,7 +2630,7 @@
                     html += `
                     <div style="margin-bottom:14px;border:1px solid ${color}44;border-radius:6px;overflow:hidden;">
                         <div style="background:${color}18;padding:8px 10px;border-bottom:1px solid ${color}33;display:flex;justify-content:space-between;align-items:center;">
-                            <span style="font-size:12px;font-weight:600;color:${color};">${icon} ${disc}</span>
+                            <span style="font-size:12px;font-weight:600;color:${color};">${disc}</span>
                             <span style="font-size:10px;color:var(--text-muted);">${rows.length} designation${rows.length > 1 ? 's' : ''}</span>
                         </div>
                         <div style="padding:8px 10px;">
@@ -2646,8 +2644,8 @@
                                     <div style="font-size:9px;color:var(--text-muted);">Avg Score</div>
                                 </div>
                                 <div style="text-align:center;">
-                                    <div style="font-size:16px;font-weight:700;color:${color};">${rows.filter(r => r.rural_status?.includes('Rural')).length > 0 ? '🌾' : '🏙'}</div>
-                                    <div style="font-size:9px;color:var(--text-muted);">${rows[0]?.rural_status || '—'}</div>
+                                    <div style="font-size:14px;font-weight:700;color:${color};">${rows.some(r => (r.rural_status || '').includes('Rural')) ? 'Rural' : 'Not rural'}</div>
+                                    <div style="font-size:11px;color:var(--text-muted);">${escHtml(rows[0]?.rural_status || 'Status not given')}</div>
                                 </div>
                             </div>
                             <div style="font-size:10px;color:var(--text-muted);line-height:1.8;">
@@ -4899,6 +4897,7 @@
         }
 
     </script>
+    <script src="assets/market-model.js"></script>
     <script src="assets/dashboard-v3.js"></script>
 <script src="assets/admin-switch.js"></script>
 </body>
