@@ -1291,45 +1291,74 @@ if (isProviderAcct) {
   ];
   var kind = 'market_memo';
 
-  var typeRow = el('div', { class: 'rp-types', role: 'radiogroup', 'aria-label': 'Document type' });
+  // The user's canvas (2026-11-03): types as radio cards, a focus box with a
+  // hint and a counter, codes in their own box, the area in a strip.
+  var typeRow = el('fieldset', { class: 'rp-types' }, el('legend', { class: 'rp-label' }, 'Report type'));
   function drawTypes() {
-    while (typeRow.firstChild) typeRow.removeChild(typeRow.firstChild);
+    Array.prototype.slice.call(typeRow.querySelectorAll('label')).forEach(function (n) { typeRow.removeChild(n); });
     TYPES.forEach(function (t) {
-      typeRow.appendChild(el('button', { type: 'button', role: 'radio', 'aria-checked': String(kind === t[0]), class: 'rp-type' + (kind === t[0] ? ' on' : ''),
-        onclick: function () { kind = t[0]; drawTypes(); forWho.hidden = kind !== 'client_pitch'; } },
-        el('b', {}, t[1]), el('span', {}, t[2])));
+      var input = el('input', { type: 'radio', name: 'rp-type', value: t[0] });
+      input.checked = kind === t[0];
+      input.addEventListener('change', function () { kind = t[0]; forWho.hidden = kind !== 'client_pitch'; });
+      typeRow.appendChild(el('label', { class: 'rp-type' }, input, el('span', { class: 'rp-tt' }, el('b', {}, t[1]), el('span', {}, t[2]))));
     });
   }
   // Reports are written by the market assistant, which scores these.
-  var spec = el('select', { class: 'rp-input', 'aria-label': 'Specialty' },
+  var spec = el('select', { class: 'rp-input', id: 'rp-spec' },
     (window.SCORED_SPECIALTIES || SPECIALTIES).map(function (s) { return el('option', { value: s[0] }, s[0]); }));
-  var compare = el('input', { class: 'rp-input', placeholder: 'e.g. 38138, 38139', 'aria-label': 'ZIPs to compare with' });
-  var who = el('input', { class: 'rp-input', placeholder: 'e.g. Dr. Rivera, Midsouth Dermatology', 'aria-label': 'Prepared for' });
-  var forWho = el('label', { class: 'rp-field', hidden: true }, el('span', {}, 'Prepared for'), who);
+  var compare = el('input', { class: 'rp-input', id: 'rp-compare', placeholder: 'e.g. 38138, 38139', inputmode: 'numeric' });
+  var who = el('input', { class: 'rp-input', id: 'rp-who', placeholder: 'e.g. Dr. Rivera, Midsouth Dermatology' });
+  var forWho = el('div', { class: 'rp-field', hidden: true }, el('label', { class: 'rp-label', for: 'rp-who' }, 'Prepared for'), who);
   // 2,000 characters, counted as you type (2026-10-22: a 400-character cut
   // silently dropped half a request, including its code list).
   var FOCUS_MAX = 2000;
-  var focus = el('textarea', { class: 'rp-input', rows: '3', maxlength: String(FOCUS_MAX), placeholder: 'Anything it must answer? e.g. "Is there room for a second location?" You can paste a list of procedure codes.', 'aria-label': 'Focus question' });
-  var focusCount = el('span', { class: 'rp-note', 'aria-live': 'polite' }, '0 / ' + FOCUS_MAX.toLocaleString());
-  focus.addEventListener('input', function () { focusCount.textContent = focus.value.length.toLocaleString() + ' / ' + FOCUS_MAX.toLocaleString() + (focus.value.length >= FOCUS_MAX ? ' (limit reached)' : ''); });
-  var market = el('div', { class: 'rp-market' });
+  var focus = el('textarea', { class: 'rp-input rp-ta', id: 'rp-focus', rows: '5', maxlength: String(FOCUS_MAX), 'aria-describedby': 'rp-focus-hint rp-focus-count',
+    placeholder: 'e.g. Is there room for a second location here? I care most about Medicare volume and who already does these procedures.' });
+  var focusCount = el('p', { class: 'rp-count', id: 'rp-focus-count' }, '0 / ' + FOCUS_MAX.toLocaleString());
+  focus.addEventListener('input', function () {
+    var n = focus.value.length;
+    focusCount.textContent = n.toLocaleString() + ' / ' + FOCUS_MAX.toLocaleString() + (n >= FOCUS_MAX ? ' (limit reached)' : '');
+    focusCount.classList.toggle('rp-near', n >= FOCUS_MAX * 0.9);
+  });
+  var codes = el('textarea', { class: 'rp-input rp-ta rp-codes', id: 'rp-codes', rows: '2', placeholder: '11102, 17311, 99213', 'aria-describedby': 'rp-codes-note' });
+  var codesNote = el('p', { class: 'pp-help', id: 'rp-codes-note', role: 'status' }, 'Paste procedure codes and the report reads every one of them for the map\'s ZIPs.');
+  function codeList() { var v = codes.value.trim(); if (!v) return null; var l = window.CodeList ? CodeList.parse(v) : null; return l && l.codes ? l : null; }
+  codes.addEventListener('input', function () {
+    var l = codeList(), v = codes.value.trim();
+    codesNote.classList.toggle('rp-near', !!v && !(l && l.isList) && !(l && l.codes && l.codes.length === 1));
+    if (!v) codesNote.textContent = 'Paste procedure codes and the report reads every one of them for the map\'s ZIPs.';
+    else if (l && l.codes && l.codes.length) codesNote.textContent = l.codes.length + ' code' + (l.codes.length === 1 ? '' : 's') + ': ' + l.codes.slice(0, 12).join(', ') + (l.codes.length > 12 ? ', and ' + (l.codes.length - 12) + ' more' : '');
+    else codesNote.textContent = 'No codes found. Use 5-character codes like 11102 or G0121, separated by commas or spaces.';
+  });
+  var market = el('p', { class: 'rp-areatext' });
+  var areaLink = el('button', { type: 'button', class: 'rp-link', onclick: function () { var i = $('addressInput'); if (i) { i.focus(); i.select && i.select(); } } }, 'Change on the map');
   var note = el('p', { class: 'rp-note', role: 'status' });
-  var go = el('button', { type: 'button', class: 'ins-btn primary rp-go', onclick: generate }, 'Write it');
+  var go = el('button', { type: 'button', class: 'rp-go', onclick: generate }, 'Write the report');
   var library = el('div', { class: 'rp-library' });
 
-  panel.appendChild(el('div', { class: 'rp-wrap' },
-    el('div', { class: 'ins-card' },
-      el('div', { class: 'ins-eyebrow' }, 'Report builder'),
-      el('p', {}, 'Written by the market assistant from the same data as Insights, with every figure traceable to its source.'),
-      market,
+  panel.appendChild(el('div', { class: 'rp-wrap dm' },
+    el('article', { class: 'dm-card rp-card', 'aria-labelledby': 'rp-build' },
+      el('div', {}, el('h3', { class: 'dm-h', id: 'rp-build' }, 'Write a report'),
+        el('p', { class: 'pp-help' }, 'Written by the market assistant from the data on these tabs. Every figure is checked against it before you see it.')),
       typeRow,
-      el('label', { class: 'rp-field' }, el('span', {}, 'Specialty'), spec),
-      el('label', { class: 'rp-field' }, el('span', {}, 'Compare with (optional)'), compare),
+      el('div', { class: 'rp-field' }, el('label', { class: 'rp-label', for: 'rp-spec' }, 'Specialty'), spec),
+      el('div', { class: 'rp-field' }, el('label', { class: 'rp-label', for: 'rp-focus' }, 'What should it focus on?'), focus,
+        el('div', { class: 'rp-under' }, el('p', { class: 'pp-help', id: 'rp-focus-hint' }, 'Name the decision it should help with.'), focusCount)),
+      el('div', { class: 'rp-field' }, el('label', { class: 'rp-label', for: 'rp-codes' }, 'Codes to include ', el('span', { class: 'rp-opt' }, '(optional)')), codes, codesNote),
+      el('div', { class: 'rp-field' }, el('label', { class: 'rp-label', for: 'rp-compare' }, 'Compare with ', el('span', { class: 'rp-opt' }, '(optional ZIPs)')), compare),
       forWho,
-      el('label', { class: 'rp-field' }, el('span', {}, 'Focus (optional)'), focus, focusCount),
+      el('div', { class: 'rp-area' }, pinIcon(), market, areaLink),
       go, note),
-    el('div', { class: 'ins-card' }, el('div', { class: 'ins-eyebrow' }, 'Documents this session'), library)));
+    el('article', { class: 'dm-card' }, el('h3', { class: 'dm-h' }, 'Documents this session'), library)));
   drawTypes();
+  function pinIcon() {
+    var NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', '20'); svg.setAttribute('height', '20'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', '#115E59'); svg.setAttribute('stroke-width', '2'); svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round');
+    var p1 = document.createElementNS(NS, 'path'); p1.setAttribute('d', 'M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z');
+    var c = document.createElementNS(NS, 'circle'); c.setAttribute('cx', '12'); c.setAttribute('cy', '9'); c.setAttribute('r', '2.5');
+    svg.appendChild(p1); svg.appendChild(c); return svg;
+  }
 
   function refresh() {
     var z = lastZip;
@@ -1337,8 +1366,9 @@ if (isProviderAcct) {
     // The report covers every ZIP on the map; the opportunity score is
     // anchored on one ZIP (2026-10-22: the old label said "within 25 miles").
     var n = A.areaZips ? A.areaZips().length : 0;
+    if (z) market.appendChild(el('b', {}, 'Area: '));
     market.appendChild(document.createTextNode(!z ? 'Search a ZIP, city or state first; the report is written about the market on the map.'
-      : 'Market: ' + (n > 1 ? n + ' ZIPs on the map' : 'ZIP ' + z + (n === 1 ? ' (the nearest ZIPs are added so the area has at least 8)' : '')) + (n > 1 ? ' · opportunity score anchored on ZIP ' + z : '')));
+      : '' + (n > 1 ? n + ' ZIPs on the map' : 'ZIP ' + z + (n === 1 ? ' (the nearest ZIPs are added so the area has at least 8)' : '')) + (n > 1 ? ' · opportunity score anchored on ZIP ' + z : '')));
     if (!spec.dataset.touched) spec.value = A.currentSpec() || 'Primary care / family doctor';
     go.disabled = !z || A.isBusy();
     while (library.firstChild) library.removeChild(library.firstChild);
@@ -1357,7 +1387,9 @@ if (isProviderAcct) {
     var brief = 'Write a ' + label.toLowerCase() + ' about opening or growing a ' + spec.value + ' practice around ZIP ' + z + '.';
     if (others.length) brief += ' Compare it with ZIP' + (others.length > 1 ? 's ' : ' ') + others.join(', ') + '.';
     if (kind === 'client_pitch' && who.value.trim()) brief += ' It is prepared for ' + who.value.trim().slice(0, 120) + '.';
-    if (focus.value.trim()) brief += ' Make sure it answers: ' + focus.value.trim().slice(0, FOCUS_MAX) +
+    var cl = codeList(), focusText = focus.value.trim();
+    if (cl && cl.codes.length) focusText = (focusText ? focusText + ' ' : '') + 'Procedure codes to include: ' + cl.codes.join(', ') + '.';
+    if (focusText) brief += ' Make sure it answers: ' + focusText.slice(0, FOCUS_MAX + 1200) +
       ' (If that lists procedure codes, call get_procedures with all of them as one query, specialty null and use_map_area true, for medicare_clinicians and medicaid, and show every code in a table, naming the codes with no rows.)';
     // Volumes and payments come from get_procedures; without this the reports
     // said procedure data did not exist (2026-10-20). Across the map's ZIPs,
@@ -1379,7 +1411,7 @@ if (isProviderAcct) {
     // cannot write that much inside the function time limit.
     brief += ' Make it a full report of about 1,200 words, written in two or three parts with create_deliverable (continues and more_parts).';
     brief += '\nGather the numbers with your tools first, then deliver it with create_deliverable (kind "' + kind + '").';
-    var shown = label + ': ' + spec.value + ' around ' + z + (others.length ? ' vs ' + others.join(', ') : '') + (focus.value.trim() ? '. ' + focus.value.trim() : '');
+    var shown = label + ': ' + spec.value + ' around ' + z + (others.length ? ' vs ' + others.join(', ') : '') + (focusText ? '. ' + focusText : '');
     note.textContent = '';
     switchTab('ai');
     A.ask(brief, shown, { fresh: true });

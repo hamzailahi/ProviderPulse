@@ -267,18 +267,8 @@ body.filters-open #map-legend { left: 306px; }
 
 /* report builder (Reports tab) --------------------------------------------- */
 #reports-panel { background: #F5F8F8; padding: 14px !important; font-family: var(--sans); color: #14232A; overflow-y: auto; }
-.rp-market { font-size: 12.5px; color: #115E59; background: #E3F3F1; border-radius: 9px; padding: 7px 10px; margin: 12px 0; }
-.rp-types { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.rp-type { text-align: left; border: 1px solid #dbe3ee; background: #fff; border-radius: 8px; padding: 10px 12px; cursor: pointer; font-family: var(--sans); color: #14232A; }
-.rp-type b { display: block; font-size: 13.5px; }
-.rp-type span { display: block; font-size: 12.5px; color: #4D5D64; margin-top: 2px; line-height: 1.4; }
-.rp-type.on { border-color: #818cf8; background: linear-gradient(135deg, #E3F3F1, #fff 60%); box-shadow: 0 0 0 3px #D3ECE8; }
-.rp-field { display: block; margin-bottom: 10px; }
 .rp-field[hidden] { display: none; }
-.rp-field > span { display: block; font: 650 12px var(--sans); color: #4D5D64; margin-bottom: 4px; }
 .rp-input { width: 100%; box-sizing: border-box; border: 1px solid #A9B6BB; border-radius: 8px; padding: 8px 10px; font: 14px/1.4 var(--sans); color: #14232A; background: #fff; resize: vertical; }
-.rp-input:focus { outline: none; border-color: #818cf8; box-shadow: 0 0 0 3px #D3ECE8; }
-.rp-go { width: 100%; justify-content: center; padding: 10px 12px; font-size: 14px; }
 .rp-go:disabled { opacity: .5; cursor: default; }
 .rp-note { font-size: 12.5px !important; color: #b45309 !important; min-height: 0; }
 .rp-empty { font-size: 13px !important; color: #4D5D64 !important; }
@@ -477,3 +467,37 @@ body.filters-open #map-legend { left: 306px; }
   border-bottom: 1px solid #D3DCDF !important; }
 #proceduresContent td { padding: 8px 6px !important; border-color: #E8EDEF !important; }
 #proceduresContent tr { border-color: #E8EDEF !important; }
+
+/* Reports tab (2026-11-03, same canvas): one form card, types as radio
+   cards, the area in a strip, a full-width primary button. */
+#reports-panel { background: #fff !important; }
+.rp-wrap { gap: 12px; }
+.rp-card { gap: 16px; }
+.rp-types { display: grid; grid-template-columns: 1fr; gap: 8px; border: 0; margin: 0; padding: 0; min-width: 0; }
+.rp-types legend { padding: 0; margin-bottom: 8px; }
+.rp-type { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid #74858C; border-radius: 8px; cursor: pointer; min-height: 44px; background: #fff; }
+.rp-type input { margin: 3px 0 0; width: 18px; height: 18px; accent-color: #0F766E; flex: none; }
+.rp-type:has(input:checked) { border-color: #0F766E; background: #E3F3F1; box-shadow: 0 0 0 1px #0F766E; }
+.rp-type:has(input:focus-visible) { outline: 3px solid #1D4ED8; outline-offset: 2px; }
+.rp-tt { display: flex; flex-direction: column; gap: 2px; }
+.rp-tt b { font: 600 14px/20px Inter, sans-serif; color: #14232A; }
+.rp-tt span { font: 400 13px/18px Inter, sans-serif; color: #4D5D64; }
+.rp-field { display: flex; flex-direction: column; gap: 6px; }
+.rp-field[hidden] { display: none; }
+.rp-label { font: 600 14px/20px Inter, sans-serif; color: #14232A; }
+.rp-opt { font-weight: 400; color: #4D5D64; }
+.rp-input { min-height: 44px; border-color: #74858C; font: 400 15px/22px Inter, sans-serif; padding: 10px 12px; }
+.rp-input:focus { outline: 3px solid #1D4ED8; outline-offset: 2px; border-color: #0F766E; box-shadow: none; }
+.rp-ta { min-height: 120px; resize: vertical; line-height: 24px; }
+.rp-codes { min-height: 64px; font-family: ui-monospace, Menlo, monospace; }
+.rp-under { display: flex; justify-content: space-between; gap: 12px; }
+.rp-count { margin: 0; font: 400 13px/18px Inter, sans-serif; color: #4D5D64; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rp-near { color: #92400E !important; font-weight: 600; }
+.rp-area { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px 14px; background: #F5F8F8; border-radius: 8px; }
+.rp-area svg { flex: none; }
+.rp-areatext { flex: 1; min-width: 180px; margin: 0; font: 400 14px/20px Inter, sans-serif; color: #14232A; }
+.rp-link { border: 0; background: none; padding: 0; min-height: 32px; color: #115E59; font: 600 14px/20px Inter, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.rp-go { align-self: stretch; min-height: 48px; padding: 0 24px; border-radius: 8px; border: 0; background: #0F766E; color: #fff; font: 600 16px/24px Inter, sans-serif; cursor: pointer; }
+.rp-go:hover { background: #115E59; }
+.rp-go:disabled { opacity: .5; cursor: default; }
+.rp-go:focus-visible { outline: 3px solid #1D4ED8; outline-offset: 2px; }
