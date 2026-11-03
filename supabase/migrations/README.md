@@ -106,3 +106,4 @@ values ('Some Regional Plan', 'TN', 'commercial', 60);
 Plan names, Medicaid brands and Blue Cross licensees change. A missing plan
 degrades gracefully (both forms offer "Other"), but a wrong name looks worse
 than a missing one, so review the list before launch.
+| `045_deaconess_midtown_pin.sql` | Moves Deaconess Midtown Hospital's listings at 600 Mary St, Evansville from a point 3.5 miles west onto the hospital (2026-11-03). One-shot: a second run refuses. Applied by `apply-migration.yml`. |

@@ -11,7 +11,7 @@ on:
       migration:
         description: Migration to run
         type: choice
-        options: [043_column_grants.sql, 044_provider_npis.sql, 042_benchmark_care_type.sql, 041_listing_reports.sql]
+        options: [045_deaconess_midtown_pin.sql, 043_column_grants.sql, 044_provider_npis.sql, 042_benchmark_care_type.sql, 041_listing_reports.sql]
 
 permissions:
   contents: read

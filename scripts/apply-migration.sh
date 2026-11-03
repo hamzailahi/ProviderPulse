@@ -26,6 +26,14 @@ case "$(basename "$FILE")" in
       select 'anon/authenticated grants: ' || count(*) from information_schema.role_table_grants
         where table_schema = 'public' and table_name = 'listing_reports' and grantee in ('anon', 'authenticated');"
     ;;
+  045_*)
+    echo "== listings at 600 Mary St, Evansville"
+    psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -At -c "
+      select 'clinics ' || npi || ' ' || coalesce(taxonomy_code, '') || ' ' || latitude || ',' || longitude from public.clinics
+        where upper(address) like '600 MARY ST%' and upper(city) = 'EVANSVILLE' order by npi;
+      select 'individuals at the old point: ' || count(*) from public.provider_individuals
+        where upper(address) like '600 MARY ST%' and upper(city) = 'EVANSVILLE' and latitude between 37.983 and 37.985;"
+    ;;
   043_*|044_*)
     echo "== write privileges left to anon and authenticated (expect column lists only)"
     psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -At -c "
