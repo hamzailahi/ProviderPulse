@@ -1888,6 +1888,16 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   **Procedure tables** (`procedure-tables.yml`, manual, `dry_run` / `apply`
   with `disk_free_gb`): see the 036 tables under Supabase schema. Run the
   tables job yearly after HHS and CMS publish a new year.
+- **Procedure summary** (`procedure-summary.yml`, manual, read only,
+  `scripts/build-procedure-summary.py`, 2026-11-04): the second try at a
+  per-ZIP summary of `cms_procedures_full`, built **outside** the database:
+  a plain `COPY` out (read-only session, no ORDER BY, so no server sort
+  files), DuckDB sums per ZIP x specialty x code on the runner (patients,
+  services, plain and service-weighted average sums, paid split by entity I
+  and O), and the report `supabase/reference/procedure-sources/summary-dry-run.md`
+  gives the row count, estimated size and dense ZIPs before and after. No
+  load yet: that needs a numbered migration, the free-disk figure and the
+  user's go-ahead.
 - **Medicaid code probe** (`medicaid-code-probe.yml`, manual, read only, `scripts/probe-medicaid-codes.py`): a list of codes looked up in HHS's raw file (every year, by the NPI's state in our directory, what one state bills in the same range, the smallest published patient count); commits `supabase/reference/procedure-sources/code-probe.md`. First finding (2026-10-20): Texas Medicaid bills no global delivery code (59400, 59510, 59610); it bills 59409, 59514, 59430 and 59025 (Fort Worth: 627, 70, 1,273 and 2,046 claim lines), and HHS's under-12-patients-per-provider-month suppression hides most deliveries, so delivery counts are floors. 59400 appears in 32 states, 15,083 claim lines nationally in 2024. Quote a workflow input default that is a list of numbers: GitHub read an unquoted `59400,59409,...` as one number and the first run probed a single nonsense code.
 - **Procedure codes around a ZIP** (`code-area-report.yml`, manual, read only, `scripts/live/code-area-report.mjs`): inputs a centre ZIP, a radius and a code list; writes CSVs (Medicare rows per clinician, code and place of service with distance; Medicaid rows per ZIP and specialty; hospital outpatient rows whose APC description looks GI or endoscopic, since hospitals report payment groups, not CPT codes; the ZIPs searched) as a 7-day run artifact; with `push_branch` (must start with `tmp/`) it also pushes them to that orphan branch for a cloud session, which cannot reach GitHub's artifact storage. Delete the branch after use with `tmp-branch-cleanup.yml` (manual; deletes every `tmp/` branch and fails if any is left; the session's proxy refuses branch deletes); never merge it. Any failed request stops the run, so a partial pull never passes as complete.
 - **Procedures panel check** (`procedures-panel-check.yml`, manual, read only, `scripts/live/procedures-check.mjs`): the panel's Medicare loader replayed for one city, page by page, beside direct queries for one specialty and a list of codes, the same codes in the Medicaid table, and CMS's own file through its data API.
