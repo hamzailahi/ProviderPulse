@@ -16,6 +16,7 @@ const CASES = [
   { source: 'medicare_clinicians', specialty: 'Gastroenterology', query: null, radius_miles: 10 },
   { source: 'medicare_clinicians', specialty: null, query: '45380', radius_miles: 10 },
   { source: 'medicare_clinicians', specialty: null, query: null, radius_miles: 5 },
+  { source: 'medicare_clinicians', specialty: null, query: null, radius_miles: 15 },
   { source: 'medicare_clinicians', specialty: 'Obstetrics & Gynecology', query: null, radius_miles: 10 },
   { source: 'medicaid', specialty: 'Obstetrics', query: 'delivery', radius_miles: 10 },
   { source: 'medicaid', specialty: null, query: 'pregnancy ultrasound', radius_miles: 10 },
@@ -33,7 +34,7 @@ for (const c of CASES) {
   const ms = Date.now() - t0;
   out.push(`## ${c.source} · specialty ${c.specialty || 'any'} · query ${c.query && c.query.length > 60 ? c.query.split(' ').length + ' codes' : c.query || 'any'} · ${c.radius_miles} mi (${(ms / 1000).toFixed(1)}s)`, '');
   if (r.error) { out.push(`**error:** ${r.error}`, ''); continue; }
-  out.push(`- complete: ${!r.incomplete}${r.incomplete ? ' (' + r.incomplete_reason + ')' : ''}; area ${JSON.stringify(r.area)}; terms ${JSON.stringify(r.filters.matched_terms)}`);
+  out.push(`- read from: ${r.read_from || 'n/a'}; complete: ${!r.incomplete}${r.incomplete ? ' (' + r.incomplete_reason + ')' : ''}; area ${JSON.stringify(r.area)}; terms ${JSON.stringify(r.filters.matched_terms)}`);
   out.push(`- totals ${JSON.stringify(r.totals)}`);
   (r.top_codes || []).slice(0, 6).forEach(x => out.push(`  - ${JSON.stringify(x)}`));
   if (r.code_list) out.push(`- code list: ${r.code_list.requested_count} requested, ${r.code_list.with_rows_count} with rows; without rows: ${JSON.stringify(r.code_list.codes_without_rows)}`);
