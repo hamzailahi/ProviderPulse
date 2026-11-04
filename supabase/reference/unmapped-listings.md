@@ -4,37 +4,37 @@ Listings with no coordinates are never drawn on a map. This pass places them onl
 
 | Table | Without coordinates | With an address to try |
 |---|---|---|
-| clinics | 24907 | 24907 |
-| provider_individuals | 134877 | 134877 |
+| clinics | 22820 | 22820 |
+| provider_individuals | 125530 | 125530 |
 | clinic_secondary_locations | 80 | 80 |
 
 ## Geocoding
 
 | Table | Tried | Placed | Left unplaced | Geocoder failed |
 |---|---|---|---|---|
-| provider_individuals | 51,030 | 9,347 | 41,683 | 0 |
-| clinics | 8,934 | 2,087 | 6,847 | 0 |
-| clinic_secondary_locations | 36 | 0 | 36 | 0 |
+| provider_individuals | 51,254 | 2,793 | 48,461 | 0 |
+| clinics | 8,706 | 741 | 7,965 | 0 |
+| clinic_secondary_locations | 40 | 0 | 40 | 0 |
 
-Census exact 1,664, Census same address written another way 9,770 (one direction word, an ordinal, a state route's spelling or a space; same house number and ZIP), Google 0 (off unless a key is passed); anything else keeps no coordinates.
+Census exact 1,922, Census same address written another way 1,612 (one direction word, an ordinal, a state route's spelling or a space; same house number and ZIP), Google 0 (off unless a key is passed); anything else keeps no coordinates.
 
-Why the rest were not placed: no match 33,809, a fuzzy (non-exact) match 13,380, matched in another ZIP 0, several equal matches 1,377.
+Why the rest were not placed: no match 39,312, a fuzzy (non-exact) match 15,566, matched in another ZIP 0, several equal matches 1,588.
 
 Examples (public listing addresses):
 
 | Why | Listed | Census matched |
 |---|---|---|
-| non_exact | 747 N LA SALLE DR STE 700, CHICAGO, IL 60654 | 747 N LASALLE ST, CHICAGO, IL, 60654 |
-| non_exact | 780 ROSE ST, LEXINGTON, KY 40536 | 780 ROSE ST, LEXINGTON, KY, 40506 |
-| non_exact | 4701 TROUSDALE DR STE 211A, NASHVILLE, TN 37220 | 4701 TROUSDALE DR, NASHVILLE, TN, 37211 |
-| non_exact | 13544 HIGHWAY 43 N UNIT 3, NORTHPORT, AL 35475 | 13544 US HWY 43, NORTHPORT, AL, 35475 |
-| non_exact | 504 SNAKE RIVER DR. B1, ALPINE, WY 83128 | 504 SNAKE RIVER DR, ALPINE, WY, 83128 |
-| non_exact | 909 FULTON ST SE, MINNEAPOLIS, MN 55455 | 909 FULTON ST SE, MINNEAPOLIS, MN, 55414 |
-| non_exact | 800 LAKESHORE DR, BIRMINGHAM, AL 35229 | 800 LAKESHORE DR, BIRMINGHAM, AL, 35209 |
-| tie | 1 PARK ST, NEW HAVEN, CT 06504 |  |
-| non_exact | 500 VILAGE SQUARE CROSSING, PALM BEACH GARDENS, FL 33410 | 500 VILLAGE SQUARE CROSSING, PALM BEACH GARDENS, FL, 33410 |
-| non_exact | 80 SEYMOUR ST, HARTFORD, CT 06102 | 80 SEYMOUR ST, HARTFORD, CT, 06106 |
-| non_exact | 16114 NC HIGHWAY 50 N, GARNER, NC 27529 | 16114 STATE HWY 50, GARNER, NC, 27529 |
-| non_exact | 1045 12TH AVE, EAST MOLINE, IL 61244 | 1045 12TH AVE, MOLINE, IL, 61265 |
+| non_exact | 1325 N LITCHFIELD RD STE 130, GOODYEAR, AZ 85395 | 1325 N LITCHFIELD RD, GOODYEAR, AZ, 85338 |
+| non_exact | 2853 CANDLER RD SIDE, DECATUR, GA 30037 | 2853 CANDLER RD, DECATUR, GA, 30034 |
+| non_exact | 225 PRINCE COLLINS ST, HOUMA, LA 70364 | 225 PRINCE COLLINS AVE, HOUMA, LA, 70364 |
+| tie | 3450 CENTRE LAKE DR, ONTARIO, CA 91761 |  |
+| non_exact | 909 NE INTERSTATE 410 LOOP, SAN ANTONIO, TX 78209 | 909 NE LOOP 410, SAN ANTONIO, TX, 78209 |
+| tie | 254 COHASSET RD # 100, CHICO, CA 95926 |  |
+| non_exact | 759 CHESTNUT ST, SPRINGFIELD, MA 01199 | 759 CHESTNUT ST, SPRINGFIELD, MA, 01107 |
+| non_exact | 500 E VETERANS ST, TOMAH, WI 54660 | 500 W VETERANS ST, TOMAH, WI, 54660 |
+| non_exact | 229 S DAVID RD STE 900, LAGRANGE, GA 30241 | 229 S DAVIS RD, LAGRANGE, GA, 30241 |
+| non_exact | 219 PARKWAY DR, WHEATON, IL 60187 | 219 E PARKWAY DR, WHEATON, IL, 60187 |
+| non_exact | 10753 FALLS RD PAVILION II STE 145, LUTHERVILLE, MD 21093 | 10753 FALLS RD, LUTHERVILLE, MD, 21093 |
+| non_exact | 202 INDUSTRIAL PARK, JACKSON, MN 56143 | 202 INDUSTRIAL PKWY, JACKSON, MN, 56143 |
 
-Written: clinics=2087 provider_individuals=9347 clinic_secondary_locations=0 
+Written: clinics=741 provider_individuals=2793 clinic_secondary_locations=0 
