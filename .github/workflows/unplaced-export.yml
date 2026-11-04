@@ -1,0 +1,78 @@
+name: Export unplaced listings
+
+# Manual, read only. Every directory listing with no map pin (null latitude or
+# longitude in clinics, provider_individuals or clinic_secondary_locations) as
+# one CSV of public NPPES fields: a 7-day run artifact and, when push_branch is
+# given (must start with tmp/), an orphan branch for a cloud session that
+# cannot download artifacts. Delete the branch afterwards with
+# tmp-branch-cleanup.yml; never merge it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      push_branch:
+        description: "Optional throwaway branch for the CSV (must start with tmp/)"
+        default: ""
+
+permissions:
+  contents: write   # only used by the optional tmp/ branch push
+
+jobs:
+  export:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "::error::Add the repository secret SUPABASE_DB_URL."; exit 1; fi
+
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Export (read only)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p out
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X <<'SQL'
+          begin transaction read only;
+          set local statement_timeout = '20min';
+          \copy (select 'clinics' as tbl, npi::text as npi, null::text as parent_npi, name, primary_taxonomy, taxonomy_code, address, city, state, zip, phone from public.clinics where latitude is null or longitude is null union all select 'provider_individuals', npi, null, name, primary_taxonomy, taxonomy_code, address, city, state, zip, phone from public.provider_individuals where latitude is null or longitude is null union all select 'clinic_secondary_locations', null, parent_npi, name, primary_taxonomy, taxonomy_code, concat_ws(' ', address, nullif(address2, '')), city, state, zip, null from public.clinic_secondary_locations where latitude is null or longitude is null order by 1, 9, 10, 7) to 'out/unplaced-listings.csv' with (format csv, header true)
+          commit;
+          SQL
+          rows=$(($(wc -l < out/unplaced-listings.csv) - 1))
+          echo "rows: $rows"
+          echo "Unplaced listings exported: $rows" >> "$GITHUB_STEP_SUMMARY"
+          [ "$rows" -gt 0 ] || { echo "::error::no rows exported"; exit 1; }
+          gzip -k out/unplaced-listings.csv
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unplaced-listings
+          path: out/unplaced-listings.csv.gz
+          retention-days: 7
+
+      - name: Push to a throwaway branch
+        if: inputs.push_branch != ''
+        env:
+          BRANCH: ${{ inputs.push_branch }}
+        run: |
+          case "$BRANCH" in tmp/*) ;; *) echo "push_branch must start with tmp/"; exit 1;; esac
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan "$BRANCH"
+          git rm -rq --cached .
+          git add -f out/unplaced-listings.csv.gz
+          git commit -qm "Unplaced listings export (temporary branch; delete after use) [skip netlify]"
+          git push -f origin "HEAD:refs/heads/$BRANCH"

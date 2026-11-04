@@ -652,6 +652,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-04
 
+- A new read-only job, Export unplaced listings, writes every listing that still has no map pin to one CSV (public NPPES fields: NPI, name, specialty, address, phone), so the remainder can be reviewed or sent to another geocoder.
 - Listings without a map pin are now matched to an exact street address more often: the suite, unit or floor is dropped before the Census lookup, since it never changes the building. The first placement run after the NPPES catch-up had placed only 31 of 60,000 listings, half of them missed because of suite numbers.
 - A new read-only check, NAD dry run, measures how many of the listings without a map pin the U.S. Department of Transportation's National Address Database could place at their real address point, state by state, and how closely its points agree with the Census pins we already have. It writes nothing; loading would come only after the numbers are reviewed.
 - A second pass over hospital campus candidates (80 busy addresses not on the first list) found three hospitals already findable and one real gap: Phoenix Indian Medical Center now shows under Emergency rooms & hospitals, with a note that its 24-hour emergency room treats anyone while other care is for eligible American Indian and Alaska Native patients.

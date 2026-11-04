@@ -1775,6 +1775,11 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   Summary in `supabase/reference/unmapped-listings.md` (`[skip netlify]`).
   The SQL was checked on a local Postgres 16 before shipping (no CI test:
   CI has no database).
+- **Export unplaced listings** (`unplaced-export.yml`, manual, read only,
+  2026-11-04): every row with a null latitude or longitude in the three
+  directory tables as one CSV of public NPPES fields (table, NPI or parent
+  NPI, name, taxonomy, address, city, state, ZIP, phone), a 7-day artifact
+  and, with `push_branch` (tmp/ only), an orphan branch; delete it after use.
 - **NAD dry run** (`nad-dry-run.yml`, manual, read only, `scripts/nad-dry-run.sh`;
   2026-11-04, the user's choice of a free, storable source for the ~148,000
   listings the Census cannot place; Google was ruled out because its terms
