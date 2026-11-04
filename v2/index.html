@@ -1939,12 +1939,12 @@
                     });
                 }
 
-                const allZips = new Set(neighborZipSet);
+                const allZips = new Set([...neighborZipSet, ...(ringBaseZips || [])]);
                 if (neighborSeedZip) allZips.add(String(neighborSeedZip).padStart(5, '0'));
                 const agg = aggregateZips(allZips);
 
                 document.getElementById('dashboard-title').textContent = "NEIGHBOR AREA";
-                document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span><br/>Covering ${allZips.size} ZIP codes (seed + neighbors).<br/><span style="color:var(--text-muted);font-size:10px;">Click any ZIP for its individual demographics.</span>`;
+                document.getElementById('dashboard-context').innerHTML = `<span style="color:var(--accent);font-weight:600;font-size:13px;">${currentlyVisiblePractices.length} Providers</span><br/>Covering ${allZips.size} ZIP codes (${ringBaseZips ? 'searched area' : 'seed'} + neighbors).<br/><span style="color:var(--text-muted);font-size:10px;">Click any ZIP for its individual demographics.</span>`;
                 acsView = [...allZips];
                 renderDashboard(agg);
 
@@ -1970,6 +1970,11 @@
         // Simple logic: click ZIP = isolate demographics. Show Neighbors button loads adjacent ZIPs.
         let neighborZipSet = new Set(); // Currently loaded neighbor ZIPs
         let neighborSeedZip = null; // The ZIP that neighbors were loaded around
+        // A city or multi-ZIP search selects no ZIP, so rings grow from every
+        // searched ZIP instead (2026-11-04; before, "Add neighbors" did nothing
+        // after a city search and the live audit's ring steps timed out).
+        let ringBaseZips = null;
+        const RING_BASE_MAX = 150;
 
         function showNeighborButtons(show) {
             const nb = document.getElementById('neighborsBtn');
@@ -1981,6 +1986,7 @@
         function clearNeighbors() {
             neighborZipSet.clear();
             neighborSeedZip = null;
+            ringBaseZips = null;
             lockedZip = null; lockedLayer = null;
             if (zipGeoJSONLayer) zipGeoJSONLayer.eachLayer(l => zipGeoJSONLayer.resetStyle(l));
             showNeighborButtons(false);
@@ -2125,8 +2131,20 @@
             // One run at a time: a double click used to start a second run that
             // found every ZIP already loaded and reported "No neighboring ZIPs".
             if (neighborLoadInFlight) return;
-            const seedZip = lockedZip || neighborSeedZip;
-            if (!seedZip) return;
+            let seedZip = lockedZip || neighborSeedZip;
+            if (!seedZip) {
+                // No selected ZIP: grow from the whole searched area.
+                const base = [...zipsWithClinics].map(z => String(z).padStart(5, '0')).filter(z => !strayAreaZips.has(z));
+                if (!base.length || base.length > RING_BASE_MAX) {
+                    document.getElementById('dbStatus').textContent = base.length ? 'This area is too large to add rings to. Click a ZIP to grow from it.' : 'Search an area or click a ZIP first.';
+                    return;
+                }
+                const withShape = new Set();
+                if (zipGeoJSONLayer) zipGeoJSONLayer.eachLayer(l => withShape.add(String(l.feature.properties.ZCTA5CE10).padStart(5, '0')));
+                seedZip = base.find(z => withShape.has(z));
+                if (!seedZip) { document.getElementById('dbStatus').textContent = 'ZIP boundaries are still loading. Try again in a moment.'; return; }
+                ringBaseZips = new Set(base.filter(z => withShape.has(z)));
+            }
             neighborLoadInFlight = true;
             document.getElementById('neighborsBtn').style.display = 'none';
             try { await addNeighborRing(seedZip); }
@@ -2140,7 +2158,7 @@
             // that ZIP is inside the loaded area grows the whole area by one
             // more ring. A clicked ZIP outside the area starts from itself.
             if (!neighborSeedZip) neighborSeedZip = seedPadded;
-            const area = new Set([String(neighborSeedZip).padStart(5, '0'), ...neighborZipSet]);
+            const area = new Set([String(neighborSeedZip).padStart(5, '0'), ...neighborZipSet, ...(ringBaseZips || [])]);
             const sources = area.has(seedPadded) ? [...area] : [seedPadded];
             if (!area.has(seedPadded)) neighborZipSet.add(seedPadded);
 
@@ -2278,7 +2296,7 @@
                 updateLegend();
 
                 // Show aggregate demographics for the whole loaded area
-                const allZips = [String(neighborSeedZip).padStart(5, '0'), ...neighborZipSet];
+                const allZips = [...new Set([String(neighborSeedZip).padStart(5, '0'), ...(ringBaseZips || []), ...neighborZipSet])];
                 let agg = {};
                 allZips.forEach(z => {
                     const row = zipDemographics[z] || zipDemographics[String(parseInt(z, 10))];
@@ -2293,7 +2311,7 @@
 
                 document.getElementById('dashboard-title').textContent = `${allZips.length} ZIP CODES`;
                 document.getElementById('dashboard-context').innerHTML = `
-                    <span style="color:var(--accent);font-weight:600;font-size:12px;">${neighborSeedZip} + ${neighborZipSet.size} neighbors</span>
+                    <span style="color:var(--accent);font-weight:600;font-size:12px;">${ringBaseZips ? ringBaseZips.size + ' searched ZIPs' : neighborSeedZip} + ${neighborZipSet.size} neighbors</span>
                     <button onclick="clearNeighbors()" style="margin-left:8px;padding:3px 8px;font-size:11px;background:var(--bg-elevated);border:1px solid #da3633;color:#f85149;border-radius:4px;cursor:pointer;font-family:'DM Sans',sans-serif;">✕ Clear</button>
                     <br/><span style="font-size:10px;color:var(--text-muted);">Click any ZIP to see its individual demographics</span>`;
                 document.getElementById('closePanelBtn').style.display = 'none';

@@ -797,7 +797,7 @@ side deliberately does not. Keep those separate.
 both directions, grid-indexed). Never go back to bounding-box intersection: an
 L-shaped or large ZIP's box covers ZIPs that don't touch it. Each click adds
 one ring around the whole loaded area; one run at a time. Loading neighbors
-must **not** reset `selectedTaxonomies`: an unfiltered map stays unfiltered,
+must **not** reset `selectedTaxonomies`; after a city or multi-ZIP search with no ZIP selected, a ring grows from every searched ZIP (`ringBaseZips`, at most `RING_BASE_MAX` 150; 2026-11-04, before which the button did nothing there), and a new search clears the rings (`ringsAfterSearch` in `dashboard-v3.js`): an unfiltered map stays unfiltered,
 a filtered one keeps its selection, and a first-seen taxonomy joins only if it
 matches the active specialty (`activeSpecialtyTerms()`). Rebuild the checkbox
 list after new taxonomies arrive.

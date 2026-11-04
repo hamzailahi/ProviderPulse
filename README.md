@@ -650,6 +650,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-04
 
+- After a city or multi-ZIP search, the dashboard now offers "+ Add neighbors", which adds a ring of bordering ZIPs around the whole searched area (up to 150 ZIPs). Before, the button only appeared after clicking one ZIP, and a new search no longer carries over rings from the last one.
 - The NPPES refresh and the weekly unmapped-listings job now wait out short Census geocoder outages (retrying after 30 seconds, then 1, 2 and 4 minutes) instead of stopping after two quick failures. The March-to-now catch-up had stopped three times on brief Census errors; each run kept what it had applied, about 38,000 to 380,000 changes at a time.
 - The dashboard's Ask AI tab matches the new design: "Ask about this market" with a plain note that every figure is checked and answers are a starting point, suggestion chips that wrap, and an Ask button.
 - The dashboard's map key has a new "Shade ZIPs by" picker: residents 65 and over, uninsured share, median household income, or listings shown per 10,000 residents. ZIPs fall into five bands with about the same number of ZIPs each, and ZIPs with no figure stay unshaded and are counted. The design's per-ZIP opportunity shading is not offered, because it would need a separate model run for every ZIP.

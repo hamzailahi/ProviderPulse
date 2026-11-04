@@ -1870,6 +1870,24 @@ if (isProviderAcct) {
   if (specSel) specSel.addEventListener('change', function () { if (mode === 'density') setTimeout(paint, 300); });
 })();
 
+/* ---- Rings after a city search (2026-11-04) -------------------------------
+   A new search starts with no rings (they used to survive into the next
+   search), and a city or multi-ZIP search shows "+ Add neighbors", which
+   grows from every searched ZIP (index.html's ringBaseZips). */
+(function ringsAfterSearch() {
+  var prev = window.processData;
+  if (typeof prev !== 'function') return;
+  window.processData = function () {
+    try { neighborZipSet.clear(); neighborSeedZip = null; ringBaseZips = null; } catch (e) {}
+    var r = prev.apply(this, arguments);
+    try {
+      var nb = $('neighborsBtn'), n = zipsWithClinics.size;
+      if (nb && !lockedZip && n >= 1 && n <= RING_BASE_MAX) { nb.textContent = '+ Add neighbors'; nb.style.display = 'inline-block'; }
+    } catch (e) {}
+    return r;
+  };
+})();
+
 function authHeadersSync() {
   return session && session.access_token ? { Authorization: 'Bearer ' + session.access_token } : {};
 }
