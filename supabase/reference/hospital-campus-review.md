@@ -42,3 +42,31 @@ secondary practice location, so patient search shows it:
   hospital's name, and psychiatric, rehabilitation, long-term acute care,
   pediatric post-acute and nursing facilities, which the Emergency rooms &
   hospitals door does not include.
+
+## Second pass, 2026-11-04
+
+The 80 candidates with 150 or more clinicians at the address that were not on
+the first shortlist (no hospital department code there). Most are medical
+office buildings, clinics, administrative offices, psychiatric, rehabilitation
+or children's specialty sites, or addresses a hospital has moved away from
+(Marquette General, UPMC South Side, Saint Joseph Denver's Ogden St offices).
+Four looked like acute-care campuses and were looked up (`lookup` step):
+
+- **Carolinas Medical Center, Charlotte (1001 Blythe Blvd)**: already
+  findable. Its hospital NPIs (1295789907, 1346648235, 1982930533) are at
+  1000 Blythe Blvd, and 1295789907 lists 1001 Blythe Blvd suites as
+  hospital-coded secondary locations, loaded after the candidate list was
+  built.
+- **Naval Medical Center San Diego**: already findable. Hospital NPI
+  1366527764 (282N00000X) sits 0.27 miles from the candidate pin, on the same
+  campus.
+- **Montefiore New Rochelle (20 Cedar St)**: already findable. Hospital NPI
+  1720414154 is at 16 Guion Pl, 0.44 miles from the candidate, which is an
+  office building beside it.
+- **Phoenix Indian Medical Center (4212 N 16th St)**: a real gap. Its NPIs are
+  coded Public Health or Welfare Agency (1144382219) and Family Medicine
+  (1184738049), so the Emergency rooms & hospitals door never shows it. It is
+  an Indian Health Service hospital for eligible American Indian and Alaska
+  Native patients, and the campus list has no way to carry that eligibility
+  note (no hospital code in the overrides carries it), so it is **not added**
+  until the user decides how it should be shown.
