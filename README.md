@@ -580,6 +580,7 @@ node scripts/test-self-check.mjs           # a provider's own listing check: the
 node scripts/test-listing-report.mjs       # report a wrong listing: only the NPI and issue are stored, repeats throttled
 node scripts/test-admin.mjs                 # the admin account and its view switch
 node scripts/test-address-fit.mjs          # typed addresses only match places that fit what was typed
+node scripts/test-nad-match.mjs            # the National Address Database matcher: same number and street only, far-apart points refused, non-public states left out
 node scripts/test-hospital-campuses.mjs     # the reviewed hospital campus list and how patient search shows it
 node scripts/test-nppes-refresh.mjs        # weekly NPPES refresh: new, changed and deactivated NPIs, accurate geocoding only, limits, a rerun writes nothing
 node scripts/test-npi-activity.mjs         # the public Medicare-activity lookup: published columns only, unknown never "inactive"
@@ -652,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ### 2026-11-04
 
 - Listings without a map pin are now matched to an exact street address more often: the suite, unit or floor is dropped before the Census lookup, since it never changes the building. The first placement run after the NPPES catch-up had placed only 31 of 60,000 listings, half of them missed because of suite numbers.
+- A new read-only check, NAD dry run, measures how many of the listings without a map pin the U.S. Department of Transportation's National Address Database could place at their real address point, state by state, and how closely its points agree with the Census pins we already have. It writes nothing; loading would come only after the numbers are reviewed.
 - A second pass over hospital campus candidates (80 busy addresses not on the first list) found three hospitals already findable and one real gap: Phoenix Indian Medical Center now shows under Emergency rooms & hospitals, with a note that its 24-hour emergency room treats anyone while other care is for eligible American Indian and Alaska Native patients.
 - Ask AI and its reports now read Medicare procedures from the summed per-ZIP table when a question covers every specialty or the map is large, so the answer covers every ZIP on the map instead of stopping at a page limit and ranking whichever specialties came first alphabetically. A specialty or code question still reads clinician by clinician, and switches to the summed table if that read times out.
 - A whole-state search on the dashboard no longer stops partway on big states. Texas used to time out after 14,000 individual clinicians and say the map was partly loaded; when that happens now, the rest of the state loads ZIP by ZIP, spread across the whole state, up to the usual 25,000 per listing type.
