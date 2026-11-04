@@ -11,10 +11,18 @@
 // inferred from names. Run with --check in CI: a stale or hand-edited asset
 // fails the build.
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { parseCsv } from './lib/taxonomy-map.mjs';
 
+// eligibility (2026-11-04, for Phoenix Indian Medical Center): who may use the
+// site, in the same words the taxonomy overrides use, so the patient app
+// shows it and ranks the site after places open to everyone. note: replaces
+// the sheet's default "a campus of ..." line when the default would be wrong.
+const TM = createRequire(import.meta.url)('../v2/assets/taxonomy-map.js');
+const ELIGIBILITY = new Set(TM.codes().map(c => (TM.get(c) || {}).eligibility).filter(Boolean));
+
 const SRC = 'supabase/reference/hospital-campuses.csv', OUT = 'v2/assets/hospital-campuses.js';
-const COLS = ['id', 'name', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'phone', 'taxonomy_code', 'billing_npi', 'billing_name', 'emergency', 'source', 'verified_on'];
+const COLS = ['id', 'name', 'address', 'city', 'state', 'zip', 'latitude', 'longitude', 'phone', 'taxonomy_code', 'billing_npi', 'billing_name', 'emergency', 'source', 'verified_on', 'eligibility', 'note'];
 
 function luhnNpi(npi) {
   if (!/^\d{10}$/.test(npi)) return false;
@@ -44,8 +52,10 @@ export function parseCampuses(text, hospitalCodes) {
     if (!luhnNpi(o.billing_npi)) bad('billing_npi is not a valid NPI');
     if (!['yes', 'no'].includes(o.emergency)) bad('emergency must be yes or no');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(o.verified_on)) bad('verified_on must be YYYY-MM-DD');
+    if (o.eligibility && !ELIGIBILITY.has(o.eligibility)) bad(`eligibility must be one the taxonomy overrides use: ${[...ELIGIBILITY].join('; ')}`);
     return { id: o.id, name: o.name, address: o.address, city: o.city, state: o.state, zip: o.zip, lat, lng,
-      phone: o.phone || null, taxonomy_code: o.taxonomy_code, billing_npi: o.billing_npi, billing_name: o.billing_name, emergency: o.emergency === 'yes' };
+      phone: o.phone || null, taxonomy_code: o.taxonomy_code, billing_npi: o.billing_npi, billing_name: o.billing_name, emergency: o.emergency === 'yes',
+      eligibility: o.eligibility || null, note: o.note || null };
   });
 }
 
@@ -61,7 +71,7 @@ export function renderAsset(list) {
     return LIST.filter(function (c) { return c.lat >= b.s && c.lat <= b.n && c.lng >= b.w && c.lng <= b.e; }).map(function (c) {
       return { npi: 'campus-' + c.id, name: c.name, address: c.address, city: c.city, state: c.state, zip: c.zip,
         latitude: c.lat, longitude: c.lng, phone: c.phone, taxonomy_code: c.taxonomy_code, primary_taxonomy: 'Hospital campus',
-        _src: 'campus', campus: { billing_npi: c.billing_npi, billing_name: c.billing_name, emergency: c.emergency } };
+        _src: 'campus', campus: { billing_npi: c.billing_npi, billing_name: c.billing_name, emergency: c.emergency, eligibility: c.eligibility, note: c.note } };
     });
   }
   var api = { list: LIST, inBox: inBox };

@@ -17,7 +17,9 @@
     "taxonomy_code": "282N00000X",
     "billing_npi": "1578527172",
     "billing_name": "Baptist Memorial Hospital (Memphis)",
-    "emergency": true
+    "emergency": true,
+    "eligibility": null,
+    "note": null
   },
   {
     "id": "avc-st-joseph",
@@ -32,7 +34,9 @@
     "taxonomy_code": "282N00000X",
     "billing_npi": "1154314789",
     "billing_name": "Ascension Via Christi Hospitals Wichita (listed at the St. Francis campus)",
-    "emergency": true
+    "emergency": true,
+    "eligibility": null,
+    "note": null
   },
   {
     "id": "lbj-houston",
@@ -47,7 +51,9 @@
     "taxonomy_code": "282N00000X",
     "billing_npi": "1205900370",
     "billing_name": "Harris County Hospital District (Harris Health; listed at Ben Taub)",
-    "emergency": true
+    "emergency": true,
+    "eligibility": null,
+    "note": null
   },
   {
     "id": "kp-ontario",
@@ -62,7 +68,26 @@
     "taxonomy_code": "282N00000X",
     "billing_npi": "1356496772",
     "billing_name": "Kaiser Foundation Hospital Fontana/Ontario",
-    "emergency": true
+    "emergency": true,
+    "eligibility": null,
+    "note": null
+  },
+  {
+    "id": "pimc-phoenix",
+    "name": "Phoenix Indian Medical Center",
+    "address": "4212 N 16th St",
+    "city": "Phoenix",
+    "state": "AZ",
+    "zip": "85016",
+    "lat": 33.497016,
+    "lng": -112.04848,
+    "phone": "6022631200",
+    "taxonomy_code": "282N00000X",
+    "billing_npi": "1144382219",
+    "billing_name": "Phoenix Indian Medical Center (Indian Health Service)",
+    "emergency": true,
+    "eligibility": "American Indian and Alaska Native people",
+    "note": "An Indian Health Service hospital. Its emergency room is open 24 hours and treats anyone; other care is for eligible American Indian and Alaska Native patients, and people found not eligible may be billed. The federal registry does not list it as a hospital, so we added it by hand."
   }
 ];
   // Campuses inside a {s, n, w, e} box, shaped like directory rows.
@@ -70,7 +95,7 @@
     return LIST.filter(function (c) { return c.lat >= b.s && c.lat <= b.n && c.lng >= b.w && c.lng <= b.e; }).map(function (c) {
       return { npi: 'campus-' + c.id, name: c.name, address: c.address, city: c.city, state: c.state, zip: c.zip,
         latitude: c.lat, longitude: c.lng, phone: c.phone, taxonomy_code: c.taxonomy_code, primary_taxonomy: 'Hospital campus',
-        _src: 'campus', campus: { billing_npi: c.billing_npi, billing_name: c.billing_name, emergency: c.emergency } };
+        _src: 'campus', campus: { billing_npi: c.billing_npi, billing_name: c.billing_name, emergency: c.emergency, eligibility: c.eligibility, note: c.note } };
     });
   }
   var api = { list: LIST, inBox: inBox };

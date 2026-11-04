@@ -739,7 +739,10 @@ function buildResults(rows, s) {
 
 // The care-type facts of a listing's own code (taxonomy-map.js), or {}.
 function codeInfo(p) {
-  return ((typeof TaxonomyMap !== 'undefined' && p && p.code) ? TaxonomyMap.get(p.code) : null) || {};
+  var t = ((typeof TaxonomyMap !== 'undefined' && p && p.code) ? TaxonomyMap.get(p.code) : null) || {};
+  // A reviewed hospital campus can carry its own eligibility (2026-11-04:
+  // Phoenix Indian Medical Center), shown and ranked like a code's.
+  return p && p.campus && p.campus.eligibility ? Object.assign({}, t, { eligibility: p.campus.eligibility }) : t;
 }
 function isLowCost(p) { return !!codeInfo(p).safetyNet; }
 
@@ -1841,14 +1844,14 @@ function detailSheet(npi) {
       } }, 'Show on map') : null),
     info.safetyNet || info.eligibility || info.patientNote ? h('div', { class: 'note', style: 'margin-top:12px' },
       [info.safetyNet, info.eligibility ? 'For: ' + info.eligibility : null, info.patientNote].filter(Boolean).join('. ') + '.') : null,
-    p.campus ? h('div', { class: 'note info', style: 'margin-top:12px' }, 'A campus of ' + p.campus.billing_name +
+    p.campus ? h('div', { class: 'note info', style: 'margin-top:12px' }, p.campus.note ? p.campus.note + ' Call ahead to confirm services.' : 'A campus of ' + p.campus.billing_name +
       (p.campus.emergency ? ', with an emergency room' : '') + '. The federal registry lists only its parent hospital, so we added this site by hand. Call ahead to confirm services.') : null,
     p.bio ? h('p', { style: 'margin-top:14px;color:var(--muted);font-size:14px' }, p.bio) : null,
     p.volume ? h('div', { class: 'note info', style: 'margin-top:12px' }, (state.search.procedure ? state.search.procedure.label : 'This procedure') + ': billed Medicare ' + p.volume.services.toLocaleString() +
       ' times in 2024, at least ' + p.volume.patients.toLocaleString() + ' patients (' + Object.keys(p.volume.codes).map(function (k) { return k + ' ×' + p.volume.codes[k].toLocaleString(); }).join(', ') + ').') : null,
     h('dl', { class: 'f', style: 'margin-top:18px' },
       h('dt', {}, 'Specialty'), h('dd', {}, plainType(p) || '—'),
-      h('dt', {}, 'NPI'), p.campus ? h('dd', {}, 'None of its own. It bills under NPI ' + p.campus.billing_npi + ', ' + p.campus.billing_name + '.')
+      h('dt', {}, 'NPI'), p.campus ? h('dd', {}, p.campus.note ? 'Registered under NPI ' + p.campus.billing_npi + ', ' + p.campus.billing_name + ', with a non-hospital code.' : 'None of its own. It bills under NPI ' + p.campus.billing_npi + ', ' + p.campus.billing_name + '.')
         : h('dd', {}, p.npi),
       h('dt', {}, 'Address'), h('dd', {}, [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ') || '—'),
       p.miles != null ? h('dt', {}, 'Distance') : null, p.miles != null ? h('dd', {}, fmtMiles(p.miles) + ' from ' + placeWords(state.search) + (state.search.origin ? ' (straight line)' : '')) : null,

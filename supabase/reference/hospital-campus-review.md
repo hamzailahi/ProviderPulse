@@ -68,5 +68,7 @@ Four looked like acute-care campuses and were looked up (`lookup` step):
   (1184738049), so the Emergency rooms & hospitals door never shows it. It is
   an Indian Health Service hospital for eligible American Indian and Alaska
   Native patients, and the campus list has no way to carry that eligibility
-  note (no hospital code in the overrides carries it), so it is **not added**
-  until the user decides how it should be shown.
+  note (no hospital code in the overrides carries it), so it was held back;
+  **added the same day** at the user's word, with the list's new
+  `eligibility` and `note` columns (the ER treats anyone; other care is for
+  eligible patients).

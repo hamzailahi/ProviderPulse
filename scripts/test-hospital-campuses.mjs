@@ -13,6 +13,7 @@ const TaxonomyMap = require('../v2/assets/taxonomy-map.js');
 const codes = new Set(TaxonomyMap.codesForCare('Emergency rooms & hospitals'));
 const text = readFileSync('supabase/reference/hospital-campuses.csv', 'utf8');
 const list = parseCampuses(text, codes);
+function H0() { return require('../v2/assets/hospital-campuses.js'); }
 ok(list.length >= 1, 'the reviewed list loads');
 ok(list.some(c => c.id === 'bmh-collierville' && c.billing_npi === '1578527172' && c.zip === '38017'), 'Baptist Memorial Hospital-Collierville is on it, billing under the Memphis NPI');
 ok(readFileSync('v2/assets/hospital-campuses.js', 'utf8') === renderAsset(list), 'the generated asset is current');
@@ -28,9 +29,15 @@ refuses({ zip: '3801' }, 'a bad ZIP');
 refuses({ latitude: '0' }, 'a point outside the US');
 refuses({ source: '' }, 'a row with no source');
 refuses({ emergency: 'maybe' }, 'an unclear emergency flag');
+refuses({ eligibility: 'Members only' }, 'an eligibility the taxonomy overrides do not use');
+ok(parseCampuses(row({ eligibility: 'American Indian and Alaska Native people' }), codes)[0].eligibility === 'American Indian and Alaska Native people', 'a known eligibility passes');
+const pimc = list.find(c => c.id === 'pimc-phoenix');
+ok(pimc && pimc.eligibility === 'American Indian and Alaska Native people' && pimc.emergency && /treats anyone/.test(pimc.note || ''), 'Phoenix Indian Medical Center carries its eligibility and says the ER treats anyone');
+const pr = H0().inBox({ s: 33.4, n: 33.6, w: -112.1, e: -112.0 }).find(r => r.npi === 'campus-pimc-phoenix');
+ok(pr && pr.campus.eligibility && pr.campus.note, 'its search row carries the eligibility and note');
 let dup = false; try { parseCampuses(row({}) + row({}).split('\n')[1] + '\n', codes); } catch { dup = true; } ok(dup, 'refuses a duplicate id');
 
-const H = require('../v2/assets/hospital-campuses.js');
+const H = H0();
 const near = H.inBox({ s: 35.0, n: 35.1, w: -89.8, e: -89.6 });
 const far = H.inBox({ s: 32.7, n: 32.9, w: -97.4, e: -97.2 });
 ok(near.some(r => r.npi === 'campus-bmh-collierville') && !far.length, 'only campuses inside the box come back');
@@ -39,6 +46,7 @@ ok(r._src === 'campus' && codes.has(r.taxonomy_code) && r.campus.billing_npi ===
 
 const patient = readFileSync('v2/assets/patient.js', 'utf8');
 ok(/HospitalCampuses\.inBox\(box\)/.test(patient) && /regNpi = p\.campus \? p\.campus\.billing_npi/.test(patient), 'patient search adds campuses and the sheet looks up the billing NPI');
+ok(/p\.campus && p\.campus\.eligibility \? Object\.assign/.test(patient), 'a campus eligibility is read like a code\'s (badge, sheet, ranked last)');
 ok(/assets\/hospital-campuses\.js/.test(readFileSync('v2/app.html', 'utf8')), 'app.html loads the campus list');
 
 console.log(`${pass} passed, ${fail} failed`);
