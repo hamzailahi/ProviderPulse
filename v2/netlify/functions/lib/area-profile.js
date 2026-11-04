@@ -123,7 +123,9 @@ async function getAreaProfile(input, opts) {
   const [acs, places, med, mcd, xwalk] = await Promise.all([
     pagedAll(`census_acs_zcta?zip=in.(${list})&select=zip,acs_year,pop_total,households,median_hh_income,poverty_universe,poverty_below,income_bands,age_male,age_female,education,ins_universe,ins_uninsured,ins_medicare,ins_medicaid,pop_prior,pop_prior_year,signals&order=zip`, 1),
     pagedAll(`cdc_places?zip=in.(${list})&select=zip,measureid,short_text,measure,categoryid,value,pop_18plus,data_year&order=zip,measureid,data_year`, 5),
-    getProcedures({ zip, source: 'medicare_clinicians', specialty, query: null, radius_miles: 0 }, procOpts),
+    // With no specialty the Medicare read goes to the ZIP totals table
+    // (migration 046), which covers every ZIP here; with one, the nearest 30.
+    getProcedures({ zip, source: 'medicare_clinicians', specialty, query: null, radius_miles: 0 }, specialty ? procOpts : Object.assign({}, procOpts, { zips })),
     getProcedures({ zip, source: 'medicaid', specialty, query: null, radius_miles: 0 }, procOpts),
     pagedAll(`zip_county_crosswalk?zip=in.(${list})&select=zip,fips,res_ratio&order=zip,fips`, 2)
   ]);
@@ -258,13 +260,15 @@ async function getAreaProfile(input, opts) {
   // Pages are ordered by specialty, so a capped all-specialty read holds the
   // first specialties alphabetically: its rankings would mislead (live,
   // 2026-10-20: radiology codes "led" Fort Worth). Keep only floor totals.
+  // Since 2026-11-04 an all-specialty read goes to the ZIP totals table first
+  // (read_from 'zip_totals'), so this happens only when that read fails too.
   const slim = (r, n) => {
     if (!r || r.error) return { error: (r && r.error) || 'did not answer' };
     const skewed = !specialty && r.incomplete && /capped/.test(r.incomplete_reason || '');
     return skewed
       ? { totals: r.totals, incomplete: true, incomplete_reason: r.incomplete_reason,
         note: 'Too many rows for every specialty at once, so only floor totals are given. Call again with a CMS specialty name, or get_procedures, for codes and per-ZIP figures.' }
-      : { totals: r.totals, top_codes: (r.top_codes || []).slice(0, n), by_specialty: r.by_specialty, by_zip: r.by_zip, incomplete: r.incomplete, incomplete_reason: r.incomplete_reason };
+      : { read_from: r.read_from, totals: r.totals, top_codes: (r.top_codes || []).slice(0, n), by_specialty: r.by_specialty, by_zip: r.by_zip, incomplete: r.incomplete, incomplete_reason: r.incomplete_reason };
   };
   const procedures = {
     specialty: specialty || 'all specialties',

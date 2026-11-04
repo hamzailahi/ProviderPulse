@@ -155,5 +155,34 @@ const MED = [
   check('a failed Medicare comparison leaves the check out and the Medicaid figures complete', r2.incomplete === false && r2.top_codes[0].per_claim_check === undefined);
 }
 
+// 9. ZIP totals (medicare_procedures_zip, migration 046, 2026-11-04): a broad
+// read goes there first; a capped or failed clinician-row read is retried there.
+{
+  const SUM = [
+    { zip: '76104', specialty: 'Gastroenterology', hcpcs_cd: '45385', hcpcs_desc: 'Removal of polyps or growths of large bowel using an endoscope', billers: 2, tot_benes: 150, tot_srvcs: 200,
+      allowed_x_srvcs: 51000, paid_x_srvcs: 40800, srvcs_i: 110, paid_x_srvcs_i: 26400, srvcs_o: 90, paid_x_srvcs_o: 14400 },
+    { zip: '76110', specialty: 'Gastroenterology', hcpcs_cd: '45385', hcpcs_desc: 'Removal of polyps or growths of large bowel using an endoscope', billers: 1, tot_benes: 30, tot_srvcs: 30,
+      allowed_x_srvcs: 7500, paid_x_srvcs: 6000, srvcs_i: 30, paid_x_srvcs_i: 6000, srvcs_o: 0, paid_x_srvcs_o: 0 },
+    { zip: '76104', specialty: 'Diagnostic Radiology', hcpcs_cd: '71045', hcpcs_desc: 'X-ray of chest, 1 view', billers: 5, tot_benes: 40, tot_srvcs: 40,
+      allowed_x_srvcs: 1200, paid_x_srvcs: 960, srvcs_i: 40, paid_x_srvcs_i: 960, srvcs_o: 0, paid_x_srvcs_o: 0 }
+  ];
+  const f = fakeDb([centroid, box, [/medicare_procedures_zip/, u => (u.includes('offset=0') ? SUM.filter(r => u.includes(r.zip)) : [])], [/cms_procedures_full/, 500]]);
+  const r = await getProcedures({ zip: '76104', source: 'medicare_clinicians', specialty: null, query: null, radius_miles: 5 }, { fetch: f, env });
+  const top = r.top_codes && r.top_codes[0];
+  check('ZIP totals: a broad read uses the summary, not clinician rows', r.read_from === 'zip_totals' && !f.urls.some(u => u.includes('cms_procedures_full')), JSON.stringify(r).slice(0, 300));
+  check('ZIP totals: the busiest code leads with its ZIPs added up', top && top.code === '45385' && top.patients === 180 && top.services === 230);
+  check('ZIP totals: averages are weighted by services, fees split by biller', top && top.avg_medicare_paid === 203.48 && top.clinician_fee.avg_medicare_paid === 231.43 && top.facility_fee.avg_medicare_paid === 160, JSON.stringify(top));
+  check('ZIP totals: clinicians per code add billers; no distinct total is claimed', top && top.clinicians === 3 && r.totals.clinicians === null && r.by_zip.every(z => z.clinicians === null));
+  check('ZIP totals: complete, with a note on how clinicians are counted', r.incomplete === false && r.notes.some(n => /ZIP totals/.test(n)));
+  // A specialty read on clinician rows that times out is answered from the summary.
+  const g = fakeDb([centroid, [/medicare_procedures_zip/, u => (u.includes('offset=0') ? SUM.slice(0, 1) : [])], [/cms_procedures_full/, 500]]);
+  const r2 = await getProcedures({ zip: '76104', source: 'medicare_clinicians', specialty: 'Gastroenterology', query: null, radius_miles: 0 }, { fetch: g, env });
+  check('ZIP totals: a failed clinician-row read is answered from the summary, complete', r2.read_from === 'zip_totals' && r2.incomplete === false && r2.top_codes[0].patients === 150);
+  // An empty summary (not loaded) leaves the clinician rows' answer in place.
+  const h = fakeDb([centroid, [/cms_procedures_full/, u => (u.includes('offset=0') ? MED : [])]]);
+  const r3 = await getProcedures({ zip: '76104', source: 'medicare_clinicians', specialty: null, query: null, radius_miles: 0 }, { fetch: h, env });
+  check('ZIP totals: an empty summary falls back to clinician rows', r3.read_from === 'clinician_rows' && r3.totals.clinicians === 2 && r3.incomplete === false);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

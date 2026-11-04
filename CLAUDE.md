@@ -1404,7 +1404,14 @@ AI tab in `dashboard-v3.js`.
   its paid per claim line runs over 3x Medicare's local average per service,
   from a side sample that never marks the result incomplete: a claim line can
   carry several units, and ECG 93000 showed $205.76 per claim line against
-  about $10), `get_area_profile` (`lib/area-profile.js`,
+  about $10); Medicare reads two tables (2026-11-04): a broad read (no
+  specialty, no words, no codes) goes to `medicare_procedures_zip` first, up
+  to 120 map ZIPs, and a clinician-row read that is capped or has a failed
+  request is retried there; `read_from` says which (`zip_totals` /
+  `clinician_rows`), ZIP totals give clinicians per code as the sum of each
+  ZIP's billers and `null` for the distinct total, per-specialty and per-ZIP
+  clinician counts, with a `zip_totals` note saying so; an empty or
+  incomplete summary read leaves the row answer in place), `get_area_profile` (`lib/area-profile.js`,
   2026-10-20, the user's choice of "what's on the map" and "totals plus
   each ZIP": every map ZIP, topped up to 8 with the nearest by PLACES
   centroid and named in `notes`, cut to the nearest 60 (40 until
@@ -1423,7 +1430,8 @@ AI tab in `dashboard-v3.js`.
   cap, and because pages are ordered by specialty the codes would rank the
   alphabet's first specialties (live, Fort Worth: radiology "led"), so a
   capped all-specialty read keeps only floor totals and asks for a
-  specialty; 13s budget, live 0.6 to 1.9s; the system prompt calls it with
+  specialty (since 2026-11-04 an all-specialty read covers every area ZIP
+  from the ZIP totals table, so that happens only if that read fails too); 13s budget, live 0.6 to 1.9s; the system prompt calls it with
   `get_market_insights` and for every report, which gains an "Area
   profile" section), `query_database` (a plan
   through `lib/query-plan.js`), and two browser effects: `update_map`
@@ -2098,7 +2106,7 @@ python3 scripts/test-procedure-tables.py   # 20: Medicaid and Medicare hospital 
 node scripts/test-patient-query.mjs       # 231: typed words to doors and specialties (whole words, generic words, new categories, low-cost words, misspellings, every related-care entry real), codesFor per label and door, the frozen market list
 node scripts/test-area-profile.mjs        # 53: the assistant's get_area_profile (incl. the report's key health measures) on a fake database: the map's ZIPs from the dashboard block, topped up to 8, counts summed, health weighted by adults, per-ZIP procedures, failures never zero
 node scripts/test-providers-near.mjs      # 22: the assistant's find_providers: codes in a location box, individuals and organizations, radius or map, failures never "none"
-node scripts/test-procedures-tool.mjs     # 43: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo
+node scripts/test-procedures-tool.mjs     # 50: the assistant's get_procedures on a fake database: weighted averages, words to CMS wording, failures marked incomplete, Medicaid codes by description, nearest hospitals, doctor vs facility fee, a 47-code list in one call with its echo, ZIP totals for broad reads and as the fallback for a failed row read
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
 node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty), the API script against a local server, and the pacer on a fake clock
