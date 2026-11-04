@@ -771,7 +771,8 @@
                 // locations (clinic_secondary_locations), paginated per table.
                 let clinicData = await fetchProviderRows(
                     () => filter,
-                    n => statusEl.textContent = 'Loaded ' + n + ' providers...'
+                    n => statusEl.textContent = 'Loaded ' + n + ' providers...',
+                    filter.startsWith('state=eq.') ? { state: filter.slice('state=eq.'.length) } : null
                 );
 
                 if (clinicData.length === 0) {
@@ -865,7 +866,7 @@
             { table: 'clinic_secondary_locations', select: 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude', src: 'secondary' }
         ];
 
-        async function fetchProviderRows(filterFn, onProgress) {
+        async function fetchProviderRows(filterFn, onProgress, opts) {
             // The three sources used to be fetched one after another -- clinics fully
             // paginated, then provider_individuals fully paginated, then secondary
             // locations -- which made every multi-ZIP search pay for all three trips
@@ -883,19 +884,26 @@
             // (no city/state index; migration 039). A source stops at
             // PROVIDER_SOURCE_CAP rows and is listed in .capped, so a state search
             // cannot page forever or draw more pins than a browser can hold.
+            //
+            // A state search (opts.state) whose offset paging times out goes on ZIP
+            // by ZIP instead (2026-11-04): Texas individuals timed out at offset
+            // 14,000 (each deeper page re-reads every row before it), so the map
+            // stopped at 14,000 and said "partly loaded". See loadStateByZip.
             let total = 0;
             const failed = [], capped = [];
+            const count = n => { total += n; if (onProgress) onProgress(total); };
             const perSource = await Promise.all(PROVIDER_SOURCES.map(async (src) => {
                 const rows = [];
-                let offset = 0;
+                let offset = 0, pageFailed = false;
                 while (true) {
                     const url = `${SUPABASE_URL}/rest/v1/${src.table}?${filterFn()}&select=${src.select}&limit=1000&offset=${offset}`;
                     let res;
                     try { res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }); }
-                    catch (e) { failed.push(src.table); break; }
-                    if (!res.ok) { failed.push(src.table); break; }
+                    catch (e) { pageFailed = true; break; }
+                    if (!res.ok) { pageFailed = true; break; }
                     const batch = await res.json();
-                    if (!batch || batch.length === 0) break;
+                    if (!Array.isArray(batch)) { pageFailed = true; break; }
+                    if (batch.length === 0) break;
                     // _src tags where a row came from -- no stored affiliation link exists
                     // yet (migration 015's coordinate-match stage hasn't been uploaded), so
                     // renderMap infers a physician's likely clinic live, from sharing exact
@@ -903,17 +911,105 @@
                     // such rather than letting them read as a practice's main address.
                     batch.forEach(r => { r._src = src.src; });
                     rows.push(...batch);
-                    total += batch.length;
-                    if (onProgress) onProgress(total);
+                    count(batch.length);
                     if (batch.length < 1000) break;
                     if (rows.length >= PROVIDER_SOURCE_CAP) { capped.push(src.table); break; }
                     offset += 1000;
                 }
+                if (pageFailed && opts && opts.state) {
+                    const r = await loadStateByZip(src, rows, opts.state, count);
+                    if (r.failed) failed.push(src.table);
+                    if (r.capped) capped.push(src.table);
+                } else if (pageFailed) failed.push(src.table);
                 return rows;
             }));
             const all = perSource.flat();
             all.failed = failed; all.capped = capped;
             return all;
+        }
+
+        // The state's ZIPs, from census_acs_zcta (two-letter state codes), with
+        // the leading-zero-stripped form beside each (some rows store "2114"),
+        // or null when the lookup fails. Cached per state; a failure is not kept.
+        const stateZipCache = {};
+        function stateZips(state) {
+            if (stateZipCache[state]) return stateZipCache[state];
+            const job = (async () => {
+                const out = new Set();
+                for (let offset = 0, pages = 0; pages < 6; offset += 1000, pages++) {
+                    let res;
+                    try { res = await fetch(`${SUPABASE_URL}/rest/v1/census_acs_zcta?state=eq.${encodeURIComponent(state)}&select=zip&order=zip&limit=1000&offset=${offset}`,
+                        { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }); }
+                    catch (e) { return null; }
+                    if (!res.ok) return null;
+                    const batch = await res.json();
+                    if (!Array.isArray(batch)) return null;
+                    batch.forEach(r => {
+                        const z = String(r.zip || '').padStart(5, '0');
+                        if (!/^\d{5}$/.test(z)) return;
+                        out.add(z);
+                        const bare = String(parseInt(z, 10));
+                        if (bare !== z) out.add(bare);
+                    });
+                    if (batch.length < 1000) break;
+                }
+                return out.size ? [...out].sort() : null;
+            })();
+            stateZipCache[state] = job;
+            job.then(v => { if (!v) delete stateZipCache[state]; });
+            return job;
+        }
+
+        // The rest of a state search for one table, ZIP by ZIP, after its offset
+        // paging failed. Groups of about ten ZIPs are taken across the whole state
+        // (every Nth ZIP), so a capped load is a statewide spread rather than the
+        // first few cities; each group pages from offset 0, which the zip index
+        // answers quickly. Rows already loaded are skipped. A group that fails
+        // twice marks the table failed; reaching PROVIDER_SOURCE_CAP marks it
+        // capped. A listing whose ZIP has no Census ZCTA (a PO-box-only ZIP) can be
+        // reached only by the state paging, so an uncapped load that fell back here
+        // may miss a few of those.
+        async function loadStateByZip(src, rows, state, count) {
+            const zips = await stateZips(state);
+            if (!zips) return { failed: true };
+            const key = r => (r.npi || '') + '|' + (r.address || '') + '|' + (r.zip || '');
+            const seen = new Set(rows.map(key));
+            const n = Math.max(1, Math.ceil(zips.length / 10));
+            const groups = Array.from({ length: n }, (_, k) => zips.filter((_, i) => i % n === k));
+            let next = 0, failedGroups = 0, capped = false;
+            const runGroup = async (g) => {
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    const got = [];
+                    let ok = true;
+                    for (let offset = 0, pages = 0; pages < 20; offset += 1000, pages++) {
+                        let res;
+                        try { res = await fetch(`${SUPABASE_URL}/rest/v1/${src.table}?zip=in.(${g.join(',')})&state=eq.${encodeURIComponent(state)}&select=${src.select}&limit=1000&offset=${offset}`,
+                            { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } }); }
+                        catch (e) { ok = false; break; }
+                        if (!res.ok) { ok = false; break; }
+                        const batch = await res.json();
+                        if (!Array.isArray(batch)) { ok = false; break; }
+                        got.push(...batch);
+                        if (batch.length < 1000) break;
+                    }
+                    if (!ok) continue;
+                    const fresh = got.filter(r => { const k = key(r); if (seen.has(k)) return false; seen.add(k); return true; });
+                    fresh.forEach(r => { r._src = src.src; });
+                    const room = PROVIDER_SOURCE_CAP - rows.length;
+                    if (fresh.length > room) capped = true;
+                    const take = fresh.slice(0, Math.max(0, room));
+                    rows.push(...take);
+                    count(take.length);
+                    return;
+                }
+                failedGroups++;
+            };
+            const worker = async () => {
+                while (next < groups.length && !capped && rows.length < PROVIDER_SOURCE_CAP) await runGroup(groups[next++]);
+            };
+            await Promise.all(Array.from({ length: 4 }, worker));
+            if (rows.length >= PROVIDER_SOURCE_CAP && next < groups.length) capped = true;
+            return { failed: failedGroups > 0, capped };
         }
 
         const PROVIDER_SOURCE_CAP = 25000;

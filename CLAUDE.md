@@ -152,7 +152,16 @@ city and state searches timed out on `provider_individuals` and
 `clinic_secondary_locations` (no city/state index; migration 039, applied the same day, adds
 `(state, city)` and `(city)` on both) while the status line said "Loaded".
 `fetchProviderRows` now returns `.failed` and `.capped` (25,000 rows per
-table, `PROVIDER_SOURCE_CAP`), and `setLoadWarning` / `loadWarningFor` put a
+table, `PROVIDER_SOURCE_CAP`); a state search whose offset paging times out
+(Texas individuals at offset 14,000 on 2026-11-04, each deeper page re-reading
+every row before it) goes on ZIP by ZIP for that table (`loadStateByZip`: the
+state's ZIPs from `census_acs_zcta` plus leading-zero-stripped forms,
+`stateZips`, cached unless failed; groups of about ten taken every Nth ZIP
+across the state so a capped load is a statewide spread; each group pages from
+offset 0 with `zip=in.(...)&state=eq.`; rows already loaded are skipped; a
+group that fails twice, or a failed ZIP lookup, marks the table failed;
+reaching the cap marks it capped; a PO-box-only ZIP with no ZCTA is reachable
+only by the state paging), and `setLoadWarning` / `loadWarningFor` put a
 notice on the map that the filters' status rewrites cannot erase; every
 search clears it. The Medicare procedures loader asked for all of a state's
 ZIPs at once (84 for RI), timed out, and read the error object as a page with
