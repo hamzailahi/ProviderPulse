@@ -559,3 +559,13 @@ body.filters-open #map-legend { left: 306px; }
 .as-input { min-height: 44px; border-color: #74858C; font: 400 15px/22px Inter, sans-serif; }
 .as-input:focus { outline: 3px solid #1D4ED8; outline-offset: 2px; border-color: #0F766E; box-shadow: none; }
 .as-send { width: auto; height: 44px; padding: 0 18px; font: 600 15px/20px Inter, sans-serif; }
+
+/* Shade ZIPs by (2026-11-04), at the top of the map key. */
+.lg-shade { display: flex; flex-direction: column; gap: 6px; }
+.lg-label { font: 600 13px/18px Inter, sans-serif; color: #14232A; }
+.lg-select { min-height: 36px; border: 1px solid #74858C; border-radius: 8px; padding: 0 8px; font: 400 13px/18px Inter, sans-serif; color: #14232A; background: #fff; }
+.lg-select:focus-visible { outline: 3px solid #1D4ED8; outline-offset: 2px; }
+.lg-scale { display: flex; flex-direction: column; gap: 4px; }
+.lg-sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(20,35,42,.15); flex: none; }
+.lg-note { margin: 0; font: 400 12px/16px Inter, sans-serif; color: #4D5D64; max-width: 240px; }
+@media (max-width: 640px) { .lg-select { font-size: 16px; } }

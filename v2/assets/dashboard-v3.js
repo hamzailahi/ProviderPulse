@@ -1753,6 +1753,123 @@ if (isProviderAcct) {
   window.switchTab = function (tab) { baseSwitch(tab); if (tab === 'health') window.ppHealth.repaint(); };
 })();
 
+/* ---- Shade ZIPs by (2026-11-04, the user's canvas "Group areas by") -----
+   Colours the map's ZIP outlines by one Census or listing figure, in five
+   equal-count bands over the ZIPs on the map. Real data only: the canvas's
+   per-ZIP "opportunity" would need a model run per ZIP, so it is not offered.
+   A ZIP with no figure stays unshaded and the key says how many. */
+(function zipShade() {
+  var body = document.querySelector('#map-legend .lg-body');
+  if (!body) return;
+  var SB = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : null, KEY = typeof SUPABASE_KEY !== 'undefined' ? SUPABASE_KEY : null;
+  var PAL = ['#E3F3F1', '#B8DDD7', '#8FCFC6', '#4FA89D', '#115E59'];
+  var N = function (v) { var n = Number(v); return isFinite(n) ? n : 0; };
+  var MODES = {
+    p65: { label: 'Residents 65 and over', fmt: function (v) { return v.toFixed(1) + '%'; }, of: function (r) {
+      var t = (r.age_male || []).map(function (v, i) { return N(v) + N((r.age_female || [])[i]); });
+      var tot = t.reduce(function (a, b) { return a + b; }, 0);
+      return tot ? t.slice(13).reduce(function (a, b) { return a + b; }, 0) / tot * 100 : null; } },
+    unins: { label: 'Uninsured', fmt: function (v) { return v.toFixed(1) + '%'; }, of: function (r) {
+      return r.ins_universe != null && r.ins_uninsured != null && N(r.ins_universe) > 0 ? N(r.ins_uninsured) / N(r.ins_universe) * 100 : null; } },
+    income: { label: 'Median household income', fmt: function (v) { return v >= 250000 ? '$250k+' : '$' + Math.round(v / 1000) + 'k'; }, of: function (r) {
+      return r.median_hh_income != null ? Math.min(N(r.median_hh_income), 250001) : null; } },
+    density: { label: 'Listings shown per 10,000 residents', fmt: function (v) { return v.toFixed(v < 10 ? 1 : 0); }, of: null }
+  };
+  var mode = '', values = {}, cuts = [], seq = 0;
+  var sel = el('select', { id: 'zip-shade', class: 'lg-select' },
+    el('option', { value: '' }, 'None'),
+    Object.keys(MODES).map(function (k) { return el('option', { value: k }, MODES[k].label); }));
+  var scale = el('div', { class: 'lg-scale' });
+  var note = el('p', { class: 'lg-note' });
+  body.insertBefore(el('div', { class: 'lg-shade' }, el('label', { for: 'zip-shade', class: 'lg-label' }, 'Shade ZIPs by'), sel, scale, note), body.firstChild);
+  body.insertBefore(el('div', { class: 'lg-sep' }), body.children[1]);
+
+  window.ppZipShade = function (z) {
+    if (!mode || values[z] == null || !cuts.length) return null;
+    var v = values[z], i = 0;
+    while (i < cuts.length && v > cuts[i]) i++;
+    return { fillColor: PAL[i], fillOpacity: 0.55 };
+  };
+  function areaZips() {
+    var set = {};
+    try { zipsWithClinics.forEach(function (z) { set[String(z).padStart(5, '0')] = 1; }); } catch (e) {}
+    try { if (neighborZipSet) neighborZipSet.forEach(function (z) { set[String(z).padStart(5, '0')] = 1; }); } catch (e) {}
+    try { if (strayAreaZips) strayAreaZips.forEach(function (z) { delete set[z]; }); } catch (e) {}
+    return Object.keys(set).filter(function (z) { return /^\d{5}$/.test(z) && z !== '00000'; }).slice(0, 600);
+  }
+  function rows(zips) {
+    var need = zips.filter(function (z) { return !acsRowCache.has(z); }), groups = [];
+    for (var i = 0; i < need.length; i += 100) groups.push(need.slice(i, i + 100));
+    var failed = 0;
+    return Promise.all(groups.map(function (g) {
+      return fetch(SB + '/rest/v1/census_acs_zcta?zip=in.(' + g.join(',') + ')&select=*', { headers: { apikey: KEY, Accept: 'application/json' }, signal: AbortSignal.timeout(12000) })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (list) {
+          var got = {}; (list || []).forEach(function (x) { got[String(x.zip).padStart(5, '0')] = x; });
+          g.forEach(function (z) { acsRowCache.set(z, got[z] || null); });
+        }).catch(function () { failed += g.length; });
+    })).then(function () { return failed; });
+  }
+  function paint() {
+    var mine = ++seq;
+    values = {}; cuts = [];
+    while (scale.firstChild) scale.removeChild(scale.firstChild);
+    note.textContent = '';
+    if (!mode) { restyle(); return; }
+    var zips = areaZips();
+    if (!zips.length) { note.textContent = 'Search an area first.'; restyle(); return; }
+    note.textContent = 'Loading…';
+    rows(zips).then(function (failed) {
+      if (mine !== seq) return;
+      var M = MODES[mode], perZip = {};
+      if (mode === 'density') {
+        (typeof currentlyVisiblePractices !== 'undefined' ? currentlyVisiblePractices : []).forEach(function (p) {
+          var z = String(p['ZIP Code'] || p['Zipcode'] || '').trim().split('-')[0].padStart(5, '0'); perZip[z] = (perZip[z] || 0) + 1;
+        });
+      }
+      zips.forEach(function (z) {
+        var r = acsRowCache.get(z);
+        if (!r) return;
+        var v = mode === 'density' ? (N(r.pop_total) >= 200 ? (perZip[z] || 0) / N(r.pop_total) * 10000 : null) : M.of(r);
+        if (v != null && isFinite(v)) values[z] = v;
+      });
+      var vals = Object.keys(values).map(function (z) { return values[z]; }).sort(function (a, b) { return a - b; });
+      var none = zips.length - vals.length;
+      note.textContent = '';
+      if (vals.length < 2) { note.textContent = failed ? 'Census figures did not load. Pick it again to retry.' : 'Not enough ZIPs with this figure to shade.'; values = {}; restyle(); return; }
+      var top = vals[vals.length - 1];
+      if (top === vals[0]) { note.textContent = 'Every ZIP here has the same figure (' + M.fmt(top) + '), so there is nothing to shade.'; values = {}; restyle(); return; }
+      for (var i = 1; i < 5; i++) { var c = vals[Math.min(vals.length - 1, Math.floor(vals.length * i / 5))]; if (c < top && (!cuts.length || c > cuts[cuts.length - 1])) cuts.push(c); }
+      var lo = vals[0];
+      cuts.concat([top]).forEach(function (hi, i) {
+        var sw = el('i', { class: 'lg-sw' }); sw.style.background = PAL[i];
+        scale.appendChild(el('div', { class: 'lg-row' }, sw, M.fmt(lo) + ' to ' + M.fmt(hi)));
+        lo = hi;
+      });
+      note.textContent = (mode === 'density' ? 'Counts what the map shows now, with its filters. ' : 'Census ACS 5-year. ') + 'Five bands with about the same number of ZIPs each.' +
+        (none ? ' ' + none + ' ZIP' + (none === 1 ? ' has' : 's have') + ' no figure and ' + (none === 1 ? 'is' : 'are') + ' left unshaded' + (failed ? ' (some did not load)' : '') + '.' : '');
+      restyle();
+    });
+  }
+  function restyle() {
+    try {
+      if (!zipGeoJSONLayer) return;
+      zipGeoJSONLayer.eachLayer(function (l) {
+        var z = String(l.feature.properties.ZCTA5CE10).padStart(5, '0');
+        if (typeof lockedZip !== 'undefined' && lockedZip && String(lockedZip).padStart(5, '0') === z) return;   // keep the selected outline
+        if (typeof neighborZipSet !== 'undefined' && neighborZipSet.has(z) && !mode) return;
+        zipGeoJSONLayer.resetStyle(l);
+      });
+    } catch (e) {}
+  }
+  sel.addEventListener('change', function () { mode = sel.value; paint(); });
+  // Repaint after each search and when the specialty filter changes the map.
+  var prevProcess = window.processData;
+  if (typeof prevProcess === 'function') window.processData = function () { var r = prevProcess.apply(this, arguments); if (mode) setTimeout(paint, 1500); return r; };
+  var specSel = $('specialty-select');
+  if (specSel) specSel.addEventListener('change', function () { if (mode === 'density') setTimeout(paint, 300); });
+})();
+
 function authHeadersSync() {
   return session && session.access_token ? { Authorization: 'Bearer ' + session.access_token } : {};
 }

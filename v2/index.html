@@ -1194,9 +1194,12 @@
                     style: f => {
                         const z = f.properties.ZCTA5CE10;
                         const hasData = zipsWithClinics.has(z) || zipsWithClinics.has(String(z).padStart(5,'0'));
-                        return hasData 
+                        const base = hasData
                             ? { color: '#3b82f6', weight: 1, fillOpacity: 0.04, fillColor: '#3b82f6' }
                             : { color: 'transparent', weight: 0, fillOpacity: 0, fillColor: 'transparent' };
+                        // "Shade ZIPs by" in the map key (dashboard-v3.js, 2026-11-04).
+                        const sh = hasData && window.ppZipShade ? window.ppZipShade(String(z).padStart(5, '0')) : null;
+                        return sh ? Object.assign(base, sh) : base;
                     }, 
                     onEachFeature: attachZipHover 
                 }).addTo(map);
