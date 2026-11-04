@@ -544,3 +544,18 @@ body.filters-open #map-legend { left: 306px; }
 .ins-code { font: 600 13px/18px ui-monospace, Menlo, monospace; white-space: nowrap; }
 .ins-pcell { display: flex; gap: 8px; align-items: center; }
 .ins-pbar { display: inline-block; height: 8px; border-radius: 4px; background: #115E59; }
+
+/* Ask AI (2026-11-03, same canvas): a plain serif heading, chips that wrap,
+   a labelled box with an "Ask" button instead of an arrow. */
+#ai-panel { background: #fff !important; }
+.as-head b { font: 600 17px/24px "Source Serif 4", Georgia, serif !important; background: none !important; color: #14232A !important; -webkit-background-clip: initial !important; }
+.as-empty { border-color: #E8EDEF; padding: 16px; }
+.as-empty h3 { font: 600 18px/24px "Source Serif 4", Georgia, serif; color: #14232A; }
+.as-empty p { font: 400 14px/21px Inter, sans-serif; }
+.as-chips { flex-direction: row; flex-wrap: wrap; }
+.as-chip { border-radius: 18px; min-height: 36px; padding: 6px 14px; border-color: #D3DCDF; font: 500 13px/18px Inter, sans-serif; color: #14232A; }
+.as-chip:hover { border-color: #0F766E; }
+.as-chip:focus-visible, .as-send:focus-visible { outline: 3px solid #1D4ED8; outline-offset: 2px; }
+.as-input { min-height: 44px; border-color: #74858C; font: 400 15px/22px Inter, sans-serif; }
+.as-input:focus { outline: 3px solid #1D4ED8; outline-offset: 2px; border-color: #0F766E; box-shadow: none; }
+.as-send { width: auto; height: 44px; padding: 0 18px; font: 600 15px/20px Inter, sans-serif; }

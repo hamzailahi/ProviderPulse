@@ -974,8 +974,8 @@ if (isProviderAcct) {
 
   while (panel.firstChild) panel.removeChild(panel.firstChild);
   var list = el('div', { class: 'as-list', id: 'ai-messages', role: 'log', 'aria-live': 'polite' });
-  var input = el('textarea', { id: 'ai-input', class: 'as-input', rows: '1', placeholder: 'Ask about this market…', 'aria-label': 'Ask the market assistant' });
-  var send = el('button', { type: 'button', class: 'as-send', 'aria-label': 'Send', onclick: function () { ask(input.value); } }, '↑');
+  var input = el('textarea', { id: 'ai-input', class: 'as-input', rows: '1', placeholder: 'e.g. Which nearby ZIPs are also underserved?', 'aria-label': 'Your question' });
+  var send = el('button', { type: 'button', class: 'as-send', onclick: function () { ask(input.value); } }, 'Ask');
   panel.appendChild(el('div', { class: 'as-head' },
     el('div', {}, el('b', {}, 'Market assistant'), el('span', { class: 'as-sub', id: 'as-sub' })),
     el('button', { type: 'button', class: 'as-new', onclick: function () { if (busy) return; chat = { api: [], ui: [] }; save(); draw(); } }, 'New chat')));
@@ -1046,8 +1046,8 @@ if (isProviderAcct) {
     updateSub();
     if (!chat.ui.length) {
       list.appendChild(el('div', { class: 'as-empty' },
-        el('h3', {}, 'Ask about any market'),
-        el('p', {}, 'Answers come from the same data as Insights: the market model, federal provider listings, Census and CDC data. It can move the map, compare ZIPs, and write memos you can share.'),
+        el('h3', {}, 'Ask about this market'),
+        el('p', {}, 'Answers come from the same data as these tabs: the market model, federal provider listings, Medicare and Medicaid billing, Census and CDC data. Every figure is checked against that data before you see it. Treat answers as a starting point, not advice.'),
         el('div', { class: 'as-chips' }, suggestions().map(function (q) {
           return el('button', { type: 'button', class: 'as-chip', onclick: function () { ask(q); } }, q);
         }))));
@@ -1074,11 +1074,11 @@ if (isProviderAcct) {
       if (v.unverified && v.unverified.length) {
         box.appendChild(el('div', { class: 'as-check warn' }, 'Could not trace to the data: ' + v.unverified.join(', ') + '. Treat these as unverified.'));
       } else if (v.checked > 0) {
-        box.appendChild(el('div', { class: 'as-check ok' }, '✓ ' + v.checked + (v.checked === 1 ? ' figure' : ' figures') + ' checked against the data'));
+        box.appendChild(el('div', { class: 'as-check ok' }, v.checked + (v.checked === 1 ? ' figure' : ' figures') + ' checked against the data'));
       }
     }
     (m.actions || []).forEach(function (a) {
-      box.appendChild(el('div', { class: 'as-action' }, '◎ Map: ' + [a.zip, a.specialty].filter(Boolean).join(' · ')));
+      box.appendChild(el('div', { class: 'as-action' }, 'Map moved to: ' + [a.zip, a.specialty].filter(Boolean).join(' · ')));
     });
     (m.docs || []).forEach(function (d) { box.appendChild(docCard(d)); });
     if (m.error && m.retry) box.appendChild(el('button', { type: 'button', class: 'as-retry', onclick: m.retry }, 'Try again'));

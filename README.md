@@ -651,6 +651,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ### 2026-11-04
 
 - The NPPES refresh and the weekly unmapped-listings job now wait out short Census geocoder outages (retrying after 30 seconds, then 1, 2 and 4 minutes) instead of stopping after two quick failures. The March-to-now catch-up had stopped three times on brief Census errors; each run kept what it had applied, about 38,000 to 380,000 changes at a time.
+- The dashboard's Ask AI tab matches the new design: "Ask about this market" with a plain note that every figure is checked and answers are a starting point, suggestion chips that wrap, and an Ask button.
 
 ### 2026-11-03
 
