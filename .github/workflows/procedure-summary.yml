@@ -1,13 +1,25 @@
 name: Procedure summary
 
-# Manual, read only for now. Streams cms_procedures_full out with a plain
-# COPY (no sort on the server), sums it per ZIP, specialty and code with
-# DuckDB on the runner, and reports how big that summary would be
-# (scripts/build-procedure-summary.py). Nothing is written to the database;
-# a load needs its own migration and the user's go-ahead after this report.
+# Manual. Streams cms_procedures_full out with a plain COPY (no sort on the
+# server), sums it per ZIP, specialty and code with DuckDB on the runner, and
+# reports how big that summary is (scripts/build-procedure-summary.py).
+# dry_run writes nothing to the database. apply (needs migration 046) also
+# loads medicare_procedures_zip in one transaction and checks the load; it
+# refuses unless disk_free_gb (Supabase, Settings, Usage, Disk: size minus
+# used) covers three times the estimated table. Rerun apply after a new CMS
+# year is loaded into cms_procedures_full.
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry_run (report only) or apply (load medicare_procedures_zip)'
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+      disk_free_gb:
+        description: 'Free database disk in GB (Supabase, Settings, Usage, Disk); apply only'
+        default: '0'
 
 permissions:
   contents: write
@@ -17,7 +29,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  dry-run:
+  summary:
     if: github.repository_owner == 'hamzailahi'
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -47,22 +59,25 @@ jobs:
           sudo apt-get install -y -q postgresql-client-17
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
-      - name: Dry run
+      - name: Build${{ inputs.mode == 'apply' && ' and load' || '' }}
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: python3 scripts/build-procedure-summary.py --mode dry_run
+          MODE: ${{ inputs.mode }}
+          DISK_FREE_GB: ${{ inputs.disk_free_gb }}
+        run: python3 scripts/build-procedure-summary.py --mode "$MODE" --disk-free-gb "$DISK_FREE_GB"
 
       - name: Summary
         if: always()
-        run: cat supabase/reference/procedure-sources/summary-dry-run.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        run: cat supabase/reference/procedure-sources/summary-dry-run.md supabase/reference/procedure-sources/summary-load.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
       - name: Commit the report
         if: success()
         run: |
           git add supabase/reference/procedure-sources/summary-dry-run.md
+          [ -f supabase/reference/procedure-sources/summary-load.md ] && git add supabase/reference/procedure-sources/summary-load.md
           if git diff --cached --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -q -m "Procedure summary dry run $(date -u +%F) [skip netlify]"
+          git commit -q -m "Procedure summary ${{ inputs.mode }} $(date -u +%F) [skip netlify]"
           git pull -q --rebase origin main
           git push origin HEAD:main

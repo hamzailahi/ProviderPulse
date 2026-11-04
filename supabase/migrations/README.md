@@ -83,6 +83,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 043 | `043_column_grants.sql` | anon and authenticated lose INSERT/UPDATE/DELETE on `provider_profiles`, `provider_locations`, `appointment_requests` and get back only the columns the functions write; `trg_appointment_guard` enforces status transitions by party (a provider could clear their own review hold, a patient confirm their own request) | applied 2026-10-25 by `apply-migration.yml` |
 | 044 | `044_provider_npis.sql` | `provider_npis` and `provider_npi_insurance` (one account, many NPIs), one-owner trigger across both listing tables, `appointment_requests.npi` with its guard, explicit service-role grants (incl. 041's table) | applied 2026-10-25 in the SQL editor; confirmed the same day: the public key gets permission denied (42501) on both new tables |
 | 045 | `045_deaconess_midtown_pin.sql` | Deaconess Midtown Hospital's listings at 600 Mary St, Evansville moved from a point 3.5 miles west onto the hospital; one-shot data fix that refuses a second run | applied 2026-11-03 by `apply-migration.yml` |
+| 046 | `046_medicare_procedures_zip.sql` | `medicare_procedures_zip`: `cms_procedures_full` summed per ZIP, specialty and code (4.1M rows), public read, filled by `procedure-summary.yml` in apply mode | written 2026-11-04; apply with `apply-migration.yml`, then load |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

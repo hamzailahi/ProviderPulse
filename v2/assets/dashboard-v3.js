@@ -581,6 +581,9 @@ function medicaidNamesFor(label) {
 }
 function procSummary(label, med, mcd) {
   var out = { label: label, medicare: null, medicaid: null };
+  // A large area read from the ZIP summary (migration 046) has no clinician
+  // rows to match by NPI: say so rather than "did not load".
+  if (med && !med.error && med.summary && !med.flat) out.medicare = { summaryOnly: true };
   // A load that failed outright is "did not load", never "nobody billed".
   if (med && !med.error && med.flat && !(med.failedBatches && !med.flat.length)) {
     var codes = {}; window.TaxonomyMap.codesFor(label).forEach(function (c) { codes[c] = 1; });
@@ -596,7 +599,7 @@ function procSummary(label, med, mcd) {
     });
     var list = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b.patients - a.patients; });
     out.medicare = { clinicians: Object.keys(who).length, onMap: Object.keys(npis).length, codes: list.length, services: services, paid: paid,
-      top: list.slice(0, 5), partial: !!med.partial };
+      top: list.slice(0, 5), partial: !!(med.partial || med.flatPartial) };
   }
   if (mcd && !mcd.error && mcd.groups) {
     var names = medicaidNamesFor(label), claims = 0, mpaid = 0, mby = {};
@@ -644,6 +647,12 @@ function procCard(M) {
 }
 function drawProc(card, s) {
   var m = s.medicare, lower = s.label.toLowerCase();
+  if (m && m.summaryOnly) {
+    card.appendChild(el('p', {}, 'This area is large, so Medicare billing is read as totals per ZIP, which do not say which clinician billed. ' +
+      'The Procedures tab lists every code by Medicare specialty; search a city or ZIP to see what the ' + lower + ' listings on the map billed.'));
+    card.appendChild(el('div', { class: 'ins-actions' }, el('button', { type: 'button', class: 'ins-btn', onclick: function () { switchTab('procedures'); } }, 'Open Procedures')));
+    return;
+  }
   if (!m) {
     card.appendChild(el('p', {}, 'Medicare billing data did not load for this area.'));
     card.appendChild(el('div', { class: 'ins-actions' }, el('button', { type: 'button', class: 'ins-btn', onclick: function () {

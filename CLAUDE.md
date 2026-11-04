@@ -945,7 +945,7 @@ is the read-only SQL-editor equivalent (round-trip tested: a database rebuilt
 from its output snapshots identically). Status per file is in
 `supabase/migrations/README.md`; keep it current.
 
-`041` (`listing_reports`) applied 2026-10-25 by `apply-migration.yml`; `042` (benchmark kind `care_type`) applied the same day the same way. `043` (column grants) applied 2026-10-25 by `apply-migration.yml`; `044` (`provider_npis`) applied the same day in the SQL editor, confirmed by the public key getting 42501 on both new tables. `045` (Deaconess Midtown's pin, a one-shot data fix that refuses a second run) applied 2026-11-03 by `apply-migration.yml`. Benchmarks rebuilt 2026-10-25 after the care-type re-filing (124 rows, then again for `care_type`).
+`041` (`listing_reports`) applied 2026-10-25 by `apply-migration.yml`; `042` (benchmark kind `care_type`) applied the same day the same way. `043` (column grants) applied 2026-10-25 by `apply-migration.yml`; `044` (`provider_npis`) applied the same day in the SQL editor, confirmed by the public key getting 42501 on both new tables. `045` (Deaconess Midtown's pin, a one-shot data fix that refuses a second run) applied 2026-11-03 by `apply-migration.yml`. `046` (`medicare_procedures_zip`, the per-ZIP Medicare procedures summary, public read) written 2026-11-04 with the user's go-ahead (7.2 GB free of 18); apply with `apply-migration.yml`, then load with `procedure-summary.yml` `apply`. Benchmarks rebuilt 2026-10-25 after the care-type re-filing (124 rows, then again for `care_type`).
 Applied as of 2026-09-30: `001`, `003` through `015`, `017` through `022`. `023` applied (`census_acs_zcta`). `024` applied (insurance columns). `025` (allows `demand_model` in `market_benchmarks`) is written but **not applied and not needed** while the demand model is parked. `026` and `027` applied 2026-10-06. `029` (taxonomy codes) applied 2026-10-08, backfilled 2026-10-09; `030` (its indexes) applied 2026-10-09 by `taxonomy-indexes.yml` in 57s, all three valid (clinics 13 MB, individuals 48 MB, secondary 8 MB). **Phase 1 is complete.** `034` (390 state insurance plans) applied 2026-10-11; `035` (its cleanup) applied 2026-10-11. `039` (city and state indexes on `provider_individuals` and `clinic_secondary_locations`, concurrent, via `concurrent-indexes.yml`) applied 2026-10-20, all four valid (individuals 50 and 49 MB, secondary about 8 MB each); the next audit loaded Collierville, TN at 982 listings and RI at 36,823 with no failed request. `038` (location indexes `clinics_geo_idx`, `provider_individuals_geo_idx`, concurrent, via `concurrent-indexes.yml` / `scripts/build-indexes.sh`) applied 2026-10-13: clinics 74 MB, individuals 215 MB, both valid. The 38017 primary care box query went from timeouts at 3.2 to 3.4s to 0.9s (clinics, 143 rows) and 1.6s (individuals, 837 rows); a 50-mile box answers its first page in 1.0 to 1.5s. `037` (`medicare_hospitals`, one row per hospital at its ZIP's ZCTA centroid, for the panel's nearest-hospitals list) applied and loaded 2026-10-12 (3,084 hospitals, 2,977 with a centroid). `036` (procedure sources: `medicaid_procedures`, `medicare_hospital_procedures`, `procedure_codes`) applied and loaded 2026-10-11 (3,083,819 Medicaid rows, 208,246 hospital rows, 6,218 code descriptions; load 44s with 9 GB free). `031`/`032` (procedures summary) **abandoned, do not run**; `033` ends a stuck 031 build and drops the summary table.
 `016` is applied (the first snapshot shows `clinics_npi_unique`). `028` (closes
 public reads of v1's `access_requests` / `access_codes`) applied 2026-10-06,
@@ -1030,6 +1030,19 @@ Tables:
 - `cms_county_utilization` (ER visits, stays, readmissions by county FIPS):
   made in the dashboard, public read, read directly by `index.html`.
   `cms_zip_procedures` is public read and unused by any code.
+- `medicare_procedures_zip` (046, 2026-11-04): `cms_procedures_full` summed
+  per ZIP x specialty x code (`row_count`, `billers`, patients, services, the
+  sums of each row's average charge, allowed and paid, service-weighted sums,
+  paid split by entity I and O), public read, filled only by
+  `procedure-summary.yml`. The Procedures panel's Medicare loader
+  (`loadMedicareProcedures` in `index.html`) reads it for areas over
+  `PROC_SUMMARY_MIN_ZIPS` (100) and when the row load (`loadMedicareRows`)
+  has a failed batch; the panel's per-code figures are identical (averages
+  are the sum of row averages over `row_count`). It carries no NPI, so a
+  summary load has `flat: null` (or the partial rows, `flatPartial`), and
+  the Insights procedures card says the area is read as ZIP totals
+  (`summaryOnly`) instead of "did not load". An empty or failed summary falls
+  back to the rows.
 - `cms_procedures_full`: CMS by-provider-and-service rows (9.8M rows, 28
   columns, **4.0 GB, half the database** on 2026-10-09), made in the dashboard
   by hand; no import script exists. Read directly by `index.html`'s Procedures
@@ -1904,16 +1917,24 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   **Procedure tables** (`procedure-tables.yml`, manual, `dry_run` / `apply`
   with `disk_free_gb`): see the 036 tables under Supabase schema. Run the
   tables job yearly after HHS and CMS publish a new year.
-- **Procedure summary** (`procedure-summary.yml`, manual, read only,
+- **Procedure summary** (`procedure-summary.yml`, manual,
   `scripts/build-procedure-summary.py`, 2026-11-04): the second try at a
   per-ZIP summary of `cms_procedures_full`, built **outside** the database:
   a plain `COPY` out (read-only session, no ORDER BY, so no server sort
   files), DuckDB sums per ZIP x specialty x code on the runner (patients,
   services, plain and service-weighted average sums, paid split by entity I
   and O), and the report `supabase/reference/procedure-sources/summary-dry-run.md`
-  gives the row count, estimated size and dense ZIPs before and after. No
-  load yet: that needs a numbered migration, the free-disk figure and the
-  user's go-ahead.
+  gives the row count, estimated size and dense ZIPs before and after
+  (first dry run: 9,781,673 rows to 4,128,906 across 20,747 ZIPs, services
+  and patients exact; 02114 25,809 rows to 3,180). `apply` (the user's
+  go-ahead, 2026-11-04, 7.2 GB free of 18) loads `medicare_procedures_zip`
+  (migration 046): one psql `-1` transaction that truncates and `\copy`s the
+  summary, then checks row count and services against DuckDB and writes
+  `summary-load.md`. It refuses unless `disk_free_gb` is three times the
+  estimate and the table exists. Keys are coalesced to '' (the primary key
+  is `(zip, specialty, hcpcs_cd)`), rows with no ZIP are left out. The
+  truncate locks the table for the load (minutes), so the panel's large-area
+  view waits in that window. Tested end to end on a local Postgres 16.
 - **Medicaid code probe** (`medicaid-code-probe.yml`, manual, read only, `scripts/probe-medicaid-codes.py`): a list of codes looked up in HHS's raw file (every year, by the NPI's state in our directory, what one state bills in the same range, the smallest published patient count); commits `supabase/reference/procedure-sources/code-probe.md`. First finding (2026-10-20): Texas Medicaid bills no global delivery code (59400, 59510, 59610); it bills 59409, 59514, 59430 and 59025 (Fort Worth: 627, 70, 1,273 and 2,046 claim lines), and HHS's under-12-patients-per-provider-month suppression hides most deliveries, so delivery counts are floors. 59400 appears in 32 states, 15,083 claim lines nationally in 2024. Quote a workflow input default that is a list of numbers: GitHub read an unquoted `59400,59409,...` as one number and the first run probed a single nonsense code.
 - **Procedure codes around a ZIP** (`code-area-report.yml`, manual, read only, `scripts/live/code-area-report.mjs`): inputs a centre ZIP, a radius and a code list; writes CSVs (Medicare rows per clinician, code and place of service with distance; Medicaid rows per ZIP and specialty; hospital outpatient rows whose APC description looks GI or endoscopic, since hospitals report payment groups, not CPT codes; the ZIPs searched) as a 7-day run artifact; with `push_branch` (must start with `tmp/`) it also pushes them to that orphan branch for a cloud session, which cannot reach GitHub's artifact storage. Delete the branch after use with `tmp-branch-cleanup.yml` (manual; deletes every `tmp/` branch and fails if any is left; the session's proxy refuses branch deletes); never merge it. Any failed request stops the run, so a partial pull never passes as complete.
 - **Procedures panel check** (`procedures-panel-check.yml`, manual, read only, `scripts/live/procedures-check.mjs`): the panel's Medicare loader replayed for one city, page by page, beside direct queries for one specialty and a list of codes, the same codes in the Medicaid table, and CMS's own file through its data API.

@@ -4069,8 +4069,65 @@
         // rows whose length was undefined, so it re-asked the database without
         // end (2026-10-20). Errors now stop that batch and are reported; the
         // order carries tie-breakers so offset paging cannot skip or repeat.
+        // Large areas read medicare_procedures_zip (migration 046, 2026-11-04):
+        // the same rows already summed per ZIP, specialty and code, so a state
+        // or a dense ZIP no longer times out. Its figures equal the row load's
+        // (row_count and the sums of each row's averages), but it does not say
+        // which clinician billed, so smaller areas keep the row load for the
+        // Insights card, and fall back to the summary when a batch times out.
+        // An empty or failed summary (not yet loaded) falls back to the rows.
+        const PROC_SUMMARY_MIN_ZIPS = 100;
+        async function loadMedicareSummary(padded) {
+            const batches = [];
+            for (let i = 0; i < padded.length; i += 10) batches.push(padded.slice(i, i + 10));
+            const bySpec = {};
+            let rows = 0, failedBatches = 0;
+            const runBatch = async (list) => {
+                for (let offset = 0, pages = 0; pages < 50; offset += 1000, pages++) {
+                    let res;
+                    try {
+                        res = await fetch(
+                            `${SUPABASE_URL}/rest/v1/medicare_procedures_zip?zip=in.(${list.join(',')})&select=specialty,hcpcs_cd,hcpcs_desc,row_count,tot_benes,tot_srvcs,sum_avg_charge,sum_avg_allowed,sum_avg_paid&order=zip,specialty,hcpcs_cd&limit=1000&offset=${offset}`,
+                            { headers: { 'apikey': SUPABASE_KEY, 'Accept': 'application/json' } });
+                    } catch (e) { failedBatches++; return; }
+                    if (!res.ok) { failedBatches++; return; }
+                    const batch = await res.json();
+                    if (!Array.isArray(batch)) { failedBatches++; return; }
+                    rows += batch.length;
+                    batch.forEach(row => {
+                        const sp = row.specialty || 'Unknown', cd = row.hcpcs_cd;
+                        const g = bySpec[sp] || (bySpec[sp] = {});
+                        const p = g[cd] || (g[cd] = { hcpcs_cd: cd, hcpcs_desc: row.hcpcs_desc, tot_benes: 0, tot_srvcs: 0,
+                            avg_sbmtd_chrg: 0, avg_mdcr_alowd_amt: 0, avg_mdcr_pymt_amt: 0, count: 0 });
+                        if (!p.hcpcs_desc && row.hcpcs_desc) p.hcpcs_desc = row.hcpcs_desc;
+                        p.tot_benes += Number(row.tot_benes) || 0;
+                        p.tot_srvcs += Number(row.tot_srvcs) || 0;
+                        p.avg_sbmtd_chrg += Number(row.sum_avg_charge) || 0;
+                        p.avg_mdcr_alowd_amt += Number(row.sum_avg_allowed) || 0;
+                        p.avg_mdcr_pymt_amt += Number(row.sum_avg_paid) || 0;
+                        p.count += Number(row.row_count) || 0;
+                    });
+                    if (batch.length < 1000) return;
+                }
+                failedBatches++;               // still more after 50 pages: a floor, not a total
+            };
+            for (let i = 0; i < batches.length; i += 6) await Promise.all(batches.slice(i, i + 6).map(runBatch));
+            return { bySpec, rows, failedBatches, batches: batches.length };
+        }
         async function loadMedicareProcedures(zips) {
             const padded = [...new Set(zips.map(z => String(z).padStart(5, '0')))];
+            if (padded.length > PROC_SUMMARY_MIN_ZIPS) {
+                const sm = await loadMedicareSummary(padded);
+                if (sm.rows && !sm.failedBatches) return { bySpec: sm.bySpec, flat: null, summary: true, failedBatches: 0, partial: '' };
+            }
+            const rowsLoad = await loadMedicareRows(padded);
+            if (rowsLoad.failedBatches) {
+                const sm = await loadMedicareSummary(padded);
+                if (sm.rows && !sm.failedBatches) return { bySpec: sm.bySpec, flat: rowsLoad.flat, flatPartial: true, summary: true, failedBatches: 0, partial: '' };
+            }
+            return rowsLoad;
+        }
+        async function loadMedicareRows(padded) {
             const batches = [];
             for (let i = 0; i < padded.length; i += 10) batches.push(padded.slice(i, i + 10));
             let allRows = [], failedBatches = 0;
