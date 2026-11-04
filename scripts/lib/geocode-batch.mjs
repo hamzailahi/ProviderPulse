@@ -83,7 +83,12 @@ export async function geocodeAll(items, opt = {}) {
     while (bi < batches.length) {
       const batch = batches[bi++];
       let hits = null;
-      for (let attempt = 0; attempt < 2 && !hits; attempt++) {
+      // The Census geocoder has brief 502 and timeout spells: three catch-up
+      // runs on 2026-11-03 stopped on two quick failures each. Wait them out
+      // (30s, 1, 2 and 4 minutes) before calling it an outage.
+      const waits = opt.censusWaitsMs || [30000, 60000, 120000, 240000];
+      for (let attempt = 0; attempt <= waits.length && !hits; attempt++) {
+        if (attempt) await new Promise(r => setTimeout(r, waits[attempt - 1]));
         try {
           const form = new FormData();
           form.append('benchmark', 'Public_AR_Current');
@@ -91,7 +96,7 @@ export async function geocodeAll(items, opt = {}) {
           const res = await f(censusUrl, { method: 'POST', body: form, signal: AbortSignal.timeout(opt.censusTimeoutMs || 300000) });
           if (!res.ok) throw new Error('HTTP ' + res.status);
           hits = parseCensus(await res.text());
-        } catch (e) { if (attempt) log(`  Census batch failed twice (${e.message || e}); those ${batch.length} go to the next tier`); }
+        } catch (e) { log(attempt === waits.length ? `  Census batch failed ${waits.length + 1} times over about ${Math.round(waits.reduce((a, b) => a + b, 0) / 60000)} minutes (${e.message || e}); those ${batch.length} go to the next tier` : `  Census batch failed (${e.message || e}); trying again${waits[attempt] ? ' in ' + Math.round(waits[attempt] / 1000) + 's' : ''}`); }
       }
       for (const it of batch) {
         const hit = hits && hits.get(String(it.id));

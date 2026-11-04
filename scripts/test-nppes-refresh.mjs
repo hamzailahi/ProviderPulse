@@ -131,8 +131,16 @@ let g = await geocodeAll(items, { fetch: fakeFetch('"a","x","Match","Exact","12 
 eq([g.coords.get('a').how, g.coords.get('b').how, g.stats.unplaced], ['census_exact', 'google', 0], 'Census exact first, Google for the non-exact');
 g = await geocodeAll(items, { fetch: fakeFetch('"a","x","No_Match"\n"b","x","No_Match"\n', null), censusUrl: 'http://census' });
 eq([g.coords.size, g.stats.unplaced, g.stats.google_not_configured, g.failed.size], [0, 2, 2, 0], 'no Google key: unmatched addresses stay unplaced');
-g = await geocodeAll(items, { fetch: fakeFetch(null, null), censusUrl: 'http://census' });
+g = await geocodeAll(items, { fetch: fakeFetch(null, null), censusUrl: 'http://census', censusWaitsMs: [0, 0, 0, 0] });
 eq([g.failed.size, g.stats.unplaced], [2, 0], 'a Census outage is a failure, not "unplaced"');
+{
+  // One 502, then an answer: waited out, not an outage (2026-11-04).
+  let calls = 0;
+  const flaky = async () => (++calls === 1 ? { ok: false, status: 502, text: async () => '' }
+    : { ok: true, status: 200, text: async () => '"a","x","Match","Exact","12 MAIN ST, C, TN, 38017","-89.7,35.04"\n"b","x","No_Match"\n' });
+  const h = await geocodeAll(items, { fetch: flaky, censusUrl: 'http://census', censusWaitsMs: [0, 0, 0, 0] });
+  eq([h.failed.size, h.stats.census_exact, calls], [0, 1, 2], 'a brief Census failure is retried, not called an outage');
+}
 
 // 6. End to end against a fake database and geocoders
 const db = {
