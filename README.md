@@ -650,6 +650,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-04
 
+- The repository now ignores Python's `__pycache__` folders, so local test runs leave nothing to commit.
 - A new read-only job, Procedure summary, measures how small a per-ZIP Medicare procedures summary would be. It copies the procedures table out as a plain scan and adds it up on the GitHub runner, so the database does no sorting, and it writes nothing back. This is the first step toward a Procedures tab that loads whole states and dense ZIPs without timing out.
 - `docs/hipaa-readiness.md` lists every service that would see patient information (Supabase, Netlify Functions, the Anthropic API, Supabase's auth emails), what each vendor's BAA requires as far as their public pages say, and the order to sign them before patient sign-up opens.
 - After a city or multi-ZIP search, the dashboard now offers "+ Add neighbors", which adds a ring of bordering ZIPs around the whole searched area (up to 150 ZIPs). Before, the button only appeared after clicking one ZIP, and a new search no longer carries over rings from the last one.
