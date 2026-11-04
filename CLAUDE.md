@@ -263,7 +263,9 @@ All use raw `fetch` against Supabase REST/auth endpoints (no SDK).
   (2026-10-28: internal sign-off for the operator to test with their own
   information; not a BAA, so keep the list to testers) (this was an opt-out until 2026-09-30, which left it
   open when unset; keep it opt-in, like `DOCUMENT_UPLOAD_ENABLED`). Do not
-  enable in production until a Supabase BAA is in place. Passwords are at
+  enable in production until a Supabase BAA is in place (and Netlify's and
+  Anthropic's: `docs/hipaa-readiness.md`, 2026-11-04, maps every PHI path and
+  what each vendor requires). Passwords are at
   least 12 characters on both flows.
 - **auth-login.js**: password grant proxied through the server. Generic 401 so
   email existence isn't leaked. Returns tokens, `role` and `staff`.
