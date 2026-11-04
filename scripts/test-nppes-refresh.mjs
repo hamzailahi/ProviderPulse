@@ -134,6 +134,15 @@ eq([g.coords.size, g.stats.unplaced, g.stats.google_not_configured, g.failed.siz
 g = await geocodeAll(items, { fetch: fakeFetch(null, null), censusUrl: 'http://census', censusWaitsMs: [0, 0, 0, 0] });
 eq([g.failed.size, g.stats.unplaced], [2, 0], 'a Census outage is a failure, not "unplaced"');
 {
+  // Suites, units and floors go before the Census lookup; street names that
+  // contain a unit word stay whole (2026-11-04).
+  const { streetOnly } = await import('./lib/geocode-batch.mjs');
+  const cases = [['331 W HARWOOD RD STE A', '331 W HARWOOD RD'], ['1225 W GUADALUPE RD # ED', '1225 W GUADALUPE RD'],
+    ['2853 CANDLER RD SIDE', '2853 CANDLER RD'], ['100 MAIN ST 2ND FLOOR', '100 MAIN ST'], ['10 MAIN ST SUITE 200 BLDG B', '10 MAIN ST'],
+    ['9 E SIDE DR', '9 E SIDE DR'], ['12 SUITE ST', '12 SUITE ST'], ['45 APT ROW', '45 APT ROW'], ['PO BOX 5', 'PO BOX 5']];
+  eq(cases.map(c => streetOnly(c[0])), cases.map(c => c[1]), 'units are stripped for the Census, street names are not');
+}
+{
   // One 502, then an answer: waited out, not an outage (2026-11-04).
   let calls = 0;
   const flaky = async () => (++calls === 1 ? { ok: false, status: 502, text: async () => '' }

@@ -650,6 +650,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-04
 
+- Listings without a map pin are now matched to an exact street address more often: the suite, unit or floor is dropped before the Census lookup, since it never changes the building. The first placement run after the NPPES catch-up had placed only 31 of 60,000 listings, half of them missed because of suite numbers.
 - The repository now ignores Python's `__pycache__` folders, so local test runs leave nothing to commit.
 - A new read-only job, Procedure summary, measures how small a per-ZIP Medicare procedures summary would be. It copies the procedures table out as a plain scan and adds it up on the GitHub runner, so the database does no sorting, and it writes nothing back. This is the first step toward a Procedures tab that loads whole states and dense ZIPs without timing out.
 - `docs/hipaa-readiness.md` lists every service that would see patient information (Supabase, Netlify Functions, the Anthropic API, Supabase's auth emails), what each vendor's BAA requires as far as their public pages say, and the order to sign them before patient sign-up opens.

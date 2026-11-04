@@ -1724,7 +1724,11 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   that changes every ISO week (`md5(key || week)`, so unmatched addresses do
   not block the queue), at most `max_rows` (60,000), and the update touches
   only coordinates that are still null (secondary rows get
-  `geocode_precision = 'address'`). A dry run counts and geocodes 300. Over
+  `geocode_precision = 'address'`). Both jobs send the Census the street line
+  without its suite, unit or floor (`streetOnly`, 2026-11-04: the first apply
+  after the catch-up placed 31 of 60,000, and 29,908 misses were Non_Exact,
+  mostly "STE A"-style suffixes); a unit word followed by a street type
+  ("9 E SIDE DR", "12 SUITE ST") is kept. A dry run counts and geocodes 300. Over
   5% geocoder failures turns the run red; what was placed is still written.
   Summary in `supabase/reference/unmapped-listings.md` (`[skip netlify]`).
   The SQL was checked on a local Postgres 16 before shipping (no CI test:
@@ -2059,7 +2063,7 @@ node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: 
 node scripts/test-provider-npis.mjs       # 39: one account, many NPIs: the registry and OIG checks, live only when the registry's person is the account's, caller never sets npi/review_status/account_id, own rows only, published once cleared, bookable through the account, registration refuses an added NPI, admin reject removes an added NPI (logged, claimable again) while approve publishes and an account's own NPI is still only blocked
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
-node scripts/test-nppes-refresh.mjs       # 61: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
+node scripts/test-nppes-refresh.mjs       # 62: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
 node scripts/test-hospital-campuses.mjs   # 15: the reviewed hospital campus list: every row checked (hospital code, NPI check digit, US point, source), the asset current, campuses only inside the search box, under their own id, the sheet looks up the billing NPI
 node scripts/test-address-fit.mjs         # 16: which geocoder matches a typed address accepts (house number, ZIP, distinctive words; gibberish and a neighbouring number refused)
 node scripts/test-admin.mjs               # 19: the admin account: only ADMIN_EMAILS, counts as staff, sign-in reports it, opens the review queue (staff and patients refused, the shared password still works), guest in the patient app, the switch on four pages

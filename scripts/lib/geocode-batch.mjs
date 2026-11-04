@@ -21,8 +21,36 @@ const csvField = s => {
   const v = String(s ?? '').replace(/[\r\n]+/g, ' ');
   return /[",]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
 };
+// The street line without a suite, unit or floor. The Census matches
+// "331 W HARWOOD RD STE A" only as Non_Exact but "331 W HARWOOD RD" exactly,
+// and a suite never moves the building (2026-11-04: 29,908 of 60,000 unplaced
+// listings were Non_Exact, most for this reason).
+const UNIT_WORD = /^(?:STE|SUITE|UNIT|APT|BLDG|BUILDING|RM|ROOM|FLOOR|FL|DEPT|SIDE|LOT|SPC|SPACE)\.?$/i;
+const STREET_TYPE = /^(?:ST|STREET|DR|DRIVE|RD|ROAD|AVE?|AVENUE|BLVD|LN|LANE|CT|COURT|WAY|PL|PLACE|PKWY|HWY|CIR|TER|TRL|SQ|LOOP|ROW|PIKE|PLZ|PLAZA)\.?$/i;
+export function streetOnly(address) {
+  const a = String(address || '').trim().replace(/\s+/g, ' ');
+  let words = a.split(' ');
+  // "# ED", "#130": everything from the hash on.
+  const hash = words.findIndex((w, i) => i > 1 && w.startsWith('#'));
+  if (hash > 1) words = words.slice(0, hash);
+  // A unit word followed by at most one token (its number), never a street type:
+  // "STE A", "SUITE 130", "SIDE"; not "SIDE DR" or "SUITE ST".
+  // Repeated, so "SUITE 200 BLDG B" loses both parts.
+  for (let cut = true; cut;) {
+    cut = false;
+    for (let i = 2; i < words.length; i++) {
+      const rest = words.slice(i + 1);
+      if ((UNIT_WORD.test(words[i]) && rest.length <= 1 && !(rest[0] && STREET_TYPE.test(rest[0]))) ||
+          (/^\d+(?:ST|ND|RD|TH)$/i.test(words[i]) && rest.length === 1 && /^(?:FLOOR|FL)$/i.test(rest[0]))) { words = words.slice(0, i); cut = true; break; }
+    }
+  }
+  const b = words.join(' ').replace(/[\s,]+$/, '');
+  // Keep the original when what is left is not a house number and a street.
+  return /^\d+\S*\s+\S+\s+\S/.test(b) || b === a ? b : a;
+}
+
 export function censusCsv(items) {
-  return items.map(it => [it.id, it.address, it.city, it.state, it.zip].map(csvField).join(',')).join('\n') + '\n';
+  return items.map(it => [it.id, streetOnly(it.address), it.city, it.state, it.zip].map(csvField).join(',')).join('\n') + '\n';
 }
 
 // The Census answer: id, input, Match|No_Match|Tie, Exact|Non_Exact,
