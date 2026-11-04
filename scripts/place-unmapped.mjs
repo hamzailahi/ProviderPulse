@@ -2,7 +2,7 @@
 // (place-unmapped.yml, scripts/place-unmapped.sh). Rows the hourly ZIP job
 // inserted, and rows the weekly refresh could not place, are stored with null
 // coordinates and never drawn on any map. Same rule as the refresh
-// (scripts/lib/geocode-batch.mjs): a Census Exact match in the same ZIP, or
+// (scripts/lib/geocode-batch.mjs): a Census match of the same house number and street in the same ZIP (Exact, or written another way: censusNearExact), or
 // nothing; no ZIP centres.
 //
 // node scripts/place-unmapped.mjs --in rows.csv --out placed.csv --summary out.md [--sample 300]
@@ -35,9 +35,9 @@ for (const it of items) {
 }
 writeFileSync(arg('out'), out.join('\n') + '\n');
 const lines = [`## Geocoding${sample ? ` (a sample of ${fmt(sample)})` : ''}`, '',
-  '| Table | Tried | Placed (exact) | Left unplaced | Geocoder failed |', '|---|---|---|---|---|',
+  '| Table | Tried | Placed | Left unplaced | Geocoder failed |', '|---|---|---|---|---|',
   ...Object.entries(per).map(([t, v]) => `| ${t} | ${fmt(v.asked)} | ${fmt(v.placed)} | ${fmt(v.asked - v.placed - v.failed)} | ${fmt(v.failed)} |`), '',
-  `Census exact ${fmt(stats.census_exact)}, Google ${fmt(stats.google)} (off unless a key is passed); an address without an exact match keeps no coordinates.`, '',
+  `Census exact ${fmt(stats.census_exact)}, Census same address written another way ${fmt(stats.census_near)} (one direction word, an ordinal, a state route's spelling or a space; same house number and ZIP), Google ${fmt(stats.google)} (off unless a key is passed); anything else keeps no coordinates.`, '',
   `Why the rest were not placed: no match ${fmt(stats.census_no_match)}, a fuzzy (non-exact) match ${fmt(stats.census_non_exact)}, matched in another ZIP ${fmt(stats.census_other_zip)}, several equal matches ${fmt(stats.census_tie)}.`,
   ...(examples.length ? ['', 'Examples (public listing addresses):', '', '| Why | Listed | Census matched |', '|---|---|---|',
     ...examples.map(e => `| ${e.why} | ${e.input.replace(/\|/g, '/')} | ${e.matched.replace(/\|/g, '/')} |`)] : [])];

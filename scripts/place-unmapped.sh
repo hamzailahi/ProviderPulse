@@ -10,7 +10,7 @@
 #
 # Rows are taken in an order that changes every ISO week (md5 of key and
 # week), so an address that has no exact match does not block the rest of the
-# queue week after week. Exact Census matches only (scripts/place-unmapped.mjs).
+# queue week after week. Census matches of the same house number and street only, exact or written another way (scripts/place-unmapped.mjs).
 # Env: SUPABASE_DB_URL (Session pooler string), MODE, MAX_ROWS.
 # Writes supabase/reference/unmapped-listings.md.
 set -euo pipefail
@@ -81,7 +81,7 @@ fi
 # ---- 5. Summary ------------------------------------------------------------------
 {
   echo "# Unmapped listings, $(date -u +%F)$([ "$MODE" = dry_run ] && echo ' (dry run: nothing written)')"; echo
-  echo "Listings with no coordinates are never drawn on a map. This pass places them only by an exact Census match in the same ZIP."; echo
+  echo "Listings with no coordinates are never drawn on a map. This pass places them only by a Census match of the same house number and street in the same ZIP: exact, or written another way (a direction word, an ordinal, a state route, a space)."; echo
   echo "| Table | Without coordinates | With an address to try |"; echo "|---|---|---|"
   while IFS=, read -r t n a; do printf '| %s | %s | %s |\n' "$t" "$(printf "%'d" "$n")" "$(printf "%'d" "$a")"; done < "$WORK/counts.csv"
   echo; cat "$WORK/geo.md"; echo

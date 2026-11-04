@@ -1679,7 +1679,8 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   ZIP; never removed for being absent). Formats follow the national load:
   capitals, "FIRST LAST", the first address line, 10-digit phones, the NUCC
   display name. **Geocoding is accurate or nothing** (no ZIP centres): Census
-  batch Exact in the same ZIP, then Google ROOFTOP or RANGE_INTERPOLATED, not
+  batch Exact in the same ZIP (or the same address written another way, below),
+  then Google ROOFTOP or RANGE_INTERPOLATED, not
   partial, same ZIP, **off for now** (the user's choice, 2026-10-25: the
   workflow passes no `GOOGLE_GEOCODING_KEY`; add it to the Refresh step's
   env to turn it on); else stored
@@ -1728,7 +1729,18 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   without its suite, unit or floor (`streetOnly`, 2026-11-04: the first apply
   after the catch-up placed 31 of 60,000, and 29,908 misses were Non_Exact,
   mostly "STE A"-style suffixes); a unit word followed by a street type
-  ("9 E SIDE DR", "12 SUITE ST") is kept. A dry run counts and geocodes 300. Over
+  ("9 E SIDE DR", "12 SUITE ST") is kept. That rerun placed 9,996, and the
+  report showed most of the remaining 19,874 Non_Exact misses were the same
+  address written another way, so (2026-11-04, the user's choice: "the
+  one-word difference rule") `censusNearExact` also accepts a Non_Exact match
+  in the same ZIP with the same house number whose street differs only by one
+  direction word on one side ("N TURNER AVE" / "TURNER AVE"), an ordinal
+  ("210" / "210TH"), a state route's spelling ("FL-54" / "STATE RD 54",
+  "ROUTE 37" / "STATE RTE 37"; a bare "HWY 7" is not a state route) or a space
+  ("BASE LINE" / "BASELINE"), after spelling street types the same way. It
+  refuses a different or missing street type ("NEW CREEK HWY" / "NEW CREEK
+  DR", "WESTFIELD BLVD" / "WESTFIELD"), two different directions, and
+  misspellings. Counted as `census_near`. A dry run counts and geocodes 300. Over
   5% geocoder failures turns the run red; what was placed is still written.
   Summary in `supabase/reference/unmapped-listings.md` (`[skip netlify]`).
   The SQL was checked on a local Postgres 16 before shipping (no CI test:
@@ -2063,7 +2075,7 @@ node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: 
 node scripts/test-provider-npis.mjs       # 39: one account, many NPIs: the registry and OIG checks, live only when the registry's person is the account's, caller never sets npi/review_status/account_id, own rows only, published once cleared, bookable through the account, registration refuses an added NPI, admin reject removes an added NPI (logged, claimable again) while approve publishes and an account's own NPI is still only blocked
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
-node scripts/test-nppes-refresh.mjs       # 62: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
+node scripts/test-nppes-refresh.mjs       # 64: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact (or the same address written another way, one-word differences only) then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
 node scripts/test-hospital-campuses.mjs   # 15: the reviewed hospital campus list: every row checked (hospital code, NPI check digit, US point, source), the asset current, campuses only inside the search box, under their own id, the sheet looks up the billing NPI
 node scripts/test-address-fit.mjs         # 16: which geocoder matches a typed address accepts (house number, ZIP, distinctive words; gibberish and a neighbouring number refused)
 node scripts/test-admin.mjs               # 19: the admin account: only ADMIN_EMAILS, counts as staff, sign-in reports it, opens the review queue (staff and patients refused, the shared password still works), guest in the patient app, the switch on four pages

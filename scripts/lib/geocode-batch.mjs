@@ -2,7 +2,8 @@
 // "proper accurate geocoding", so no ZIP-centre fallback).
 //
 //   1. Census batch geocoder (free, the same first tier the national load
-//      used): only an Exact match in the same ZIP counts.
+//      used): an Exact match in the same ZIP, or a Non_Exact one that is the
+//      same house number and street written another way (censusNearExact).
 //   2. Google Geocoding, when GOOGLE_GEOCODING_KEY is set, for everything the
 //      Census did not match exactly: only a ROOFTOP or RANGE_INTERPOLATED
 //      street-level result in the same ZIP counts.
@@ -71,6 +72,53 @@ export function parseCensus(text) {
 export const censusAccepts = (hit, zip) =>
   !!hit && hit.match === 'Match' && hit.exact && hit.zip === zip && Number.isFinite(hit.lat) && Number.isFinite(hit.lng);
 
+// A Non_Exact Census match that is the same address written another way
+// (2026-11-04, the user's choice: "the one-word difference rule"). The house
+// number and ZIP must be the same; after spelling out the same words the same
+// way, the streets may differ only by:
+//   - one direction word present on one side only ("N TURNER AVE" / "TURNER AVE"),
+//   - an ordinal suffix ("E 210 ST" / "E 210TH ST"),
+//   - the way a state route is written ("FL-54" / "STATE RD 54", "ROUTE 37" / "STATE RTE 37"),
+//   - a space ("BASE LINE RD" / "BASELINE RD").
+// Refused: a different street type (HWY / DR), a missing street type
+// (WESTFIELD BLVD / WESTFIELD), two different directions (N / S), spelling
+// differences, and anything else.
+const DIRS = { N: 'N', S: 'S', E: 'E', W: 'W', NE: 'NE', NW: 'NW', SE: 'SE', SW: 'SW', NORTH: 'N', SOUTH: 'S', EAST: 'E', WEST: 'W',
+  NORTHEAST: 'NE', NORTHWEST: 'NW', SOUTHEAST: 'SE', SOUTHWEST: 'SW' };
+const TYPES = { STREET: 'ST', ROAD: 'RD', AVENUE: 'AVE', AV: 'AVE', DRIVE: 'DR', BOULEVARD: 'BLVD', LANE: 'LN', COURT: 'CT', PLACE: 'PL',
+  PARKWAY: 'PKWY', HIGHWAY: 'HWY', CIRCLE: 'CIR', TERRACE: 'TER', TRAIL: 'TRL', SQUARE: 'SQ', PLAZA: 'PLZ' };
+const STATES = new Set('AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR'.split(' '));
+function streetParts(street, state) {
+  let t = String(street || '').toUpperCase().replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim();
+  // State routes, every spelling to "RT n": FL-54, SR 54, STATE ROAD 54,
+  // STATE HWY 7, STATE RTE 37, ROUTE 37, RT 37. A bare "HWY 7" is not
+  // touched (it may be a US or county highway).
+  t = t.replace(/\b([A-Z]{2})-(\d+[A-Z]?)\b/g, (m, st, n) => (STATES.has(st) && st === state ? 'RT ' + n : m));
+  t = t.replace(/\b(?:STATE\s+(?:ROAD|RD|HWY|HIGHWAY|ROUTE|RTE|RT)|SR|ROUTE|RTE)\s+(\d+[A-Z]?)\b/g, 'RT $1');
+  const words = t.split(' ').filter(Boolean);
+  const house = words.shift() || '';
+  const dirs = [], rest = [];
+  for (const w of words) {
+    if (DIRS[w]) dirs.push(DIRS[w]);
+    else rest.push(TYPES[w] || w.replace(/^(\d+)(?:ST|ND|RD|TH)$/, '$1'));
+  }
+  return { house, dirs, rest };
+}
+export function censusNearExact(input, matched, state) {
+  const a = streetParts(streetOnly(input), state);
+  const b = streetParts(String(matched || '').split(',')[0], state);
+  if (!/^\d/.test(a.house) || a.house !== b.house) return false;
+  // Something besides a street type must be left to compare.
+  if (!a.rest.some(w => !STREET_TYPE.test(w))) return false;
+  if (a.rest.join('') !== b.rest.join('')) return false;
+  const [few, many] = a.dirs.length <= b.dirs.length ? [a.dirs, b.dirs] : [b.dirs, a.dirs];
+  if (many.length - few.length > 1) return false;
+  // The shorter list must be the longer one with at most one direction removed.
+  const left = [...many];
+  for (const d of few) { const i = left.indexOf(d); if (i < 0) return false; left.splice(i, 1); }
+  return true;
+}
+
 // One Google answer -> coordinates, or null when it is not street-accurate in
 // the same ZIP.
 export function googleAccepts(data, zip) {
@@ -96,7 +144,7 @@ export async function geocodeAll(items, opt = {}) {
   const log = opt.log || (() => {});
   const coords = new Map();
   const failed = new Set();   // ids a geocoder outage left unanswered
-  const stats = { asked: items.length, census_exact: 0, google: 0, unplaced: 0, census_service_failed: 0,
+  const stats = { asked: items.length, census_exact: 0, census_near: 0, google: 0, unplaced: 0, census_service_failed: 0,
     google_service_failed: 0, google_not_configured: 0,
     // Why the Census did not count: none, fuzzy, another ZIP, several equal.
     census_no_match: 0, census_non_exact: 0, census_other_zip: 0, census_tie: 0 };
@@ -129,6 +177,10 @@ export async function geocodeAll(items, opt = {}) {
       for (const it of batch) {
         const hit = hits && hits.get(String(it.id));
         if (censusAccepts(hit, it.zip)) { coords.set(it.id, { lat: hit.lat, lng: hit.lng, how: 'census_exact' }); stats.census_exact++; }
+        else if (hit && hit.match === 'Match' && !hit.exact && hit.zip === it.zip && Number.isFinite(hit.lat) && Number.isFinite(hit.lng)
+          && censusNearExact(it.address, hit.matched, String(it.state || '').toUpperCase())) {
+          coords.set(it.id, { lat: hit.lat, lng: hit.lng, how: 'census_near' }); stats.census_near++;
+        }
         else {
           if (hit) {
             const why = hit.match === 'Tie' ? 'tie' : hit.match !== 'Match' ? 'no_match' : !hit.exact ? 'non_exact' : 'other_zip';

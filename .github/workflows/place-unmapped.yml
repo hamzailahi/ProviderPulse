@@ -2,7 +2,7 @@ name: Place unmapped listings
 
 # Listings with no coordinates (rows the hourly ZIP job inserted, rows the
 # weekly NPPES refresh could not place) are never drawn on any map. This gives
-# them a location only from an exact Census match in the same ZIP, up to
+# them a location only from a Census match of the same house number and street in the same ZIP, up to
 # max_rows a run, in an order that changes every week; scripts/place-unmapped.sh
 # has the flow. It fills in coordinates that are still null and nothing else.
 # The summary is committed to supabase/reference/unmapped-listings.md.

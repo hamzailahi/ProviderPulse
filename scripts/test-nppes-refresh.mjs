@@ -8,7 +8,7 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileIndex, plIndex, fileRecord, apiRecord, plRecord, isDeactivated, planChunk, rowFor, changes, overLimit, weeksToApply, weeklyRange } from './lib/nppes-refresh.mjs';
-import { parseCensus, censusAccepts, googleAccepts, geocodeAll } from './lib/geocode-batch.mjs';
+import { parseCensus, censusAccepts, censusNearExact, googleAccepts, geocodeAll } from './lib/geocode-batch.mjs';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.log('FAIL', m); } };
@@ -127,7 +127,7 @@ const fakeFetch = (censusText, googleBody) => async (url) => {
   if (String(url).includes('census')) { if (censusText === null) throw new Error('down'); return new Response(censusText); }
   return new Response(JSON.stringify(googleBody));
 };
-let g = await geocodeAll(items, { fetch: fakeFetch('"a","x","Match","Exact","12 MAIN ST, C, TN, 38017","-89.7,35.04"\n"b","x","Match","Non_Exact","4 OAK, M, TN, 38120","-90,35"\n', gres('ROOFTOP', '38120')), googleKey: 'k', censusUrl: 'http://census', googleUrl: 'http://google' });
+let g = await geocodeAll(items, { fetch: fakeFetch('"a","x","Match","Exact","12 MAIN ST, C, TN, 38017","-89.7,35.04"\n"b","x","Match","Non_Exact","4 OAK DR, M, TN, 38120","-90,35"\n', gres('ROOFTOP', '38120')), googleKey: 'k', censusUrl: 'http://census', googleUrl: 'http://google' });
 eq([g.coords.get('a').how, g.coords.get('b').how, g.stats.unplaced], ['census_exact', 'google', 0], 'Census exact first, Google for the non-exact');
 g = await geocodeAll(items, { fetch: fakeFetch('"a","x","No_Match"\n"b","x","No_Match"\n', null), censusUrl: 'http://census' });
 eq([g.coords.size, g.stats.unplaced, g.stats.google_not_configured, g.failed.size], [0, 2, 2, 0], 'no Google key: unmatched addresses stay unplaced');
@@ -149,6 +149,33 @@ eq([g.failed.size, g.stats.unplaced], [2, 0], 'a Census outage is a failure, not
     : { ok: true, status: 200, text: async () => '"a","x","Match","Exact","12 MAIN ST, C, TN, 38017","-89.7,35.04"\n"b","x","No_Match"\n' });
   const h = await geocodeAll(items, { fetch: flaky, censusUrl: 'http://census', censusWaitsMs: [0, 0, 0, 0] });
   eq([h.failed.size, h.stats.census_exact, calls], [0, 1, 2], 'a brief Census failure is retried, not called an outage');
+}
+
+{
+  // A Non_Exact Census match is taken only when it is the same house number
+  // and street written another way (2026-11-04; the cases are from the first
+  // placement run's report).
+  const near = [
+    ['9330 FL-54', '9330 STATE RD 54, TRINITY, FL, 34655', 'FL', true],
+    ['710 N TURNER AVE', '710 TURNER AVE, HASTINGS, NE, 68901', 'NE', true],
+    ['575 N SIOUX POINT ROAD', '575 SIOUX POINT RD, DAKOTA DUNES, SD, 57049', 'SD', true],
+    ['5165 S STATE ROAD 7', '5165 STATE HWY 7, LAKE WORTH, FL, 33449', 'FL', true],
+    ['111 E 210 ST', '111 E 210TH ST, BRONX, NY, 10467', 'NY', true],
+    ['99 ROUTE 37 W', '99 STATE RTE 37, TOMS RIVER, NJ, 08755', 'NJ', true],
+    ['8880 BASE LINE RD STE 4', '8880 BASELINE RD, RANCHO CUCAMONGA, CA, 91701', 'CA', true],
+    ['273 NEW CREEK HWY', '273 NEW CREEK DR, KEYSER, WV, 26726', 'WV', false],
+    ['175 WESTFIELD BLVD STE 120', '175 WESTFIELD, TEMPLE, TX, 76502', 'TX', false],
+    ['510 UPPER CHESAPEKE DR', '510 UPPER CHESAPEAKE DR, BEL AIR, MD, 21014', 'MD', false],
+    ['1 GUSTAVE LEVY PLACE', '1 GUSTAVE L LEVY PL, NEW YORK, NY, 10029', 'NY', false],
+    ['100 N MAIN ST', '100 S MAIN ST, X, TX, 75001', 'TX', false],
+    ['100 MAIN ST', '101 MAIN ST, X, TX, 75001', 'TX', false],
+    ['100 N MAIN ST NW', '100 MAIN ST, X, DC, 20001', 'DC', false],
+    ['100 E ST', '100 ST, X, DC, 20001', 'DC', false],
+    ['50 TX-54', '50 STATE RD 54, X, FL, 33333', 'FL', false]];
+  eq(near.map(c => censusNearExact(c[0], c[1], c[2])), near.map(c => c[3]), 'one-word differences only: a direction, an ordinal, a state route, a space');
+  const it2 = [{ id: 'n', address: '710 N TURNER AVE', city: 'H', state: 'NE', zip: '68901' }, { id: 'z', address: '710 N TURNER AVE', city: 'H', state: 'NE', zip: '68902' }];
+  const h = await geocodeAll(it2, { fetch: fakeFetch('"n","x","Match","Non_Exact","710 TURNER AVE, H, NE, 68901","-98.4,40.6"\n"z","x","Match","Non_Exact","710 TURNER AVE, H, NE, 68901","-98.4,40.6"\n', null), censusUrl: 'http://census' });
+  eq([h.coords.get('n') && h.coords.get('n').how, h.coords.has('z'), h.stats.census_near, h.stats.census_non_exact], ['census_near', false, 1, 1], 'a near match counts in its own ZIP only');
 }
 
 // 6. End to end against a fake database and geocoders
