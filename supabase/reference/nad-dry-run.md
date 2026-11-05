@@ -1,6 +1,6 @@
 # National Address Database: dry run
 
-Run 2026-11-04 18:07 UTC by scripts/nad-dry-run.sh. Nothing was written to the database.
+Run 2026-11-05 21:36 UTC by scripts/nad-dry-run.sh. Nothing was written to the database.
 
 Rule: the same ZIP, the same house number, and the same street or one of the placement job's one-word differences (scripts/lib/nad-match.mjs). Several matching points count as one place only within 100 m of each other.
 
@@ -8,42 +8,43 @@ NAD file: NAD_r24.txt from https://data.transportation.gov/download/fc2s-wawr/ap
 
 ## Listings with no pin
 
-- Listings tried: **144,896**
-- Would be placed: **45,020** (31.1%), of which 8,110 are in states USDOT marks partly not public domain (CO, IL, KS, MD, MN, ND, SC, SD); their sources need checking before an apply
-- Matched but left out, because the state is not public domain in the NAD (HI, MI, NH, OR): 1,247
-- Several matching points far apart (left unplaced): 2,251
-- NAD has this house number in the ZIP, but on another street: 18,136
-- NAD has nothing at this house number in the ZIP: 61,230
+- Listings tried: **143,811**
+- Would be placed: **44,491** (30.9%), of which 7,977 are in states USDOT marks partly not public domain (CO, IL, KS, MD, MN, ND, SC, SD); their sources need checking before an apply
+- In wholly public-domain states, so an apply may write them: **36,513**
+- Matched but left out, because the state is not public domain in the NAD (HI, MI, NH, OR): 1,237
+- Several matching points far apart (left unplaced): 2,243
+- NAD has this house number in the ZIP, but on another street: 18,052
+- NAD has nothing at this house number in the ZIP: 60,776
 - The address has no house number (PO box, building name): 17,012
 
 | Table | Tried | Would be placed |
 |---|---|---|
 | clinic_secondary_locations | 80 | 0 (0.0%) |
-| provider_individuals | 122,737 | 37,657 (30.7%) |
-| clinics | 22,079 | 7,363 (33.3%) |
+| provider_individuals | 121,852 | 37,218 (30.5%) |
+| clinics | 21,879 | 7,273 (33.2%) |
 
 How NAD placed the points it matched (its own `Placement` field):
 
 | Placement | Listings |
 |---|---|
-| Unknown | 32,463 |
-| Structure - Rooftop | 9,078 |
-| Parcel - Other | 1,460 |
-| Structure - Entrance | 607 |
-| Structure - Interior | 281 |
+| Unknown | 32,058 |
+| Structure - Rooftop | 8,995 |
+| Parcel - Other | 1,432 |
+| Structure - Entrance | 601 |
+| Structure - Interior | 280 |
 | Parcel - Centroid | 196 |
 | Site | 180 |
 | Other | 171 |
-| Property Access | 166 |
-| Structure - Entrance; Structure - Interior | 54 |
+| Property Access | 165 |
 | Structure - Rooftop; Unknown | 54 |
+| Structure - Entrance; Structure - Interior | 53 |
 | Structure - Rooftop; Structure - Interior | 46 |
 | Structure - Entrance; Unknown | 42 |
-| Unknown; Structure - Rooftop | 33 |
-| Parcel - Centroid; Structure - Rooftop | 22 |
+| Unknown; Structure - Rooftop | 32 |
 | Structure - Rooftop; Site | 21 |
+| Parcel - Centroid; Structure - Rooftop | 21 |
 | Structure - Rooftop; Parcel - Other | 19 |
-| Unknown; Parcel - Other | 19 |
+| Unknown; Parcel - Other | 18 |
 | Parcel - Other; Unknown | 14 |
 | Structure - Rooftop; Parcel - Centroid | 12 |
 | Linear Geocode | 12 |
@@ -51,7 +52,7 @@ How NAD placed the points it matched (its own `Placement` field):
 | Parcel - Centroid; Parcel - Other | 10 |
 | Structure - Interior; Structure - Entrance | 9 |
 | Structure - Rooftop; Property Access | 6 |
-| Site; Structure - Rooftop | 5 |
+| Site; Structure - Rooftop | 4 |
 | Structure - Rooftop; Site; Parcel - Other | 3 |
 | Site; Unknown | 3 |
 | Structure - Rooftop; Structure - Entrance | 3 |
@@ -75,68 +76,68 @@ How NAD placed the points it matched (its own `Placement` field):
 
 | State | Unplaced | Would be placed | Note |
 |---|---|---|---|
-| CA | 15,875 | 1,845 (11.6%) |  |
-| TX | 11,820 | 4,329 (36.6%) |  |
-| FL | 8,570 | 9 (0.1%) |  |
-| NY | 5,352 | 2,445 (45.7%) |  |
-| GA | 4,956 | 766 (15.5%) |  |
-| NC | 4,863 | 2,322 (47.7%) |  |
-| OH | 4,303 | 2,747 (63.8%) |  |
-| IL | 4,189 | 2,091 (49.9%) | partly not public domain |
-| PA | 3,951 | 313 (7.9%) |  |
-| MI | 3,596 | 2 (0.1%) | not public domain: skipped |
+| CA | 15,702 | 1,805 (11.5%) |  |
+| TX | 11,743 | 4,289 (36.5%) |  |
+| FL | 8,491 | 9 (0.1%) |  |
+| NY | 5,329 | 2,426 (45.5%) |  |
+| GA | 4,908 | 758 (15.4%) |  |
+| NC | 4,822 | 2,287 (47.4%) |  |
+| OH | 4,270 | 2,720 (63.7%) |  |
+| IL | 4,146 | 2,054 (49.5%) | partly not public domain |
+| PA | 3,932 | 311 (7.9%) |  |
+| MI | 3,565 | 2 (0.1%) | not public domain: skipped |
 | AE | 3,444 | 0 (0.0%) |  |
-| MN | 3,262 | 1,907 (58.5%) | partly not public domain |
 | PR | 3,239 | 0 (0.0%) |  |
-| VA | 3,176 | 1,997 (62.9%) |  |
-| NJ | 3,157 | 1,632 (51.7%) |  |
-| MD | 2,939 | 1,874 (63.8%) | partly not public domain |
-| WV | 2,718 | 1,598 (58.8%) |  |
-| WA | 2,675 | 1,689 (63.1%) |  |
+| MN | 3,225 | 1,870 (58.0%) | partly not public domain |
+| VA | 3,160 | 1,983 (62.8%) |  |
+| NJ | 3,133 | 1,615 (51.5%) |  |
+| MD | 2,904 | 1,840 (63.4%) | partly not public domain |
+| WV | 2,704 | 1,586 (58.7%) |  |
+| WA | 2,653 | 1,669 (62.9%) |  |
 | AP | 2,599 | 4 (0.2%) |  |
-| MO | 2,540 | 625 (24.6%) |  |
-| CO | 2,507 | 1,111 (44.3%) | partly not public domain |
-| UT | 2,478 | 1,719 (69.4%) |  |
-| KY | 2,421 | 944 (39.0%) |  |
-| MA | 2,340 | 1,288 (55.0%) |  |
-| IN | 2,309 | 1,426 (61.8%) |  |
-| TN | 2,028 | 1,237 (61.0%) |  |
-| AL | 2,010 | 833 (41.4%) |  |
-| AZ | 1,936 | 1,193 (61.6%) |  |
-| SC | 1,900 | 91 (4.8%) | partly not public domain |
-| OK | 1,872 | 752 (40.2%) |  |
-| WI | 1,741 | 863 (49.6%) |  |
-| NM | 1,668 | 602 (36.1%) |  |
-| LA | 1,659 | 340 (20.5%) |  |
-| OR | 1,558 | 1,245 (79.9%) | not public domain: skipped |
-| AR | 1,402 | 867 (61.8%) |  |
-| NE | 1,336 | 321 (24.0%) |  |
+| MO | 2,527 | 620 (24.5%) |  |
+| CO | 2,473 | 1,098 (44.4%) | partly not public domain |
+| UT | 2,446 | 1,689 (69.1%) |  |
+| KY | 2,414 | 940 (38.9%) |  |
+| MA | 2,321 | 1,272 (54.8%) |  |
+| IN | 2,290 | 1,413 (61.7%) |  |
+| TN | 2,016 | 1,228 (60.9%) |  |
+| AL | 1,993 | 822 (41.2%) |  |
+| AZ | 1,923 | 1,183 (61.5%) |  |
+| SC | 1,883 | 89 (4.7%) | partly not public domain |
+| OK | 1,858 | 743 (40.0%) |  |
+| WI | 1,733 | 859 (49.6%) |  |
+| LA | 1,643 | 336 (20.5%) |  |
+| NM | 1,642 | 587 (35.7%) |  |
+| OR | 1,547 | 1,235 (79.8%) | not public domain: skipped |
+| AR | 1,390 | 857 (61.7%) |  |
+| NE | 1,322 | 314 (23.8%) |  |
 | VI | 1,223 | 5 (0.4%) |  |
-| CT | 1,066 | 347 (32.6%) |  |
-| NV | 1,038 | 0 (0.0%) |  |
-| MS | 1,034 | 0 (0.0%) |  |
-| GU | 1,003 | 0 (0.0%) |  |
-| KS | 977 | 560 (57.3%) | partly not public domain |
-| ID | 974 | 25 (2.6%) |  |
+| CT | 1,061 | 343 (32.3%) |  |
+| NV | 1,026 | 0 (0.0%) |  |
+| MS | 1,025 | 0 (0.0%) |  |
+| GU | 1,001 | 0 (0.0%) |  |
+| KS | 969 | 557 (57.5%) | partly not public domain |
+| ID | 966 | 25 (2.6%) |  |
 | BA | 824 | 0 (0.0%) |  |
-| NH | 690 | 0 (0.0%) | not public domain: skipped |
-| IA | 649 | 452 (69.6%) |  |
-| ND | 558 | 415 (74.4%) | partly not public domain |
-| DE | 533 | 225 (42.2%) |  |
+| NH | 682 | 0 (0.0%) | not public domain: skipped |
+| IA | 644 | 447 (69.4%) |  |
+| ND | 550 | 408 (74.2%) | partly not public domain |
+| DE | 530 | 225 (42.5%) |  |
 | AA | 416 | 16 (3.8%) |  |
-| ME | 404 | 251 (62.1%) |  |
-| DC | 394 | 236 (59.9%) |  |
-| MT | 359 | 217 (60.4%) |  |
-| HI | 350 | 0 (0.0%) | not public domain: skipped |
+| ME | 402 | 250 (62.2%) |  |
+| DC | 393 | 236 (60.1%) |  |
+| MT | 355 | 213 (60.0%) |  |
+| HI | 348 | 0 (0.0%) | not public domain: skipped |
 | MP | 325 | 1 (0.3%) |  |
 | PU | 323 | 0 (0.0%) |  |
 | RI | 318 | 141 (44.3%) |  |
 | AK | 315 | 117 (37.1%) |  |
-| SD | 262 | 61 (23.3%) | partly not public domain |
+| SD | 259 | 61 (23.6%) | partly not public domain |
 | AS | 234 | 0 (0.0%) |  |
-| WY | 229 | 68 (29.7%) |  |
+| WY | 225 | 67 (29.8%) |  |
 | CH | 170 | 0 (0.0%) |  |
-| VT | 147 | 77 (52.4%) |  |
+| VT | 146 | 77 (52.7%) |  |
 | BC | 140 | 0 (0.0%) |  |
 | RH | 79 | 0 (0.0%) |  |
 | JA | 76 | 0 (0.0%) |  |
@@ -186,7 +187,6 @@ How NAD placed the points it matched (its own `Placement` field):
 | RA | 8 | 0 (0.0%) |  |
 | RO | 8 | 1 (12.5%) |  |
 | VE | 8 | 0 (0.0%) |  |
-| LO | 8 | 3 (37.5%) |  |
 | P. | 8 | 0 (0.0%) |  |
 | KE | 8 | 0 (0.0%) |  |
 | MX | 8 | 0 (0.0%) |  |
@@ -196,6 +196,7 @@ How NAD placed the points it matched (its own `Placement` field):
 | FR | 7 | 0 (0.0%) |  |
 | ZZ | 7 | 0 (0.0%) |  |
 | AV | 7 | 0 (0.0%) |  |
+| LO | 7 | 3 (42.9%) |  |
 | FP | 7 | 0 (0.0%) |  |
 | ES | 6 | 0 (0.0%) |  |
 | TI | 6 | 0 (0.0%) |  |
@@ -241,8 +242,8 @@ How NAD placed the points it matched (its own `Placement` field):
 | PY | 2 | 0 (0.0%) |  |
 | KW | 2 | 0 (0.0%) |  |
 | BI | 2 | 0 (0.0%) |  |
-| IW | 2 | 0 (0.0%) |  |
 | SU | 2 | 0 (0.0%) |  |
+| IW | 2 | 0 (0.0%) |  |
 | NR | 2 | 0 (0.0%) |  |
 | BW | 2 | 0 (0.0%) |  |
 | RJ | 2 | 0 (0.0%) |  |
@@ -274,28 +275,28 @@ How NAD placed the points it matched (its own `Placement` field):
 | EO | 1 | 0 (0.0%) |  |
 | EG | 1 | 0 (0.0%) |  |
 | LU | 1 | 0 (0.0%) |  |
-| CN | 1 | 0 (0.0%) |  |
 | JP | 1 | 0 (0.0%) |  |
+| CN | 1 | 0 (0.0%) |  |
 | LB | 1 | 0 (0.0%) |  |
 | ER | 1 | 0 (0.0%) |  |
 | A. | 1 | 0 (0.0%) |  |
-| AH | 1 | 0 (0.0%) |  |
 | GT | 1 | 0 (0.0%) |  |
+| AH | 1 | 0 (0.0%) |  |
 | ON | 1 | 0 (0.0%) |  |
 | RS | 1 | 0 (0.0%) |  |
-| D. | 1 | 0 (0.0%) |  |
 | S | 1 | 0 (0.0%) |  |
+| D. | 1 | 0 (0.0%) |  |
 | XI | 1 | 0 (0.0%) |  |
 | DH | 1 | 0 (0.0%) |  |
 | EH | 1 | 0 (0.0%) |  |
 | VO | 1 | 0 (0.0%) |  |
 | (M | 1 | 0 (0.0%) |  |
 | KH | 1 | 0 (0.0%) |  |
-| GO | 1 | 0 (0.0%) |  |
 | VR | 1 | 0 (0.0%) |  |
+| GO | 1 | 0 (0.0%) |  |
 | IR | 1 | 0 (0.0%) |  |
-| IB | 1 | 0 (0.0%) |  |
 | PL | 1 | 0 (0.0%) |  |
+| IB | 1 | 0 (0.0%) |  |
 | BR | 1 | 0 (0.0%) |  |
 | SG | 1 | 0 (0.0%) |  |
 | UP | 1 | 0 (0.0%) |  |
@@ -303,8 +304,8 @@ How NAD placed the points it matched (its own `Placement` field):
 | NP | 1 | 0 (0.0%) |  |
 | UR | 1 | 0 (0.0%) |  |
 | ? | 1 | 0 (0.0%) |  |
-| TR | 1 | 0 (0.0%) |  |
 | OU | 1 | 0 (0.0%) |  |
+| TR | 1 | 0 (0.0%) |  |
 | IM | 1 | 0 (0.0%) |  |
 | 6T | 1 | 0 (0.0%) |  |
 | QA | 1 | 0 (0.0%) |  |
@@ -320,13 +321,12 @@ How NAD placed the points it matched (its own `Placement` field):
 
 ## Agreement with the Census
 
-Of 3,000 listings the Census already placed exactly, NAD matched 1,507. Distance from the Census pin to the NAD point: median 73 m, 75th percentile 127 m, 90th percentile 213 m, 99th percentile 638 m; 30 more than 500 m apart.
+Of 3,000 listings the Census already placed exactly, NAD matched 1,531. Distance from the Census pin to the NAD point: median 70 m, 75th percentile 117 m, 90th percentile 201 m, 99th percentile 502 m; 16 more than 500 m apart.
 
 ## Examples (public listing addresses)
 
 Another street at the same number:
 
-- 103 CAMELIA ST NW, ROYAL CITY, WA 99357
 - 15436 BEL-RED RD, REDMOND, WA 98052
 - 9300 DEWITT LOOP, FORT BELVOIR, VA 22060
 - 4249 N SAINT PETERS PKWY STE B, SAINT PETERS, MO 63304
@@ -336,6 +336,7 @@ Another street at the same number:
 - 2435 VETERANS WAY, GREENWOOD, AR 72936
 - 9300 DEWITT LOOP, FORT BELVOIR, VA 22060
 - 1728 W MARINE VIEW DR STE 221, SEATTLE, WA 98134
+- 12834 OLD U.S. 169, OOLOGAH, OK 74053
 
 Points far apart:
 
