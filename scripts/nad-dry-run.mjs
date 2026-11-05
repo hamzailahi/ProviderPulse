@@ -4,7 +4,10 @@
 //     the distinct (zip, house) pairs to pull out of the NAD file
 //   node scripts/nad-dry-run.mjs match --unplaced unplaced.csv --sample sample.csv --cands cands.csv --out report.md
 //     matches each listing (scripts/lib/nad-match.mjs) and writes the report;
-//     nothing is written to the database
+//     nothing is written to the database. With --placements file.csv it also
+//     writes the listings an apply may place (tbl,key,address,zip,lat,lng):
+//     placed, in a state USDOT marks wholly public domain (never NOT_PUBLIC or
+//     PARTLY_PUBLIC); nad-dry-run.sh's apply mode loads it
 //
 // unplaced.csv: tbl,key,address,city,state,zip (listings with no pin)
 // sample.csv:   tbl,key,address,city,state,zip,lat,lng (listings the Census
@@ -12,7 +15,7 @@
 //               point shows how far the two sources agree)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseCsv } from './lib/taxonomy-map.mjs';
-import { houseOf, matchOne, metres, NOT_PUBLIC, PARTLY_PUBLIC } from './lib/nad-match.mjs';
+import { houseOf, matchOne, metres, applicable, NOT_PUBLIC, PARTLY_PUBLIC } from './lib/nad-match.mjs';
 
 const args = process.argv.slice(2);
 const cmd = args[0];
@@ -62,6 +65,12 @@ if (cmd === 'keys') {
     if (examples[m.status] && examples[m.status].length < 10) examples[m.status].push(`${m.row.address}, ${m.row.city}, ${s} ${m.row.zip}`);
   }
   const usable = st.placed || 0;
+  const forApply = un.filter(m => applicable(m.status, m.row.state));
+  if (one('placements')) {
+    const q = v => (/[",\n]/.test(String(v ?? '')) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v ?? ''));
+    writeFileSync(one('placements'), 'tbl,key,address,zip,lat,lng\n' + forApply.map(m =>
+      [m.row.tbl, m.row.key, m.row.address, m.row.zip, m.lat.toFixed(7), m.lng.toFixed(7)].map(q).join(',')).join('\n') + (forApply.length ? '\n' : ''));
+  }
   const partly = un.filter(m => m.status === 'placed' && PARTLY_PUBLIC.has(String(m.row.state || '').toUpperCase())).length;
 
   // ---- agreement with the Census on listings already placed exactly
@@ -78,6 +87,7 @@ if (cmd === 'keys') {
     '## Listings with no pin', '',
     `- Listings tried: **${fmt(un.length)}**`,
     `- Would be placed: **${fmt(usable)}** (${pct(usable, un.length)})${partly ? `, of which ${fmt(partly)} are in states USDOT marks partly not public domain (${[...PARTLY_PUBLIC].join(', ')}); their sources need checking before an apply` : ''}`,
+    `- In wholly public-domain states, so an apply may write them: **${fmt(forApply.length)}**`,
     `- Matched but left out, because the state is not public domain in the NAD (${[...NOT_PUBLIC].join(', ')}): ${fmt(st.placed_not_public)}`,
     `- Several matching points far apart (left unplaced): ${fmt(st.tie)}`,
     `- NAD has this house number in the ZIP, but on another street: ${fmt(st.no_street)}`,

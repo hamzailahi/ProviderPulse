@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-04. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-05. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -649,6 +649,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-05
+
+- Listings without a map pin in the states whose National Address Database data is public domain now get the address point that database holds for them, when the ZIP, the house number and the street agree (the same one-word rule as the Census placement). Only rows still without a pin are touched, a point more than 25 miles from its ZIP's centre is refused, and every row written is listed so it can be found again. Partly public states (CO, IL, KS, MD, MN, ND, SC, SD) and non-public ones (HI, MI, NH, OR) are left for later.
 
 ### 2026-11-04
 

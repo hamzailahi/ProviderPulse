@@ -1,6 +1,8 @@
 name: NAD dry run
 
-# Manual, read only. How many listings with no pin the USDOT National Address
+# Manual. mode dry_run (default) is read only; mode apply (2026-11-05, the
+# user's go-ahead) also writes NAD points for listings with no pin in states
+# USDOT marks wholly public domain and commits nad-applied.csv / nad-apply.md. How many listings with no pin the USDOT National Address
 # Database would place, by state, and how far its points sit from the Census
 # pins of listings already placed (scripts/nad-dry-run.sh). Writes nothing to
 # the database; commits supabase/reference/nad-dry-run.md.
@@ -8,6 +10,11 @@ name: NAD dry run
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'dry_run (read only) or apply (write public-domain matches)'
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
       nad_url:
         description: 'NAD text file zip (blank: data.transportation.gov fc2s-wawr)'
         required: false
@@ -62,21 +69,24 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           NAD_URL: ${{ inputs.nad_url }}
           WORK: ${{ runner.temp }}
+          MODE: ${{ inputs.mode || 'dry_run' }}
         run: |
           [ -n "$NAD_URL" ] || unset NAD_URL
           bash scripts/nad-dry-run.sh
 
       - name: Summary
         if: always()
-        run: cat supabase/reference/nad-dry-run.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        run: cat supabase/reference/nad-apply.md supabase/reference/nad-dry-run.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || cat supabase/reference/nad-dry-run.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
       - name: Commit the report
         if: success()
+        env:
+          MODE: ${{ inputs.mode || 'dry_run' }}
         run: |
-          git add supabase/reference/nad-dry-run.md
+          git add supabase/reference/nad-dry-run.md supabase/reference/nad-applied.csv supabase/reference/nad-apply.md 2>/dev/null || git add supabase/reference/nad-dry-run.md
           if git diff --cached --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -q -m "NAD dry run $(date -u +%F) [skip netlify]"
+          git commit -q -m "NAD ${MODE:-dry_run} $(date -u +%F) [skip netlify]"
           git pull -q --rebase origin main
           git push origin HEAD:main

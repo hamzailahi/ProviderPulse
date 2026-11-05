@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { houseOf, nadLine, matchOne, NOT_PUBLIC } from './lib/nad-match.mjs';
+import { houseOf, nadLine, matchOne, applicable, NOT_PUBLIC } from './lib/nad-match.mjs';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.log('FAIL', m); } };
@@ -30,6 +30,8 @@ ok(m.status === 'tie', 'two matching points far apart are a tie, not a guess');
 ok(matchOne(row, []).status === 'no_candidates' && matchOne(row, [c({ lat: '' })]).status === 'no_street', 'nothing, or a point with no coordinates, places nothing');
 ok(NOT_PUBLIC.has('MI') && !NOT_PUBLIC.has('TX'), 'states USDOT does not mark public domain are listed');
 
+ok(applicable('placed', 'tx') && !applicable('placed', 'MI') && !applicable('placed', 'IL') && !applicable('tie', 'TX') && !applicable('placed', ''), 'only placed matches in wholly public states may be applied');
+
 // keys and match end to end on small files
 const d = mkdtempSync(join(tmpdir(), 'nad-'));
 writeFileSync(join(d, 'un.csv'), 'tbl,key,address,city,state,zip\nclinics,1,710 N TURNER AVE,HASTINGS,NE,68901\nprovider_individuals,2,5 ELM ST,LANSING,MI,48933\nprovider_individuals,3,PO BOX 9,X,TX,75001\nclinics,4,99 NOPE RD,Y,TX,75001\n');
@@ -40,8 +42,12 @@ const keys = readFileSync(join(d, 'keys.csv'), 'utf8').trim().split('\n');
 ok(keys[0] === 'zip,house' && keys.includes('68901,710') && keys.includes('48933,5') && keys.length === 4, 'keys are the distinct ZIP and house pairs, PO boxes left out');
 writeFileSync(join(d, 'c.csv'), 'num,num_pre,num_suf,pre_mod,pre_dir,pre_type,pre_sep,name,post_type,post_dir,post_mod,zip,state,lat,lng,placement,source\n' +
   '710,,,,North,,,Turner,Avenue,,,68901,NE,40.586,-98.389,Structure - Rooftop,x\n5,,,,,,,Elm,Street,,,48933,MI,42.7,-84.5,Parcel - Centroid,y\n');
-const rep = run('match', '--unplaced', join(d, 'un.csv'), '--sample', join(d, 'sa.csv'), '--cands', join(d, 'c.csv'), '--out', join(d, 'r.md'));
-ok(/Would be placed: \*\*1\*\*/.test(rep), 'one listing would be placed');
+writeFileSync(join(d, 'un.csv'), readFileSync(join(d, 'un.csv'), 'utf8') + 'clinics,5,"710 N TURNER AVE, STE 2",HASTINGS,IL,68901\n');
+const rep = run('match', '--unplaced', join(d, 'un.csv'), '--sample', join(d, 'sa.csv'), '--cands', join(d, 'c.csv'), '--out', join(d, 'r.md'), '--placements', join(d, 'p.csv'));
+const pl = readFileSync(join(d, 'p.csv'), 'utf8').trim().split('\n');
+ok(pl[0] === 'tbl,key,address,zip,lat,lng' && pl.length === 2 && pl[1] === 'clinics,1,710 N TURNER AVE,68901,40.5860000,-98.3890000', 'the apply list holds only the public-state match, with its address and point');
+ok(/an apply may write them: \*\*1\*\*/.test(rep), 'the report counts what an apply may write');
+ok(/Would be placed: \*\*2\*\*/.test(rep) && /partly not public domain/.test(rep), 'two would be placed, one in a partly public state');
 ok(/not public domain in the NAD \(HI, MI, NH, OR\): 1/.test(rep), 'a Michigan match is counted but left out');
 ok(/no house number \(PO box, building name\): 1/.test(rep) && /nothing at this house number in the ZIP: 1/.test(rep), 'PO boxes and missing numbers are counted apart');
 ok(/NAD matched 1\. Distance from the Census pin to the NAD point: median 11 m/.test(rep), 'agreement with the Census is measured in metres');

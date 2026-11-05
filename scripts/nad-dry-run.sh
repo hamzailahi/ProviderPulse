@@ -10,12 +10,23 @@
 #   3. match with the placement job's street rule (scripts/lib/nad-match.mjs)
 #      and write supabase/reference/nad-dry-run.md
 #
-# Env: SUPABASE_DB_URL, NAD_URL (default: data.transportation.gov's TXT zip).
+#   4. MODE=apply only (2026-11-05, the user's go-ahead): write the matches in
+#      wholly public-domain states, only where the row still has no pin and
+#      its address and ZIP are what was matched, and only when the point lies
+#      within FAR_MILES of the ZIP's centre (cdc_places); secondary rows get
+#      geocode_precision 'nad'. The written rows go to
+#      supabase/reference/nad-applied.csv (table, key, point) so they can be
+#      found again, and the counts to supabase/reference/nad-apply.md.
+#
+# Env: SUPABASE_DB_URL, NAD_URL (default: data.transportation.gov's TXT zip),
+#      MODE (dry_run | apply), FAR_MILES (default 25), MAX_WRITE (default 60000).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 : "${SUPABASE_DB_URL:?Set SUPABASE_DB_URL}"
 NAD_URL="${NAD_URL:-https://data.transportation.gov/download/fc2s-wawr/application/x-zip-compressed}"
 WORK="${WORK:-$(mktemp -d)}"; OUT=supabase/reference/nad-dry-run.md
+MODE="${MODE:-dry_run}"; FAR_MILES="${FAR_MILES:-25}"; MAX_WRITE="${MAX_WRITE:-60000}"
+case "$MODE" in dry_run|apply) ;; *) echo "MODE must be dry_run or apply" >&2; exit 2;; esac
 fail() { echo "::error::$1"; echo "$1" >&2; exit 1; }
 psqlq() { psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X "$@"; }
 
@@ -46,4 +57,57 @@ unzip -p "$WORK/nad.zip" "$ENTRY" | python3 scripts/nad-candidates.py --header "
 
 echo "== Matching"
 NAD_FILE="$(basename "$ENTRY") from $NAD_URL ($(stat -c %s "$WORK/nad.zip") bytes zipped)" \
-  node scripts/nad-dry-run.mjs match --unplaced "$WORK/unplaced.csv" --sample "$WORK/sample.csv" --cands "$WORK/cands.csv" --out "$OUT"
+  node scripts/nad-dry-run.mjs match --unplaced "$WORK/unplaced.csv" --sample "$WORK/sample.csv" --cands "$WORK/cands.csv" --out "$OUT" --placements "$WORK/placements.csv"
+
+[ "$MODE" = apply ] || exit 0
+n=$(($(wc -l < "$WORK/placements.csv") - 1))
+echo "== Applying: $n matches in wholly public-domain states"
+[ "$n" -gt 0 ] || fail "nothing to apply"
+[ "$n" -le "$MAX_WRITE" ] || fail "$n matches is more than MAX_WRITE ($MAX_WRITE); refusing"
+psqlq -At > "$WORK/written.txt" 2> "$WORK/err" <<SQL || fail "write failed: $(tr '\n' ' ' < "$WORK/err" | cut -c1-300)"
+begin;
+set local statement_timeout = '30min';
+create temp table nad_place (tbl text, key text, address text, zip text, lat double precision, lng double precision) on commit drop;
+\\copy nad_place from '$WORK/placements.csv' with (format csv, header true)
+create temp table zc on commit drop as
+  select zip, avg(lat)::float8 as clat, avg(lon)::float8 as clon from public.cdc_places
+  where measureid = 'DENTAL' and lat is not null and zip in (select distinct zip from nad_place) group by zip;
+create temp table nad_ok on commit drop as
+  select p.* from nad_place p left join zc on zc.zip = p.zip
+  where zc.zip is null or 69.0 * sqrt((p.lat - zc.clat)^2 + ((p.lng - zc.clon) * cos(radians(zc.clat)))^2) <= $FAR_MILES;
+select 'far_from_zip=' || ((select count(*) from nad_place) - (select count(*) from nad_ok));
+create temp table applied (tbl text, key text, lat double precision, lng double precision) on commit drop;
+with u as (update public.clinics c set latitude = o.lat, longitude = o.lng from nad_ok o
+  where o.tbl = 'clinics' and c.npi = o.key and c.latitude is null and c.longitude is null
+    and c.address is not distinct from o.address and c.zip is not distinct from o.zip returning o.tbl, o.key, o.lat, o.lng)
+insert into applied select * from u;
+with u as (update public.provider_individuals c set latitude = o.lat, longitude = o.lng from nad_ok o
+  where o.tbl = 'provider_individuals' and c.npi = o.key and c.latitude is null and c.longitude is null
+    and c.address is not distinct from o.address and c.zip is not distinct from o.zip returning o.tbl, o.key, o.lat, o.lng)
+insert into applied select * from u;
+with u as (update public.clinic_secondary_locations c set latitude = o.lat, longitude = o.lng, geocode_precision = 'nad' from nad_ok o
+  where o.tbl = 'clinic_secondary_locations' and c.id::text = o.key and c.latitude is null and c.longitude is null
+    and c.address is not distinct from o.address and c.zip is not distinct from o.zip returning o.tbl, o.key, o.lat, o.lng)
+insert into applied select * from u;
+select tbl || '=' || count(*) from applied group by tbl order by tbl;
+\\copy (select tbl, key, round(lat::numeric, 7) as lat, round(lng::numeric, 7) as lng from applied order by tbl, key) to '$WORK/applied.csv' with (format csv, header true)
+commit;
+SQL
+cat "$WORK/written.txt"
+cp "$WORK/applied.csv" supabase/reference/nad-applied.csv
+total=$(($(wc -l < "$WORK/applied.csv") - 1))
+far=$(sed -n 's/^far_from_zip=//p' "$WORK/written.txt")
+{
+  echo "# National Address Database: apply"
+  echo
+  echo "Run $(date -u '+%F %H:%M') UTC by scripts/nad-dry-run.sh (MODE=apply). Only matches in states USDOT marks wholly public domain were written, only to rows that still had no pin and whose address and ZIP were the ones matched, and only when the NAD point lay within $FAR_MILES miles of the ZIP's centre."
+  echo
+  echo "- Matches offered: $n"
+  echo "- Left out, more than $FAR_MILES miles from the ZIP's centre: ${far:-0}"
+  echo "- Left out, the row was pinned or its address changed since the export: $((n - ${far:-0} - total))"
+  grep -v '^far_from_zip=' "$WORK/written.txt" | sed 's/^\(.*\)=\(.*\)$/- Written to \1: \2/'
+  echo "- Rows written in all: **$total** (listed in nad-applied.csv with the point written)"
+  echo
+  echo "Source: U.S. Department of Transportation, National Address Database ($(basename "$ENTRY"))."
+} > supabase/reference/nad-apply.md
+cat supabase/reference/nad-apply.md

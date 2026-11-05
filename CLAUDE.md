@@ -1797,8 +1797,21 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   counted and left out; partly public ones (CO, IL, KS, MD, MN, ND, SC, SD)
   are reported apart. The report (`supabase/reference/nad-dry-run.md`) gives
   would-be-placed counts by table, state and NAD `Placement`, and the
-  distance between NAD points and the sample's Census pins. No apply mode
-  yet.
+  distance between NAD points and the sample's Census pins. First dry run
+  (2026-11-04, NAD release 24): 45,020 of 144,896 would be placed (36,910
+  in wholly public states); Florida, Nevada and Mississippi have almost no
+  NAD rows, California and Pennsylvania few; NAD points sat a median 73 m
+  from the Census's interpolated pins. **`mode: apply`** (2026-11-05, the
+  user's go-ahead for the wholly public states): reruns the whole dry run,
+  then in one transaction writes only `applicable()` matches (placed, a
+  state neither `NOT_PUBLIC` nor `PARTLY_PUBLIC`), only to rows whose
+  latitude and longitude are both still null and whose address and ZIP equal
+  the exported ones, and only when the point is within `FAR_MILES` (25) of
+  the ZIP's `cdc_places` centre; at most `MAX_WRITE` (60,000). Secondary rows
+  get `geocode_precision = 'nad'` (the other two tables have no provenance
+  column), so `supabase/reference/nad-applied.csv` (table, key, point) is the
+  record of what NAD placed; counts in `nad-apply.md`. The SQL was checked on
+  a local Postgres 16.
 - **Hospital campus candidates** (`hospital-campus-candidates.yml`, manual, read
   only, `scripts/hospital-campus-candidates.sh`): one query lists street
   addresses where an organization named hospital or medical center is listed
@@ -2138,7 +2151,7 @@ node scripts/test-provider-npis.mjs       # 39: one account, many NPIs: the regi
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
 node scripts/test-nppes-refresh.mjs       # 64: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact (or the same address written another way, one-word differences only) then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
-node scripts/test-nad-match.mjs           # 16: the NAD matcher: house numbers, NAD street lines, the one-word rule, units as one place, far points a tie, non-public states left out, the dry run's keys and report on small files
+node scripts/test-nad-match.mjs           # 19: the NAD matcher: house numbers, NAD street lines, the one-word rule, units as one place, far points a tie, non-public states left out, only wholly public states applied, the dry run's keys, report and apply list on small files
 node scripts/test-hospital-campuses.mjs   # 20: the reviewed hospital campus list: every row checked (hospital code, NPI check digit, US point, source, eligibility wording), the asset current, campuses only inside the search box, under their own id, the sheet looks up the billing NPI
 node scripts/test-address-fit.mjs         # 16: which geocoder matches a typed address accepts (house number, ZIP, distinctive words; gibberish and a neighbouring number refused)
 node scripts/test-admin.mjs               # 19: the admin account: only ADMIN_EMAILS, counts as staff, sign-in reports it, opens the review queue (staff and patients refused, the shared password still works), guest in the patient app, the switch on four pages

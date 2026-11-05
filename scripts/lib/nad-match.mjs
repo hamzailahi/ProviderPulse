@@ -16,6 +16,14 @@ export const NOT_PUBLIC = new Set(['HI', 'MI', 'NH', 'OR']);
 export const PARTLY_PUBLIC = new Set(['CO', 'IL', 'KS', 'MD', 'MN', 'ND', 'SC', 'SD']);
 export const MAX_SPREAD_M = 100;
 
+// Whether an apply may write this match: placed, and in a state USDOT marks
+// wholly public domain. Partly public states wait until their counties are
+// checked; territories and military mail codes have no NAD rows anyway.
+export function applicable(status, state) {
+  const s = String(state || '').toUpperCase();
+  return status === 'placed' && /^[A-Z]{2}$/.test(s) && !NOT_PUBLIC.has(s) && !PARTLY_PUBLIC.has(s);
+}
+
 // The house number a listing's street line starts with, without leading
 // zeros; null when it does not start with one (a PO box, a building name).
 export function houseOf(address) {
