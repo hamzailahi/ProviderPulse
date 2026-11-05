@@ -1,24 +1,24 @@
-# Unmapped listings, 2026-11-04
+# Unmapped listings, 2026-11-05
 
 Listings with no coordinates are never drawn on a map. This pass places them only by a Census match of the same house number and street in the same ZIP: exact, or written another way (a direction word, an ordinal, a state route, a space).
 
 | Table | Without coordinates | With an address to try |
 |---|---|---|
-| clinics | 22820 | 22820 |
-| provider_individuals | 125530 | 125530 |
+| clinics | 22079 | 22079 |
+| provider_individuals | 122737 | 122737 |
 | clinic_secondary_locations | 80 | 80 |
 
 ## Geocoding
 
 | Table | Tried | Placed | Left unplaced | Geocoder failed |
 |---|---|---|---|---|
-| provider_individuals | 51,254 | 2,793 | 48,461 | 0 |
-| clinics | 8,706 | 741 | 7,965 | 0 |
-| clinic_secondary_locations | 40 | 0 | 40 | 0 |
+| provider_individuals | 51,433 | 885 | 50,548 | 0 |
+| clinics | 8,525 | 200 | 8,325 | 0 |
+| clinic_secondary_locations | 42 | 0 | 42 | 0 |
 
-Census exact 1,922, Census same address written another way 1,612 (one direction word, an ordinal, a state route's spelling or a space; same house number and ZIP), Google 0 (off unless a key is passed); anything else keeps no coordinates.
+Census exact 613, Census same address written another way 472 (one direction word, an ordinal, a state route's spelling or a space; same house number and ZIP), Google 0 (off unless a key is passed); anything else keeps no coordinates.
 
-Why the rest were not placed: no match 39,312, a fuzzy (non-exact) match 15,566, matched in another ZIP 0, several equal matches 1,588.
+Why the rest were not placed: no match 41,053, a fuzzy (non-exact) match 16,211, matched in another ZIP 0, several equal matches 1,651.
 
 Examples (public listing addresses):
 
@@ -37,4 +37,4 @@ Examples (public listing addresses):
 | non_exact | 10753 FALLS RD PAVILION II STE 145, LUTHERVILLE, MD 21093 | 10753 FALLS RD, LUTHERVILLE, MD, 21093 |
 | non_exact | 202 INDUSTRIAL PARK, JACKSON, MN 56143 | 202 INDUSTRIAL PKWY, JACKSON, MN, 56143 |
 
-Written: clinics=741 provider_individuals=2793 clinic_secondary_locations=0 
+Written: clinics=200 provider_individuals=885 clinic_secondary_locations=0 
