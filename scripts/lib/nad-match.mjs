@@ -19,9 +19,27 @@ export const MAX_SPREAD_M = 100;
 // Whether an apply may write this match: placed, and in a state USDOT marks
 // wholly public domain. Partly public states wait until their counties are
 // checked; territories and military mail codes have no NAD rows anyway.
-export function applicable(status, state) {
+//
+// In a partly public state (2026-11-06, the county check) a match may be
+// written only when its NAD county is on the reviewed list of public
+// counties (supabase/reference/nad-public-counties.csv, built from USDOT's
+// NAD County Participation Status by scripts/build-nad-counties.mjs): every
+// piece of the county "Data in the NAD", none "Data not in public domain".
+// A missing or unknown county is never public.
+export function applicable(status, state, county, publicCounties) {
   const s = String(state || '').toUpperCase();
-  return status === 'placed' && /^[A-Z]{2}$/.test(s) && !NOT_PUBLIC.has(s) && !PARTLY_PUBLIC.has(s);
+  if (status !== 'placed' || !/^[A-Z]{2}$/.test(s) || NOT_PUBLIC.has(s)) return false;
+  if (!PARTLY_PUBLIC.has(s)) return true;
+  const k = countyKey(county);
+  return !!(k && publicCounties && publicCounties.has(s + '|' + k));
+}
+
+// One spelling for a county name from NAD or from USDOT's status layer:
+// capitals, "County"/"Parish" dropped, Saint as ST, punctuation out.
+export function countyKey(name) {
+  let n = String(name || '').toUpperCase().replace(/[.'’]/g, '').replace(/[^A-Z0-9 ]+/g, ' ');
+  n = n.replace(/\b(COUNTY|PARISH|BOROUGH)\b/g, ' ').replace(/\bSAINT\b/g, 'ST').replace(/\s+/g, ' ').trim();
+  return n || null;
 }
 
 // The house number a listing's street line starts with, without leading
@@ -58,10 +76,12 @@ export function matchOne(row, cands) {
     const line = nadLine(c);
     const lat = Number(c.lat), lng = Number(c.lng);
     return line && Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && censusNearExact(row.address, line, state);
-  }).map(c => ({ lat: Number(c.lat), lng: Number(c.lng), placement: c.placement || '' }));
+  }).map(c => ({ lat: Number(c.lat), lng: Number(c.lng), placement: c.placement || '', county: c.county || '' }));
   if (!hits.length) return { status: 'no_street' };
   const mid = { lat: hits.reduce((a, h) => a + h.lat, 0) / hits.length, lng: hits.reduce((a, h) => a + h.lng, 0) / hits.length };
   if (hits.some(h => metres(h, mid) > MAX_SPREAD_M)) return { status: 'tie', points: hits.length };
   const placements = [...new Set(hits.map(h => h.placement).filter(Boolean))];
-  return { status: 'placed', lat: mid.lat, lng: mid.lng, placement: placements.join('; ') || 'unknown', points: hits.length };
+  // Points that disagree on their county give no county (never public).
+  const counties = [...new Set(hits.map(h => countyKey(h.county)).filter(Boolean))];
+  return { status: 'placed', lat: mid.lat, lng: mid.lng, placement: placements.join('; ') || 'unknown', points: hits.length, county: counties.length === 1 ? counties[0] : null };
 }

@@ -1812,6 +1812,20 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   column), so `supabase/reference/nad-applied.csv` (table, key, point) is the
   record of what NAD placed; counts in `nad-apply.md`. The SQL was checked on
   a local Postgres 16.
+  First apply (2026-11-05): 36,471 written (30,604 clinicians, 5,867
+  organizations), 42 refused as far from their ZIP. **County check
+  (2026-11-06):** in the partly public states `applicable()` also needs the
+  match's NAD county (`county` column, one county across its points, else
+  none) on `supabase/reference/nad-public-counties.csv`, built by
+  `scripts/build-nad-counties.mjs` (CI runs `--check`) from USDOT's NAD
+  County Participation Status layer (`nad-status/county-status-2.jsonl`;
+  codes: 10 in the NAD, 20 awaiting, 30 no statewide data, 40 not in public
+  domain). A county is public only when every piece is 10; any 40 piece makes
+  it not public (six South Dakota counties are split, Minnehaha and Lincoln
+  among them). Result: CO 45 public of 64, IL 100 of 102, KS 81 of 105, MD
+  22 of 23, MN 53 of 87, ND 53 of 53, SC 2 of 46, SD 1 of 66. Oregon is all
+  10 in that layer though USDOT's state note flags it; it stays in
+  `NOT_PUBLIC` until the user decides.
 - **NAD status discovery** (`nad-status-discover.yml`, manual, read only,
   `scripts/nad-status-discover.sh`, 2026-11-06): the county check for the
   partly public states starts here. Saves the text of USDOT's NAD pages (live,
@@ -2166,7 +2180,7 @@ node scripts/test-provider-npis.mjs       # 39: one account, many NPIs: the regi
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
 node scripts/test-nppes-refresh.mjs       # 64: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact (or the same address written another way, one-word differences only) then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
-node scripts/test-nad-match.mjs           # 19: the NAD matcher: house numbers, NAD street lines, the one-word rule, units as one place, far points a tie, non-public states left out, only wholly public states applied, the dry run's keys, report and apply list on small files
+node scripts/test-nad-match.mjs           # 25: the NAD matcher: house numbers, NAD street lines, the one-word rule, units as one place, far points a tie, non-public states left out, only wholly public states applied, partly public states only in listed public counties (split counties never), the dry run's keys, report and apply list on small files
 node scripts/test-hospital-campuses.mjs   # 20: the reviewed hospital campus list: every row checked (hospital code, NPI check digit, US point, source, eligibility wording), the asset current, campuses only inside the search box, under their own id, the sheet looks up the billing NPI
 node scripts/test-address-fit.mjs         # 16: which geocoder matches a typed address accepts (house number, ZIP, distinctive words; gibberish and a neighbouring number refused)
 node scripts/test-admin.mjs               # 19: the admin account: only ADMIN_EMAILS, counts as staff, sign-in reports it, opens the review queue (staff and patients refused, the shared password still works), guest in the patient app, the switch on four pages

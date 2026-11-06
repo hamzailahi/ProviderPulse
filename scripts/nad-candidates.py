@@ -27,6 +27,7 @@ WANT = {
     'post_mod': ['st_posmod', 'st_postmod'],
     'zip': ['zip_code', 'zipcode', 'zip', 'post_code'],
     'state': ['state'],
+    'county': ['county', 'county_name', 'countyname'],
     'lat': ['latitude', 'lat'],
     'lng': ['longitude', 'long', 'lon'],
     'placement': ['placement'],

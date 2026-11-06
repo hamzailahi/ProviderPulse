@@ -121,6 +121,9 @@ jobs:
       - name: NAD address point matcher
         run: node scripts/test-nad-match.mjs
 
+      - name: NAD public county list is current
+        run: node scripts/build-nad-counties.mjs --check
+
       - name: Typed addresses only match what was typed
         run: node scripts/test-address-fit.mjs
 

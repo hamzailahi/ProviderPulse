@@ -15,7 +15,7 @@
 //               point shows how far the two sources agree)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseCsv } from './lib/taxonomy-map.mjs';
-import { houseOf, matchOne, metres, applicable, NOT_PUBLIC, PARTLY_PUBLIC } from './lib/nad-match.mjs';
+import { houseOf, matchOne, metres, applicable, countyKey, NOT_PUBLIC, PARTLY_PUBLIC } from './lib/nad-match.mjs';
 
 const args = process.argv.slice(2);
 const cmd = args[0];
@@ -65,7 +65,18 @@ if (cmd === 'keys') {
     if (examples[m.status] && examples[m.status].length < 10) examples[m.status].push(`${m.row.address}, ${m.row.city}, ${s} ${m.row.zip}`);
   }
   const usable = st.placed || 0;
-  const forApply = un.filter(m => applicable(m.status, m.row.state));
+  // Reviewed public counties of the partly public states (--counties).
+  const publicCounties = new Set();
+  if (one('counties')) for (const r of readRows(one('counties'))) if (r.verdict === 'public') publicCounties.add(String(r.state).toUpperCase() + '|' + countyKey(r.county));
+  const forApply = un.filter(m => applicable(m.status, m.row.state, m.county, publicCounties));
+  const partlyRows = un.filter(m => m.status === 'placed' && PARTLY_PUBLIC.has(String(m.row.state || '').toUpperCase()));
+  const partlyApplied = partlyRows.filter(m => applicable(m.status, m.row.state, m.county, publicCounties)).length;
+  const partlyNoCounty = partlyRows.filter(m => !m.county).length;
+  const partlyByState = {};
+  for (const m of partlyRows) {
+    const s = String(m.row.state).toUpperCase(), b = partlyByState[s] || (partlyByState[s] = { matched: 0, applied: 0 });
+    b.matched++; if (applicable(m.status, m.row.state, m.county, publicCounties)) b.applied++;
+  }
   if (one('placements')) {
     const q = v => (/[",\n]/.test(String(v ?? '')) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v ?? ''));
     writeFileSync(one('placements'), 'tbl,key,address,zip,lat,lng\n' + forApply.map(m =>
@@ -87,7 +98,8 @@ if (cmd === 'keys') {
     '## Listings with no pin', '',
     `- Listings tried: **${fmt(un.length)}**`,
     `- Would be placed: **${fmt(usable)}** (${pct(usable, un.length)})${partly ? `, of which ${fmt(partly)} are in states USDOT marks partly not public domain (${[...PARTLY_PUBLIC].join(', ')}); their sources need checking before an apply` : ''}`,
-    `- In wholly public-domain states, so an apply may write them: **${fmt(forApply.length)}**`,
+    `- An apply may write: **${fmt(forApply.length)}** (wholly public states, plus ${fmt(partlyApplied)} in public counties of partly public states${publicCounties.size ? '' : '; no county list was given'})`,
+    `- In partly public states but not applied: ${fmt(partlyRows.length - partlyApplied)} (county not public domain or split, ${fmt(partlyNoCounty)} with no single NAD county)`,
     `- Matched but left out, because the state is not public domain in the NAD (${[...NOT_PUBLIC].join(', ')}): ${fmt(st.placed_not_public)}`,
     `- Several matching points far apart (left unplaced): ${fmt(st.tie)}`,
     `- NAD has this house number in the ZIP, but on another street: ${fmt(st.no_street)}`,
@@ -98,6 +110,9 @@ if (cmd === 'keys') {
     'How NAD placed the points it matched (its own `Placement` field):', '',
     '| Placement | Listings |', '|---|---|',
     ...Object.entries(placement).sort((a, b) => b[1] - a[1]).map(([k, v]) => `| ${k} | ${fmt(v)} |`), '',
+    '## Partly public states by county check', '',
+    '| State | Matched | In public counties |', '|---|---|---|',
+    ...Object.entries(partlyByState).sort((a, b) => b[1].matched - a[1].matched).map(([s, v]) => `| ${s} | ${fmt(v.matched)} | ${fmt(v.applied)} |`), '',
     '## By state (most unplaced first)', '',
     '| State | Unplaced | Would be placed | Note |', '|---|---|---|---|',
     ...Object.entries(byState).sort((a, b) => b[1].rows - a[1].rows).map(([s, v]) => `| ${s} | ${fmt(v.rows)} | ${fmt(v.placed)} (${pct(v.placed, v.rows)}) | ${NOT_PUBLIC.has(s) ? 'not public domain: skipped' : PARTLY_PUBLIC.has(s) ? 'partly not public domain' : ''} |`), '',

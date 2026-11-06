@@ -4,7 +4,8 @@ import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { houseOf, nadLine, matchOne, applicable, NOT_PUBLIC } from './lib/nad-match.mjs';
+import { houseOf, nadLine, matchOne, applicable, countyKey, NOT_PUBLIC } from './lib/nad-match.mjs';
+import { buildCounties } from './build-nad-counties.mjs';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.log('FAIL', m); } };
@@ -32,6 +33,20 @@ ok(NOT_PUBLIC.has('MI') && !NOT_PUBLIC.has('TX'), 'states USDOT does not mark pu
 
 ok(applicable('placed', 'tx') && !applicable('placed', 'MI') && !applicable('placed', 'IL') && !applicable('tie', 'TX') && !applicable('placed', ''), 'only placed matches in wholly public states may be applied');
 
+// the county check for partly public states
+const pub = new Set(['IL|COOK', 'MN|ST LOUIS']);
+ok(applicable('placed', 'IL', 'Cook County', pub) && !applicable('placed', 'IL', 'Saline', pub) && !applicable('placed', 'IL', null, pub) && !applicable('placed', 'IL', 'Cook', null), 'a partly public state is applied only in a listed public county; no county is never public');
+ok(applicable('placed', 'MN', 'Saint Louis', pub) && countyKey("St. Louis County") === 'ST LOUIS' && countyKey('') === null, 'county names are spelled one way on both sides');
+ok(!applicable('placed', 'MI', 'Wayne', new Set(['MI|WAYNE'])), 'a county list never opens a non-public state');
+const bc = buildCounties([
+  JSON.stringify({ STATE_ABBR: 'SD', NAME: 'Minnehaha', CountyStatus: 10 }), JSON.stringify({ STATE_ABBR: 'SD', NAME: 'Minnehaha', CountyStatus: 40 }),
+  JSON.stringify({ STATE_ABBR: 'ND', NAME: 'Cass', CountyStatus: 10 }), JSON.stringify({ STATE_ABBR: 'CO', NAME: 'Mesa', CountyStatus: 30 }),
+  JSON.stringify({ STATE_ABBR: 'TX', NAME: 'Harris', CountyStatus: 10 })]);
+ok(bc.length === 3 && bc.find(r => r.county === 'MINNEHAHA').verdict === 'not_public' && bc.find(r => r.county === 'CASS').verdict === 'public' && bc.find(r => r.county === 'MESA').verdict === 'not_in_nad', 'a county split between public and non-public pieces is not public; only partly public states are listed');
+const m2 = matchOne(row, [c({ county: 'Adams County' }), c({ lat: '40.5861', county: 'ADAMS' })]);
+ok(m2.status === 'placed' && m2.county === 'ADAMS', 'a match carries its NAD county');
+ok(matchOne(row, [c({ county: 'Adams' }), c({ lat: '40.5861', county: 'Hall' })]).county === null, 'points that disagree on the county give none');
+
 // keys and match end to end on small files
 const d = mkdtempSync(join(tmpdir(), 'nad-'));
 writeFileSync(join(d, 'un.csv'), 'tbl,key,address,city,state,zip\nclinics,1,710 N TURNER AVE,HASTINGS,NE,68901\nprovider_individuals,2,5 ELM ST,LANSING,MI,48933\nprovider_individuals,3,PO BOX 9,X,TX,75001\nclinics,4,99 NOPE RD,Y,TX,75001\n');
@@ -46,7 +61,7 @@ writeFileSync(join(d, 'un.csv'), readFileSync(join(d, 'un.csv'), 'utf8') + 'clin
 const rep = run('match', '--unplaced', join(d, 'un.csv'), '--sample', join(d, 'sa.csv'), '--cands', join(d, 'c.csv'), '--out', join(d, 'r.md'), '--placements', join(d, 'p.csv'));
 const pl = readFileSync(join(d, 'p.csv'), 'utf8').trim().split('\n');
 ok(pl[0] === 'tbl,key,address,zip,lat,lng' && pl.length === 2 && pl[1] === 'clinics,1,710 N TURNER AVE,68901,40.5860000,-98.3890000', 'the apply list holds only the public-state match, with its address and point');
-ok(/an apply may write them: \*\*1\*\*/.test(rep), 'the report counts what an apply may write');
+ok(/An apply may write: \*\*1\*\*/.test(rep) && /partly public states but not applied: 1 \(county not public domain or split, 1 with no single NAD county\)/.test(rep), "the report counts what an apply may write, and the partly public match with no county is held back");
 ok(/Would be placed: \*\*2\*\*/.test(rep) && /partly not public domain/.test(rep), 'two would be placed, one in a partly public state');
 ok(/not public domain in the NAD \(HI, MI, NH, OR\): 1/.test(rep), 'a Michigan match is counted but left out');
 ok(/no house number \(PO box, building name\): 1/.test(rep) && /nothing at this house number in the ZIP: 1/.test(rep), 'PO boxes and missing numbers are counted apart');

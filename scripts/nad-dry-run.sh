@@ -10,7 +10,8 @@
 #   3. match with the placement job's street rule (scripts/lib/nad-match.mjs)
 #      and write supabase/reference/nad-dry-run.md
 #
-#   4. MODE=apply only (2026-11-05, the user's go-ahead): write the matches in
+#   4. MODE=apply only (2026-11-05, the user's go-ahead; public counties of the
+#      partly public states added 2026-11-06 after the county check): write the matches in
 #      wholly public-domain states, only where the row still has no pin and
 #      its address and ZIP are what was matched, and only when the point lies
 #      within FAR_MILES of the ZIP's centre (cdc_places); secondary rows get
@@ -57,7 +58,7 @@ unzip -p "$WORK/nad.zip" "$ENTRY" | python3 scripts/nad-candidates.py --header "
 
 echo "== Matching"
 NAD_FILE="$(basename "$ENTRY") from $NAD_URL ($(stat -c %s "$WORK/nad.zip") bytes zipped)" \
-  node scripts/nad-dry-run.mjs match --unplaced "$WORK/unplaced.csv" --sample "$WORK/sample.csv" --cands "$WORK/cands.csv" --out "$OUT" --placements "$WORK/placements.csv"
+  node scripts/nad-dry-run.mjs match --unplaced "$WORK/unplaced.csv" --sample "$WORK/sample.csv" --cands "$WORK/cands.csv" --out "$OUT" --placements "$WORK/placements.csv" --counties supabase/reference/nad-public-counties.csv
 
 [ "$MODE" = apply ] || exit 0
 n=$(($(wc -l < "$WORK/placements.csv") - 1))
@@ -100,7 +101,7 @@ far=$(sed -n 's/^far_from_zip=//p' "$WORK/written.txt")
 {
   echo "# National Address Database: apply"
   echo
-  echo "Run $(date -u '+%F %H:%M') UTC by scripts/nad-dry-run.sh (MODE=apply). Only matches in states USDOT marks wholly public domain were written, only to rows that still had no pin and whose address and ZIP were the ones matched, and only when the NAD point lay within $FAR_MILES miles of the ZIP's centre."
+  echo "Run $(date -u '+%F %H:%M') UTC by scripts/nad-dry-run.sh (MODE=apply). Only matches in states USDOT marks wholly public domain, or in counties of the partly public states that USDOT's county status layer shows wholly in the NAD with no non-public piece (nad-public-counties.csv), were written, only to rows that still had no pin and whose address and ZIP were the ones matched, and only when the NAD point lay within $FAR_MILES miles of the ZIP's centre."
   echo
   echo "- Matches offered: $n"
   echo "- Left out, more than $FAR_MILES miles from the ZIP's centre: ${far:-0}"
