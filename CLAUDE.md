@@ -1835,7 +1835,12 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   "Baltimore" for both Baltimore County and Baltimore city, so the list is
   keyed on `NAMELSAD` ("Baltimore city" becomes `BALTIMORE CITY`; both are
   10), which changed no other entry (2026-11-06, the user's go-ahead). The
-  report's county table now names the NAD counties it holds back per state.
+  report's county table now names the NAD counties it holds back per state. Its
+  apply wrote the 170 Maryland rows (48 organizations, 122 clinicians); what
+  the NAD can still place but may not is South Dakota's split counties
+  (Minnehaha 28, Lincoln 25) and Union (7), plus the same 44 points each run
+  refuses as more than 25 miles from their ZIP. After it, 99,425 listings
+  have no pin; the user is taking the rest to another geocoder.
 - **NAD status discovery** (`nad-status-discover.yml`, manual, read only,
   `scripts/nad-status-discover.sh`, 2026-11-06): the county check for the
   partly public states starts here. Saves the text of USDOT's NAD pages (live,
