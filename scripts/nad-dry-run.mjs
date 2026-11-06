@@ -75,7 +75,9 @@ if (cmd === 'keys') {
   const partlyByState = {};
   for (const m of partlyRows) {
     const s = String(m.row.state).toUpperCase(), b = partlyByState[s] || (partlyByState[s] = { matched: 0, applied: 0 });
-    b.matched++; if (applicable(m.status, m.row.state, m.county, publicCounties)) b.applied++;
+    b.matched++;
+    if (applicable(m.status, m.row.state, m.county, publicCounties)) b.applied++;
+    else { b.held = b.held || {}; const c = m.county || '(no single county)'; b.held[c] = (b.held[c] || 0) + 1; }
   }
   if (one('placements')) {
     const q = v => (/[",\n]/.test(String(v ?? '')) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v ?? ''));
@@ -111,8 +113,8 @@ if (cmd === 'keys') {
     '| Placement | Listings |', '|---|---|',
     ...Object.entries(placement).sort((a, b) => b[1] - a[1]).map(([k, v]) => `| ${k} | ${fmt(v)} |`), '',
     '## Partly public states by county check', '',
-    '| State | Matched | In public counties |', '|---|---|---|',
-    ...Object.entries(partlyByState).sort((a, b) => b[1].matched - a[1].matched).map(([s, v]) => `| ${s} | ${fmt(v.matched)} | ${fmt(v.applied)} |`), '',
+    '| State | Matched | In public counties | Held back, by NAD county |', '|---|---|---|---|',
+    ...Object.entries(partlyByState).sort((a, b) => b[1].matched - a[1].matched).map(([s, v]) => `| ${s} | ${fmt(v.matched)} | ${fmt(v.applied)} | ${Object.entries(v.held || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c, n]) => `${c} ${fmt(n)}`).join(', ')} |`), '',
     '## By state (most unplaced first)', '',
     '| State | Unplaced | Would be placed | Note |', '|---|---|---|---|',
     ...Object.entries(byState).sort((a, b) => b[1].rows - a[1].rows).map(([s, v]) => `| ${s} | ${fmt(v.rows)} | ${fmt(v.placed)} (${pct(v.placed, v.rows)}) | ${NOT_PUBLIC.has(s) ? 'not public domain: skipped' : PARTLY_PUBLIC.has(s) ? 'partly not public domain' : ''} |`), '',

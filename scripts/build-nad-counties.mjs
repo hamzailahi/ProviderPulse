@@ -24,7 +24,9 @@ export function buildCounties(lines) {
     const r = JSON.parse(line);
     const s = String(r.STATE_ABBR || '').toUpperCase();
     if (!PARTLY_PUBLIC.has(s)) continue;
-    const k = countyKey(r.NAME);
+    // The full name tells an independent city from the county of the same
+    // name (Maryland's "Baltimore" and "Baltimore city" share NAME).
+    const k = countyKey(r.NAMELSAD || r.NAME);
     if (!k) continue;
     const e = by.get(s + '|' + k) || by.set(s + '|' + k, { state: s, county: k, statuses: new Set() }).get(s + '|' + k);
     e.statuses.add(Number(r.CountyStatus));

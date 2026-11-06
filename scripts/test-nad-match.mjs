@@ -41,8 +41,11 @@ ok(!applicable('placed', 'MI', 'Wayne', new Set(['MI|WAYNE'])), 'a county list n
 const bc = buildCounties([
   JSON.stringify({ STATE_ABBR: 'SD', NAME: 'Minnehaha', CountyStatus: 10 }), JSON.stringify({ STATE_ABBR: 'SD', NAME: 'Minnehaha', CountyStatus: 40 }),
   JSON.stringify({ STATE_ABBR: 'ND', NAME: 'Cass', CountyStatus: 10 }), JSON.stringify({ STATE_ABBR: 'CO', NAME: 'Mesa', CountyStatus: 30 }),
-  JSON.stringify({ STATE_ABBR: 'TX', NAME: 'Harris', CountyStatus: 10 })]);
-ok(bc.length === 3 && bc.find(r => r.county === 'MINNEHAHA').verdict === 'not_public' && bc.find(r => r.county === 'CASS').verdict === 'public' && bc.find(r => r.county === 'MESA').verdict === 'not_in_nad', 'a county split between public and non-public pieces is not public; only partly public states are listed');
+  JSON.stringify({ STATE_ABBR: 'TX', NAME: 'Harris', CountyStatus: 10 }),
+  JSON.stringify({ STATE_ABBR: 'MD', NAME: 'Baltimore', NAMELSAD: 'Baltimore city', CountyStatus: 10 }),
+  JSON.stringify({ STATE_ABBR: 'MD', NAME: 'Baltimore', NAMELSAD: 'Baltimore County', CountyStatus: 10 })]);
+ok(bc.length === 5 && bc.some(r => r.county === 'BALTIMORE CITY' && r.verdict === 'public') && bc.some(r => r.county === 'BALTIMORE') && bc.find(r => r.county === 'MINNEHAHA').verdict === 'not_public' && bc.find(r => r.county === 'CASS').verdict === 'public' && bc.find(r => r.county === 'MESA').verdict === 'not_in_nad', 'a county split between public and non-public pieces is not public; only partly public states are listed; an independent city is its own entry');
+ok(applicable('placed', 'MD', 'Baltimore City', new Set(['MD|BALTIMORE CITY'])), 'a NAD point in Baltimore City matches the city entry');
 const m2 = matchOne(row, [c({ county: 'Adams County' }), c({ lat: '40.5861', county: 'ADAMS' })]);
 ok(m2.status === 'placed' && m2.county === 'ADAMS', 'a match carries its NAD county');
 ok(matchOne(row, [c({ county: 'Adams' }), c({ lat: '40.5861', county: 'Hall' })]).county === null, 'points that disagree on the county give none');

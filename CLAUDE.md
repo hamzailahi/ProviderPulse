@@ -1831,9 +1831,11 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   apply lost its connection 13 minutes in and wrote nothing. The rerun
   (2026-11-06) wrote 7,745 (1,338 organizations, 6,407 clinicians): IL 2,054,
   MN 1,870, MD 1,670 of 1,840, CO 1,098, KS 557, ND 408, SC 89, SD 1 of 61;
-  44 refused as far from their ZIP. Maryland's held-back rows include
-  Baltimore City, whose NAD county "Baltimore City" is not a key the status
-  layer's "Baltimore" gives, so it waits (conservative, not a decision).
+  44 refused as far from their ZIP. The status layer's `NAME` is
+  "Baltimore" for both Baltimore County and Baltimore city, so the list is
+  keyed on `NAMELSAD` ("Baltimore city" becomes `BALTIMORE CITY`; both are
+  10), which changed no other entry (2026-11-06, the user's go-ahead). The
+  report's county table now names the NAD counties it holds back per state.
 - **NAD status discovery** (`nad-status-discover.yml`, manual, read only,
   `scripts/nad-status-discover.sh`, 2026-11-06): the county check for the
   partly public states starts here. Saves the text of USDOT's NAD pages (live,
@@ -2188,7 +2190,7 @@ node scripts/test-provider-npis.mjs       # 39: one account, many NPIs: the regi
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
 node scripts/test-nppes-refresh.mjs       # 64: weekly NPPES refresh: file and API records, deactivation vs reactivation, add/update/remove plan, coordinates kept or cleared, limits, week selection and gaps, Census exact (or the same address written another way, one-word differences only) then Google street level only, an outage is not unplaced, end to end on a fake database, a rerun writes nothing
-node scripts/test-nad-match.mjs           # 25: the NAD matcher: house numbers, NAD street lines, the one-word rule, units as one place, far points a tie, non-public states left out, only wholly public states applied, partly public states only in listed public counties (split counties never), the dry run's keys, report and apply list on small files
+node scripts/test-nad-match.mjs           # 26: the NAD matcher: house numbers, NAD street lines, the one-word rule, units as one place, far points a tie, non-public states left out, only wholly public states applied, partly public states only in listed public counties (split counties never), the dry run's keys, report and apply list on small files
 node scripts/test-hospital-campuses.mjs   # 20: the reviewed hospital campus list: every row checked (hospital code, NPI check digit, US point, source, eligibility wording), the asset current, campuses only inside the search box, under their own id, the sheet looks up the billing NPI
 node scripts/test-address-fit.mjs         # 16: which geocoder matches a typed address accepts (house number, ZIP, distinctive words; gibberish and a neighbouring number refused)
 node scripts/test-admin.mjs               # 19: the admin account: only ADMIN_EMAILS, counts as staff, sign-in reports it, opens the review queue (staff and patients refused, the shared password still works), guest in the patient app, the switch on four pages
