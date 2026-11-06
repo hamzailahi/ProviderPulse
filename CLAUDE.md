@@ -1816,9 +1816,12 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   `scripts/nad-status-discover.sh`, 2026-11-06): the county check for the
   partly public states starts here. Saves the text of USDOT's NAD pages (live,
   else the Internet Archive's latest copy: transportation.gov answers 403 to
-  Actions), ArcGIS Online's items about the NAD, and the layers of any
-  status, coverage or public-domain service among them (fields, counts, and
-  rows when a layer holds at most 20,000) to `supabase/reference/nad-status/`.
+  Actions), ArcGIS Online's items about the NAD (`arcgis-items.tsv`), and
+  USDOT's own status layers: `NAD_County_Participation_Status` (owner
+  `jason.ford_usdot`) and the layers of the "NAD Coverage & Data
+  Currentness" web map (fields, counts, and rows when a layer holds at most
+  20,000). A keyword filter over the search results was tried first and
+  pulled in unrelated "public schools" layers, so the services are named to `supabase/reference/nad-status/`.
   `National_Address_Database_WFL1` is not a status map: three hexbin
   density layers and the address points (layer 3, millions of rows; the
   first run paged it until the job timed out), so only its fields are kept.
