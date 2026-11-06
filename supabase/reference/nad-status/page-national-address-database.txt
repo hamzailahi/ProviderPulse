@@ -1,0 +1,36 @@
+# https://www.transportation.gov/gis/national-address-database
+
+National Address Database | US Department of Transportation 
+ Please enable JavaScript to use this site. 
+ Skip to main content
+ Official websites use .gov A .gov website belongs to an official government organization in the United States. 
+ Secure .gov websites use HTTPS 
+ A lock ( Lock A locked padlock ) or https:// means you’ve safely connected to the .gov website. Share sensitive information only on official, secure websites.
+ In This Section 
+ Related Links 
+ Federal Geographic Data Committee – Address Subcommittee
+ Tags 
+ GIS
+ NAD
+ National Address Database 
+ Sign up for announcements at the bottom of this page to be notified when the release is available for download. 
+ The U.S. Department of Transportation (USDOT) and its partners from all levels of government recognize the need for a National Address Database (NAD).  Accurate and up-to-date addresses are critical to transportation safety and are a vital part of Next Generation 9-1-1. They are also essential for a broad range of government services, including mail delivery, permitting, and school siting. To meet this need, USDOT partners with address programs from state, local, and tribal governments to compile their authoritative data into the NAD. 
+ To learn more about addresses and the National Address Database please visit this StoryMap . 
+ The National Address Database (NAD) has been working from the same schema since 2017. That schema was loosely based on the National Emergency Number Association (NENA) Next Generation 9-1-1 address standard and the Federal Geographic Data Committee (FGDC) Address Data Content Standard. Since then, the Address Content Subgroup of the Address Subcommittee of the FGDC has compiled content requirements for the NAD, and the NAD has transitioned to a new schema to align with these content requirements. Information about the latest schema can be found from the link at the top left menu. 
+ If you represent a state or local government and would like to include your address points in the NAD, please contact us at nad@dot.gov . 
+ Click on the map to view in a new window 
+ USDOT National Address Database (NAD) Web Map 
+ Email Updates 
+ To sign up for updates, please enter your contact information below. 
+ Email Address   
+ Last updated: Thursday, October 2, 2025
+
+## links
+/gis/nad/nad-schema
+/gis/national-address-database/national-address-database-0
+/gis/national-address-database/national-address-database-nad-disclaimer
+/tags/nad
+http://usdot.maps.arcgis.com/apps/instant/portfolio/index.html?appid=59f7e4fb71994d13b61f424e21a6cffe
+https://storymaps.arcgis.com/stories/9490f773f65d4c6aa8b79facc528a661
+https://www.transportation.gov/gis/national-address-database
+mailto:nad@dot.gov
