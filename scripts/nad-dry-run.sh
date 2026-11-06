@@ -103,7 +103,20 @@ select tbl || '=' || count(*) from applied group by tbl order by tbl;
 commit;
 SQL
 cat "$WORK/written.txt"
-cp "$WORK/applied.csv" supabase/reference/nad-applied.csv
+# Add this run's rows to the record (2026-11-06: the second apply replaced the
+# file and the first run's rows had to be restored from git history).
+python3 - "$WORK/applied.csv" supabase/reference/nad-applied.csv "$(date -u +%F)" <<'PY'
+import csv, os, sys
+new, rec, day = sys.argv[1], sys.argv[2], sys.argv[3]
+rows = list(csv.DictReader(open(rec))) if os.path.exists(rec) else []
+have = {(r['tbl'], r['key']) for r in rows}
+for r in csv.DictReader(open(new)):
+    if (r['tbl'], r['key']) not in have:
+        r['applied_on'] = day; rows.append(r); have.add((r['tbl'], r['key']))
+rows.sort(key=lambda r: (r['tbl'], r['key']))
+w = csv.DictWriter(open(rec, 'w', newline=''), fieldnames=['tbl', 'key', 'lat', 'lng', 'applied_on'], lineterminator='\n', extrasaction='ignore')
+w.writeheader(); w.writerows(rows)
+PY
 total=$(($(wc -l < "$WORK/applied.csv") - 1))
 far=$(sed -n 's/^far_from_zip=//p' "$WORK/written.txt")
 {
@@ -115,7 +128,7 @@ far=$(sed -n 's/^far_from_zip=//p' "$WORK/written.txt")
   echo "- Left out, more than $FAR_MILES miles from the ZIP's centre: ${far:-0}"
   echo "- Left out, the row was pinned or its address changed since the export: $((n - ${far:-0} - total))"
   grep -v '^far_from_zip=' "$WORK/written.txt" | sed 's/^\(.*\)=\(.*\)$/- Written to \1: \2/'
-  echo "- Rows written in all: **$total** (listed in nad-applied.csv with the point written)"
+  echo "- Rows written in all: **$total** (added to nad-applied.csv with the point written and the date)"
   echo
   echo "Source: U.S. Department of Transportation, National Address Database ($(basename "$ENTRY"))."
 } > supabase/reference/nad-apply.md

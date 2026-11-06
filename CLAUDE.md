@@ -1809,8 +1809,9 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   the exported ones, and only when the point is within `FAR_MILES` (25) of
   the ZIP's `cdc_places` centre; at most `MAX_WRITE` (60,000). Secondary rows
   get `geocode_precision = 'nad'` (the other two tables have no provenance
-  column), so `supabase/reference/nad-applied.csv` (table, key, point) is the
-  record of what NAD placed; counts in `nad-apply.md`. The SQL was checked on
+  column), so `supabase/reference/nad-applied.csv` (table, key, point, date
+  applied; each run adds to it, never replaces it) is the record of what NAD
+  placed; counts in `nad-apply.md`. The SQL was checked on
   a local Postgres 16.
   First apply (2026-11-05): 36,471 written (30,604 clinicians, 5,867
   organizations), 42 refused as far from their ZIP. **County check
@@ -1827,7 +1828,12 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   10 in that layer though USDOT's state note flags it; it stays in
   `NOT_PUBLIC` until the user decides. The 8.5 GB download resumes after a
   reset (`curl -C -`, six tries, then `unzip -t`); the first county-check
-  apply lost its connection 13 minutes in and wrote nothing.
+  apply lost its connection 13 minutes in and wrote nothing. The rerun
+  (2026-11-06) wrote 7,745 (1,338 organizations, 6,407 clinicians): IL 2,054,
+  MN 1,870, MD 1,670 of 1,840, CO 1,098, KS 557, ND 408, SC 89, SD 1 of 61;
+  44 refused as far from their ZIP. Maryland's held-back rows include
+  Baltimore City, whose NAD county "Baltimore City" is not a key the status
+  layer's "Baltimore" gives, so it waits (conservative, not a decision).
 - **NAD status discovery** (`nad-status-discover.yml`, manual, read only,
   `scripts/nad-status-discover.sh`, 2026-11-06): the county check for the
   partly public states starts here. Saves the text of USDOT's NAD pages (live,

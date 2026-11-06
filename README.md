@@ -652,7 +652,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-06
 
-- Address points from the National Address Database can now also be used in the partly public states, county by county: only counties the U.S. Department of Transportation's county status map shows wholly in the database with no non-public piece (all of North Dakota, most of Illinois, Kansas, Maryland, Colorado and Minnesota, two South Carolina counties, one South Dakota county). Counties marked not public domain, or split between the two, stay out.
+- Address points from the National Address Database can now also be used in the partly public states, county by county: only counties the U.S. Department of Transportation's county status map shows wholly in the database with no non-public piece (all of North Dakota, most of Illinois, Kansas, Maryland, Colorado and Minnesota, two South Carolina counties, one South Dakota county). Counties marked not public domain, or split between the two, stay out. The first run placed 7,745 more listings.
 - A new read-only job, NAD status discovery, saves what the U.S. Department of Transportation publishes about which parts of its National Address Database are public domain, so the partly public states can be checked county by county before any of their address points are used.
 
 ### 2026-11-05
