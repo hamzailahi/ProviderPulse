@@ -1,0 +1,33 @@
+name: NAD status discovery
+
+# Manual, read only. Saves what USDOT publishes about which parts of the
+# National Address Database are public domain (its NAD pages and the status
+# map's layers, attributes only) to supabase/reference/nad-status/, for the
+# county check of the partly public states before an NAD apply there.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  discover:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: Discover
+        run: bash scripts/nad-status-discover.sh
+      - name: Commit
+        run: |
+          git add supabase/reference/nad-status
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "NAD status discovery $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

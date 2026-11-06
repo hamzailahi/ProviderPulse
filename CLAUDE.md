@@ -1812,6 +1812,13 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   column), so `supabase/reference/nad-applied.csv` (table, key, point) is the
   record of what NAD placed; counts in `nad-apply.md`. The SQL was checked on
   a local Postgres 16.
+- **NAD status discovery** (`nad-status-discover.yml`, manual, read only,
+  `scripts/nad-status-discover.sh`, 2026-11-06): the county check for the
+  partly public states starts here. Saves the text of USDOT's NAD pages and
+  every layer of its NAD status map (ArcGIS FeatureServer
+  `National_Address_Database_WFL1`, attributes only, paged by 1,000) to
+  `supabase/reference/nad-status/`. The dev container cannot reach
+  transportation.gov or arcgis.com, so it runs in Actions.
 - **Hospital campus candidates** (`hospital-campus-candidates.yml`, manual, read
   only, `scripts/hospital-campus-candidates.sh`): one query lists street
   addresses where an organization named hospital or medical center is listed

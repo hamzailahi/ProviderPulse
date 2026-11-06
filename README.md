@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-05. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-06. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -649,6 +649,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-06
+
+- A new read-only job, NAD status discovery, saves what the U.S. Department of Transportation publishes about which parts of its National Address Database are public domain, so the partly public states can be checked county by county before any of their address points are used.
 
 ### 2026-11-05
 
