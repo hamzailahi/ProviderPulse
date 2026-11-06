@@ -43,7 +43,15 @@ echo "unplaced: $(($(wc -l < "$WORK/unplaced.csv") - 1)); sample: $(($(wc -l < "
 node scripts/nad-dry-run.mjs keys --rows "$WORK/unplaced.csv" --rows "$WORK/sample.csv" --out "$WORK/keys.csv"
 
 echo "== Downloading the NAD text file"
-curl -sSL --fail --retry 3 --retry-delay 20 -o "$WORK/nad.zip" "$NAD_URL" || fail "NAD download failed: $NAD_URL"
+# 8.5 GB: a reset mid-transfer (2026-11-06, 13 minutes in) resumes from where
+# it stopped (-C -) instead of failing the run; six tries in all.
+rm -f "$WORK/nad.zip"; ok=""
+for try in 1 2 3 4 5 6; do
+  if curl -sSL --fail --retry 3 --retry-delay 20 --retry-all-errors -C - -o "$WORK/nad.zip" "$NAD_URL"; then ok=1; break; fi
+  echo "download try $try stopped at $(stat -c %s "$WORK/nad.zip" 2>/dev/null || echo 0) bytes; resuming in 30s"; sleep 30
+done
+[ -n "$ok" ] || fail "NAD download failed: $NAD_URL"
+unzip -tq "$WORK/nad.zip" > /dev/null || fail "the NAD zip is damaged after resuming"
 ls -l "$WORK/nad.zip"
 unzip -l "$WORK/nad.zip" | tail -n +1 | head -20
 ENTRY=$(unzip -Z1 "$WORK/nad.zip" | grep -iE '\.(txt|csv)$' | while read -r f; do printf '%s\t%s\n' "$(unzip -Zl "$WORK/nad.zip" "$f" | awk 'NR==1{print $4}')" "$f"; done | sort -n | tail -1 | cut -f2)

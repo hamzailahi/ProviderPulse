@@ -1825,7 +1825,9 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   among them). Result: CO 45 public of 64, IL 100 of 102, KS 81 of 105, MD
   22 of 23, MN 53 of 87, ND 53 of 53, SC 2 of 46, SD 1 of 66. Oregon is all
   10 in that layer though USDOT's state note flags it; it stays in
-  `NOT_PUBLIC` until the user decides.
+  `NOT_PUBLIC` until the user decides. The 8.5 GB download resumes after a
+  reset (`curl -C -`, six tries, then `unzip -t`); the first county-check
+  apply lost its connection 13 minutes in and wrote nothing.
 - **NAD status discovery** (`nad-status-discover.yml`, manual, read only,
   `scripts/nad-status-discover.sh`, 2026-11-06): the county check for the
   partly public states starts here. Saves the text of USDOT's NAD pages (live,
