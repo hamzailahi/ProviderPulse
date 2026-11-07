@@ -1841,6 +1841,30 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   (Minnehaha 28, Lincoln 25) and Union (7), plus the same 44 points each run
   refuses as more than 25 miles from their ZIP. After it, 99,425 listings
   have no pin; the user is taking the rest to another geocoder.
+- **ArcGIS points apply** (`arcgis-apply.yml`, manual, `scripts/arcgis-check.py`,
+  `scripts/arcgis-apply.sh`, 2026-11-07): the user geocoded the 81,033
+  unplaced listings that have a house number (no military mail codes) with
+  ArcGIS's **keyless** World Geocoding Service on their own machine and chose
+  to load the results **without an Esri storage licence** (Esri's terms allow
+  storing only `forStorage=true` requests made with a key; the user was told
+  and decided). Claude kept only `PointAddress`, `Subaddress` and
+  `StreetAddress` matches with score 90+ whose ArcGIS `Postal` equals the
+  listing's ZIP and that are not 25+ miles from the rest of their ZIP: 71,085
+  rows (60,105 clinicians, 10,966 organizations, 14 secondary). Points shared
+  by many listings were checked: every one holds a single house number
+  (hospitals and medical buildings). The rows travel as
+  `arcgis-load.csv.gz` on a `tmp/` branch (delete after use with
+  `tmp-branch-cleanup.yml`). `mode: check` (default, read only) reports
+  whether sampled points lie inside the listing's 2020 ZCTA (Census
+  geographies by coordinates), their distance to the Census geocoder's point
+  for the same address, and every row's distance to its ZIP's `cdc_places`
+  centre, to `supabase/reference/arcgis-check.md`. `dry_run` / `apply` write,
+  in one transaction, only rows whose latitude and longitude are both null
+  and whose address and ZIP are unchanged, within `FAR_MILES` (25) of the
+  ZIP's centre (secondary rows get `geocode_precision = 'arcgis'`, matched on
+  parent NPI, address with `address2`, and ZIP). The record
+  `supabase/reference/arcgis-applied.csv` names rows and match types only,
+  never coordinates; counts in `arcgis-apply.md`.
 - **NAD status discovery** (`nad-status-discover.yml`, manual, read only,
   `scripts/nad-status-discover.sh`, 2026-11-06): the county check for the
   partly public states starts here. Saves the text of USDOT's NAD pages (live,

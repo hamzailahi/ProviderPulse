@@ -1,0 +1,86 @@
+name: ArcGIS points apply
+
+# Manual. Writes the user's own ArcGIS geocodes (keyless, loaded by the
+# user's decision, 2026-11-07) to listings still without a pin
+# (scripts/arcgis-apply.sh). The points come from a tmp/ branch, which is
+# deleted afterwards with tmp-branch-cleanup.yml; only the list of rows
+# written (no coordinates) and the counts are committed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      data_branch:
+        description: 'tmp/ branch holding arcgis-load.csv.gz'
+        required: true
+        default: 'tmp/arcgis-load'
+      mode:
+        description: 'check (accuracy, read only), dry_run (rolls back) or apply'
+        type: choice
+        options: [check, dry_run, apply]
+        default: check
+
+permissions:
+  contents: write
+
+concurrency:
+  group: arcgis-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "::error::Add the repository secret SUPABASE_DB_URL."; exit 1; fi
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Accuracy check (read only)
+        if: inputs.mode == 'check'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DATA_BRANCH: ${{ inputs.data_branch }}
+          W: ${{ runner.temp }}
+        run: |
+          case "$DATA_BRANCH" in tmp/*) ;; *) echo "data_branch must start with tmp/"; exit 1;; esac
+          git fetch -q origin "$DATA_BRANCH"
+          git show FETCH_HEAD:arcgis-load.csv.gz | gunzip > "$W/load.csv"
+          PGOPTIONS='-c default_transaction_read_only=on' psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X \
+            -c "\\copy (select zip, avg(lat)::float8 as clat, avg(lon)::float8 as clon from public.cdc_places where measureid = 'DENTAL' and lat is not null group by zip) to '$W/zc.csv' with (format csv, header true)"
+          python3 scripts/arcgis-check.py --load "$W/load.csv" --centroids "$W/zc.csv" --out supabase/reference/arcgis-check.md
+
+      - name: Apply
+        if: inputs.mode != 'check'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DATA_BRANCH: ${{ inputs.data_branch }}
+          MODE: ${{ inputs.mode }}
+          WORK: ${{ runner.temp }}
+        run: bash scripts/arcgis-apply.sh
+      - name: Summary
+        if: always()
+        run: cat supabase/reference/arcgis-check.md supabase/reference/arcgis-apply.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - name: Commit the record
+        if: success()
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          for f in arcgis-apply.md arcgis-applied.csv arcgis-check.md; do [ -f "supabase/reference/$f" ] && git add "supabase/reference/$f"; done
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "ArcGIS points $MODE $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

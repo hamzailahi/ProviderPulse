@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-06. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-07. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -649,6 +649,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-07
+
+- A new job, ArcGIS points apply, checks and then loads map pins the operator geocoded with ArcGIS on their own machine for listings no free source could place. It first runs a read-only accuracy check (is each point inside its ZIP, how far from the Census's point for the same address, how far from the ZIP centre), then can write only address-level matches to listings that still have no pin. The operator chose to load these from ArcGIS's keyless service without an Esri storage licence. Only the list of rows written, not the coordinates, is kept in the repository.
 
 ### 2026-11-06
 
