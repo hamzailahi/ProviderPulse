@@ -1864,7 +1864,18 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   ZIP's centre (secondary rows get `geocode_precision = 'arcgis'`, matched on
   parent NPI, address with `address2`, and ZIP). The record
   `supabase/reference/arcgis-applied.csv` names rows and match types only,
-  never coordinates; counts in `arcgis-apply.md`.
+  never coordinates; counts in `arcgis-apply.md`. Check (2026-11-07):
+  inside the listing's ZCTA for 91.8% of sampled Subaddress, 87.8%
+  PointAddress and 73.8% StreetAddress points (most building-level misses
+  are institutions with their own ZIP, such as Mayo's 55905, that the Census
+  maps into a neighbour); a median 99 m from the Census's fuzzy match for the
+  same address; median 1.6 miles from the ZIP centre. By the user's choice
+  only PointAddress and Subaddress were loaded (2026-11-08): 66,371 written
+  (56,144 clinicians, 10,222 organizations, 5 secondary), 109 refused as more
+  than 25 miles from the ZIP centre. The 14,662 of the user's 81,033 not
+  loaded (5,254 ZIP, street, landmark or town matches, 5,247 StreetAddress,
+  3,837 in another ZIP, 133 score under 90, 120 far, 71 no match) went back
+  to the user as a CSV with reasons. About 33,000 listings still have no pin.
 - **NAD status discovery** (`nad-status-discover.yml`, manual, read only,
   `scripts/nad-status-discover.sh`, 2026-11-06): the county check for the
   partly public states starts here. Saves the text of USDOT's NAD pages (live,

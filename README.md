@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-07. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-08. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -649,6 +649,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-08
+
+- 66,371 more listings now have a map pin (56,144 clinicians, 10,222 organizations, 5 second practice addresses) from the operator's own ArcGIS run, loaded by the operator's decision without an Esri storage licence. Only building-level matches went in (the building itself or a suite in it, score 90 or more, in the listing's own ZIP, within 25 miles of the ZIP's centre); street-level estimates and ZIP or town centres were left out and handed back for review. About 33,000 listings still have no pin.
 
 ### 2026-11-07
 
