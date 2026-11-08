@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ### 2026-11-08
 
 - 66,371 more listings now have a map pin (56,144 clinicians, 10,222 organizations, 5 second practice addresses) from the operator's own ArcGIS run, loaded by the operator's decision without an Esri storage licence. Only building-level matches went in (the building itself or a suite in it, score 90 or more, in the listing's own ZIP, within 25 miles of the ZIP's centre); street-level estimates and ZIP or town centres were left out and handed back for review. About 33,000 listings still have no pin.
+- A stricter cut for those ArcGIS pins, at the operator's request (only points that are exactly the place): a pin stays only when ArcGIS scored the match 100 and the point lies inside the full-resolution 2020 Census area of the listing's own ZIP. Pins that fail go back to no pin and to the operator's review list (`arcgis-revert.sh`, workflow modes `strict_dry_run` and `strict_apply`; record of what was taken back in `supabase/reference/arcgis-reverted.csv`, no coordinates).
 
 ### 2026-11-07
 

@@ -14,9 +14,9 @@ on:
         required: true
         default: 'tmp/arcgis-load'
       mode:
-        description: 'check (accuracy, read only), dry_run (rolls back) or apply'
+        description: 'check (accuracy, read only), dry_run (rolls back), apply, or strict_dry_run / strict_apply (take back loaded points that fail the strict cut; data_branch holds arcgis-loaded.csv.gz)'
         type: choice
-        options: [check, dry_run, apply]
+        options: [check, dry_run, apply, strict_dry_run, strict_apply]
         default: check
 
 permissions:
@@ -62,22 +62,32 @@ jobs:
           python3 scripts/arcgis-check.py --load "$W/load.csv" --centroids "$W/zc.csv" --out supabase/reference/arcgis-check.md
 
       - name: Apply
-        if: inputs.mode != 'check'
+        if: inputs.mode == 'dry_run' || inputs.mode == 'apply'
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           DATA_BRANCH: ${{ inputs.data_branch }}
           MODE: ${{ inputs.mode }}
           WORK: ${{ runner.temp }}
         run: bash scripts/arcgis-apply.sh
+      - name: Strict cut (score 100, inside the listing's own ZIP area)
+        if: startsWith(inputs.mode, 'strict_')
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DATA_BRANCH: ${{ inputs.data_branch }}
+          MODE: ${{ inputs.mode == 'strict_apply' && 'apply' || 'dry_run' }}
+          WORK: ${{ runner.temp }}
+        run: |
+          python3 -m pip install -q pyshp shapely
+          bash scripts/arcgis-revert.sh
       - name: Summary
         if: always()
-        run: cat supabase/reference/arcgis-check.md supabase/reference/arcgis-apply.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+        run: cat supabase/reference/arcgis-check.md supabase/reference/arcgis-apply.md supabase/reference/arcgis-revert.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
       - name: Commit the record
         if: success()
         env:
           MODE: ${{ inputs.mode }}
         run: |
-          for f in arcgis-apply.md arcgis-applied.csv arcgis-check.md; do [ -f "supabase/reference/$f" ] && git add "supabase/reference/$f"; done
+          for f in arcgis-apply.md arcgis-applied.csv arcgis-check.md arcgis-revert.md arcgis-reverted.csv; do [ -f "supabase/reference/$f" ] && git add "supabase/reference/$f"; done
           if git diff --cached --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
