@@ -959,6 +959,38 @@ CREATE TABLE public.medicare_hospitals (
 
 
 --
+-- Name: medicare_procedures_zip; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.medicare_procedures_zip (
+    zip text NOT NULL,
+    specialty text NOT NULL,
+    hcpcs_cd text NOT NULL,
+    hcpcs_desc text,
+    row_count integer NOT NULL,
+    billers integer NOT NULL,
+    tot_benes double precision,
+    tot_srvcs double precision,
+    sum_avg_charge double precision,
+    sum_avg_allowed double precision,
+    sum_avg_paid double precision,
+    allowed_x_srvcs double precision,
+    paid_x_srvcs double precision,
+    srvcs_i double precision,
+    paid_x_srvcs_i double precision,
+    srvcs_o double precision,
+    paid_x_srvcs_o double precision
+);
+
+
+--
+-- Name: TABLE medicare_procedures_zip; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.medicare_procedures_zip IS 'cms_procedures_full summed per ZIP x specialty x code (procedure-summary.yml); public read';
+
+
+--
 -- Name: npi_activity; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1554,6 +1586,14 @@ ALTER TABLE ONLY public.medicare_hospital_procedures
 
 ALTER TABLE ONLY public.medicare_hospitals
     ADD CONSTRAINT medicare_hospitals_pkey PRIMARY KEY (ccn);
+
+
+--
+-- Name: medicare_procedures_zip medicare_procedures_zip_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.medicare_procedures_zip
+    ADD CONSTRAINT medicare_procedures_zip_pkey PRIMARY KEY (zip, specialty, hcpcs_cd);
 
 
 --
@@ -2542,6 +2582,19 @@ CREATE POLICY "medicare_hospitals public read" ON public.medicare_hospitals FOR 
 
 
 --
+-- Name: medicare_procedures_zip; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.medicare_procedures_zip ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: medicare_procedures_zip medicare_procedures_zip_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY medicare_procedures_zip_read ON public.medicare_procedures_zip FOR SELECT TO authenticated, anon USING (true);
+
+
+--
 -- Name: npi_activity; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -3179,6 +3232,15 @@ GRANT ALL ON TABLE public.medicare_hospital_procedures TO service_role;
 GRANT ALL ON TABLE public.medicare_hospitals TO anon;
 GRANT ALL ON TABLE public.medicare_hospitals TO authenticated;
 GRANT ALL ON TABLE public.medicare_hospitals TO service_role;
+
+
+--
+-- Name: TABLE medicare_procedures_zip; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.medicare_procedures_zip TO service_role;
+GRANT SELECT ON TABLE public.medicare_procedures_zip TO anon;
+GRANT SELECT ON TABLE public.medicare_procedures_zip TO authenticated;
 
 
 --
