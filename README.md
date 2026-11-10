@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-08. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-10. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -649,6 +649,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-10
+
+- A second check for the ArcGIS pins taken back because their ZIP has no Census area (single-institution ZIPs such as UCSF's 94143 and UConn Health's 06030): a pin goes back on the map only when another listing at the same street address already has a pin from another source, a point no other address shares, and the ArcGIS point is within 150 m of it (`arcgis-anchor.sh`, workflow modes `anchor_dry_run` and `anchor_apply`).
 
 ### 2026-11-08
 

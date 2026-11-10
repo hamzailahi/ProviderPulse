@@ -88,7 +88,7 @@ const DIRS = { N: 'N', S: 'S', E: 'E', W: 'W', NE: 'NE', NW: 'NW', SE: 'SE', SW:
 const TYPES = { STREET: 'ST', ROAD: 'RD', AVENUE: 'AVE', AV: 'AVE', DRIVE: 'DR', BOULEVARD: 'BLVD', LANE: 'LN', COURT: 'CT', PLACE: 'PL',
   PARKWAY: 'PKWY', HIGHWAY: 'HWY', CIRCLE: 'CIR', TERRACE: 'TER', TRAIL: 'TRL', SQUARE: 'SQ', PLAZA: 'PLZ' };
 const STATES = new Set('AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR'.split(' '));
-function streetParts(street, state) {
+export function streetParts(street, state) {
   let t = String(street || '').toUpperCase().replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim();
   // State routes, every spelling to "RT n": FL-54, SR 54, STATE ROAD 54,
   // STATE HWY 7, STATE RTE 37, ROUTE 37, RT 37. A bare "HWY 7" is not

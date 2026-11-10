@@ -13,7 +13,8 @@
 # The record kept in git (supabase/reference/arcgis-applied.csv) names the
 # rows written and their match type, never the coordinates.
 #
-# Env: SUPABASE_DB_URL, DATA_BRANCH (tmp/...), MODE (dry_run | apply), FAR_MILES (25)
+# Env: SUPABASE_DB_URL, DATA_BRANCH (tmp/...), MODE (dry_run | apply), FAR_MILES (25),
+# LOAD_FILE (a local list instead of the branch), REPORT (where the counts go)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 : "${SUPABASE_DB_URL:?Set SUPABASE_DB_URL}"; : "${DATA_BRANCH:?Set DATA_BRANCH}"
@@ -21,10 +22,11 @@ MODE="${MODE:-dry_run}"; FAR_MILES="${FAR_MILES:-25}"
 case "$MODE" in dry_run|apply) ;; *) echo "MODE must be dry_run or apply" >&2; exit 2;; esac
 case "$DATA_BRANCH" in tmp/*) ;; *) echo "DATA_BRANCH must start with tmp/" >&2; exit 2;; esac
 WORK="${WORK:-$(mktemp -d)}"
-git fetch -q origin "$DATA_BRANCH"
-git show FETCH_HEAD:arcgis-load.csv.gz | gunzip > "$WORK/load.csv"
+REPORT="${REPORT:-supabase/reference/arcgis-apply.md}"
+if [ -n "${LOAD_FILE:-}" ]; then cp "$LOAD_FILE" "$WORK/load.csv"   # arcgis-anchor.sh hands its own list
+else git fetch -q origin "$DATA_BRANCH"; git show FETCH_HEAD:arcgis-load.csv.gz | gunzip > "$WORK/load.csv"; fi
 n=$(($(wc -l < "$WORK/load.csv") - 1)); echo "rows offered: $n"
-[ "$n" -gt 0 ] && [ "$n" -le 100000 ] || { echo "row count $n out of range" >&2; exit 1; }
+[ "$n" -ge 0 ] && [ "$n" -le 100000 ] || { echo "row count $n out of range" >&2; exit 1; }
 END=$([ "$MODE" = apply ] && echo commit || echo rollback)
 psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X -At > "$WORK/out.txt" <<SQL
 begin;
@@ -66,8 +68,8 @@ total=$(($(wc -l < "$WORK/done.csv") - 1)); far=$(sed -n 's/^far_from_zip=//p' "
   echo "- Left out, pinned or address changed since the export: $((n - ${far:-0} - total))"
   grep -v '^far_from_zip=' "$WORK/out.txt" | sed 's/^/- /'
   echo "- Rows $([ "$MODE" = apply ] && echo written || echo 'that would be written'): **$total**"
-} > supabase/reference/arcgis-apply.md
-cat supabase/reference/arcgis-apply.md
+} > "$REPORT"
+cat "$REPORT"
 if [ "$MODE" = apply ]; then
   python3 - "$WORK/done.csv" supabase/reference/arcgis-applied.csv "$(date -u +%F)" <<'PY'
 import csv, os, sys
