@@ -83,7 +83,7 @@ function refresh() {
     if (!d || !d.access_token) return false;
     // Supabase rotates the refresh token: always store the new pair.
     session = { access_token: d.access_token, refresh_token: d.refresh_token, role: d.role || session.role,
-                staff: !!d.staff, admin: !!d.admin,
+                staff: !!d.staff, admin: !!d.admin, viewer: !!d.viewer,
                 expiresAt: Date.now() + (d.expires_in || 3600) * 1000 };
     try { store.setItem(SESSION_KEY, JSON.stringify(session)); } catch (e) {}
     return true;
@@ -228,7 +228,7 @@ function render() {
   clear(main);
   if (S.noListing) { main.appendChild(noListingEl()); return; }
   if (S.demo) main.appendChild(h('div', { class: 'banner warn demo-banner', role: 'note' },
-    'Demo listing, read only. You are signed in as the admin; this fictional practice lets you look around. Nothing you change is saved.'));
+    'Demo listing, read only. You are signed in as ' + (session && session.viewer ? 'a viewer' : 'the admin') + '; this fictional practice lets you look around. Nothing you change is saved.'));
   main.appendChild(VIEWS[r]());
   main.focus({ preventScroll: true });
   window.scrollTo(0, 0);
@@ -249,12 +249,12 @@ function pageHead(title, sub, right) {
 function loadProfile() {
   return api('/profile').then(function (d) {
     if (d.role !== 'provider' || !d.profile) {
-      if (session && session.admin) { S.demo = true; S.profile = DEMO_PROFILE; S.insurance = ['Medicare', 'TennCare', 'BlueCross BlueShield of Tennessee']; return; }
+      if (session && (session.admin || session.viewer)) { S.demo = true; S.profile = DEMO_PROFILE; S.insurance = ['Medicare', 'TennCare', 'BlueCross BlueShield of Tennessee']; return; }
       S.noListing = true; return;
     }
     S.profile = d.profile; S.insurance = (d.insurance || []).map(function (i) { return i.payer_name; });
   }).catch(function (e) {
-    if (session && session.admin) { S.demo = true; S.profile = DEMO_PROFILE; S.insurance = ['Medicare']; return; }
+    if (session && (session.admin || session.viewer)) { S.demo = true; S.profile = DEMO_PROFILE; S.insurance = ['Medicare']; return; }
     if (e.status === 403) S.noListing = true; else throw e;
   });
 }

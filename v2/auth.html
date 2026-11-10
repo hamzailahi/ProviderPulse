@@ -319,6 +319,7 @@ $('formSignin').onsubmit = async e => {
         role: data.role,
         staff: !!data.staff,
         admin: !!data.admin,
+        viewer: !!data.viewer,
         expiresAt: Date.now() + (data.expires_in || 3600) * 1000
       });
       (stay ? localStorage : sessionStorage).setItem(SESSION_KEY, payload);

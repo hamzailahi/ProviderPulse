@@ -47,8 +47,18 @@ function inList(value, user) {
 function isAdmin(env, user) {
   return inList(env.ADMIN_EMAILS, user);
 }
+// Viewer accounts (2026-11-10, the user's choice): marketing and partner
+// logins, one per person, listed in VIEWER_EMAILS and created by the operator
+// in Supabase (never a sign-up path). A viewer counts as staff, so it opens
+// the market dashboard and its Ask AI, and gets the same "View as" switch and
+// read-only portal demo as the admin, but never the review queue (isAdmin is
+// not true for it). An account with no listing cannot write anything: the
+// listing endpoints need a provider_profiles row of its own.
+function isViewer(env, user) {
+  return inList(env.VIEWER_EMAILS, user);
+}
 function isStaff(env, user) {
-  return inList(env.STAFF_EMAILS, user) || isAdmin(env, user);
+  return inList(env.STAFF_EMAILS, user) || isAdmin(env, user) || isViewer(env, user);
 }
 
 // True when this user owns a provider listing. Checked against
@@ -74,4 +84,4 @@ async function isProvider(env, user) {
   }
 }
 
-module.exports = { getUser, isProvider, isStaff, isAdmin };
+module.exports = { getUser, isProvider, isStaff, isAdmin, isViewer };

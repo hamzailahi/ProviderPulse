@@ -4,6 +4,8 @@
 // auth-login and auth-refresh report as `admin`). It only moves between
 // pages. Every page's server checks still decide what the account may see or
 // do, so a session edited to claim `admin` gains a menu and nothing else.
+// Viewer accounts (VIEWER_EMAILS, 2026-11-10) get the same switch without
+// the review queue.
 (function () {
   var VIEWS = [
     ['/', 'Patient app'],
@@ -13,7 +15,8 @@
   ];
   var s = null;
   try { s = JSON.parse(sessionStorage.getItem('pp.session.v1') || localStorage.getItem('pp.session.v1') || 'null'); } catch (e) { s = null; }
-  if (!s || !s.admin || !s.access_token) return;
+  if (!s || !(s.admin || s.viewer) || !s.access_token) return;
+  if (!s.admin) VIEWS = VIEWS.filter(function (v) { return v[0] !== '/admin-review.html'; });
 
   var path = location.pathname.replace(/\/+$/, '') || '/';
   var here = path === '/' || /\/app\.html$/.test(path) ? '/'
@@ -42,7 +45,7 @@
   document.head.appendChild(css);
 
   var box = el('div', { id: 'pp-admin' });
-  var btn = el('button', { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'pp-admin-menu' }, 'Admin: view as');
+  var btn = el('button', { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'pp-admin-menu' }, s.admin ? 'Admin: view as' : 'Viewer: view as');
   var menu = el('div', { class: 'menu', id: 'pp-admin-menu', hidden: '' });
   menu.appendChild(el('p', {}, 'View as'));
   VIEWS.forEach(function (v) {

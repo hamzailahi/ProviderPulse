@@ -491,6 +491,7 @@ hand, in the Supabase SQL editor. The latest is
 | `ANTHROPIC_API_KEY` | care navigator, market assistant (including reports), audit narration, briefings. This is the project's own Anthropic API account, separate from any personal account, so all AI usage bills there |
 | `GOOGLE_GEOCODING_KEY` | primary geocoder; without it, geocoding falls back to Nominatim. |
 | `ADMIN_EMAILS` | the operator's own account (create it in Supabase: Authentication, Add user). It counts as staff, gets a "View as" switch between the patient app, portal, dashboard and review queue, and opens the review queue without the shared password |
+| `VIEWER_EMAILS` | comma-separated viewer accounts for marketing and partners, one email per person (create each in Supabase: Authentication, Add user). A viewer sees the patient app as a guest, the portal's read-only demo listing and the market dashboard with Ask AI, through the same "View as" switch as the admin, but never the review queue. Remove an email to cut that person off (they lose access when their session next refreshes, within an hour) |
 | `STAFF_EMAILS` | comma-separated emails allowed into the dashboard for demos without a provider profile |
 | `ADMIN_PASSWORD` | the OIG review queue (`admin-review.html`) |
 | `AUDIT_ADMIN_KEY` | the Directory Accuracy audit engine (`audit-run`, `audit-narrate`, and `report-generate`, which now only renders audits) |
@@ -578,7 +579,7 @@ node scripts/test-catchment.mjs           # the market score's area: every ZIP w
 node scripts/test-provider-npis.mjs        # one account, many NPIs: checks, review, own rows only, publishing and booking
 node scripts/test-self-check.mjs           # a provider's own listing check: their NPI only, nothing written
 node scripts/test-listing-report.mjs       # report a wrong listing: only the NPI and issue are stored, repeats throttled
-node scripts/test-admin.mjs                 # the admin account and its view switch
+node scripts/test-admin.mjs                 # the admin and viewer accounts and their view switch
 node scripts/test-address-fit.mjs          # typed addresses only match places that fit what was typed
 node scripts/test-nad-match.mjs            # the National Address Database matcher: same number and street only, far-apart points refused, non-public states left out
 node scripts/test-hospital-campuses.mjs     # the reviewed hospital campus list and how patient search shows it
@@ -652,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-10
 
+- Viewer accounts for marketing and partners: one login per person, listed in the new `VIEWER_EMAILS` Netlify setting and created by the operator in Supabase. A viewer gets the admin's "View as" switch between the patient app (as a guest), the provider portal's read-only demo listing and the market dashboard (Ask AI and Reports included), without the OIG review queue, and can save nothing.
 - A second check for the ArcGIS pins taken back because their ZIP has no Census area (single-institution ZIPs such as UCSF's 94143 and UConn Health's 06030): a pin goes back on the map only when another listing at the same street address already has a pin from another source, a point no other address shares, and the ArcGIS point is within 150 m of it (`arcgis-anchor.sh`, workflow modes `anchor_dry_run` and `anchor_apply`).
 
 ### 2026-11-08

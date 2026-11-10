@@ -49,6 +49,7 @@ exports.handler = async (event) => {
       role: (data.user && data.user.user_metadata && data.user.user_metadata.role) || '',
       staff: require('./lib/auth').isStaff(env, data.user),
       admin: require('./lib/auth').isAdmin(env, data.user),
+      viewer: !require('./lib/auth').isAdmin(env, data.user) && require('./lib/auth').isViewer(env, data.user),
       access_token: data.access_token,
       refresh_token: data.refresh_token,   // rotated — the client must replace what it stored
       expires_in: data.expires_in

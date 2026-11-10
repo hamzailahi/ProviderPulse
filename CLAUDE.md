@@ -218,6 +218,17 @@ too.
   every non-GET call and the self-check before a request leaves the browser,
   and the server would refuse them anyway. Create the account in Supabase (Authentication, Add
   user); it is never a sign-up path.
+  **Viewer accounts** (2026-11-10, the user's choices: marketing and a
+  partner, one login per person, everything but the review queue, Ask AI
+  allowed): `isViewer()` checks `VIEWER_EMAILS`; a viewer is staff (so
+  `isProvider` lets it into the dashboard and `market-assistant`) but never
+  admin. `auth-login` / `auth-refresh` return `viewer` (false for an admin),
+  the session stores it, and `patient.js` (guest), `portal.js` (the
+  `DEMO_PROFILE` demo, banner says "a viewer") and `admin-switch.js` ("Viewer:
+  view as", no Review queue) treat it like the admin. It writes nothing: the
+  listing endpoints need its own `provider_profiles` row (`provider-npis`
+  answers 404) or a `role` it does not have. Create each in Supabase like the
+  admin; removing an email ends access at the next token refresh.
 - **The dashboard is provider-only.** `market-assistant` requires
   `isProvider`. `index.html`'s `requireSession()` also sends patients back to
   `/` unless the session is staff; that redirect is the UX half, the function
@@ -2233,7 +2244,7 @@ node scripts/test-nppes-refresh.mjs       # 64: weekly NPPES refresh: file and A
 node scripts/test-nad-match.mjs           # 26: the NAD matcher: house numbers, NAD street lines, the one-word rule, units as one place, far points a tie, non-public states left out, only wholly public states applied, partly public states only in listed public counties (split counties never), the dry run's keys, report and apply list on small files
 node scripts/test-hospital-campuses.mjs   # 20: the reviewed hospital campus list: every row checked (hospital code, NPI check digit, US point, source, eligibility wording), the asset current, campuses only inside the search box, under their own id, the sheet looks up the billing NPI
 node scripts/test-address-fit.mjs         # 16: which geocoder matches a typed address accepts (house number, ZIP, distinctive words; gibberish and a neighbouring number refused)
-node scripts/test-admin.mjs               # 19: the admin account: only ADMIN_EMAILS, counts as staff, sign-in reports it, opens the review queue (staff and patients refused, the shared password still works), guest in the patient app, the switch on four pages
+node scripts/test-admin.mjs               # 29: the admin account: only ADMIN_EMAILS, counts as staff, sign-in reports it, opens the review queue (staff, viewers and patients refused, the shared password still works), guest in the patient app, the switch on four pages; viewer accounts: only VIEWER_EMAILS, staff but never admin, sign-in and refresh report `viewer`, demo listing, switch without the review queue, no NPI can be added
 node scripts/test-npi-activity.mjs        # 15: the public Medicare-activity lookup: only its columns, a missing NPI left out, nulls stay null, failures degraded
 node scripts/test-procedure-finder.mjs    # 152: the patient procedure finder: every code a real CMS code, every specialty real, words to procedures, per-NPI counts never add patients across codes; the portal footprint (share, doctor vs facility fee)
 node scripts/test-display-names.mjs       # 16: listing names for patients: legal suffixes dropped, acronyms kept, "FT WORTH" as Fort Worth

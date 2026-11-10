@@ -44,9 +44,10 @@ exports.handler = async (event) => {
   // Company accounts on the STAFF_EMAILS allowlist may open the market
   // dashboard for demos. A hint for routing only: the AI endpoints re-check it
   // server-side (lib/auth.js isProvider).
-  const { isStaff, isAdmin } = require('./lib/auth');
+  const { isStaff, isAdmin, isViewer } = require('./lib/auth');
   const staff = isStaff(env, data.user);
   const admin = isAdmin(env, data.user);
+  const viewer = !admin && isViewer(env, data.user);
   return {
     statusCode: 200,
     headers: CORS,
@@ -55,6 +56,7 @@ exports.handler = async (event) => {
       role,
       staff,
       admin,
+      viewer,
       access_token: data.access_token,
       refresh_token: data.refresh_token,
       expires_in: data.expires_in
