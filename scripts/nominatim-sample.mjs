@@ -31,7 +31,7 @@ export function classify(row, hit) {
   return hit.osm_id ? 'building' : 'street_estimate';
 }
 
-async function lookup(row, f = fetch) {
+export async function lookup(row, f = fetch) {
   const q = new URLSearchParams({ street: streetOnly(row.address), city: row.city || '', state: row.state || '', postalcode: String(row.zip || '').slice(0, 5),
     countrycodes: 'us', format: 'jsonv2', addressdetails: '1', limit: '1' });
   for (let attempt = 0; attempt < 3; attempt++) {

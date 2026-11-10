@@ -1,0 +1,63 @@
+name: Nominatim pass
+
+# Daily batches (and manual). For unpinned listings ArcGIS placed at a
+# building, asks Nominatim (OpenStreetMap's free geocoder) for the same
+# address, one request a second, and records where the two sources agree
+# within 50 m (scripts/nominatim-run.mjs). It never touches the database: an
+# apply is a separate step that needs the operator's go-ahead. The input, with
+# the ArcGIS points, stays on a tmp/ branch; once that branch is deleted the
+# job is a quiet success. Results and counts go to
+# supabase/reference/nominatim-run/.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: 'Most listings to check in this run (one a second)'
+        default: '3000'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nominatim-run
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Batch
+        env:
+          BATCH: ${{ inputs.batch || '3000' }}
+          W: ${{ runner.temp }}
+        run: |
+          case "$BATCH" in ''|*[!0-9]*) echo "batch must be a number"; exit 1;; esac
+          [ "$BATCH" -le 5000 ] || { echo "batch is at most 5000"; exit 1; }
+          if ! git fetch -q origin tmp/nominatim-input 2>/dev/null; then echo "no input branch: nothing to do"; exit 0; fi
+          git show FETCH_HEAD:nominatim-input.csv.gz | gunzip > "$W/input.csv"
+          mkdir -p supabase/reference/nominatim-run
+          node scripts/nominatim-run.mjs --input "$W/input.csv" --results supabase/reference/nominatim-run/results.csv \
+            --report supabase/reference/nominatim-run/latest.md --batch "$BATCH"
+      - name: Summary
+        if: always()
+        run: cat supabase/reference/nominatim-run/latest.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - name: Commit the results
+        run: |
+          git add supabase/reference/nominatim-run 2>/dev/null || exit 0
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Nominatim pass $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main
