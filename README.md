@@ -654,7 +654,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ### 2026-11-10
 
 - Viewer accounts for marketing and partners: one login per person, listed in the new `VIEWER_EMAILS` Netlify setting and created by the operator in Supabase. A viewer gets the admin's "View as" switch between the patient app (as a guest), the provider portal's read-only demo listing and the market dashboard (Ask AI and Reports included), without the OIG review queue, and can save nothing.
-- A second check for the ArcGIS pins taken back because their ZIP has no Census area (single-institution ZIPs such as UCSF's 94143 and UConn Health's 06030): a pin goes back on the map only when another listing at the same street address already has a pin from another source, a point no other address shares, and the ArcGIS point is within 150 m of it (`arcgis-anchor.sh`, workflow modes `anchor_dry_run` and `anchor_apply`).
+- A second check for the ArcGIS pins taken back because their ZIP has no Census area (single-institution ZIPs such as UCSF's 94143 and UConn Health's 06030): a pin goes back on the map only when another listing at the same street address already has a pin from another source, a point no other address shares, and the ArcGIS point is within 150 m of it (`arcgis-anchor.sh`, workflow modes `anchor_dry_run` and `anchor_apply`). Its dry run found 155 that would qualify, but almost all of them only agreed with an earlier ArcGIS pin, so by the operator's choice none were put back.
 
 ### 2026-11-08
 
