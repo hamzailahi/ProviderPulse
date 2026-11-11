@@ -1,10 +1,11 @@
 {
   "retry_npis": [],
-  "last_run": "2026-11-04T01:03:06.778Z",
+  "last_run": "2026-11-11T17:17:13.814Z",
   "last_mode": "file",
-  "last_file": "NPPES_Data_Dissemination_November_2026_V2.zip",
+  "last_file": "NPPES_Data_Dissemination_110226_110826_Weekly_V2.zip",
   "full_done": {
     "file": "NPPES_Data_Dissemination_November_2026_V2.zip",
     "date": "2026-11-04"
-  }
+  },
+  "last_week_end": "2026-11-08"
 }
