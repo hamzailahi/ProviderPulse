@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-10. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-11. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -650,6 +650,11 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-11
+
+- Fixed every nearby competitor in the Competition tab showing as "Your practice." Both `assets/directory.js` and `assets/portal.js` load as plain scripts and each declared a function named `displayName` with a different shape; portal.js's version (loaded second) shadowed directory.js's name-cleanup function for every call made from inside portal.js, including Competition's row builder, so a real competitor's name had no `.org_name`/`.first_name`/`.last_name` to read and fell back to the "your own listing" label. Renamed portal.js's helper to `listingName`; added a regression check to `scripts/test-display-names.mjs`.
+- Fixed "NPI null" on My NPIs and My listing for an account with no NPI on file (the admin/viewer demo listing): both now read "No NPI on file" instead of concatenating a null NPI into the text.
 
 ### 2026-11-10
 

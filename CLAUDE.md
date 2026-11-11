@@ -91,6 +91,27 @@ second copy. The `access_requests` table still holds v1's data.
 Shared modules are **dual-exported**: `window.X` in the browser and
 `module.exports` under Node. Keep both when editing.
 
+**Plain `<script>` tags share one global namespace; page scripts don't.**
+`directory.js` has no module wrapper, so its functions (`displayName`,
+`cityName`, ...) are plain globals once a page loads it. `portal.js` and
+`patient.js` each wrap their own body in `(function () { ... })();`, so a
+same-named function declared *inside* that IIFE shadows the outer global for
+every call made from inside that page script, invisibly: nothing about the
+shadowing crosses the IIFE boundary, so it can't be seen from outside and a
+behavioral test of the page script can't catch it either (2026-11-11: a
+runtime check that loaded portal.js and inspected `displayName` from outside
+its IIFE kept passing against the buggy code, because the outer binding was
+never touched). This happened for real: `portal.js` declared its own
+`function displayName(p)` (a profile-object helper), which shadowed
+`directory.js`'s real `displayName(name)` (a name-string cleaner) for every
+call inside `portal.js`, including the Competition tab's row builder; a
+plain string has no `.org_name`/`.first_name`/`.last_name`, so every
+competitor's name fell back to "Your practice". Fixed by renaming
+`portal.js`'s helper to `listingName`. Before naming a function in a
+page-level script, check `directory.js` doesn't already own that name; the
+only check that actually catches a reintroduction is a static one over the
+source text (`test-display-names.mjs`), not a runtime one.
+
 Tokens live in `tokens.css` only. The old `app.css` was duplicated inline
 across two pages and drifted; it is deleted, do not reference it.
 
@@ -2250,7 +2271,7 @@ node scripts/test-address-fit.mjs         # 16: which geocoder matches a typed a
 node scripts/test-admin.mjs               # 29: the admin account: only ADMIN_EMAILS, counts as staff, sign-in reports it, opens the review queue (staff, viewers and patients refused, the shared password still works), guest in the patient app, the switch on four pages; viewer accounts: only VIEWER_EMAILS, staff but never admin, sign-in and refresh report `viewer`, demo listing, switch without the review queue, no NPI can be added
 node scripts/test-npi-activity.mjs        # 15: the public Medicare-activity lookup: only its columns, a missing NPI left out, nulls stay null, failures degraded
 node scripts/test-procedure-finder.mjs    # 152: the patient procedure finder: every code a real CMS code, every specialty real, words to procedures, per-NPI counts never add patients across codes; the portal footprint (share, doctor vs facility fee)
-node scripts/test-display-names.mjs       # 16: listing names for patients: legal suffixes dropped, acronyms kept, "FT WORTH" as Fort Worth
+node scripts/test-display-names.mjs       # 17: listing names for patients: legal suffixes dropped, acronyms kept, "FT WORTH" as Fort Worth; portal.js never redeclares displayName (the Competition-tab "Your practice" regression)
 node scripts/test-catchment.mjs           # 11: the market score's catchment: every ZIP within 10 miles, the 10 nearest in sparse areas, 60 ZIPs or 1M adults at most, ZIP groups, a timed-out group one ZIP at a time, a failed load refuses to score
 node scripts/test-procedure-search.mjs    # 166: procedures word search: every alias phrase is real CMS wording, what clinicians type finds the codes they mean
 ```

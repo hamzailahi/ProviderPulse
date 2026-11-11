@@ -149,7 +149,13 @@ var S = {
   // My listing is editing: null is the account's own.
   npis: null, npisEnabled: true, editing: null
 };
-function displayName(p) {
+// Named apart from directory.js's displayName(name) (a raw-string cleaner):
+// both files load as plain scripts, so two globals of the same name collide
+// and whichever loads last wins everywhere on the page. That bug once made
+// every Competition-tab row read "Your practice" (it called the shared
+// string cleaner, got this object-shaped function instead, and a plain
+// string has no .org_name/.first_name/.last_name to read).
+function listingName(p) {
   p = p || S.profile || {};
   return titleCase(p.org_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Your practice');
 }
@@ -209,7 +215,7 @@ function paintNav(active) {
       h('span', { class: 'ni', 'aria-hidden': 'true' }, icon(n[0])), h('span', { class: 'nl' }, n[1]),
       count ? h('span', { class: 'nbadge', 'aria-label': count + ' new' }, String(count)) : null));
   });
-  $('who').textContent = S.profile ? displayName() : '';
+  $('who').textContent = S.profile ? listingName() : '';
 }
 
 function route() {
@@ -359,7 +365,7 @@ VIEWS.overview = function () {
 
   var demandTotal = S.demand && S.demand.available ? S.demand.total_searches : null;
   var view = h('section', { class: 'view' },
-    pageHead(hello + ', ' + displayName(), null,
+    pageHead(hello + ', ' + listingName(), null,
       h('div', { class: 'chips' },
         p.npi_verified ? h('span', { class: 'chip ok' }, 'NPI verified') : null,
         p.review_status === 'pending' ? h('span', { class: 'chip warn' }, 'Listing under review') : null)),
@@ -793,9 +799,9 @@ VIEWS.listing = function () {
       var id = e.target.value;
       S.editing = S.npis.filter(function (n) { return n.id === id; })[0] || null;
       render();
-    } }, h('option', { value: '' }, displayName(S.profile) + ' · NPI ' + (S.profile || {}).npi + ' (this account)'),
+    } }, h('option', { value: '' }, listingName(S.profile) + ((S.profile || {}).npi ? ' · NPI ' + S.profile.npi : '') + ' (this account)'),
       S.npis.map(function (n) {
-        return h('option', { value: n.id, selected: added && added.id === n.id }, displayName(n) + ' · NPI ' + n.npi + (n.status === 'live' ? '' : ' (' + (n.status === 'review' ? 'under review' : 'blocked') + ')'));
+        return h('option', { value: n.id, selected: added && added.id === n.id }, listingName(n) + ' · NPI ' + n.npi + (n.status === 'live' ? '' : ' (' + (n.status === 'review' ? 'under review' : 'blocked') + ')'));
       }));
   }
   var view = h('section', { class: 'view' },
@@ -823,7 +829,7 @@ VIEWS.listing = function () {
           h('div', { class: 'form' }, h('label', {}, 'Street address'), fAddr,
             h('div', { class: 'row3' }, h('div', {}, h('label', {}, 'City'), fCity), h('div', {}, h('label', {}, 'State'), fState), h('div', {}, h('label', {}, 'ZIP'), fZip))), addrSave),
         h('div', { class: 'card sec readonly' }, h('div', { class: 'card-h' }, h('h2', {}, 'From the NPPES registry')),
-          h('dl', { class: 'kv' }, h('dt', {}, 'NPI'), h('dd', {}, p.npi || '—'), h('dt', {}, 'Name'), h('dd', {}, displayName(p)),
+          h('dl', { class: 'kv' }, h('dt', {}, 'NPI'), h('dd', {}, p.npi || '—'), h('dt', {}, 'Name'), h('dd', {}, listingName(p)),
             h('dt', {}, 'Specialty'), h('dd', {}, p.taxonomy_desc || '—')),
           h('p', { class: 'muted small' }, 'These come from the federal registry. Update them at nppes.cms.hhs.gov.'))),
       h('aside', { class: 'side' }, h('div', { class: 'sticky' }, h('div', { class: 'side-h' }, 'How patients see you'), preview,
@@ -839,7 +845,7 @@ VIEWS.listing = function () {
 function previewCard(p, ins) {
   p = p || S.profile || {};
   ins = ins || S.insurance;
-  var name = displayName(p);
+  var name = listingName(p);
   var badges = [h('span', { class: 'badge verified' }, '✓ Verified')];
   if (p.accepting_new_patients === true) badges.push(h('span', { class: 'badge good' }, 'Accepting new patients'));
   if (p.accepting_new_patients === false) badges.push(h('span', { class: 'badge unknown' }, 'Not taking new patients'));
@@ -887,8 +893,8 @@ VIEWS.npis = function () {
     var st = own ? ['This account', 'ok'] : (STATUS[n.status] || [n.status, 'warn']);
     return h('div', { class: 'card npi-row' },
       h('div', { class: 'npi-main' },
-        h('div', {}, h('b', {}, displayName(n)), h('span', { class: 'chip ' + st[1] }, st[0])),
-        h('div', { class: 'muted small' }, 'NPI ' + n.npi + (n.taxonomy_desc ? ' · ' + n.taxonomy_desc : '') +
+        h('div', {}, h('b', {}, listingName(n)), h('span', { class: 'chip ' + st[1] }, st[0])),
+        h('div', { class: 'muted small' }, (n.npi ? 'NPI ' + n.npi : 'No NPI on file') + (n.taxonomy_desc ? ' · ' + n.taxonomy_desc : '') +
           ([n.address_line, n.city, n.state].filter(Boolean).length ? ' · ' + [titleCase(n.address_line || ''), titleCase(n.city || ''), n.state].filter(Boolean).join(', ') : '')),
         !own && n.status === 'review' && n.review_reason ? h('div', { class: 'muted small' }, 'Why: ' + n.review_reason) : null),
       h('div', { class: 'npi-acts' },

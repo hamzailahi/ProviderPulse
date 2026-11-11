@@ -34,5 +34,24 @@ eq('MT PLEASANT', cityName('MT PLEASANT'), 'Mount Pleasant');
 eq('Fort Worth unchanged', cityName('Fort Worth'), 'Fort Worth');
 eq('a city that only starts with Ft letters is left alone', cityName('FTWORTH'), 'Ftworth');
 
+// Regression for a bug this suite missed (2026-11-11): portal.js declared
+// its own `function displayName(p)` (a profile-object helper) inside its
+// top-level IIFE. directory.js's displayName(name) (the string cleaner
+// above) is a plain global, loaded first on portal.html, but a same-named
+// function declared anywhere inside portal.js's IIFE shadows it for every
+// call made from *within* portal.js, including the Competition tab's row
+// builder -- invisibly, since nothing about that shadowing crosses the IIFE
+// boundary to show up on the outer scope portal.js runs in. A plain string
+// has none of .org_name/.first_name/.last_name, so every competitor's name
+// fell back to "Your practice". Fixed by renaming portal.js's helper to
+// listingName. A behavioral test can't see this (the shadowed calls are
+// sealed inside the IIFE), so check the source text directly: portal.js
+// must never declare or assign its own `displayName`.
+console.log('\nShared globals (portal.js must not redeclare directory.js\'s functions)');
+const portalSrc = readFileSync(new URL('../v2/assets/portal.js', import.meta.url), 'utf8');
+const redeclaresDisplayName = /\b(?:function\s+displayName\s*\(|(?:var|let|const)\s+displayName\s*=)/.test(portalSrc);
+if (!redeclaresDisplayName) { pass++; console.log('  PASS  portal.js never declares its own displayName'); }
+else { fail++; console.log('  FAIL  portal.js declares its own displayName, which shadows directory.js\'s string cleaner for every call inside portal.js (the Competition tab regression)'); }
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
