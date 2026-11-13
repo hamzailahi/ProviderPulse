@@ -1030,10 +1030,13 @@ Tables:
   `org-phone-backfill.yml` (`source: api`, the NPI Registry ZIP by ZIP,
   91 minutes, no refusals, while CMS's file site was down): 1,894,376 of
   1,901,951 organizations have one (99.6%); the rest had none in NPPES or an
-  unusable number. Patient search and the detail sheet select it.
+  unusable number. Patient search and the detail sheet select it. `fax`
+  since migration 047 (2026-11-13), filled by `fax-backfill.yml` from the
+  NPPES monthly file.
 - `provider_individuals`: NPI-1 individuals (migration 013), kept separate so
   org-only assumptions hold. `affiliated_clinic_npi` (015) is NULL everywhere
-  in production.
+  in production. `fax` since migration 047 (2026-11-13), filled the same run
+  as `clinics.fax`.
 - `clinic_secondary_locations`: NPPES secondary practice addresses for both
   entity types (014), keyed `(parent_npi, address, zip)`. Never inherits the
   parent's verified ring.
@@ -1998,6 +2001,27 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   `zip_limit` is a dry-run sample of the largest ZIPs. The container cannot
   reach the API (its proxy refuses `npiregistry.cms.hhs.gov`), so it runs in
   Actions only.
+- **Fax number backfill** (`fax-backfill.yml`, manual, `scripts/fax-backfill.sh`,
+  parser `scripts/nppes-fax.mjs`, 2026-11-13): the phone backfill's pattern
+  (size check, NPPES download, per-prefix batches with VACUUM, rerun
+  resumes), but for **two** tables at once, since neither had a fax column:
+  `clinics` (NPI-2) and `provider_individuals` (NPI-1). The only fax
+  anywhere in the product before this was a live, non-persisted NPI
+  Registry API lookup in the dashboard popup (`v2/index.html`). `dry_run` /
+  `apply` with `disk_free_gb`; migration 047 adds `fax` to both tables.
+  `nppes-fax.mjs` reads both entity types from the monthly file in one pass
+  (`npi,entity,fax`), reusing `cleanPhone`/`phoneChanges` from
+  `scripts/lib/phones.mjs` (the same 10-digit NANP validation and
+  already-right diffing phone uses); `fax-backfill.sh` splits that output
+  by entity type and runs `scripts/fax-assign.mjs` once per table before
+  staging and batch-updating each. `clinic_secondary_locations` gets no fax
+  column, matching how it has no phone column either (a secondary site
+  uses its parent NPI's numbers). **Source is the monthly file only, no
+  API fallback**: the phone backfill's API crawler
+  (`scripts/lib/nppes-api-phones.mjs`) is paced for NPI-2 organizations
+  only, and building a second-entity-type crawler for a one-time backfill
+  wasn't worth it; if the monthly file site is down, wait for it rather
+  than add that. Summary to `supabase/reference/fax-backfill-summary.md`.
 - **Taxonomy code indexes** (`taxonomy-indexes.yml`, manual,
   `scripts/taxonomy-indexes.sh`): applies 030 through psql, because the SQL
   editor wraps a pasted script in one transaction and `CREATE INDEX
@@ -2261,6 +2285,7 @@ node scripts/test-procedures-tool.mjs     # 50: the assistant's get_procedures o
 node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far and tiny goes, near or big stays, multi-city and sprawl stay whole
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
 node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty), the API script against a local server, and the pacer on a fake clock
+node scripts/test-fax-backfill.mjs        # 4: fax parsing from the NPPES monthly file, both entity types in one pass, deactivated/blank/implausible/other-entity rows dropped and counted separately
 node scripts/test-provider-npis.mjs       # 39: one account, many NPIs: the registry and OIG checks, live only when the registry's person is the account's, caller never sets npi/review_status/account_id, own rows only, published once cleared, bookable through the account, registration refuses an added NPI, admin reject removes an added NPI (logged, claimable again) while approve publishes and an account's own NPI is still only blocked
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok
