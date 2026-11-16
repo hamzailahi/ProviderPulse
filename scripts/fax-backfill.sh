@@ -29,21 +29,28 @@ mkdir -p "$WORK" "$REF"
 fail() { echo "::error::$1"; echo "$1" >&2; exit 1; }
 psqlq() { psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X "$@"; }
 [ "$MODE" = dry_run ] || [ "$MODE" = apply ] || fail "MODE must be dry_run or apply, got $MODE"
+# TABLES: both (default), clinics or provider_individuals. One table at a time
+# needs less headroom: 2026-11-16 both needed 6.4 GB against 5.9 GB free.
+TABLES="${TABLES:-both}"
+case "$TABLES" in both|clinics|provider_individuals) ;; *) fail "TABLES must be both, clinics or provider_individuals, got $TABLES" ;; esac
+want() { [ "$TABLES" = both ] || [ "$TABLES" = "$1" ]; }
 
 # ---- 1. Size check (read only) ------------------------------------------------
 # An UPDATE writes a new version of each changed row (and index entries); the
-# old ones are reclaimed by vacuum. Budget each table once more, staging and a
-# burst of WAL.
+# old ones are reclaimed by vacuum. Budget each table being written once more,
+# staging and a burst of WAL.
 echo "== Size check"
 clinics_bytes=$(psqlq -At -c "select pg_total_relation_size('public.clinics')") || fail "Size check failed"
 indiv_bytes=$(psqlq -At -c "select pg_total_relation_size('public.provider_individuals')") || fail "Size check failed"
-need_gb=$(awk -v a="$clinics_bytes" -v b="$indiv_bytes" 'BEGIN { printf "%.1f", ((a + b) * 1.1 + 0.3e9 + 2e9) / 1e9 }')
+a=$(want clinics && echo "$clinics_bytes" || echo 0); b=$(want provider_individuals && echo "$indiv_bytes" || echo 0)
+need_gb=$(awk -v a="$a" -v b="$b" 'BEGIN { printf "%.1f", ((a + b) * 1.1 + 0.3e9 + 2e9) / 1e9 }')
 has_col_clinics=$(psqlq -At -c "select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'clinics' and column_name = 'fax'")
 has_col_indiv=$(psqlq -At -c "select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'provider_individuals' and column_name = 'fax'")
 {
   echo "## Size check"; echo
   awk -v a="$clinics_bytes" -v b="$indiv_bytes" 'BEGIN { printf "- clinics: %.2f GB\n- provider_individuals: %.2f GB\n", a / 1e9, b / 1e9 }'
-  echo "- Estimated extra disk needed: **${need_gb} GB** (both tables rewritten once, staging and WAL)"
+  echo "- Tables this run writes: $TABLES"
+  echo "- Estimated extra disk needed: **${need_gb} GB** (those tables rewritten once, staging and WAL)"
   echo "- Free disk entered: ${DISK_FREE_GB:-not given}"
   echo "- fax columns (migration 047): clinics $([ "$has_col_clinics" = 1 ] && echo present || echo 'not yet; apply adds it'), provider_individuals $([ "$has_col_indiv" = 1 ] && echo present || echo 'not yet; apply adds it')"
 } > "$WORK/size.md"
@@ -144,8 +151,8 @@ SQL
   psqlq -c "drop table if exists public.fax_backfill_stage;"
 }
 
-update_table clinics "$WORK/assign-clinics.csv" "$to_write_clinics"
-update_table provider_individuals "$WORK/assign-individuals.csv" "$to_write_indiv"
+want clinics && update_table clinics "$WORK/assign-clinics.csv" "$to_write_clinics"
+want provider_individuals && update_table provider_individuals "$WORK/assign-individuals.csv" "$to_write_indiv"
 
 echo "== Checking"
 {

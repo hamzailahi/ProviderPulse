@@ -2022,6 +2022,11 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   only, and building a second-entity-type crawler for a one-time backfill
   wasn't worth it; if the monthly file site is down, wait for it rather
   than add that. Summary to `supabase/reference/fax-backfill-summary.md`.
+  Input `tables` (`both`, `clinics`, `provider_individuals`) limits what
+  apply writes and what the disk check budgets: the first dry run
+  (2026-11-16, November 2026 file) found faxes for 1,051,651 organizations
+  (52.8%) and 2,490,990 clinicians (33.0%), and both tables at once needed
+  6.4 GB against 5.9 GB free, so they go one at a time.
 - **Taxonomy code indexes** (`taxonomy-indexes.yml`, manual,
   `scripts/taxonomy-indexes.sh`): applies 030 through psql, because the SQL
   editor wraps a pasted script in one transaction and `CREATE INDEX

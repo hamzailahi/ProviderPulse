@@ -24,6 +24,11 @@ on:
       disk_free_gb:
         description: Free database disk in GB, from Supabase (needed for apply)
         required: false
+      tables:
+        description: Which tables apply writes (one at a time needs less free disk)
+        type: choice
+        options: [both, clinics, provider_individuals]
+        default: both
       nppes_url:
         description: Optional direct link to the NPPES monthly zip (skips the download page)
         required: false
@@ -71,6 +76,7 @@ jobs:
           MODE: ${{ inputs.mode }}
           DISK_FREE_GB: ${{ inputs.disk_free_gb }}
           NPPES_URL: ${{ inputs.nppes_url }}
+          TABLES: ${{ inputs.tables }}
           WORK: ${{ runner.temp }}/faxbf
         run: bash scripts/fax-backfill.sh
 
