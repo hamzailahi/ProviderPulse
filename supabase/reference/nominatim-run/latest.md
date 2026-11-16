@@ -1,6 +1,6 @@
 # Nominatim (OpenStreetMap) pass over unpinned listings
 
-Updated 2026-11-15 11:52 UTC by scripts/nominatim-run.mjs. Daily batches, one request a second. Nothing has been written to the database; an apply needs the operator's go-ahead.
+Updated 2026-11-16 11:34 UTC by scripts/nominatim-run.mjs. Daily batches, one request a second. Nothing has been written to the database; an apply needs the operator's go-ahead.
 
 - Listings to check (ArcGIS found a building, but the pin failed the strict cut): 17119
 - Checked so far: **17119**; still to do: 0
