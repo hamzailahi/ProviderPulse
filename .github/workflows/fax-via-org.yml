@@ -1,0 +1,64 @@
+name: Fax via organization (dry run)
+
+# Manual, read only. Counts clinicians with no fax who would get their
+# organization's fax under the user's rule (Medicare reassignment to that
+# organization AND the same practice address). See scripts/lib/fax-via-org.mjs.
+# Writes supabase/reference/fax-via-org-dry-run.md and keeps the match list
+# as a 7-day artifact. Nothing is written to the database.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ppef_url:
+        description: Optional direct CSV link to the Public Provider Enrollment file
+        required: false
+      reassign_url:
+        description: Optional direct CSV link to the Revalidation Reassignment List
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  dry_run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Dry run
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PPEF_URL: ${{ inputs.ppef_url }}
+          REASSIGN_URL: ${{ inputs.reassign_url }}
+          WORK: ${{ runner.temp }}/faxorg
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: bash scripts/fax-via-org.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fax-via-org-matches
+          path: ${{ runner.temp }}/faxorg/matches.csv.gz
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Commit the report
+        if: always()
+        run: |
+          git add supabase/reference/fax-via-org-dry-run.md 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Fax via organization dry run $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

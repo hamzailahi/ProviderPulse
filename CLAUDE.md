@@ -2026,7 +2026,9 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   apply writes and what the disk check budgets: the first dry run
   (2026-11-16, November 2026 file) found faxes for 1,051,651 organizations
   (52.8%) and 2,490,990 clinicians (33.0%), and both tables at once needed
-  6.4 GB against 5.9 GB free, so they go one at a time. **Applied 2026-11-16**: clinics first, then provider_individuals (1h36m); 1,051,651 of 1,992,043 organizations and 2,490,990 of 7,546,513 clinicians now carry a fax.
+  6.4 GB against 5.9 GB free, so they go one at a time.
+  **No PECOS fax** (`pecos-fax-discover.yml`, 2026-11-16): none of CMS's public PECOS files (Public Provider Enrollment, Order and Referring, both reassignment lists) has a fax or phone column; only the Provider of Services file has `FAX_PHNE_NUM`, for facilities only, keyed by CCN.
+  **Fax via organization** (`fax-via-org.yml`, dry run only, 2026-11-16, the user's rule): a clinician with no fax may show an organization's fax, labelled with its name, only when Medicare's Revalidation Reassignment List has them billing through a group whose PAC ID the Public Provider Enrollment file ties to that organization's NPI **and** their own NPPES address equals the organization's (ZIP, house number, street; suite ignored; `scripts/lib/fax-via-org.mjs`). Several qualifying organizations with different faxes: none. Never by shared address alone. **Applied 2026-11-16**: clinics first, then provider_individuals (1h36m); 1,051,651 of 1,992,043 organizations and 2,490,990 of 7,546,513 clinicians now carry a fax.
 - **Taxonomy code indexes** (`taxonomy-indexes.yml`, manual,
   `scripts/taxonomy-indexes.sh`): applies 030 through psql, because the SQL
   editor wraps a pasted script in one transaction and `CREATE INDEX
@@ -2291,6 +2293,7 @@ node scripts/test-area-zips.mjs           # 18: stray ZIPs in a city search: far
 node scripts/test-code-list.mjs           # 54: Procedures tab code lists: what counts as a list, by-code / clinician / ZIP summaries, doctor vs facility fee, hospital topics, the Download all sheets, CSV
 node scripts/test-org-phones.mjs          # 39: organization phones from NPPES: usable US numbers only, a missing phone never blanks a row, the parser and matcher end to end, the API pass on a fake API (1,200 ceiling, ZIP+4 splits, one-by-one fill, failures never empty), the API script against a local server, and the pacer on a fake clock
 node scripts/test-fax-backfill.mjs        # 4: fax parsing from the NPPES monthly file, both entity types in one pass, deactivated/blank/implausible/other-entity rows dropped and counted separately
+node scripts/test-fax-via-org.mjs         # 8: fax via organization: Medicare reassignment AND the same address, ambiguous faxes skipped
 node scripts/test-provider-npis.mjs       # 39: one account, many NPIs: the registry and OIG checks, live only when the registry's person is the account's, caller never sets npi/review_status/account_id, own rows only, published once cleared, bookable through the account, registration refuses an added NPI, admin reject removes an added NPI (logged, claimable again) while approve publishes and an account's own NPI is still only blocked
 node scripts/test-self-check.mjs          # 15: a provider's own listing check: providers only, their own NPI whatever the request says, nothing written, fixes match the signals
 node scripts/test-listing-report.mjs      # 14: report a wrong listing: only npi, issue and source written, bad input refused, repeats throttled, failures never ok

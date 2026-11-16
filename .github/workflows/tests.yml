@@ -155,3 +155,9 @@ jobs:
 
       - name: Market assistant (stepped agent, tools, history rules)
         run: node scripts/test-market-assistant.mjs
+
+      - name: Fax backfill parser
+        run: node scripts/test-fax-backfill.mjs
+
+      - name: Fax via organization rule
+        run: node scripts/test-fax-via-org.mjs
