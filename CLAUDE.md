@@ -2026,7 +2026,7 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   apply writes and what the disk check budgets: the first dry run
   (2026-11-16, November 2026 file) found faxes for 1,051,651 organizations
   (52.8%) and 2,490,990 clinicians (33.0%), and both tables at once needed
-  6.4 GB against 5.9 GB free, so they go one at a time.
+  6.4 GB against 5.9 GB free, so they go one at a time. **Applied 2026-11-16**: clinics first, then provider_individuals (1h36m); 1,051,651 of 1,992,043 organizations and 2,490,990 of 7,546,513 clinicians now carry a fax.
 - **Taxonomy code indexes** (`taxonomy-indexes.yml`, manual,
   `scripts/taxonomy-indexes.sh`): applies 030 through psql, because the SQL
   editor wraps a pasted script in one transaction and `CREATE INDEX
