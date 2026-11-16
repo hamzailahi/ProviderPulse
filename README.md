@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-13. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-16. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -651,7 +651,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
 
-### 2026-11-13
+### 2026-11-16
 
 - Added a `fax` column to `clinics` and `provider_individuals` (migration 047), filled from the NPPES monthly file by a new manual job, `fax-backfill.yml`. Fax numbers previously only showed up as a live lookup in the dashboard's popup and were never stored or searchable.
 

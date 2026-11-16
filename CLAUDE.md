@@ -1031,11 +1031,11 @@ Tables:
   91 minutes, no refusals, while CMS's file site was down): 1,894,376 of
   1,901,951 organizations have one (99.6%); the rest had none in NPPES or an
   unusable number. Patient search and the detail sheet select it. `fax`
-  since migration 047 (2026-11-13), filled by `fax-backfill.yml` from the
+  since migration 047 (2026-11-16), filled by `fax-backfill.yml` from the
   NPPES monthly file.
 - `provider_individuals`: NPI-1 individuals (migration 013), kept separate so
   org-only assumptions hold. `affiliated_clinic_npi` (015) is NULL everywhere
-  in production. `fax` since migration 047 (2026-11-13), filled the same run
+  in production. `fax` since migration 047 (2026-11-16), filled the same run
   as `clinics.fax`.
 - `clinic_secondary_locations`: NPPES secondary practice addresses for both
   entity types (014), keyed `(parent_npi, address, zip)`. Never inherits the
@@ -2002,7 +2002,7 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   reach the API (its proxy refuses `npiregistry.cms.hhs.gov`), so it runs in
   Actions only.
 - **Fax number backfill** (`fax-backfill.yml`, manual, `scripts/fax-backfill.sh`,
-  parser `scripts/nppes-fax.mjs`, 2026-11-13): the phone backfill's pattern
+  parser `scripts/nppes-fax.mjs`, 2026-11-16): the phone backfill's pattern
   (size check, NPPES download, per-prefix batches with VACUUM, rerun
   resumes), but for **two** tables at once, since neither had a fax column:
   `clinics` (NPI-2) and `provider_individuals` (NPI-1). The only fax
