@@ -188,11 +188,14 @@ function tableBoxQuery(table, select, box, extra, depth, t0) {
       });
   });
 }
-function providerBoxQuery(box, extra) {
+// moreCols: extra columns on the two NPPES tables, e.g. ',fax' (migration 047)
+// for the portal, which shows it to providers; patient search does not ask.
+function providerBoxQuery(box, extra, moreCols) {
   extra = extra || '';
+  var cols = PROVIDER_ROW_SELECT + ',phone' + (moreCols || '');
   return Promise.all([
-    tableBoxQuery('clinics', PROVIDER_ROW_SELECT + ',phone', box, extra, 0),
-    tableBoxQuery('provider_individuals', PROVIDER_ROW_SELECT + ',phone', box, extra, 0),
+    tableBoxQuery('clinics', cols, box, extra, 0),
+    tableBoxQuery('provider_individuals', cols, box, extra, 0),
     tableBoxQuery('clinic_secondary_locations', 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude', box, extra, 0)
   ]).then(function (results) {
     var all = tagSrc(results[0], 'clinic').concat(tagSrc(results[1], 'individual'), tagSrc(results[2], 'secondary'));

@@ -704,6 +704,7 @@ VIEWS.listing = function () {
 
   /* about */
   var fPhone = h('input', { value: p.phone || '', inputmode: 'tel', placeholder: '(901) 555-0100' });
+  var regPhone = h('dd', {}, p.npi ? 'Loading…' : '—'), regFax = h('dd', {}, p.npi ? 'Loading…' : '—');
   var fBio = h('textarea', { maxlength: '600', rows: '4', placeholder: 'Who you see, what you focus on, languages spoken, what a first visit is like.' });
   fBio.value = p.bio || '';
   var bioCount = h('span', { class: 'muted small' }, (fBio.value.length) + ' / 600');
@@ -830,11 +831,17 @@ VIEWS.listing = function () {
             h('div', { class: 'row3' }, h('div', {}, h('label', {}, 'City'), fCity), h('div', {}, h('label', {}, 'State'), fState), h('div', {}, h('label', {}, 'ZIP'), fZip))), addrSave),
         h('div', { class: 'card sec readonly' }, h('div', { class: 'card-h' }, h('h2', {}, 'From the NPPES registry')),
           h('dl', { class: 'kv' }, h('dt', {}, 'NPI'), h('dd', {}, p.npi || '—'), h('dt', {}, 'Name'), h('dd', {}, listingName(p)),
-            h('dt', {}, 'Specialty'), h('dd', {}, p.taxonomy_desc || '—')),
+            h('dt', {}, 'Specialty'), h('dd', {}, p.taxonomy_desc || '—'),
+            h('dt', {}, 'Phone'), regPhone, h('dt', {}, 'Fax'), regFax),
           h('p', { class: 'muted small' }, 'These come from the federal registry. Update them at nppes.cms.hhs.gov.'))),
       h('aside', { class: 'side' }, h('div', { class: 'sticky' }, h('div', { class: 'side-h' }, 'How patients see you'), preview,
         h('p', { class: 'muted small' }, 'Your card in patient search. Badges appear as you fill in the sections.')))));
   paintPreview();
+  if (p.npi) loadRegistryContact(p.npi).then(function (rc) {
+    var none = rc && rc.failed ? 'Could not load' : 'None on file';
+    regPhone.textContent = rc && rc.phone ? fmtNumber(rc.phone) : none;
+    regFax.textContent = rc && rc.fax ? fmtNumber(rc.fax) : none;
+  });
   var sub = location.hash.split('/')[2];
   if (sub) setTimeout(function () { var t = $('sec-' + sub); if (t) { t.scrollIntoView({ block: 'start', behavior: 'smooth' }); t.classList.add('flash'); } }, 50);
   return view;
@@ -1039,6 +1046,33 @@ function myCenter() {
   return /^\d{5}$/.test(String(zip || '')) ? locateZip(String(zip)) : Promise.resolve(null);
 }
 
+function fmtNumber(v) {
+  var d = String(v || '').replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '1') d = d.slice(1);
+  return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : (v ? String(v) : '');
+}
+function contactLine(phone, fax) {
+  var parts = [];
+  if (phone) parts.push('Phone ' + fmtNumber(phone));
+  if (fax) parts.push('Fax ' + fmtNumber(fax));
+  return parts.length ? h('div', { class: 'muted small' }, parts.join(' · ')) : null;
+}
+
+// The listing's own NPPES phone and fax, from whichever directory table holds the NPI.
+var registryContactCache = {};
+function loadRegistryContact(npi) {
+  if (!/^\d{10}$/.test(String(npi || ''))) return Promise.resolve(null);
+  if (registryContactCache[npi]) return Promise.resolve(registryContactCache[npi]);
+  var f = 'npi=eq.' + npi;
+  return Promise.all([tableQuery('clinics', 'phone,fax', f), tableQuery('provider_individuals', 'phone,fax', f)]).then(function (res) {
+    var failed = res.some(function (r) { return r && r.failed; });
+    var row = (res[0] || [])[0] || (res[1] || [])[0] || null;
+    var out = { phone: row && row.phone, fax: row && row.fax, failed: failed && !row };
+    if (!out.failed) registryContactCache[npi] = out;
+    return out;
+  });
+}
+
 var compCache = {};
 function loadCompetition(miles, specOverride) {
   var spec = specOverride || mySpecialty();
@@ -1052,7 +1086,7 @@ function loadCompetition(miles, specOverride) {
     // description that is not one of the specialties still matches by name.
     var codes = specialtyCodes(spec.label), codeSet = null;
     if (codes.length) { codeSet = {}; codes.forEach(function (x) { codeSet[x] = true; }); }
-    return Promise.all([providerBoxQuery(box, codeSet ? codeFilter(codes) : taxonomyPrefilter(spec.terms)), loadRegistered()]).then(function (res) {
+    return Promise.all([providerBoxQuery(box, codeSet ? codeFilter(codes) : taxonomyPrefilter(spec.terms), ',fax'), loadRegistered()]).then(function (res) {
       var mine = String((S.profile || {}).npi || '');
       var byNpi = {};
       res[0].forEach(function (r) {
@@ -1061,10 +1095,12 @@ function loadCompetition(miles, specOverride) {
         var d = milesBetween(c.lat, c.lng, +r.latitude, +r.longitude);
         if (d > miles) return;
         var cur = byNpi[r.npi];
-        if (cur && cur.miles <= d) return;
+        // Secondary sites carry no phone or fax, so a nearer one keeps the main row's.
+        if (cur && cur.miles <= d) { if (!cur.phone) cur.phone = r.phone; if (!cur.fax) cur.fax = r.fax; return; }
         var reg = r._src !== 'secondary' ? res[1][String(r.npi)] : null;
         byNpi[r.npi] = { npi: String(r.npi), name: displayName(reg && reg.name || r.name), specialty: r.primary_taxonomy,
           lat: +r.latitude, lng: +r.longitude, miles: d, registered: !!reg,
+          phone: r.phone || (cur && cur.phone), fax: r.fax || (cur && cur.fax),
           accepting: reg ? reg.accepting_new_patients : undefined, telehealth: reg ? reg.telehealth : undefined };
       });
       var list = Object.keys(byNpi).map(function (k) { return byNpi[k]; }).sort(function (a, b) { return a.miles - b.miles; });
@@ -1133,7 +1169,8 @@ VIEWS.competition = function () {
     c.list.slice(0, 60).forEach(function (x) {
       rows.appendChild(h('div', { class: 'crow' },
         h('div', { class: 'av sm', style: '--h:' + hueFor(x.npi) }, initials(x.name)),
-        h('div', { class: 'cmain' }, h('b', {}, x.name), h('div', { class: 'muted small' }, x.specialty)),
+        h('div', { class: 'cmain' }, h('b', {}, x.name), h('div', { class: 'muted small' }, x.specialty),
+          contactLine(x.phone, x.fax)),
         h('div', { class: 'cbadges' },
           x.registered ? h('span', { class: 'chip ok' }, '✓ Verified') : null,
           x.accepting === true ? h('span', { class: 'chip' }, 'Accepting') : null),
