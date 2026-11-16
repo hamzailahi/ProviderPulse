@@ -36,3 +36,8 @@ Sources: https://data.cms.gov/sites/default/files/2026-09/b840a66b-6781-4630-923
 | MAINEHEALTH | 498 |
 | THE DULUTH CLINIC, LTD. | 484 |
 | CHILDREN'S HOSPITAL MEDICAL CENTER | 481 |
+
+## Applied 2026-11-16
+
+- provider_individuals rows with a fax via their organization: 150116
+- update log: 
