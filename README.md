@@ -656,6 +656,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 - Added a `fax` column to `clinics` and `provider_individuals` (migration 047), filled from the NPPES monthly file by a new manual job, `fax-backfill.yml`. Fax numbers previously only showed up as a live lookup in the dashboard's popup and were never stored or searchable. The first check found fax numbers for about 1.05 million organizations and 2.49 million clinicians; the job can fill one table at a time so it fits the database's free disk.
 - The fax backfill finished on 2026-11-16. 1,051,651 of 1,992,043 organizations and 2,490,990 of 7,546,513 clinicians now have a stored fax number.
 - Providers now see fax numbers in the portal: beside each nearby competitor on the Competition tab, and for their own listing in the registry box on My listing. Patients do not see fax numbers.
+- The market dashboard's map popups now show the stored phone and fax (labelled) straight away, before the slower live registry lookup finishes.
 
 ### 2026-11-11
 
