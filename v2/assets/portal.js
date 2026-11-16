@@ -840,7 +840,7 @@ VIEWS.listing = function () {
   if (p.npi) loadRegistryContact(p.npi).then(function (rc) {
     var none = rc && rc.failed ? 'Could not load' : 'None on file';
     regPhone.textContent = rc && rc.phone ? fmtNumber(rc.phone) : none;
-    regFax.textContent = rc && rc.fax ? fmtNumber(rc.fax) : none;
+    regFax.textContent = (rc && faxText(rc.fax, rc.org_fax, rc.org_fax_name)) || none;
   });
   var sub = location.hash.split('/')[2];
   if (sub) setTimeout(function () { var t = $('sec-' + sub); if (t) { t.scrollIntoView({ block: 'start', behavior: 'smooth' }); t.classList.add('flash'); } }, 50);
@@ -1051,10 +1051,18 @@ function fmtNumber(v) {
   if (d.length === 11 && d[0] === '1') d = d.slice(1);
   return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : (v ? String(v) : '');
 }
-function contactLine(phone, fax) {
+// orgFax / orgName: migration 048, the fax of the organization this clinician
+// bills through in Medicare at the same address; only when there is no own fax.
+function faxText(fax, orgFax, orgName) {
+  if (fax) return fmtNumber(fax);
+  if (orgFax) return fmtNumber(orgFax) + ' via ' + (orgName ? displayName(orgName) : 'their organization');
+  return '';
+}
+function contactLine(phone, fax, orgFax, orgName) {
   var parts = [];
   if (phone) parts.push('Phone ' + fmtNumber(phone));
-  if (fax) parts.push('Fax ' + fmtNumber(fax));
+  var fx = faxText(fax, orgFax, orgName);
+  if (fx) parts.push('Fax ' + fx);
   return parts.length ? h('div', { class: 'muted small' }, parts.join(' · ')) : null;
 }
 
@@ -1064,10 +1072,10 @@ function loadRegistryContact(npi) {
   if (!/^\d{10}$/.test(String(npi || ''))) return Promise.resolve(null);
   if (registryContactCache[npi]) return Promise.resolve(registryContactCache[npi]);
   var f = 'npi=eq.' + npi;
-  return Promise.all([tableQuery('clinics', 'phone,fax', f), tableQuery('provider_individuals', 'phone,fax', f)]).then(function (res) {
+  return Promise.all([tableQuery('clinics', 'phone,fax', f), tableQuery('provider_individuals', 'phone,fax,org_fax,org_fax_name', f)]).then(function (res) {
     var failed = res.some(function (r) { return r && r.failed; });
     var row = (res[0] || [])[0] || (res[1] || [])[0] || null;
-    var out = { phone: row && row.phone, fax: row && row.fax, failed: failed && !row };
+    var out = { phone: row && row.phone, fax: row && row.fax, org_fax: row && row.org_fax, org_fax_name: row && row.org_fax_name, failed: failed && !row };
     if (!out.failed) registryContactCache[npi] = out;
     return out;
   });
@@ -1086,7 +1094,7 @@ function loadCompetition(miles, specOverride) {
     // description that is not one of the specialties still matches by name.
     var codes = specialtyCodes(spec.label), codeSet = null;
     if (codes.length) { codeSet = {}; codes.forEach(function (x) { codeSet[x] = true; }); }
-    return Promise.all([providerBoxQuery(box, codeSet ? codeFilter(codes) : taxonomyPrefilter(spec.terms), ',fax'), loadRegistered()]).then(function (res) {
+    return Promise.all([providerBoxQuery(box, codeSet ? codeFilter(codes) : taxonomyPrefilter(spec.terms), ',fax,org_fax,org_fax_name'), loadRegistered()]).then(function (res) {
       var mine = String((S.profile || {}).npi || '');
       var byNpi = {};
       res[0].forEach(function (r) {
@@ -1096,11 +1104,12 @@ function loadCompetition(miles, specOverride) {
         if (d > miles) return;
         var cur = byNpi[r.npi];
         // Secondary sites carry no phone or fax, so a nearer one keeps the main row's.
-        if (cur && cur.miles <= d) { if (!cur.phone) cur.phone = r.phone; if (!cur.fax) cur.fax = r.fax; return; }
+        if (cur && cur.miles <= d) { if (!cur.phone) cur.phone = r.phone; if (!cur.fax) cur.fax = r.fax; if (!cur.org_fax) { cur.org_fax = r.org_fax; cur.org_fax_name = r.org_fax_name; } return; }
         var reg = r._src !== 'secondary' ? res[1][String(r.npi)] : null;
         byNpi[r.npi] = { npi: String(r.npi), name: displayName(reg && reg.name || r.name), specialty: r.primary_taxonomy,
           lat: +r.latitude, lng: +r.longitude, miles: d, registered: !!reg,
           phone: r.phone || (cur && cur.phone), fax: r.fax || (cur && cur.fax),
+          org_fax: r.org_fax || (cur && cur.org_fax), org_fax_name: r.org_fax ? r.org_fax_name : (cur && cur.org_fax_name),
           accepting: reg ? reg.accepting_new_patients : undefined, telehealth: reg ? reg.telehealth : undefined };
       });
       var list = Object.keys(byNpi).map(function (k) { return byNpi[k]; }).sort(function (a, b) { return a.miles - b.miles; });
@@ -1170,7 +1179,7 @@ VIEWS.competition = function () {
       rows.appendChild(h('div', { class: 'crow' },
         h('div', { class: 'av sm', style: '--h:' + hueFor(x.npi) }, initials(x.name)),
         h('div', { class: 'cmain' }, h('b', {}, x.name), h('div', { class: 'muted small' }, x.specialty),
-          contactLine(x.phone, x.fax)),
+          contactLine(x.phone, x.fax, x.org_fax, x.org_fax_name)),
         h('div', { class: 'cbadges' },
           x.registered ? h('span', { class: 'chip ok' }, '✓ Verified') : null,
           x.accepting === true ? h('span', { class: 'chip' }, 'Accepting') : null),

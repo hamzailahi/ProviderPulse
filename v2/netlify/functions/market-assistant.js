@@ -259,7 +259,7 @@ const TOOLS = [
   },
   {
     name: 'find_providers',
-    description: 'Counts listings of one specialty (matched by their NUCC taxonomy codes) within a radius of a ZIP, or across every ZIP on the user\'s map, and lists the nearest organizations (practices, surgery centers) and individual clinicians separately (name, specialty, city, ZIP, phone, fax, distance), with counts per ZIP and how many carry a fax, and offers the user the full list (address, phone, fax) as a CSV download. Use it whenever the user asks for a list of providers or their phone or fax numbers. Public NPPES registry data. When incomplete is true the counts are floors; never call the area empty.',
+    description: 'Counts listings of one specialty (matched by their NUCC taxonomy codes) within a radius of a ZIP, or across every ZIP on the user\'s map, and lists the nearest organizations (practices, surgery centers) and individual clinicians separately (name, specialty, city, ZIP, phone, fax, distance; a clinician with no fax of their own may carry fax_via_org: the fax of the organization they bill through at the same address, which must always be presented as "via <fax_via_org_name>", never as their own), with counts per ZIP and how many carry a fax, and offers the user the full list (address, phone, fax) as a CSV download. Use it whenever the user asks for a list of providers or their phone or fax numbers. Public NPPES registry data. When incomplete is true the counts are floors; never call the area empty.',
     strict: true,
     input_schema: {
       type: 'object',

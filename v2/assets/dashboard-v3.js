@@ -1148,9 +1148,9 @@ if (isProviderAcct) {
   // find_providers' full list (name, NPI, address, phone, fax), as a CSV.
   function listCard(a) {
     var rows = a.rows || [];
-    var cols = ['name', 'type', 'taxonomy', 'npi', 'address', 'city', 'state', 'zip', 'phone', 'fax', 'miles'];
+    var cols = ['name', 'type', 'taxonomy', 'npi', 'address', 'city', 'state', 'zip', 'phone', 'fax', 'fax_via_org', 'fax_via_org_name', 'miles'];
     var cell = function (v) { v = v == null ? '' : String(v); if (/^[=+\-@]/.test(v)) v = "'" + v; return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-    var withFax = rows.filter(function (r) { return r.fax; }).length;
+    var withFax = rows.filter(function (r) { return r.fax || r.fax_via_org; }).length;
     return el('div', { class: 'as-doc' },
       el('div', { class: 'as-doc-head' }, el('span', { class: 'as-doc-kind' }, 'Provider list'), el('b', {}, a.title || 'Providers')),
       el('div', { class: 'as-check' }, rows.length + ' listings, ' + withFax + ' with a fax number' + (a.incomplete ? '. The lookup was incomplete, so this list is a floor.' : '.')),

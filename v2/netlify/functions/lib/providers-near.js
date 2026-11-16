@@ -21,7 +21,7 @@ const GEO_MEASURE = 'DENTAL';           // the PLACES rows that carry ZCTA centr
 const MAX_PAGES = 10;                   // 1,000-row pages per table
 const LIST = 25;                        // nearest organizations and individuals listed
 const BUDGET_MS = 14000;
-const SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude,phone,fax';
+const SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude,phone,fax,org_fax,org_fax_name';
 const MAX_RADIUS = 100;                 // miles (25 until 2026-11-16; the user asked for 100-mile contact lists)
 const LIST_ROWS_MAX = 5000;             // rows in the downloadable list (_list), never sent to the model
 
@@ -118,7 +118,9 @@ async function findProviders(input, opts) {
       const mi = milesBetween(lat, lon, +r.latitude, +r.longitude);
       if (!inArea(r, mi)) continue;
       const m = TaxonomyMap.get(r.taxonomy_code);
-      hits.push({ name: r.name, type, taxonomy: (m && m.displayName) || r.primary_taxonomy, npi: r.npi, address: r.address || null, city: r.city, state: r.state || null, zip: r.zip, phone: fmtTel(r.phone), fax: fmtTel(r.fax), miles: Math.round(mi * 10) / 10 });
+      hits.push({ name: r.name, type, taxonomy: (m && m.displayName) || r.primary_taxonomy, npi: r.npi, address: r.address || null, city: r.city, state: r.state || null, zip: r.zip, phone: fmtTel(r.phone), fax: fmtTel(r.fax),
+        // No own fax: the organization they bill through at this address (048), named.
+        fax_via_org: !fmtTel(r.fax) && fmtTel(r.org_fax) ? fmtTel(r.org_fax) : null, fax_via_org_name: !fmtTel(r.fax) && fmtTel(r.org_fax) ? r.org_fax_name || null : null, miles: Math.round(mi * 10) / 10 });
     }
   }
   hits.sort((a, b) => a.miles - b.miles);
@@ -130,7 +132,7 @@ async function findProviders(input, opts) {
   // A table whose lookup failed is unknown, never zero.
   const unknownWhen = (t, n) => (t.ok ? n : n || null);
   const incomplete = failed > 0 || outOfTime || capped;
-  const brief = h => ({ name: h.name, type: h.type, taxonomy: h.taxonomy, city: h.city, zip: h.zip, phone: h.phone, fax: h.fax, miles: h.miles });
+  const brief = h => ({ name: h.name, type: h.type, taxonomy: h.taxonomy, city: h.city, zip: h.zip, phone: h.phone, fax: h.fax, fax_via_org: h.fax_via_org, fax_via_org_name: h.fax_via_org_name, miles: h.miles });
   return {
     zip, specialty: label,
     area: useMap ? { map_zips: mapZips.length } : { radius_miles: radius },
@@ -138,7 +140,7 @@ async function findProviders(input, opts) {
     organizations: unknownWhen(orgs, orgN),
     individuals: unknownWhen(people, indN),
     lookups: { organizations: orgs.ok ? (orgs.capped ? 'capped' : 'complete') : 'failed', individuals: people.ok ? (people.capped ? 'capped' : 'complete') : 'failed' },
-    with_fax: { organizations: hits.filter(h => h.type === 'organization' && h.fax).length, individuals: hits.filter(h => h.type === 'individual' && h.fax).length },
+    with_fax: { organizations: hits.filter(h => h.type === 'organization' && h.fax).length, individuals: hits.filter(h => h.type === 'individual' && h.fax).length, individuals_via_organization: hits.filter(h => h.fax_via_org).length },
     nearest_organizations: hits.filter(h => h.type === 'organization').slice(0, LIST).map(brief),
     nearest_individuals: hits.filter(h => h.type === 'individual').slice(0, LIST).map(brief),
     // Every listing, for the browser's CSV download only; market-assistant

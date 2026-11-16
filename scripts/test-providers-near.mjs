@@ -110,6 +110,13 @@ const page = rows => u => (u.includes('offset=0') ? rows : []);
   check('with_fax counts listings carrying a fax', r.with_fax.individuals === 1);
   check('the full list carries NPI and address for the CSV', r._list.length === 2 && r._list[0].npi === '20' && r._list[0].address === '1 MAIN ST');
   check('the query selects phone and fax', f.urls.some(u => /select=[^&]*phone,fax/.test(u)));
+  const V = [Object.assign(L('30', 'DR VIA', GI, '38018', 35.10, -89.77), { fax: null, org_fax: '5072840000', org_fax_name: 'MAYO CLINIC' }),
+    Object.assign(L('31', 'DR OWN', GI, '38018', 35.10, -89.77), { fax: '9015550199', org_fax: '5072840000', org_fax_name: 'MAYO CLINIC' })];
+  const r2 = await findProviders({ zip: '38018', specialty: 'Digestive / gastroenterology', radius_miles: 10 }, { fetch: fakeDb([[/cdc_places\?zip=eq\./, [{ zip: '38018', lat: 35.10, lon: -89.77 }]], [/\/provider_individuals\?/, page(V)]]), env });
+  const via = r2.nearest_individuals.find(h => h.name === 'DR VIA'), own = r2.nearest_individuals.find(h => h.name === 'DR OWN');
+  check('no own fax: the organization fax comes back separately, named, never as their own', via.fax === null && via.fax_via_org === '(507) 284-0000' && via.fax_via_org_name === 'MAYO CLINIC');
+  check('an own fax wins and no organization fax is shown', own.fax === '(901) 555-0199' && own.fax_via_org === null);
+  check('with_fax counts organization faxes apart', r2.with_fax.individuals === 1 && r2.with_fax.individuals_via_organization === 1);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

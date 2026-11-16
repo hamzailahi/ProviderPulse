@@ -3505,7 +3505,7 @@
             // Stored NPPES phone and fax (migration 047) first: one indexed
             // read, shown before the slower live registry lookup.
             const stored = await storedContact(npi);
-            if (stored && (stored.phone || stored.fax)) renderNPPESData(el, stored);
+            if (stored && (stored.phone || stored.fax || stored.org_fax)) renderNPPESData(el, stored);
 
             try {
                 const res = await fetch(`/.netlify/functions/nppes-lookup?npi=${npi}`);
@@ -3536,6 +3536,8 @@
                     authorized_title: basic.authorized_official_title_or_position || null,
                     phone: practiceAddr.telephone_number || stored?.phone || null,
                     fax: practiceAddr.fax_number || stored?.fax || null,
+                    org_fax: stored?.org_fax || null,
+                    org_fax_name: stored?.org_fax_name || null,
                     last_updated: result.last_updated || null,
                     status: basic.status || null,
                 };
@@ -3553,7 +3555,7 @@
         async function storedContact(npi) {
             if (!/^\d{10}$/.test(String(npi))) return null;
             const one = async (table) => {
-                const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?npi=eq.${npi}&select=phone,fax&limit=1`,
+                const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?npi=eq.${npi}&select=${table === 'clinics' ? 'phone,fax' : 'phone,fax,org_fax,org_fax_name'}&limit=1`,
                     { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: AbortSignal.timeout(5000) });
                 if (!r.ok) throw new Error(String(r.status));
                 const rows = await r.json();
@@ -3562,7 +3564,7 @@
             try {
                 const [a, b] = await Promise.all([one('clinics'), one('provider_individuals')]);
                 const row = a || b;
-                return row ? { phone: fmtTel(row.phone), fax: fmtTel(row.fax) } : null;
+                return row ? { phone: fmtTel(row.phone), fax: fmtTel(row.fax), org_fax: fmtTel(row.org_fax), org_fax_name: row.org_fax_name || null } : null;
             } catch (e) { return null; }
         }
         function fmtTel(v) {
@@ -3576,6 +3578,7 @@
             let html = '';
             if (info.phone) html += `Phone <a href="tel:${esc(String(info.phone).replace(/[^\d+]/g,''))}" style="color:var(--accent);text-decoration:none;">${esc(info.phone)}</a><br/>`;
             if (info.fax) html += `Fax ${esc(info.fax)}<br/>`;
+            else if (info.org_fax) html += `Fax ${esc(info.org_fax)} <span style="color:var(--text-muted);font-size:10px;">via ${esc(info.org_fax_name || 'their organization')}</span><br/>`;
             if (info.authorized_official) html += `${info.authorized_official}${info.authorized_title ? ` · ${info.authorized_title}` : ''}<br/>`;
             if (info.type) html += `<span style="color:var(--text-muted);font-size:10px;">${info.type}${info.status ? ' · ' + info.status : ''}</span>`;
             if (!html) html = '<em style="color:var(--text-muted);font-size:10px;">No additional contact info</em>';
