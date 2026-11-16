@@ -259,14 +259,14 @@ const TOOLS = [
   },
   {
     name: 'find_providers',
-    description: 'Counts listings of one specialty (matched by their NUCC taxonomy codes) within a radius of a ZIP, or across every ZIP on the user\'s map, and lists the nearest organizations (practices, surgery centers) and individual clinicians separately (name, specialty, city, ZIP, distance), with counts per ZIP. Public NPPES registry data. When incomplete is true the counts are floors; never call the area empty.',
+    description: 'Counts listings of one specialty (matched by their NUCC taxonomy codes) within a radius of a ZIP, or across every ZIP on the user\'s map, and lists the nearest organizations (practices, surgery centers) and individual clinicians separately (name, specialty, city, ZIP, phone, fax, distance), with counts per ZIP and how many carry a fax, and offers the user the full list (address, phone, fax) as a CSV download. Use it whenever the user asks for a list of providers or their phone or fax numbers. Public NPPES registry data. When incomplete is true the counts are floors; never call the area empty.',
     strict: true,
     input_schema: {
       type: 'object',
       properties: {
         zip: zipProp,
         specialty: Object.assign({ description: 'Specialty to look for' }, specEnum),
-        radius_miles: { type: 'integer', description: 'Search radius, 1 to 25 miles (ignored with use_map_area)' },
+        radius_miles: { type: 'integer', description: 'Search radius, 1 to 100 miles (ignored with use_map_area)' },
         use_map_area: { type: 'boolean', description: 'true: every ZIP loaded on the user\'s map instead of a radius (use for reports)' }
       },
       required: ['zip', 'specialty', 'radius_miles', 'use_map_area'],
@@ -554,7 +554,19 @@ const RUNNERS = {
   get_market_insights: getMarketInsights,
   compare_markets: compareMarkets,
   run_scenario: runScenario,
-  find_providers: (input, ctx) => findProviders(input, input && input.use_map_area ? { zips: mapZips(ctx && ctx.messages) } : undefined),
+  find_providers: async (input, ctx) => {
+    const out = await findProviders(input, input && input.use_map_area ? { zips: mapZips(ctx && ctx.messages) } : undefined);
+    // The full list (address, phone, fax) goes to the browser as a CSV
+    // download, never into the model's context.
+    if (out && Array.isArray(out._list)) {
+      const rows = out._list; delete out._list;
+      if (rows.length && ctx && ctx.actions) {
+        ctx.actions.push({ type: 'provider_list', title: `${out.specialty} ${out.area && out.area.radius_miles ? 'within ' + out.area.radius_miles + ' miles of ' + out.zip : 'on the map around ' + out.zip}`, incomplete: !!out.incomplete, rows });
+        out.download = `The full list of ${rows.length} listings (name, NPI, address, phone, fax, distance) is offered to the user as a CSV download under your answer. Point them to it instead of writing every row.`;
+      }
+    }
+    return out;
+  },
   get_procedures: (input, ctx) => getProcedures(input, input && input.use_map_area ? { zips: mapZips(ctx && ctx.messages) } : undefined),
   get_area_profile: (input, ctx) => getAreaProfile(input, { messages: ctx && ctx.messages, keyMeasures: profileMeasures(ctx && ctx.messages) }),
   query_database: queryDatabase,

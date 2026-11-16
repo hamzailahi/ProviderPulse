@@ -201,7 +201,9 @@ check('find_providers asks the database for the specialty\'s codes in a location
   queries.some(q => /\/clinics\?latitude=gte\..*taxonomy_code=in\.\(/.test(q)) && !queries.some(q => /\/clinics\?zip=in/.test(q)));
 check('find_providers splits organizations and individuals', found.organizations === 1 && found.individuals === 1);
 check('query_database refuses tables outside the allowlist', res[1].is_error === true && /refused|not/i.test(res[1].content));
-check('update_map with nothing valid is an error, not an action', res[2].is_error === true && r.body.actions.length === 0);
+check('update_map with nothing valid is an error, not an action', res[2].is_error === true && !r.body.actions.some(a => a.type === 'update_map'));
+check('find_providers sends its full list to the browser as a download, never to the model',
+  !('_list' in found) && /CSV download/.test(found.download || '') && r.body.actions.some(a => a.type === 'provider_list' && a.rows.length === 2 && 'fax' in a.rows[0] && 'npi' in a.rows[0]));
 
 console.log('\n6b. The what-if tool');
 fake = fakeClient([

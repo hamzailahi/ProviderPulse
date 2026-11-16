@@ -1087,6 +1087,7 @@ if (isProviderAcct) {
       }
     }
     (m.actions || []).forEach(function (a) {
+      if (a.type === 'provider_list') { box.appendChild(listCard(a)); return; }
       box.appendChild(el('div', { class: 'as-action' }, 'Map moved to: ' + [a.zip, a.specialty].filter(Boolean).join(' · ')));
     });
     (m.docs || []).forEach(function (d) { box.appendChild(docCard(d)); });
@@ -1142,6 +1143,22 @@ if (isProviderAcct) {
       root.appendChild(inline(para.join(' '), el('p')));
     }
     return root;
+  }
+
+  // find_providers' full list (name, NPI, address, phone, fax), as a CSV.
+  function listCard(a) {
+    var rows = a.rows || [];
+    var cols = ['name', 'type', 'taxonomy', 'npi', 'address', 'city', 'state', 'zip', 'phone', 'fax', 'miles'];
+    var cell = function (v) { v = v == null ? '' : String(v); if (/^[=+\-@]/.test(v)) v = "'" + v; return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var withFax = rows.filter(function (r) { return r.fax; }).length;
+    return el('div', { class: 'as-doc' },
+      el('div', { class: 'as-doc-head' }, el('span', { class: 'as-doc-kind' }, 'Provider list'), el('b', {}, a.title || 'Providers')),
+      el('div', { class: 'as-check' }, rows.length + ' listings, ' + withFax + ' with a fax number' + (a.incomplete ? '. The lookup was incomplete, so this list is a floor.' : '.')),
+      el('div', { class: 'as-doc-actions' }, el('button', { type: 'button', class: 'as-doc-btn', onclick: function () {
+        var csv = cols.join(',') + '\n' + rows.map(function (r) { return cols.map(function (c) { return cell(r[c]); }).join(','); }).join('\n');
+        var link = el('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: (a.title || 'providers').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') + '.csv' });
+        document.body.appendChild(link); link.click(); link.remove();
+      } }, 'Download CSV')));
   }
 
   var KIND = { market_memo: 'Market memo', expansion_one_pager: 'Expansion one-pager', client_pitch: 'Client pitch' };

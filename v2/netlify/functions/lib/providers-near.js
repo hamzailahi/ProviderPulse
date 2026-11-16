@@ -21,7 +21,15 @@ const GEO_MEASURE = 'DENTAL';           // the PLACES rows that carry ZCTA centr
 const MAX_PAGES = 10;                   // 1,000-row pages per table
 const LIST = 25;                        // nearest organizations and individuals listed
 const BUDGET_MS = 14000;
-const SELECT = 'npi,name,city,zip,primary_taxonomy,taxonomy_code,latitude,longitude';
+const SELECT = 'npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude,phone,fax';
+const MAX_RADIUS = 100;                 // miles (25 until 2026-11-16; the user asked for 100-mile contact lists)
+const LIST_ROWS_MAX = 5000;             // rows in the downloadable list (_list), never sent to the model
+
+// 10 digits as (901) 555-0100, so the figure check traces the model's copy.
+const fmtTel = v => {
+  const d = String(v || '').replace(/\D/g, '');
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : null;
+};
 
 const milesBetween = (lat1, lon1, lat2, lon2) => {
   const R = 3958.8, r = Math.PI / 180;
@@ -42,7 +50,7 @@ async function findProviders(input, opts) {
   if (!codes.length) return { error: 'No taxonomy codes for ' + label };
   const mapZips = Array.isArray(o.zips) ? [...new Set(o.zips.filter(isZip))] : null;
   const useMap = !!(mapZips && mapZips.length);
-  const radius = Math.max(1, Math.min(25, Number(input && input.radius_miles) || 10));
+  const radius = Math.max(1, Math.min(MAX_RADIUS, Number(input && input.radius_miles) || 10));
 
   const H = { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`, Accept: 'application/json' };
   let failed = 0, outOfTime = false;
@@ -110,7 +118,7 @@ async function findProviders(input, opts) {
       const mi = milesBetween(lat, lon, +r.latitude, +r.longitude);
       if (!inArea(r, mi)) continue;
       const m = TaxonomyMap.get(r.taxonomy_code);
-      hits.push({ name: r.name, type, taxonomy: (m && m.displayName) || r.primary_taxonomy, city: r.city, zip: r.zip, miles: Math.round(mi * 10) / 10 });
+      hits.push({ name: r.name, type, taxonomy: (m && m.displayName) || r.primary_taxonomy, npi: r.npi, address: r.address || null, city: r.city, state: r.state || null, zip: r.zip, phone: fmtTel(r.phone), fax: fmtTel(r.fax), miles: Math.round(mi * 10) / 10 });
     }
   }
   hits.sort((a, b) => a.miles - b.miles);
@@ -122,6 +130,7 @@ async function findProviders(input, opts) {
   // A table whose lookup failed is unknown, never zero.
   const unknownWhen = (t, n) => (t.ok ? n : n || null);
   const incomplete = failed > 0 || outOfTime || capped;
+  const brief = h => ({ name: h.name, type: h.type, taxonomy: h.taxonomy, city: h.city, zip: h.zip, phone: h.phone, fax: h.fax, miles: h.miles });
   return {
     zip, specialty: label,
     area: useMap ? { map_zips: mapZips.length } : { radius_miles: radius },
@@ -129,8 +138,13 @@ async function findProviders(input, opts) {
     organizations: unknownWhen(orgs, orgN),
     individuals: unknownWhen(people, indN),
     lookups: { organizations: orgs.ok ? (orgs.capped ? 'capped' : 'complete') : 'failed', individuals: people.ok ? (people.capped ? 'capped' : 'complete') : 'failed' },
-    nearest_organizations: hits.filter(h => h.type === 'organization').slice(0, LIST),
-    nearest_individuals: hits.filter(h => h.type === 'individual').slice(0, LIST),
+    with_fax: { organizations: hits.filter(h => h.type === 'organization' && h.fax).length, individuals: hits.filter(h => h.type === 'individual' && h.fax).length },
+    nearest_organizations: hits.filter(h => h.type === 'organization').slice(0, LIST).map(brief),
+    nearest_individuals: hits.filter(h => h.type === 'individual').slice(0, LIST).map(brief),
+    // Every listing, for the browser's CSV download only; market-assistant
+    // strips it before the model sees the result.
+    _list: hits.slice(0, LIST_ROWS_MAX),
+    list_rows: Math.min(hits.length, LIST_ROWS_MAX),
     // Every ZIP, not the top 20 (2026-10-24): a report read ZIPs missing
     // from a 20-row list as having no GI listings. In map mode every map ZIP
     // is listed, with 0 only when the lookup was complete, else null.

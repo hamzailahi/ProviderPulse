@@ -99,5 +99,18 @@ const page = rows => u => (u.includes('offset=0') ? rows : []);
   check('a page that fails once is retried and the organizations come back', r2.organizations === 2 && r2.lookups.organizations === 'complete' && r2.incomplete === false);
 }
 
+// 7. Contact lists (2026-11-16): phone and fax formatted, a 100-mile radius, the full list for the CSV
+{
+  const P = [Object.assign(L('20', 'DR FAX', GI, '38018', 35.10, -89.77), { phone: '9015550100', fax: '901-555-0199', address: '1 MAIN ST', state: 'TN' }),
+    Object.assign(L('21', 'DR FAR', GI, '38655', 34.37, -89.52), { phone: null, fax: null })];
+  const f = fakeDb([[/cdc_places\?zip=eq\./, [{ zip: '38018', lat: 35.10, lon: -89.77 }]], [/\/provider_individuals\?/, page(P)]]);
+  const r = await findProviders({ zip: '38018', specialty: 'Digestive / gastroenterology', radius_miles: 100 }, { fetch: f, env });
+  check('a 100-mile radius is honoured', r.area.radius_miles === 100 && r.individuals === 2, JSON.stringify(r.area));
+  check('phone and fax are formatted for the model', r.nearest_individuals[0].phone === '(901) 555-0100' && r.nearest_individuals[0].fax === '(901) 555-0199');
+  check('with_fax counts listings carrying a fax', r.with_fax.individuals === 1);
+  check('the full list carries NPI and address for the CSV', r._list.length === 2 && r._list[0].npi === '20' && r._list[0].address === '1 MAIN ST');
+  check('the query selects phone and fax', f.urls.some(u => /select=[^&]*phone,fax/.test(u)));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
