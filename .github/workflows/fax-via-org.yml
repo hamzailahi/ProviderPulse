@@ -1,4 +1,4 @@
-name: Fax via organization (dry run)
+name: Fax via organization
 
 # Manual, read only. Counts clinicians with no fax who would get their
 # organization's fax under the user's rule (Medicare reassignment to that
@@ -9,6 +9,14 @@ name: Fax via organization (dry run)
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: dry_run writes nothing; apply runs migration 048 and writes org_fax
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+      disk_free_gb:
+        description: Free database disk in GB, from Supabase (apply needs at least 1)
+        required: false
       ppef_url:
         description: Optional direct CSV link to the Public Provider Enrollment file
         required: false
@@ -37,9 +45,11 @@ jobs:
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y -q postgresql-client-17
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
-      - name: Dry run
+      - name: Run
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          MODE: ${{ inputs.mode }}
+          DISK_FREE_GB: ${{ inputs.disk_free_gb }}
           PPEF_URL: ${{ inputs.ppef_url }}
           REASSIGN_URL: ${{ inputs.reassign_url }}
           WORK: ${{ runner.temp }}/faxorg
