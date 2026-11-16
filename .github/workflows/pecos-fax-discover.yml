@@ -1,0 +1,32 @@
+name: PECOS fax discovery
+
+# Manual, read only: lists CMS provider and PECOS datasets and whether any
+# carries a fax column. Commits supabase/reference/pecos-fax-discovery.md.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - run: node scripts/pecos-fax-discover.mjs
+      - name: Commit the report
+        run: |
+          git add supabase/reference/pecos-fax-discovery.md
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "PECOS fax discovery $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main
