@@ -12,6 +12,19 @@ Compares the access factor the market model uses today (listings per adult withi
 - Listings read: 408,374; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
 - Catchment edges: 30 minutes for everyday care, 60 for most specialties, 90 for oncology, genetics, infectious disease and plastic surgery (reviewable assumptions, listed per row below)
 
+## Routing sanity check
+
+Regional median: 3.06 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (7.66), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
+
+- Flagged: 4; re-anchored: 4; still implausible (left out of the rank comparison, marked in the CSV): 0
+
+| ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
+|---|---|---|---|---|---|---|
+| 24834 | no | 8.78 | 100% | 4.57 | 100% | yes (2.13) |
+| 24868 | no | 8.08 | 100% | 5.49 | 100% | yes (1.45) |
+| 41554 | no | 9.03 | 100% | 4.87 | 100% | yes (1.89) |
+| 41821 | no | 7.66 | 100% | 4.83 | 100% | yes (1.22) |
+
 ## By specialty
 
 Rank agreement is Spearman's rho between the two access factors across the state's ZIPs (1 = same order). "Moved 15+" counts ZIPs whose access factor changed by 15 points or more.
