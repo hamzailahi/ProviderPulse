@@ -654,6 +654,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ### 2026-11-17
 
 - Added a read-only drive-time access study, `access-dry-run.yml`: the Enhanced Two-Step Floating Catchment Area method (E2SFCA, Luo & Qi 2009) with a Gaussian distance decay and specialty-specific catchments (30, 60 or 90 minutes), routed on OpenStreetMap roads with OSRM. It compares that method with the market score's current 10-mile access ratio for every ZIP in one state, starting with Tennessee. The live score is unchanged until the results are reviewed.
+- The access study now checks its own routing: a ZIP whose drives are implausibly long for their straight-line distance (its centre snapped onto a road cut off from the network) is moved to the best-connected nearby road and routed again, and any still implausible is listed and left out of the comparison.
 - Added `state-listings-export.yml` (manual, read only): per state, a CSV of every organization and clinician with phone, fax and the organization fax, plus a second CSV of only those with a fax.
 
 ### 2026-11-16

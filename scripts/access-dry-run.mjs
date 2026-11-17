@@ -47,6 +47,71 @@ for (let s = 0; s < N; s += SRC) {
   if ((s / SRC) % 5 === 0) console.log(`  routed ${Math.min(s + SRC, N)} of ${N} origins`);
 }
 if (failed) throw new Error(`${failed} table requests failed; not reporting a partial matrix`);
+
+// ---- routing sanity check (2026-11-17, the user's go-ahead after the first
+// Tennessee run showed a few ZIPs, e.g. 37218, jumping 60 to 100 points in
+// nearly every specialty). A ZIP centre that OSRM snaps onto a road cut off
+// from the network (a riverfront, park or private road) makes every drive
+// from it look long. Per ZIP: the median drive minutes per straight-line mile
+// to its 12 nearest ZIPs; flagged when over FLAG_X times the regional median,
+// or when under half of those neighbours are reachable. A flagged ZIP is
+// re-anchored: points on a small grid around its centre (up to about 2.5 km)
+// are snapped to roads, each is routed to the same neighbours, and the best
+// one replaces the centre if it is clearly better; its whole row and column
+// are then routed again. A ZIP still implausible afterwards is reported and
+// left out of the rank comparison (its result is shown as unreliable).
+const FLAG_X = 2.5, K = 12;
+const near12 = zips.map((z, i) => zips.map((y, j) => [j, milesBetween(z, y)]).filter(([j, m]) => j !== i && m > 0.5).sort((a, b) => a[1] - b[1]).slice(0, K));
+const detour = i => {
+  const rs = [], nb = near12[i]; let ok = 0;
+  for (const [j, m] of nb) { const t = T[i * N + j], u = T[j * N + i]; if (Number.isFinite(t) && Number.isFinite(u)) { ok++; rs.push(Math.max(t, u) / m); } }
+  rs.sort((a, b) => a - b);
+  return { med: rs.length ? rs[rs.length >> 1] : Infinity, reach: nb.length ? ok / nb.length : 0 };
+};
+let D = zips.map((_, i) => detour(i));
+const gmed = (() => { const v = D.map(d => d.med).filter(Number.isFinite).sort((a, b) => a - b); return v[v.length >> 1]; })();
+const isBad = d => !(d.med <= FLAG_X * gmed) || d.reach < 0.5;
+const flagged = zips.map((z, i) => i).filter(i => isBad(D[i]));
+console.log(`regional median ${gmed.toFixed(2)} drive min per mile; ${flagged.length} ZIPs flagged`);
+const getJson = async url => { for (let t = 0; t < 3; t++) { try { const r = await fetch(url); const b = await r.json(); if (b.code === 'Ok') return b; } catch (e) { /* retry */ } } return null; };
+const fixes = [];
+for (const i of flagged) {
+  const z = zips[i], before = D[i];
+  const cands = new Map();
+  for (const dy of [-0.02, -0.01, 0, 0.01, 0.02]) for (const dx of [-0.02, -0.01, 0, 0.01, 0.02]) {
+    const b = await getJson(`${osrm}/nearest/v1/driving/${(z.lon + dx).toFixed(5)},${(z.lat + dy).toFixed(5)}?number=2`);
+    for (const w of (b && b.waypoints) || []) cands.set(w.location.join(','), w.location);
+  }
+  const C = [...cands.values()], nb = near12[i].map(([j]) => zips[j]);
+  if (!C.length || !nb.length) { fixes.push({ zip: z.zip, before, after: before, moved: false }); continue; }
+  const coords = C.map(c => c.join(',')).concat(nb.map(y => `${y.lon},${y.lat}`)).join(';');
+  const tb = await getJson(`${osrm}/table/v1/driving/${coords}?sources=${C.map((_, k) => k).join(';')}&destinations=${nb.map((_, k) => C.length + k).join(';')}&annotations=duration`);
+  let best = null;
+  if (tb) C.forEach((c, k) => {
+    const rs = []; tb.durations[k].forEach((sec, q) => { if (sec != null) rs.push(sec / 60 / near12[i][q][1]); });
+    rs.sort((a, b) => a - b);
+    const med = rs.length ? rs[rs.length >> 1] : Infinity, reach = rs.length / nb.length;
+    if (reach >= 0.5 && (!best || med < best.med)) best = { c, med, reach };
+  });
+  if (!best || !(best.med < before.med * 0.8 || before.reach < 0.5)) { fixes.push({ zip: z.zip, before, after: before, moved: false }); continue; }
+  // Re-route the ZIP's whole row and column from the new anchor.
+  const anchor = `${best.c[0]},${best.c[1]}`;
+  for (let d = 0; d < N; d += DST) {
+    const dst = zips.slice(d, d + DST);
+    const b = await getJson(`${osrm}/table/v1/driving/${anchor};${dst.map(y => `${y.lon},${y.lat}`).join(';')}?sources=0&destinations=${dst.map((_, k) => k + 1).join(';')}&annotations=duration`);
+    if (!b) throw new Error('re-anchor routing failed for ' + z.zip);
+    b.durations[0].forEach((sec, k) => { T[i * N + d + k] = sec == null ? NaN : sec / 60; });
+    const c = await getJson(`${osrm}/table/v1/driving/${dst.map(y => `${y.lon},${y.lat}`).join(';')};${anchor}?sources=${dst.map((_, k) => k).join(';')}&destinations=${dst.length}&annotations=duration`);
+    if (!c) throw new Error('re-anchor routing failed for ' + z.zip);
+    c.durations.forEach((row, k) => { T[(d + k) * N + i] = row[0] == null ? NaN : row[0] / 60; });
+  }
+  const off = milesBetween(z, { lat: best.c[1], lon: best.c[0] });
+  fixes.push({ zip: z.zip, before, moved: true, offMiles: off });
+}
+D = zips.map((_, i) => detour(i));
+for (const f of fixes) f.after = D[idx.get(f.zip)];
+const unreliable = new Set(fixes.filter(f => isBad(f.after)).map(f => f.zip));
+console.log(`re-anchored ${fixes.filter(f => f.moved).length}; still implausible ${unreliable.size}`);
 // Travel inside a ZIP: half the drive to its nearest other ZIP, 2 to 10 minutes.
 for (let i = 0; i < N; i++) {
   let m = Infinity;
@@ -85,8 +150,8 @@ for (const [label] of SCORED) {
   for (const z of focus) {
     const a = A.get(z.zip), c = C.get(z.zip);
     const fa = accessFactor(a == null ? null : a * 1000, rate), fc = accessFactor(c == null ? null : c * 1000, rate);
-    rows.push([label, z.zip, z.adults, fmt(c), fmt(a), fc ?? '', fa ?? '', d0].join(','));
-    if (fa != null && fc != null) {
+    rows.push([label, z.zip, z.adults, fmt(c), fmt(a), fc ?? '', fa ?? '', d0, unreliable.has(z.zip) ? 'unreliable_routing' : ''].join(','));
+    if (fa != null && fc != null && !unreliable.has(z.zip)) {
       pairs.push([fc, fa]);
       if (Math.abs(fa - fc) >= 15) moved++;
       bigUp.push([fa - fc, z.zip]); bigDown.push([fa - fc, z.zip]);
@@ -97,7 +162,7 @@ for (const [label] of SCORED) {
   summary.push({ label, d0, rate, n: pairs.length, rho, moved, up: bigUp.slice(0, 3), down: bigDown.slice(0, 3),
     listings: [...supply.values()].reduce((x, y) => x + y, 0) });
 }
-writeFileSync(arg('csv'), 'specialty,zip,adults,crude_per_1k,e2sfca_per_1k,crude_access,e2sfca_access,catchment_minutes\n' + rows.join('\n') + '\n');
+writeFileSync(arg('csv'), 'specialty,zip,adults,crude_per_1k,e2sfca_per_1k,crude_access,e2sfca_access,catchment_minutes,flag\n' + rows.join('\n') + '\n');
 
 // ---- report
 const r2 = v => (v == null ? 'n/a' : v.toFixed(2));
@@ -112,6 +177,11 @@ const lines = [
   `- Focus ZIPs with no road link to any other ZIP (islands, unrouted centres): ${unroutable}`,
   `- Listings read: ${supplyRows.toLocaleString()}; outside the region's ZIP list (no centre, or a mistyped ZIP): ${supplyOutside.toLocaleString()}`,
   '- Catchment edges: 30 minutes for everyday care, 60 for most specialties, 90 for oncology, genetics, infectious disease and plastic surgery (reviewable assumptions, listed per row below)', '',
+  '## Routing sanity check', '',
+  `Regional median: ${gmed.toFixed(2)} drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above ${FLAG_X}x that (${(FLAG_X * gmed).toFixed(2)}), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.`, '',
+  `- Flagged: ${fixes.length}; re-anchored: ${fixes.filter(f => f.moved).length}; still implausible (left out of the rank comparison, marked in the CSV): ${unreliable.size}${unreliable.size ? ' (' + [...unreliable].join(', ') + ')' : ''}`, '',
+  ...(fixes.length ? ['| ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |', '|---|---|---|---|---|---|---|',
+    ...fixes.map(f => `| ${f.zip} | ${inFocus({ zip: f.zip }) ? 'yes' : 'no'} | ${Number.isFinite(f.before.med) ? f.before.med.toFixed(2) : 'none'} | ${Math.round(f.before.reach * 100)}% | ${Number.isFinite(f.after.med) ? f.after.med.toFixed(2) : 'none'} | ${Math.round(f.after.reach * 100)}% | ${f.moved ? 'yes (' + f.offMiles.toFixed(2) + ')' : 'no'} |`), ''] : []),
   '## By specialty', '',
   'Rank agreement is Spearman\'s rho between the two access factors across the state\'s ZIPs (1 = same order). "Moved 15+" counts ZIPs whose access factor changed by 15 points or more.', '',
   '| Specialty | Catchment (min) | Listings in region | US rate per 1k | Rank agreement | ZIPs moved 15+ | Most improved access (new minus old) | Most worsened |',
