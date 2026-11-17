@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-16. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-17. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -650,6 +650,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-17
+
+- Added `state-listings-export.yml` (manual, read only): per state, a CSV of every organization and clinician with phone, fax and the organization fax, plus a second CSV of only those with a fax.
 
 ### 2026-11-16
 

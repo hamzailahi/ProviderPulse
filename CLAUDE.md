@@ -1810,6 +1810,7 @@ All in `.github/workflows/`, each with `workflow_dispatch`:
   Summary in `supabase/reference/unmapped-listings.md` (`[skip netlify]`).
   The SQL was checked on a local Postgres 16 before shipping (no CI test:
   CI has no database).
+- **Export listings by state** (`state-listings-export.yml`, manual, read only, 2026-11-17): for each state in `states` (default `TN AR MS AL`), `<ST>-all-listings.csv` (every `clinics` and `provider_individuals` row: type, NPI, name, taxonomy, address, phone, `fax`, `fax_via_org`, `fax_via_org_name`, `fax_via_org_npi`) and `<ST>-with-fax.csv` (only rows with either fax), zipped as a 7-day artifact and, with `push_branch` (tmp/ only), an orphan branch; delete it after use.
 - **Export unplaced listings** (`unplaced-export.yml`, manual, read only,
   2026-11-04): every row with a null latitude or longitude in the three
   directory tables as one CSV of public NPPES fields (table, NPI or parent

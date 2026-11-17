@@ -1,0 +1,82 @@
+name: Export listings by state
+
+# Manual, read only. For each state: every organization (clinics) and
+# clinician (provider_individuals) as one CSV of public NPPES fields with
+# phone, own fax and, for clinicians with no fax of their own, the fax of the
+# organization they bill through (fax_via_org, migration 048); plus a second
+# CSV of only the listings that have either fax. A 7-day artifact and, with
+# push_branch (tmp/ only), an orphan branch. Delete it afterwards with
+# tmp-branch-cleanup.yml; never merge it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      states:
+        description: "Two-letter state codes, space separated"
+        default: "TN AR MS AL"
+      push_branch:
+        description: "Optional throwaway branch for the files (must start with tmp/)"
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Export (read only)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          STATES: ${{ inputs.states }}
+        run: |
+          [ -n "$SUPABASE_DB_URL" ] || { echo "::error::Add the repository secret SUPABASE_DB_URL."; exit 1; }
+          mkdir -p out
+          echo "| State | All listings | With a fax |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for st in $STATES; do
+            [[ "$st" =~ ^[A-Z]{2}$ ]] || { echo "::error::bad state $st"; exit 1; }
+            psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X <<SQL
+          begin transaction read only;
+          set local statement_timeout = '20min';
+          \\copy (select 'organization' as type, npi::text as npi, name, primary_taxonomy as taxonomy, taxonomy_code, address, city, state, zip, phone, fax, null::text as fax_via_org, null::text as fax_via_org_name, null::text as fax_via_org_npi from public.clinics where state = '$st' union all select 'clinician', npi::text, name, primary_taxonomy, taxonomy_code, address, city, state, zip, phone, fax, org_fax, org_fax_name, org_fax_npi from public.provider_individuals where state = '$st' order by 9, 1, 3) to 'out/$st-all-listings.csv' with (format csv, header true)
+          commit;
+          SQL
+            # faxes only: own fax (col 11) or via organization (col 12); csv-aware filter
+            python3 -c "import csv,sys; r=csv.reader(open('out/$st-all-listings.csv',newline='')); w=csv.writer(open('out/$st-with-fax.csv','w',newline='')); h=next(r); w.writerow(h); [w.writerow(x) for x in r if x[10] or x[11]]"
+            all=$(python3 -c "import csv; print(sum(1 for _ in csv.reader(open('out/$st-all-listings.csv',newline='')))-1)")
+            fx=$(python3 -c "import csv; print(sum(1 for _ in csv.reader(open('out/$st-with-fax.csv',newline='')))-1)")
+            echo "$st: $all listings, $fx with a fax"
+            echo "| $st | $all | $fx |" >> "$GITHUB_STEP_SUMMARY"
+            [ "$all" -gt 1000 ] || { echo "::error::$st exported only $all rows"; exit 1; }
+          done
+          (cd out && zip -q ../state-listings.zip *.csv)
+          ls -l out state-listings.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: state-listings
+          path: state-listings.zip
+          retention-days: 7
+      - name: Push to a throwaway branch
+        if: inputs.push_branch != ''
+        env:
+          BRANCH: ${{ inputs.push_branch }}
+        run: |
+          case "$BRANCH" in tmp/*) ;; *) echo "push_branch must start with tmp/"; exit 1;; esac
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan "$BRANCH"
+          git rm -rq --cached .
+          git add -f state-listings.zip
+          git commit -qm "State listings export (temporary branch; delete after use) [skip netlify]"
+          git push -f origin "HEAD:refs/heads/$BRANCH"
