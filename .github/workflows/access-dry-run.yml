@@ -1,0 +1,78 @@
+name: E2SFCA access dry run
+
+# Manual, read only. Drive-time E2SFCA access (Luo & Qi 2009) beside the
+# market model's current crude access ratio, per scored specialty, for every
+# ZIP in one state (plus a ~60-mile border strip so cross-state travel
+# counts). Roads from OpenStreetMap (Geofabrik) routed with OSRM. Writes
+# supabase/reference/access-e2sfca/<state>-dry-run.md and keeps the per-ZIP
+# CSV as a 7-day artifact. Nothing in the database or on the site changes.
+# Defaults are Tennessee (the user's pilot, 2026-11-17).
+
+on:
+  workflow_dispatch:
+    inputs:
+      state_label:
+        description: State name for the report
+        default: "Tennessee"
+      focus:
+        description: ZIP3 range of the state
+        default: "370-385"
+      bbox:
+        description: "minlon,minlat,maxlon,maxlat (the state plus about 60 miles)"
+        default: "-91.38,34.11,-80.58,37.55"
+      geofabrik:
+        description: Geofabrik us/<state> extracts covering the box
+        default: "us/tennessee us/kentucky us/virginia us/north-carolina us/georgia us/alabama us/mississippi us/arkansas us/missouri us/south-carolina us/west-virginia us/illinois"
+      sample:
+        description: ZIPs to show in detail
+        default: "38017 38018 38103 37203 37902 37402 37683 38551 37336 38464"
+
+permissions:
+  contents: write
+
+jobs:
+  dry_run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install psql 17 and osmium
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common osmium-tool
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Dry run
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          STATE_LABEL: ${{ inputs.state_label }}
+          FOCUS: ${{ inputs.focus }}
+          BBOX: ${{ inputs.bbox }}
+          GEOFABRIK: ${{ inputs.geofabrik }}
+          SAMPLE: ${{ inputs.sample }}
+          WORK: ${{ runner.temp }}/access
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: bash scripts/access-dry-run.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2sfca-access
+          path: ${{ runner.temp }}/access/*.csv.gz
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Commit the report
+        if: always()
+        run: |
+          git add supabase/reference/access-e2sfca 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "E2SFCA access dry run $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main
