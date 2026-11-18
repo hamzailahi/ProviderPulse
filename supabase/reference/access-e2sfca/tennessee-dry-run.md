@@ -1,6 +1,6 @@
 # E2SFCA access dry run: Tennessee
 
-Run 2026-11-17 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-18 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
@@ -16,14 +16,13 @@ Compares the access factor the market model uses today (listings per adult withi
 
 Regional median: 3.06 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (7.66), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
 
-- Flagged: 4; re-anchored: 4; still implausible (left out of the rank comparison, marked in the CSV): 0
+- Flagged: 3; re-anchored: 3; still implausible (left out of the rank comparison, marked in the CSV): 0
 
 | ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
 |---|---|---|---|---|---|---|
 | 24834 | no | 8.78 | 100% | 4.57 | 100% | yes (2.13) |
 | 24868 | no | 8.08 | 100% | 5.49 | 100% | yes (1.45) |
 | 41554 | no | 9.03 | 100% | 4.87 | 100% | yes (1.89) |
-| 41821 | no | 7.66 | 100% | 4.83 | 100% | yes (1.22) |
 
 ## By specialty
 
@@ -134,3 +133,7 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - E2SFCA counts clinicians just outside a fixed 10-mile circle (with a smaller weight) and stops counting ones that are close in a straight line but a long drive away (across a river or mountain).
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
+
+## Applied 2026-11-18
+
+- 24600 rows (ZIP x specialty) stored in access_e2sfca for TN; market-score now uses drive-time access for these ZIPs.
