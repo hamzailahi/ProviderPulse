@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-18
 
+- Drive-time access now covers Arkansas, Mississippi and Alabama as well as Tennessee: market scores for ZIPs in all four states measure access by drive time instead of a 10-mile count.
 - Market scores in **Tennessee** now measure access by drive time. Each specialty's supply is the E2SFCA drive-time figure (clinicians weighted by how far they are by road and shared with every community that drives to them), stored per ZIP in a new table (migration 049) by the access job's `apply` mode. Other states keep the 10-mile count until their own run, and Insights says which method a score used.
 
 ### 2026-11-17
