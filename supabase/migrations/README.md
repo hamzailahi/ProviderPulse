@@ -84,6 +84,9 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 044 | `044_provider_npis.sql` | `provider_npis` and `provider_npi_insurance` (one account, many NPIs), one-owner trigger across both listing tables, `appointment_requests.npi` with its guard, explicit service-role grants (incl. 041's table) | applied 2026-10-25 in the SQL editor; confirmed the same day: the public key gets permission denied (42501) on both new tables |
 | 045 | `045_deaconess_midtown_pin.sql` | Deaconess Midtown Hospital's listings at 600 Mary St, Evansville moved from a point 3.5 miles west onto the hospital; one-shot data fix that refuses a second run | applied 2026-11-03 by `apply-migration.yml` |
 | 046 | `046_medicare_procedures_zip.sql` | `medicare_procedures_zip`: `cms_procedures_full` summed per ZIP, specialty and code (4.1M rows), public read, filled by `procedure-summary.yml` in apply mode | applied 2026-11-04 by `apply-migration.yml` (public key reads, cannot write); loaded the same day by `procedure-summary.yml` apply: 4,128,906 rows, services match, 1,182 MB with its key, 62s |
+| 047 | `047_fax_numbers.sql` | `fax` on `clinics` and `provider_individuals`, filled from the NPPES monthly file by `fax-backfill.yml`, which runs this file in apply mode | applied 2026-11-16 by the job's apply runs |
+| 048 | `048_org_fax.sql` | `org_fax`, `org_fax_npi`, `org_fax_name` (fax of the organization a clinician bills through at the same address; always null on `clinics`) | applied 2026-11-16 by `fax-via-org.yml` apply (150,116 clinicians) |
+| 049 | `049_access_e2sfca.sql` | `access_e2sfca`: drive-time E2SFCA access per ZIP and scored specialty, public read; market-score uses it where present | applied by `access-dry-run.yml` apply (Tennessee first, 2026-11-18) |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

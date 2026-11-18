@@ -45,6 +45,28 @@ echo "== E2SFCA"
 slug=$(echo "${STATE_LABEL:-region}" | tr 'A-Z ' 'a-z-')
 node scripts/access-dry-run.mjs --zips "$WORK/zips.csv" --supply "$WORK/supply.csv" --bench "$WORK/bench.csv" \
   --osrm http://127.0.0.1:5000 --focus "$FOCUS" --label "${STATE_LABEL:-region}" --sample "${SAMPLE:-}" \
-  --report "$REF/$slug-dry-run.md" --csv "$WORK/$slug-access.csv"
+  --report "$REF/$slug-dry-run.md" --csv "$WORK/$slug-access.csv" --load "$WORK/load.csv"
 gzip -kf "$WORK/$slug-access.csv"
 docker rm -f osrm >/dev/null || true
+
+# ---- apply (the user's go-ahead for Tennessee, 2026-11-18): store the
+# drive-time figures for the focus state's ZIPs in access_e2sfca (049), which
+# market-score reads. One transaction: the state's earlier rows are replaced.
+if [ "${MODE:-dry_run}" = apply ]; then
+  [[ "${STATE_CODE:-}" =~ ^[A-Z]{2}$ ]] || { echo "::error::apply needs state_code (two letters)"; exit 1; }
+  n=$(($(wc -l < "$WORK/load.csv") - 1))
+  [ "$n" -ge 1000 ] || { echo "::error::only $n rows to load; not writing"; exit 1; }
+  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X -f supabase/migrations/049_access_e2sfca.sql
+  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X <<SQL
+begin;
+create temp table s (zip text, specialty text, per_1k numeric, catchment_minutes integer) on commit drop;
+\\copy s from '$WORK/load.csv' with (format csv, header true)
+delete from public.access_e2sfca where state = '$STATE_CODE';
+insert into public.access_e2sfca (zip, specialty, per_1k, catchment_minutes, state) select zip, specialty, per_1k, catchment_minutes, '$STATE_CODE' from s;
+commit;
+SQL
+  got=$(psql "$SUPABASE_DB_URL" -At -X -c "select count(*) from public.access_e2sfca where state = '$STATE_CODE'")
+  [ "$got" -eq "$n" ] || { echo "::error::wrote $got rows, expected $n"; exit 1; }
+  printf '\n## Applied %s\n\n- %s rows (ZIP x specialty) stored in access_e2sfca for %s; market-score now uses drive-time access for these ZIPs.\n' "$(date -u +%F)" "$got" "$STATE_CODE" >> "$REF/$slug-dry-run.md"
+  echo "applied $got rows"
+fi

@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-17. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-18. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -650,6 +650,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-18
+
+- Market scores in **Tennessee** now measure access by drive time. Each specialty's supply is the E2SFCA drive-time figure (clinicians weighted by how far they are by road and shared with every community that drives to them), stored per ZIP in a new table (migration 049) by the access job's `apply` mode. Other states keep the 10-mile count until their own run, and Insights says which method a score used.
 
 ### 2026-11-17
 

@@ -137,7 +137,7 @@ const bench = new Map(readFileSync(arg('bench'), 'utf8').trim().split('\n').slic
   .map(l => { const i = l.lastIndexOf(','); return [l.slice(0, i).replace(/^"|"$/g, '').replace(/""/g, '"'), +l.slice(i + 1)]; }));
 
 // ---- per specialty: both measures for every focus ZIP
-const rows = [], summary = [];
+const rows = [], summary = [], load = [];
 const fmt = v => (v == null ? '' : (v * 1000).toFixed(3));
 for (const [label] of SCORED) {
   const codes = TaxonomyMap.codesFor(label);
@@ -150,6 +150,7 @@ for (const [label] of SCORED) {
   for (const z of focus) {
     const a = A.get(z.zip), c = C.get(z.zip);
     const fa = accessFactor(a == null ? null : a * 1000, rate), fc = accessFactor(c == null ? null : c * 1000, rate);
+    if (a != null && !unreliable.has(z.zip)) load.push([z.zip, '"' + label.replace(/"/g, '""') + '"', (a * 1000).toFixed(4), d0].join(','));
     rows.push([label, z.zip, z.adults, fmt(c), fmt(a), fc ?? '', fa ?? '', d0, unreliable.has(z.zip) ? 'unreliable_routing' : ''].join(','));
     if (fa != null && fc != null && !unreliable.has(z.zip)) {
       pairs.push([fc, fa]);
@@ -162,6 +163,7 @@ for (const [label] of SCORED) {
   summary.push({ label, d0, rate, n: pairs.length, rho, moved, up: bigUp.slice(0, 3), down: bigDown.slice(0, 3),
     listings: [...supply.values()].reduce((x, y) => x + y, 0) });
 }
+if (arg('load')) writeFileSync(arg('load'), 'zip,specialty,per_1k,catchment_minutes\n' + load.join('\n') + '\n');
 writeFileSync(arg('csv'), 'specialty,zip,adults,crude_per_1k,e2sfca_per_1k,crude_access,e2sfca_access,catchment_minutes,flag\n' + rows.join('\n') + '\n');
 
 // ---- report

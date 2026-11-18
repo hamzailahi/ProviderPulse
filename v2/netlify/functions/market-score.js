@@ -715,6 +715,12 @@ exports.handler = async (event) => {
             });
           }
 
+          // Drive-time access for this ZIP where a state run has stored it (049).
+          // A failed or empty read keeps the 10-mile ratio; evidence says which.
+          const e2Rows = await get(`access_e2sfca?zip=eq.${zip}&select=specialty,per_1k,catchment_minutes&limit=100`, 4000);
+          const accessE2sfca = {};
+          (Array.isArray(e2Rows) ? e2Rows : []).forEach(r => { if (r && r.per_1k != null) accessE2sfca[r.specialty] = r; });
+
           const selfNpi = /^\d{10}$/.test(String((event.queryStringParameters || {}).npi || '')) ? String(event.queryStringParameters.npi) : '';
           const baseInput = {
             specialties: SPECIALTIES,
@@ -726,13 +732,13 @@ exports.handler = async (event) => {
             places, demo, pay, shortage,
             benchmarks: Object.keys(benchmarks.measures).length || Object.keys(benchmarks.specialties).length ? benchmarks : null,
             catchmentTruncated: catchment.truncated, radiusMiles: catchment.furthest_miles || CATCHMENT_MAX_MILES,
-            learnedNeed
+            learnedNeed, accessE2sfca
           };
           const scored = MarketModel.score(baseInput);
           const want = String((event.queryStringParameters || {}).specialty || '');
           model = {
             version: scored.version, weights: scored.weights,
-            benchmarks: scored.specialties.some(x => x.evidence.access && x.evidence.access.basis === 'specialty') ? 'specialty' : 'group',
+            benchmarks: scored.specialties.some(x => x.evidence.access && (x.evidence.access.basis === 'specialty' || x.evidence.access.basis === 'e2sfca')) ? 'specialty' : 'group',
             headline: scored.specialties.some(x => x.specialty === want) ? want : 'Primary care / family doctor',
             specialties: scored.specialties
           };

@@ -270,6 +270,16 @@
         // without a national rate to compare against.
         f.access = 100;
         ev.access = { basis: rate ? 'specialty' : 'none_found', per_1k: 0, national_per_1k: rate ? round2(rate) : null, clinicians: 0 };
+      } else if (rate && input.accessE2sfca && input.accessE2sfca[label] && input.adults > 0) {
+        // Drive-time access (E2SFCA, migration 049; Tennessee first, the
+        // user's choice 2026-11-18). A what-if's extra listings are added at
+        // the crude rate, since the stored figure cannot be re-routed here.
+        var e2 = input.accessE2sfca[label];
+        var extra = listings.filter(function (r) { return r.npi === 'scenario'; }).length;
+        var p2 = Number(e2.per_1k) + (extra / input.adults) * 1000;
+        f.access = p2 === 0 ? 100 : clamp(100 - (p2 / rate) * 50);
+        ev.access = { basis: 'e2sfca', per_1k: round2(p2), national_per_1k: round2(rate), clinicians: clin,
+          catchment_minutes: e2.catchment_minutes, crude_per_1k: per1k == null ? null : round2(per1k) };
       } else if (per1k != null && rate) {
         f.access = clamp(100 - (per1k / rate) * 50);
         ev.access = { basis: 'specialty', per_1k: round2(per1k), national_per_1k: round2(rate), clinicians: clin };
@@ -380,6 +390,9 @@
       var top = (e.parts || []).slice().sort(function (a, b) { return b.percentile - a.percentile; })[0];
       var what = top ? (top.measure && top.measure.indexOf('group:') !== 0 ? MEASURE_NAME[top.measure] || top.measure : top.label || 'health measures') : 'health measures';
       return (hi ? 'Higher' : lo ? 'Lower' : 'Average') + ' modelled need than most of the US (' + ord(v) + ' pct), led by ' + what + '.';
+    }
+    if (k === 'access' && e.basis === 'e2sfca') {
+      return e.per_1k + ' ' + label.toLowerCase() + ' clinicians per 1,000 adults within about ' + e.catchment_minutes + ' minutes\' drive (shared with every community that drives there) vs ' + e.national_per_1k + ' nationally.';
     }
     if (k === 'access') {
       if (!e.clinicians) return 'No ' + label.toLowerCase() + ' clinicians in the catchment.';

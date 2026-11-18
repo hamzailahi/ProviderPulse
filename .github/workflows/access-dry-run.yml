@@ -11,6 +11,14 @@ name: E2SFCA access dry run
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: dry_run writes nothing; apply stores the state's drive-time access in access_e2sfca (migration 049)
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+      state_code:
+        description: Two-letter state code for apply
+        default: "TN"
       state_label:
         description: State name for the report
         default: "Tennessee"
@@ -52,6 +60,8 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           STATE_LABEL: ${{ inputs.state_label }}
+          MODE: ${{ inputs.mode }}
+          STATE_CODE: ${{ inputs.state_code }}
           FOCUS: ${{ inputs.focus }}
           BBOX: ${{ inputs.bbox }}
           GEOFABRIK: ${{ inputs.geofabrik }}

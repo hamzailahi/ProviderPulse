@@ -143,5 +143,19 @@ console.log('\nPlaces patients go: organizations per care type against the natio
   check('a capped load is a floor with no verdict', capped.floor === true && capped.verdict === null);
 }
 
+
+console.log('E2SFCA drive-time access (049)');
+{
+  const crude = one(base({ rows: cardRows(5, 6) }));
+  const e2 = one(base({ rows: cardRows(5, 6), accessE2sfca: { 'Heart / cardiology': { per_1k: 0.4, catchment_minutes: 60 } } }));
+  check('a stored drive-time figure replaces the crude ratio', e2.evidence.access.basis === 'e2sfca' && e2.evidence.access.per_1k === 0.4 && e2.factors.access === 0, JSON.stringify(e2.evidence.access));
+  check('the crude ratio is kept beside it for reference', e2.evidence.access.crude_per_1k === crude.evidence.access.per_1k);
+  check('without a stored figure the crude ratio still applies', crude.evidence.access.basis === 'specialty');
+  const other = one(base({ rows: cardRows(5, 6), accessE2sfca: { 'Skin / dermatology': { per_1k: 9, catchment_minutes: 60 } } }));
+  check('another specialty\'s figure is never used', other.evidence.access.basis === 'specialty');
+  const what = one(base({ rows: cardRows(5, 6).concat([{ npi: 'scenario', primary_taxonomy: 'Cardiovascular Disease Physician', latitude: 35, longitude: -90 }]), accessE2sfca: { 'Heart / cardiology': { per_1k: 0.1, catchment_minutes: 60 } } }));
+  check('a what-if listing still adds supply on top of the drive-time figure', what.evidence.access.per_1k === 0.11, String(what.evidence.access.per_1k));
+  check('the reason says drive time', /minutes' drive/.test(JSON.stringify(e2.reasons || [])) || /minutes' drive/.test(JSON.stringify(e2)));
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

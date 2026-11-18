@@ -775,6 +775,7 @@ function evidenceLine(k, e) {
     return (e.parts || []).slice().sort(function (a, b) { return b.percentile - a.percentile; }).slice(0, 3)
       .map(function (x) { return (x.label || x.measure) + ' ' + ordinal(x.percentile); }).join(' · ');   // inverted labels already say "missed"
   }
+  if (k === 'access' && e.basis === 'e2sfca') return 'Drive-time access: ' + e.per_1k + ' per 1,000 adults within about ' + e.catchment_minutes + ' minutes (distance-weighted, shared with every community that drives there) vs ' + e.national_per_1k + ' nationally · ' + fmtN(e.clinicians) + ' within the catchment';
   if (k === 'access' && !e.clinicians) return 'None within the catchment' + (e.national_per_1k ? ' (' + e.national_per_1k + ' per 1,000 nationally)' : '');
   if (k === 'access') return fmtN(e.clinicians) + ' within the catchment' + (e.per_1k != null ? ', ' + e.per_1k + ' per 1,000 adults' : '') +
     (e.national_per_1k ? ' vs ' + e.national_per_1k + ' nationally' : ' (compared at group level)');
