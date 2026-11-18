@@ -23,7 +23,7 @@ on:
         description: State name for the report
         default: "Tennessee"
       focus:
-        description: ZIP3 range of the state
+        description: ZIP3 ranges of the state, comma separated (e.g. 300-319,398-399)
         default: "370-385"
       bbox:
         description: "minlon,minlat,maxlon,maxlat (the state plus about 60 miles)"

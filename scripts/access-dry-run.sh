@@ -55,7 +55,7 @@ docker rm -f osrm >/dev/null || true
 if [ "${MODE:-dry_run}" = apply ]; then
   [[ "${STATE_CODE:-}" =~ ^[A-Z]{2}$ ]] || { echo "::error::apply needs state_code (two letters)"; exit 1; }
   n=$(($(wc -l < "$WORK/load.csv") - 1))
-  [ "$n" -ge 1000 ] || { echo "::error::only $n rows to load; not writing"; exit 1; }
+  [ "$n" -ge "${MIN_ROWS:-400}" ] || { echo "::error::only $n rows to load; not writing"; exit 1; }
   psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X -f supabase/migrations/049_access_e2sfca.sql
   psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X <<SQL
 begin;

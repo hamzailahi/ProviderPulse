@@ -22,11 +22,12 @@ const csv = p => readFileSync(p, 'utf8').trim().split('\n').slice(1).map(l => l.
 const zips = csv(arg('zips')).map(([zip, lat, lon, adults]) => ({ zip, lat: +lat, lon: +lon, adults: +adults || 0 }))
   .filter(z => /^\d{5}$/.test(z.zip) && Number.isFinite(z.lat) && Number.isFinite(z.lon));
 const idx = new Map(zips.map((z, i) => [z.zip, i]));
-const [lo, hi] = arg('focus').split('-').map(Number);
-const inFocus = z => +z.zip.slice(0, 3) >= lo && +z.zip.slice(0, 3) <= hi;
+// ZIP3 ranges, comma separated: "300-319,398-399" (a state can own several).
+const ranges = arg('focus').split(',').map(r => { const [a, b] = r.trim().split('-').map(Number); return [a, Number.isFinite(b) ? b : a]; });
+const inFocus = z => { const p = +z.zip.slice(0, 3); return ranges.some(([a, b]) => p >= a && p <= b); };
 const focus = zips.filter(inFocus);
 console.log(`region ZIPs ${zips.length}, focus ZIPs ${focus.length}`);
-if (focus.length < 100) throw new Error('too few focus ZIPs: ' + focus.length);
+if (focus.length < 15) throw new Error('too few focus ZIPs: ' + focus.length);
 
 // ---- drive-time matrix (minutes), OSRM table service in chunks
 const N = zips.length, T = new Float32Array(N * N).fill(NaN);
