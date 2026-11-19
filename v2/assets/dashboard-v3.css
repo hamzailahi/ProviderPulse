@@ -569,3 +569,25 @@ body.filters-open #map-legend { left: 306px; }
 .lg-sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(20,35,42,.15); flex: none; }
 .lg-note { margin: 0; font: 400 12px/16px Inter, sans-serif; color: #4D5D64; max-width: 240px; }
 @media (max-width: 640px) { .lg-select { font-size: 16px; } }
+
+/* Name lookup (name-lookup.js, 2026-11-19) */
+.nl-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.nl-input { flex: 1 1 240px; min-width: 0; padding: 9px 12px; border: 1px solid var(--pp-border, #D3DCDF); border-radius: 8px; font: inherit; font-size: 14px; }
+.nl-state { padding: 9px 10px; border: 1px solid var(--pp-border, #D3DCDF); border-radius: 8px; font: inherit; font-size: 14px; background: #fff; }
+.nl-go { padding: 9px 16px; border-radius: 8px; border: 0; background: var(--pp-teal, #0F766E); color: #fff; font-weight: 600; cursor: pointer; }
+.nl-go:hover { background: var(--pp-teal-strong, #115E59); }
+.nl-status { font-size: 13px; color: var(--pp-muted, #5b6b72); margin: 4px 0 8px; }
+.nl-list { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; }
+.nl-row { padding: 10px 0; border-top: 1px solid var(--pp-border, #e3e8ef); font-size: 13.5px; line-height: 1.45; }
+.nl-kind, .nl-type, .nl-addr, .nl-contact { color: var(--pp-muted, #5b6b72); }
+.nl-acts { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.nl-act { padding: 6px 10px; border: 1px solid var(--pp-teal, #0F766E); color: var(--pp-teal-strong, #115E59); background: #fff; border-radius: 8px; font-size: 13px; cursor: pointer; }
+.nl-input:focus-visible, .nl-state:focus-visible, .nl-go:focus-visible, .nl-act:focus-visible { outline: 3px solid var(--pp-teal, #0F766E); outline-offset: 2px; }
+@media (max-width: 640px) { .nl-input, .nl-state { font-size: 16px; } }
+/* A floating panel under the top bar, above the map and the welcome screen
+   (the bar clips anything that hangs below it). */
+#nl-panel { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); width: min(720px, calc(100vw - 32px)); z-index: 4000;
+  background: #fff; border: 1px solid var(--pp-border, #D3DCDF); border-radius: 8px; padding: 10px 14px; box-shadow: 0 12px 32px rgba(15, 23, 42, .18); }
+#nl-panel .nl-list { max-height: min(460px, calc(100vh - 220px)); }
+#nl-panel .nl-close { position: absolute; top: 6px; right: 8px; border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: var(--pp-muted, #5b6b72); padding: 6px; }
+#nl-panel h2 { display: block; font-size: 15px; font-weight: 600; margin: 0 28px 2px 0; }

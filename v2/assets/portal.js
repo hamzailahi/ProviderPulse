@@ -1150,9 +1150,13 @@ VIEWS.competition = function () {
     render();
   } }, specOpts);
 
+  // Any doctor or clinic by name or NPI (2026-11-19), with phone and fax.
+  var lookup = h('div', { class: 'card pad nl-card' }, h('h2', {}, 'Look up a doctor or clinic'),
+    h('p', { class: 'muted' }, 'Search the whole directory by name or NPI. Phone and fax come from NPPES, the national provider registry.'));
+  if (window.NameLookup) NameLookup.mount(lookup, { url: SB_URL, key: SB_KEY, state: String((S.profile || {}).state || '').toUpperCase() });
   var view = h('section', { class: 'view' },
     pageHead('Competition', 'Same-specialty providers near you, as patients see them in search.', h('div', { class: 'inline' }, fSpec, fMiles)),
-    body);
+    lookup, body);
 
   Promise.all([loadCompetition(miles, spec), S.demand ? null : loadDemand()]).then(function (res) {
     var c = res[0];

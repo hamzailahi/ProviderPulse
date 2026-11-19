@@ -1920,3 +1920,58 @@ function authHeadersSync() {
 }
 
 })();
+
+// Find a provider by name (2026-11-19, the user's ask): a button beside the
+// search bar opens a lookup by name or NPI anywhere in the directory (shared
+// with the portal, name-lookup.js). "Show on map" flies to the listing and
+// drops a marker; "Load ... market" searches its ZIP like the main box.
+(function () {
+  function init() {
+    var go = document.getElementById('addressGoBtn');
+    var status = document.getElementById('addressStatus');
+    if (!go || !status || !window.NameLookup || document.getElementById('nl-toggle')) return;
+    var btn = document.createElement('button');
+    btn.id = 'nl-toggle'; btn.type = 'button'; btn.className = 'control-btn';
+    btn.textContent = 'Find a provider';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.style.cssText = 'padding:9px 14px;font-size:13px;white-space:nowrap;';
+    go.parentNode.insertBefore(btn, go.nextSibling);
+    var panel = document.createElement('div');
+    panel.id = 'nl-panel'; panel.hidden = true;
+    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Find a provider by name');
+    var hd = document.createElement('h2'); hd.textContent = 'Find a doctor or clinic by name or NPI';
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'nl-close'; x.setAttribute('aria-label', 'Close'); x.textContent = '×';
+    x.addEventListener('click', function () { panel.hidden = true; btn.setAttribute('aria-expanded', 'false'); btn.focus(); });
+    panel.insertBefore(hd, panel.firstChild); panel.insertBefore(x, panel.firstChild);
+    panel.addEventListener('keydown', function (e) { if (e.key === 'Escape') x.click(); });
+    document.body.appendChild(panel);
+    var pin = null;
+    var ui = NameLookup.mount(panel, {
+      url: SUPABASE_URL, key: SUPABASE_KEY,
+      onShow: function (r) {
+        if (typeof map === 'undefined' || !map || typeof L === 'undefined') return;
+        var ll = [+r.latitude, +r.longitude];
+        if (pin) { try { map.removeLayer(pin); } catch (e) {} }
+        var label = document.createElement('div');
+        var b = document.createElement('b'); b.textContent = (r.name || '').toString();
+        var t = document.createElement('div'); t.textContent = [r.address, r.city, r.state].filter(Boolean).join(', ');
+        label.appendChild(b); label.appendChild(t);
+        pin = L.marker(ll).addTo(map).bindPopup(label).openPopup();
+        map.setView(ll, 16);
+        panel.hidden = true; btn.setAttribute('aria-expanded', 'false');
+      },
+      onArea: function (zip) {
+        var box = document.getElementById('addressInput');
+        if (box) box.value = zip;
+        if (typeof omniSearch === 'function') omniSearch(zip);
+        panel.hidden = true; btn.setAttribute('aria-expanded', 'false');
+      }
+    });
+    btn.addEventListener('click', function () {
+      panel.hidden = !panel.hidden;
+      btn.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+      if (!panel.hidden) ui.input.focus();
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();

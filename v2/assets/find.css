@@ -515,3 +515,11 @@ dl.f dd { font-variant-numeric: tabular-nums; }
 /* live audit, 2026-10-30: the pass above shrank these under the phone rules */
 .rel, .spec-chip { min-height: 44px; }
 .fsort { font-size: 16px; }
+
+/* Find care / Find by name (2026-11-19) */
+.mode-tabs { display: flex; gap: 6px; margin: 0 0 10px; flex-wrap: wrap; }
+.mode-tab { font: 600 14px/20px var(--sans, inherit); padding: 8px 14px; border-radius: 999px; border: 1px solid var(--pp-border, #D3DCDF);
+  background: #fff; color: var(--pp-ink, #1f2937); cursor: pointer; min-height: 44px; }
+.mode-tab.on { background: var(--pp-teal-tint, #E3F3F1); border-color: var(--pp-teal, #0F766E); color: var(--pp-teal-strong, #115E59); }
+.mode-tab:focus-visible { outline: 3px solid var(--pp-teal, #0F766E); outline-offset: 2px; }
+@media (max-width: 900px) { .find-top.folded .mode-tabs { display: none; } }

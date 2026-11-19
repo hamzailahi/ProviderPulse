@@ -481,6 +481,7 @@ function relatedFor(text, searched) {
 function newSearch() {
   var p = state.profile || {};
   return {
+    mode: 'care',   // 'care' (a kind of care) or 'name' (a doctor or clinic by name, 2026-11-19)
     text: '', label: '', terms: [], door: null, procedure: null, related: null,
     origin: null,   // {lat, lng, label, zip}: a typed address or the browser's location (this visit only)
     zip: /^\d{5}$/.test(String(p.zip || '')) ? p.zip : '',
@@ -580,8 +581,76 @@ function placeWords(s) {
   return s.zip;
 }
 
+// Name search (2026-11-19): a doctor or clinic by name, or a 10-digit NPI.
+// The place is optional. With one, listings within 50 miles come first by
+// distance and up to 40 more from anywhere follow; without one, matches
+// nationwide. Both directory tables, through migration 050's name indexes.
+// A failed table makes the list partial, never "no one by that name".
+var NAME_NEAR_MILES = 50;
+function nameFetch(table, filter, limit) {
+  var url = SB_URL + '/rest/v1/' + table + '?' + filter + '&select=' + PROVIDER_ROW_SELECT + ',phone&limit=' + limit;
+  return fetch(url, { headers: { apikey: SB_KEY, Accept: 'application/json' }, signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (rows) { if (!Array.isArray(rows)) { var f = []; f.failed = true; return f; } return tagSrc(rows, table === 'clinics' ? 'clinic' : 'individual'); })
+    .catch(function () { var f = []; f.failed = true; return f; });
+}
+function runNameSearch() {
+  var s = state.search;
+  var q = NameSearch.parse(s.text);
+  if (q.error) { s.ran = true; s.error = q.error; paintFind(); return; }
+  var seq = ++s.seq;
+  s.loading = true; s.error = ''; s.ran = true; s.shown = RESULTS_PAGE; s.active = null; s.expanded = {}; s.all = [];
+  s.partial = false; s.truncated = false; s.dense = false; s.related = null; s.procedure = null; s.door = null;
+  paintFind();
+  var from = !hasPlace(s) ? Promise.resolve(null) : s.origin ? Promise.resolve({ lat: s.origin.lat, lng: s.origin.lng }) : locateZip(s.zip);
+  Promise.all([from, loadRegistered()]).then(function (res) {
+    if (seq !== s.seq) return;
+    var c = res[0], f = NameSearch.filter(q), tables = ['provider_individuals', 'clinics'];
+    s.center = c;
+    var asks = [];
+    tables.forEach(function (t) {
+      if (c) { var b = milesBox(c, NAME_NEAR_MILES); asks.push(nameFetch(t, f + '&' + boxFilter(b), 150)); }
+      asks.push(nameFetch(t, f, c ? 40 : 150));
+    });
+    return Promise.all(asks).then(function (sets) {
+      if (seq !== s.seq) return;
+      var byNpi = {}, failed = false, capped = false;
+      sets.forEach(function (rows, i) {
+        if (rows.failed) failed = true;
+        if (rows.length >= (c && i % 2 === 0 ? 150 : c ? 40 : 150)) capped = true;
+        rows.forEach(function (row) {
+          var r = NameSearch.rank(row.name, q);
+          if (r < 0 || !row.npi) return;
+          var lat = row.latitude != null ? +row.latitude : null, lng = row.longitude != null ? +row.longitude : null;
+          var p = { npi: String(row.npi), name: displayName(row.name), specialty: row.primary_taxonomy || '', code: row.taxonomy_code || '', phone: fmtPhone(row.phone),
+            address: titleCase(row.address), city: cityName(row.city), state: row.state, zip: row.zip,
+            lat: lat, lng: lng, src: row._src, nameRank: r, sites: 1,
+            miles: c && lat != null && lng != null ? milesBetween(c.lat, c.lng, lat, lng) : null };
+          var cur = byNpi[p.npi];
+          if (!cur || (p.miles != null && (cur.miles == null || p.miles < cur.miles))) byNpi[p.npi] = p;
+        });
+      });
+      s.all = Object.keys(byNpi).map(function (npi) {
+        var p = byNpi[npi], reg = registeredNpis[npi];
+        if (reg) { p.registered = true; p.name = reg.name || p.name; p.phone = p.phone || reg.phone; p.accepting_new_patients = reg.accepting_new_patients;
+          p.telehealth = reg.telehealth; p.payers = reg.payers || []; p.office_hours = reg.office_hours; p.bio = reg.bio; }
+        return p;
+      });
+      s.partial = failed; s.truncated = capped;
+      s.loading = false;
+      if (failed && !s.all.length) { s.error = 'Name search is unavailable right now. Please try again.'; paintFind(); return; }
+      foldSearch();
+      paintFind(true);
+    });
+  }).catch(function () {
+    if (seq !== s.seq) return;
+    s.loading = false; s.error = 'Name search is unavailable right now. Please try again.'; paintFind();
+  });
+}
+
 function runProviderSearch() {
   var s = state.search;
+  if (s.mode === 'name') return runNameSearch();
   if (!s.terms.length) { s.error = 'Choose a specialty, or describe what you need.'; paintFind(); return; }
   if (!hasPlace(s)) { s.error = 'Enter a ZIP code or an address, or use your location.'; paintFind(); return; }
   var seq = ++s.seq;
@@ -800,6 +869,18 @@ function visibleResults() {
     if (f.lowcost && !isLowCost(p)) return false;
     return true;
   });
+  if (s.mode === 'name') {
+    // Closest fit to the typed name first, then nearest, then those with no
+    // known distance; one card per listing (no folding by address).
+    list.sort(function (a, b) {
+      if (s.sort === 'best' && a.nameRank !== b.nameRank) return a.nameRank - b.nameRank;
+      if ((a.miles == null) !== (b.miles == null)) return a.miles == null ? 1 : -1;
+      return (a.miles || 0) - (b.miles || 0) || String(a.name).localeCompare(String(b.name));
+    });
+    list.forEach(function (p) { p.here = []; });
+    list.listings = list.length;
+    return list;
+  }
   list.forEach(function (p) { p.tier = s.sort === 'best' && !s.procedure ? tierOf(p, s) : 0; });
   list.sort(function (a, b) {
     if (s.sort === 'verified' && !!a.registered !== !!b.registered) return a.registered ? -1 : 1;
@@ -837,8 +918,21 @@ var findMap = { map: null, layer: null, ring: null, markers: {} };
 
 function findView() {
   var s = state.search;
-  var fWhat = h('input', { type: 'search', list: 'specList', value: s.text || s.label, autocomplete: 'off',
-    placeholder: 'Specialty, condition or procedure', 'aria-label': 'Specialty, condition or procedure' });
+  var byName = s.mode === 'name';
+  var fWhat = h('input', { type: 'search', list: byName ? null : 'specList', value: byName ? s.text : (s.text || s.label), autocomplete: 'off',
+    placeholder: byName ? 'Doctor or clinic name, or NPI' : 'Specialty, condition or procedure',
+    'aria-label': byName ? 'Doctor or clinic name, or NPI' : 'Specialty, condition or procedure' });
+  // Find care or Find by name (2026-11-19). Switching keeps the place.
+  function setMode(m) {
+    if (s.mode === m) return;
+    s.mode = m; s.text = ''; s.label = ''; s.terms = []; s.door = null; s.procedure = null; s.related = null;
+    s.all = []; s.ran = false; s.error = ''; s.center = null;
+    unmountFind(); render();
+    if (findEls) findEls.what.focus();
+  }
+  var modeTabs = h('div', { class: 'mode-tabs', role: 'tablist', 'aria-label': 'Search by' },
+    h('button', { type: 'button', role: 'tab', class: 'mode-tab' + (byName ? '' : ' on'), 'aria-selected': byName ? 'false' : 'true', onclick: function () { setMode('care'); } }, 'Find care'),
+    h('button', { type: 'button', role: 'tab', class: 'mode-tab' + (byName ? ' on' : ''), 'aria-selected': byName ? 'true' : 'false', onclick: function () { setMode('name'); } }, 'Find a doctor or clinic by name'));
   var dl = h('datalist', { id: 'specList' }, SPECIALTIES.map(function (x) { return h('option', { value: x[0] }); }));
   var fZip = h('input', { id: 'nearIn', value: s.origin ? s.origin.label : s.zip, maxlength: '120', autocomplete: 'off', placeholder: 'ZIP, address or my location',
     'aria-label': 'ZIP code or address', role: 'combobox', 'aria-autocomplete': 'list', 'aria-controls': 'nearList', 'aria-expanded': 'false' });
@@ -929,6 +1023,7 @@ function findView() {
     s.miles = parseInt(fMiles.value, 10) || DEFAULT_RADIUS;
     s.payer = fPayer.value;
     var text = fWhat.value.trim();
+    if (s.mode === 'name') { s.text = text; runNameSearch(); return; }
     if (!text && s.terms.length) { runProviderSearch(); return; }
     var hit = resolveQuery(text);
     if (!hit) { state.askDraft = text; location.hash = '#/ask'; return; }
@@ -947,9 +1042,9 @@ function findView() {
   });
 
   var form = h('form', { class: 'sbar', onsubmit: submit },
-    h('label', { class: 'sfield what' }, h('span', { class: 'slbl' }, 'What do you need?'), fWhat, dl),
+    h('label', { class: 'sfield what' }, h('span', { class: 'slbl' }, byName ? 'Name or NPI' : 'What do you need?'), fWhat, byName ? null : dl),
     h('div', { class: 'sfield zip' }, h('label', { class: 'slbl', for: 'nearIn' }, 'Near'), h('div', { class: 'near-row' }, fZip, locBtn), nearList),
-    h('label', { class: 'sfield miles' }, h('span', { class: 'slbl' }, 'Distance'), fMiles),
+    byName ? null : h('label', { class: 'sfield miles' }, h('span', { class: 'slbl' }, 'Distance'), fMiles),
     h('label', { class: 'sfield payer' }, h('span', { class: 'slbl' }, 'Insurance'), fPayer),
     h('button', { class: 'sgo', type: 'submit' }, 'Search'));
 
@@ -982,7 +1077,7 @@ function findView() {
   var summary = h('button', { class: 'sbar-sum', type: 'button', 'aria-label': 'Edit search', onclick: function () {
     top.classList.remove('folded'); fWhat.focus();
   } }, h('span', { class: 'sum-icon', 'aria-hidden': 'true' }), sumText, h('span', { class: 'sum-edit' }, 'Edit'));
-  var top = h('div', { class: 'find-top' }, summary, form, helper, filters);
+  var top = h('div', { class: 'find-top' }, summary, modeTabs, form, byName ? null : helper, filters);
   findEls = { filters: filters, results: results, map: mapEl, what: fWhat, zip: fZip, resolveNear: resolveNear, toggle: toggle, body: body, top: top, sumText: sumText };
   var view = h('section', { class: 'find' }, top, body);
   setTimeout(function () { mountMap(); paintFind(true); }, 0);
@@ -992,7 +1087,8 @@ function findView() {
 function foldSearch() {
   if (!findEls) return;
   var s = state.search;
-  findEls.sumText.textContent = [s.label || 'Providers', placeWords(s), s.miles + ' mi', s.payer || null].filter(Boolean).join(' · ');
+  findEls.sumText.textContent = s.mode === 'name' ? ['Name: ' + s.text, hasPlace(s) ? 'near ' + placeWords(s) : 'anywhere'].join(' · ')
+    : [s.label || 'Providers', placeWords(s), s.miles + ' mi', s.payer || null].filter(Boolean).join(' · ');
   findEls.top.classList.add('folded');
 }
 
@@ -1048,7 +1144,8 @@ function paintFind(refit) {
   var r = findEls.results;
   clear(r);
   if (s.loading) {
-    r.appendChild(h('h2', { class: 'rhead' }, h('span', { class: 'spin' }), 'Searching ' + (s.label || 'providers') + ' within ' + s.miles + ' mi of ' + placeWords(s) + '…'));
+    r.appendChild(h('h2', { class: 'rhead' }, h('span', { class: 'spin' }), s.mode === 'name' ? 'Looking up "' + s.text + '"…'
+      : 'Searching ' + (s.label || 'providers') + ' within ' + s.miles + ' mi of ' + placeWords(s) + '…'));
     for (var i = 0; i < 5; i++) r.appendChild(h('div', { class: 'res skel' }, h('div', { class: 'sk', style: 'width:52%' }), h('div', { class: 'sk', style: 'width:34%' }), h('div', { class: 'sk', style: 'width:70%' })));
   } else if (s.error) {
     r.appendChild(h('div', { class: 'empty' }, h('h3', {}, 'Let\'s fix the search'), h('p', {}, s.error)));
@@ -1059,7 +1156,10 @@ function paintFind(refit) {
     // A table that failed or hit the row cap makes the count a floor: say
     // "at least". A partial search once read "660" where the full one had 4,289.
     var floor = s.partial || s.truncated;
-    r.appendChild(h('h2', { class: 'rhead' },
+    r.appendChild(s.mode === 'name' ? h('h2', { class: 'rhead' },
+      h('b', {}, (floor ? 'At least ' : '') + list.listings.toLocaleString() + ' match' + (list.listings === 1 ? '' : 'es') + ' for "' + s.text + '"'),
+      hasPlace(s) ? ', nearest to ' + placeWords(s) + ' first' : ' nationwide',
+      filtered ? h('span', { class: 'muted' }, ' · ' + (s.all.length - list.listings) + ' hidden by filters') : null) : h('h2', { class: 'rhead' },
       s.procedure ? h('b', {}, (floor ? 'At least ' : '') + list.listings.toLocaleString() + ' billed Medicare for ' + s.procedure.label.toLowerCase())
         : h('b', {}, (floor ? 'At least ' : '') + list.listings.toLocaleString() + ' ' + (s.label || 'providers')),
       ' within ' + s.miles + ' mi of ' + placeWords(s),
@@ -1072,12 +1172,16 @@ function paintFind(refit) {
       ? 'This area has more listings than we could load in a few seconds, so some are missing. A shorter distance loads all of them. '
       : 'Part of the directory did not answer in time, so this list is missing some providers. ',
       h('button', { class: 'linkbtn', type: 'button', onclick: function () { runProviderSearch(); } }, 'Try again')));
+    else if (s.truncated && s.mode === 'name') r.appendChild(h('div', { class: 'note' }, 'Many listings share this name, so these are the first we found. Add a first name, a city word or a ZIP to narrow it.'));
     else if (s.truncated) r.appendChild(h('div', { class: 'note' }, 'This area has more listings than we can show at once, so these are a sample. Try a shorter distance.'));
     if (s.related) r.appendChild(relatedEl(s));
     if (s.procedure) r.appendChild(procedureNote(s));
     if (s.door === 'Emergency rooms & hospitals' || s.door === 'Rides & transport') r.appendChild(h('div', { class: 'note urgent' },
       h('b', {}, 'In an emergency, call 911.'), s.door === 'Emergency rooms & hospitals' ? ' The registry does not say which hospitals have an emergency room, so call ahead if you can.' : ''));
-    if (!list.length) {
+    if (!list.length && s.mode === 'name') {
+      r.appendChild(h('div', { class: 'empty' }, h('h3', {}, s.all.length ? 'No matches with these filters' : 'No one listed by that name'),
+        h('p', {}, s.all.length ? 'Try turning some filters off.' : 'Check the spelling, try the last name alone, or search by the clinic\'s name. The directory lists names as registered with NPPES, the national provider registry.')));
+    } else if (!list.length) {
       r.appendChild(h('div', { class: 'empty' },
         h('h3', {}, s.all.length ? 'No matches with these filters' : s.procedure ? 'No one within ' + s.miles + ' miles billed Medicare for this in 2024'
           : 'No ' + (s.label || 'providers') + ' within ' + s.miles + ' miles'),
@@ -1268,7 +1372,7 @@ function resultCard(p, n) {
       h('div', { class: 'res-top' },
         n ? h('span', { class: 'res-num', 'aria-hidden': 'true' }, String(n)) : null,
         h('h3', {}, p.name || 'Provider'),
-        h('span', { class: 'dist' }, fmtMiles(p.miles))),
+        p.miles != null ? h('span', { class: 'dist' }, fmtMiles(p.miles)) : h('span', { class: 'dist' }, [p.city, p.state].filter(Boolean).join(', '))),
       h('div', { class: 'res-spec' }, plainType(p)),
       h('div', { class: 'res-addr' }, addrLine(p),
         p.sites > 1 ? h('span', { class: 'muted' }, ' · ' + (p.sites - 1) + ' more location' + (p.sites > 2 ? 's' : '')) : null,
@@ -1342,7 +1446,7 @@ function paintMarkers(list, refit) {
   var s = state.search;
   findMap.layer.clearLayers();
   findMap.markers = {};
-  if (s.center) {
+  if (s.center && s.mode !== 'name') {
     L.circle([s.center.lat, s.center.lng], {
       radius: s.miles * 1609.34, color: '#4f46e5', weight: 1.5, dashArray: '6 6',
       fillColor: '#4f46e5', fillOpacity: 0.04, interactive: false
@@ -1352,7 +1456,11 @@ function paintMarkers(list, refit) {
   }
   // Dots first, then numbered pins, nearest last so they sit on top.
   var shown = Math.min(s.shown, list.length);
+  // Listings with no pin (no geocoded location) are in the list, not the map;
+  // numbers still follow the cards.
+  function pinned(p) { return p.lat != null && p.lng != null && !isNaN(p.lat) && !isNaN(p.lng); }
   list.slice(shown).reverse().forEach(function (p) {
+    if (!pinned(p)) return;
     var mk = L.circleMarker([p.lat, p.lng], dotStyle(p, s.active === p.npi));
     mk.bindTooltip(p.name || 'Provider', { direction: 'top', offset: [0, -6] });
     mk.on('click', function () { focusResult(p.npi, false); });
@@ -1360,13 +1468,18 @@ function paintMarkers(list, refit) {
     findMap.markers[p.npi] = { mk: mk, p: p };
   });
   for (var i = shown - 1; i >= 0; i--) (function (p, n) {
+    if (!pinned(p)) return;
     var mk = L.marker([p.lat, p.lng], { icon: pinIcon(p, n, s.active === p.npi), keyboard: false, riseOnHover: true });
     mk.bindTooltip(n + '. ' + (p.name || 'Provider'), { direction: 'top', offset: [0, -14] });
     mk.on('click', function () { focusResult(p.npi, false); });
     mk.addTo(findMap.layer);
     findMap.markers[p.npi] = { mk: mk, p: p, n: n };
   })(list[i], i + 1);
-  if (refit && s.center) {
+  if (refit && s.mode === 'name') {
+    var pts = list.slice(0, Math.max(shown, 1)).filter(pinned).map(function (p) { return [p.lat, p.lng]; });
+    if (s.center) pts.push([s.center.lat, s.center.lng]);
+    if (pts.length) m.fitBounds(pts, { padding: [30, 30], maxZoom: 14 });
+  } else if (refit && s.center) {
     var dLat = s.miles / 69, dLng = s.miles / (69 * Math.cos(s.center.lat * Math.PI / 180));
     m.fitBounds([[s.center.lat - dLat, s.center.lng - dLng], [s.center.lat + dLat, s.center.lng + dLng]], { padding: [20, 20] });
   }
