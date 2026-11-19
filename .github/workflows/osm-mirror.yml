@@ -1,0 +1,40 @@
+name: OpenStreetMap extracts mirror
+
+# Manual. Downloads every US state extract (plus DC and Puerto Rico) from
+# Geofabrik one at a time, with a pause between files, and publishes them as
+# assets of the release "osm-extracts" in this repository. The drive-time job
+# (access-dry-run.yml) reads them from there first: Geofabrik refuses an
+# address that downloads a lot, and dozens of parallel runs each fetching up to
+# 13 neighbouring states tripped that repeatedly (2026-11-19). OpenStreetMap
+# data, ODbL: (c) OpenStreetMap contributors.
+
+on:
+  workflow_dispatch:
+    inputs:
+      states:
+        description: "Geofabrik us/<name> slugs, space separated (empty = all)"
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v5
+      - name: Mirror
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATES: ${{ inputs.states }}
+        run: |
+          set -euo pipefail
+          ALL="alabama alaska arizona arkansas california colorado connecticut delaware district-of-columbia florida georgia hawaii idaho illinois indiana iowa kansas kentucky louisiana maine maryland massachusetts michigan minnesota mississippi missouri montana nebraska nevada new-hampshire new-jersey new-mexico new-york north-carolina north-dakota ohio oklahoma oregon pennsylvania rhode-island south-carolina south-dakota tennessee texas utah vermont virginia washington west-virginia wisconsin wyoming puerto-rico"
+          gh release view osm-extracts >/dev/null 2>&1 || gh release create osm-extracts --title "OpenStreetMap extracts" --notes "US state extracts from Geofabrik, mirrored for the drive-time access job. (c) OpenStreetMap contributors, ODbL."
+          for s in ${STATES:-$ALL}; do
+            f="$RUNNER_TEMP/$s.osm.pbf"
+            curl -sSfL --retry 40 --retry-all-errors --retry-delay 60 -o "$f" "https://download.geofabrik.de/north-america/us/$s-latest.osm.pbf"
+            gh release upload osm-extracts "$f" --clobber
+            echo "$s $(du -h "$f" | cut -f1)"; rm -f "$f"; sleep 20
+          done

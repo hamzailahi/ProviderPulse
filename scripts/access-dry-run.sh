@@ -27,13 +27,12 @@ sleep $((RANDOM % 300))
 parts=()
 for s in $GEOFABRIK; do
   f="$WORK/osm/$(basename "$s").osm.pbf"
-  # Geofabrik refuses an address that downloads a lot (2026-11-19: 30 minutes
-  # of refused connections), so after ten tries fall back to the
-  # OpenStreetMap France mirror of the same extracts (underscored names).
+  # Read the repo's own mirror first (osm-mirror.yml, release "osm-extracts"):
+  # Geofabrik refuses an address that downloads a lot (2026-11-19), and the
+  # France mirror's paths did not match (404). Geofabrik stays the fallback.
   b=$(basename "$s")
-  curl -sSfL --retry 10 --retry-all-errors --retry-delay 30 -o "$f" "https://download.geofabrik.de/north-america/$s-latest.osm.pbf" ||
-  curl -sSfL --retry 20 --retry-all-errors --retry-delay 45 -o "$f" "https://download.openstreetmap.fr/extracts/north-america/us/$b-latest.osm.pbf" ||
-  curl -sSfL --retry 20 --retry-all-errors --retry-delay 45 -o "$f" "https://download.openstreetmap.fr/extracts/north-america/us/${b//-/_}-latest.osm.pbf"
+  curl -sSfL --retry 5 --retry-all-errors --retry-delay 20 -o "$f" "https://github.com/hamzailahi/ProviderPulse/releases/download/osm-extracts/$b.osm.pbf" ||
+  curl -sSfL --retry 20 --retry-all-errors --retry-delay 45 -o "$f" "https://download.geofabrik.de/north-america/$s-latest.osm.pbf"
   osmium extract -b "$BBOX" "$f" -o "$f.clip.pbf" --overwrite -s smart >/dev/null
   rm -f "$f"; parts+=("$f.clip.pbf")
 done
