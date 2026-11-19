@@ -168,5 +168,15 @@ console.log('ZIP totals (053)');
   const wt = one(base({ rows: [Object.assign({}, rows[0], { n: 10, w: 6, sites: 10 })] }));
   check('its weighted sum sets the rate, the head count stays n', wt.clinicians === 10 && wt.evidence.access.weighted_clinicians === 6);
 }
+console.log('Two scores, competition as a fact (2026-11-19)');
+{
+  const r = one(base({ rows: cardRows(5, 6) }));
+  check('competition is not weighted', !('competition' in M.WEIGHTS) && Math.abs(M.WEIGHTS.need + M.WEIGHTS.access + M.WEIGHTS.pay - 1) < 1e-9);
+  check('competition is still returned as a fact', r.factors.competition != null && r.evidence.competition != null);
+  check('no reason cites competition', !(r.reasons || []).some(x => x.factor === 'competition'));
+  const pn = Math.round([r.factors.need, r.factors.access].filter(v => v != null).reduce((a, b, _, A) => a + b / A.length, 0));
+  check('patient_need is the mean of need and access', r.scores.patient_need === pn, JSON.stringify(r.scores));
+  check('viability is ability to pay', r.scores.viability === (r.factors.pay == null ? null : Math.round(r.factors.pay)));
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

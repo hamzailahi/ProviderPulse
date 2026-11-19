@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-19
 
+- The market opportunity score no longer rewards distance from competitors. The back-test showed new clinicians set up near existing ones, so "room from competitors" predicted the wrong direction. It is now shown as a fact (nearest same-specialty practice) and the score is health need, access gap and ability to pay, a third each. Insights also shows two plain scores: "Patients need care here" (need and access) and "A practice can make it here" (ability to pay).
 - New manual job, Avoidable admission rates: fills the county table's empty avoidable-admission columns (heart failure, diabetes, COPD, high blood pressure, pneumonia, urinary infection, amputation, by age band) from CMS's Medicare Geographic Variation file, so the back-test can check the need score against them. Dry run first; apply writes only those columns.
 - The back-test now tests each half of the score against what it claims: the need half against avoidable hospital admissions, ER visits and readmissions by county, and the business half against where new clinicians started. Its first run found that new clinicians in 2021 to 2025 went mostly to areas already well supplied, not to the areas of greatest need.
 

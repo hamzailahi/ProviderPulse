@@ -821,7 +821,7 @@ exports.handler = async (event) => {
             const fake = Array.from({ length: addN }, () => ({ npi: 'scenario', primary_taxonomy: term, taxonomy_code: code, latitude: oLat, longitude: oLon }));
             const afterAll = MarketModel.score(Object.assign({}, baseInput, { rows: baseInput.rows.concat(fake) }));
             const pick = x => x && ({
-              score: x.score, archetype: x.archetype_name, confidence: x.confidence, clinicians: x.clinicians, factors: x.factors,
+              score: x.score, scores: x.scores, archetype: x.archetype_name, confidence: x.confidence, clinicians: x.clinicians, factors: x.factors,
               listings_per_1k_adults: x.evidence.access ? x.evidence.access.per_1k : null,
               nearest_competitor_miles: x.evidence.competition ? x.evidence.competition.nearest_miles : null
             });

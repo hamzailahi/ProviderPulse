@@ -42,14 +42,25 @@
 (function (global) {
   'use strict';
 
-  var VERSION = '2026-11-19.1';
+  var VERSION = '2026-11-19.2';
 
   // The HRSA shortage factor (HPSA score, 0.10) was retired 2026-11-19, the
   // user's choice: HPSA is itself a population-to-provider ratio, the method
   // the drive-time access factor replaces, so scoring with it was circular.
   // Its weight was shared out in proportion; the HPSA figure is still
   // reported (evidence.hpsa_reference) as an independent comparison.
-  var WEIGHTS = { need: 0.333, access: 0.333, pay: 0.222, competition: 0.112 };
+  //
+  // Competition left the score 2026-11-19 (the user's choice after the
+  // back-test, supabase/reference/backtest-entry.md): distance from the
+  // nearest competitor ran -0.18 to -0.74 against where clinicians actually
+  // set up in 2021 to 2025, because new clinicians join groups and hospitals
+  // where others already practise. It is still computed and returned as a
+  // fact (factors.competition, evidence.competition), never weighted.
+  //
+  // Two scores sit beside the headline (scores.patient_need = mean of need
+  // and access, tested against county ER use; scores.viability = pay, the
+  // only part that ran positive against entry).
+  var WEIGHTS = { need: 0.333, access: 0.333, pay: 0.334 };
 
   // Per-specialty need drivers. m: [PLACES measureid, weight, invert?],
   // d: [census proxy, weight]. Weights are relative within a specialty.
@@ -349,8 +360,13 @@
       var confidence = conf >= 0.8 ? 'high' : conf >= 0.55 ? 'medium' : 'low';
 
       var arche = classify(f, clin, confidence);
+      var pn = [f.need, f.access].filter(function (v) { return v != null; });
+      var scores = {
+        patient_need: pn.length ? Math.round(pn.reduce(function (a, b) { return a + b; }, 0) / pn.length) : null,
+        viability: f.pay != null ? Math.round(f.pay) : null
+      };
       out.push({
-        specialty: label, group: group, score: sc, archetype: arche, archetype_name: ARCHETYPES[arche].name,
+        specialty: label, group: group, score: sc, scores: scores, archetype: arche, archetype_name: ARCHETYPES[arche].name,
         strategy: ARCHETYPES[arche].strategy, confidence: confidence, factors: roundAll(f), evidence: ev,
         reasons: reasons(f, ev, label), caveats: dedupe(caveats), clinicians: clin
       });

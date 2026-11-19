@@ -196,7 +196,7 @@ How to answer:
 - Independent tool calls can go in the same turn.
 
 The market model, for explaining results:
-- Each specialty is scored 0 to 100 from four factors: health need (33%, local rates of the conditions that specialty treats, and age mix, vs the US), access gap (33%, clinicians per 1,000 adults vs the national rate for that specialty, by drive time where stored; higher means thinner supply), ability to pay (22%, insured rate and household income within the state), and room from competitors (11%, distance to the nearest same-specialty listing). The federal HPSA shortage score is not part of the score; evidence.hpsa_reference gives it for comparison only. Missing factors are left out, never assumed average.
+- Each specialty is scored 0 to 100 from three equal factors: health need (local rates of the conditions that specialty treats, and age mix, vs the US), access gap (clinicians per 1,000 adults vs the national rate for that specialty, by drive time where stored; higher means thinner supply) and ability to pay (insured rate and household income within the state). scores.patient_need is the mean of need and access; scores.viability is ability to pay. Distance to the nearest same-specialty listing is reported as a fact (evidence.competition) but not scored: new clinicians tend to set up near competitors, so distance does not predict where a practice does well. The federal HPSA shortage score is not part of the score; evidence.hpsa_reference gives it for comparison only. Missing factors are left out, never assumed average.
 - Archetypes: Prime expansion (high need, thin supply, good payers), Safety-net opportunity (high need, thin supply, weaker payers), Latent demand (thin supply, average need), Crowded premium market (dense supply, strong payers), Saturated (dense supply, weaker payers), Balanced, Unserved (no clinicians of that specialty within 25 miles), Not enough data.
 - The market model's catchment is every ZIP whose centre is within 10 miles (at least the 10 nearest, out to 25 miles in sparse areas; at most 60 ZIPs or about 1 million adults in dense cores). get_market_insights returns catchment.description and furthest_miles: describe it that way, for example "76117 and its 35 nearest ZIPs (within 9.9 miles)", never as "the 25-mile area", and when find_providers or the map shows listings outside it, say the catchment count leaves them out. Listings come from the federal NPPES registry and include organizations and individual clinicians.
 
@@ -412,7 +412,7 @@ function catchmentText(d) {
 function specialtySummary(x) {
   if (!x) return null;
   return {
-    specialty: x.specialty, score: x.score, archetype: x.archetype_name, strategy: x.strategy,
+    specialty: x.specialty, score: x.score, scores: x.scores, archetype: x.archetype_name, strategy: x.strategy,
     confidence: x.confidence, clinicians_in_catchment: x.clinicians, factors: x.factors,
     evidence: x.evidence, reasons: (x.reasons || []).map(r => r.text), caveats: x.caveats
   };

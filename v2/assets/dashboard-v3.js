@@ -756,9 +756,10 @@ var ARCH_TONE = { prime: 'good', unserved: 'good', safety_net: 'warm', latent: '
 var FACTORS = [
   ['need', 'Health need', 'How common the conditions this specialty treats are here, vs US ZIPs'],
   ['access', 'Access gap', 'Higher when there are fewer clinicians per adult than nationally'],
-  ['pay', 'Ability to pay', 'Insured rate and household income, ranked within the state'],
-  ['competition', 'Room from competitors', 'Higher when the nearest same-specialty listing is far away']
+  ['pay', 'Ability to pay', 'Insured rate and household income, ranked within the state']
 ];
+// Competition is shown as a fact, not scored (2026-11-19: the back-test found
+// new clinicians set up near competitors, not away from them).
 function ordinal(v) {
   var n = Math.round(v), t = n % 100, u = n % 10;
   return n + (t >= 11 && t <= 13 ? 'th' : u === 1 ? 'st' : u === 2 ? 'nd' : u === 3 ? 'rd' : 'th');
@@ -831,7 +832,9 @@ function paintModel(p, d, M) {
     el('div', { class: 'ins-vgrid' },
       el('div', { class: 'ins-vcol' }, el('span', { class: 'ins-arch t-' + tn }, h.archetype_name), el('p', { class: 'ins-help' }, h.strategy)),
       el('div', { class: 'ins-vcol' },
-        el('p', { class: 'ins-bigscore' }, el('b', {}, sc == null ? '--' : String(sc)), el('span', {}, '/ 100 opportunity score')), scoreBar),
+        el('p', { class: 'ins-bigscore' }, el('b', {}, sc == null ? '--' : String(sc)), el('span', {}, '/ 100 opportunity score')), scoreBar,
+        h.scores ? el('p', { class: 'ins-help' }, 'Patients need care here: ' + (h.scores.patient_need == null ? 'n/a' : h.scores.patient_need) +
+          ' · A practice can make it here: ' + (h.scores.viability == null ? 'n/a' : h.scores.viability)) : null),
       el('div', { class: 'ins-vcol' },
         el('p', { class: 'ins-confl', title: 'How much of the model is backed by local data' }, bars, h.confidence.charAt(0).toUpperCase() + h.confidence.slice(1) + ' confidence'),
         el('p', { class: 'ins-help' }, h.caveats.length ? h.caveats.length + ' data note' + (h.caveats.length === 1 ? '' : 's') + ' under How the score is built.' : 'Every factor is backed by local data.'))),
@@ -860,6 +863,7 @@ function paintModel(p, d, M) {
     // the score 2026-11-19: it is a population-to-provider ratio itself).
     h.evidence.hpsa_reference ? el('div', { class: 'ins-fev' }, 'For comparison, not scored: federal ' +
       evidenceLine('shortage', h.evidence.hpsa_reference)) : null,
+    h.evidence.competition ? el('div', { class: 'ins-fev' }, 'Competitors, not scored: ' + evidenceLine('competition', h.evidence.competition)) : null,
     h.caveats.length ? el('details', { class: 'ins-caveats' },
       el('summary', {}, 'Data notes (' + h.caveats.length + ')'),
       el('ul', {}, h.caveats.map(function (c) { return el('li', {}, c); }))) : null));

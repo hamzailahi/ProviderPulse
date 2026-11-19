@@ -173,7 +173,7 @@ function specialtyHtml(model, catchment, zip) {
   if (!rows && !none) return '';
   return '<div class="specialty-note">Strongest openings' +
     (radius ? ', within ' + radius + ' miles of ' + esc(zip) : '') +
-    '. Each specialty is scored from health need, supply against the national rate, payers and competition, not from patient searches.</div>' +
+    '. Each specialty is scored from health need, supply against the national rate and payers, not from patient searches.</div>' +
     '<div class="specialty-rows">' + rows + '</div>' +
     (none ? '<div class="specialty-note">' + none + ' of ' + model.specialties.length + ' specialties have no listing in this area at all.</div>' : '');
 }
