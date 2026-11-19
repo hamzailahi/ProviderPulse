@@ -1,6 +1,6 @@
 # E2SFCA access dry run: Louisiana
 
-Run 2026-11-18 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-19 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
@@ -16,7 +16,7 @@ Compares the access factor the market model uses today (listings per adult withi
 
 Regional median: 2.72 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (6.79), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
 
-- Flagged: 11; re-anchored: 3; still implausible (left out of the rank comparison, marked in the CSV): 5 (36602, 36603, 36604, 70712, 71316)
+- Flagged: 11; re-anchored: 3; still implausible (left out of the rank comparison, still stored, marked in the CSV): 5 (36602, 36603, 36604, 70712, 71316)
 
 | ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
 |---|---|---|---|---|---|---|
@@ -110,11 +110,11 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 | 71301 | Heart / cardiology | 0.441 | 0.400 | 22 | 29 |
 | 71301 | Cancer care / oncology | 0.209 | 0.130 | 41 | 64 |
 | 71301 | Urgent care & emergency | 0.684 | 1.081 | 31 | 0 |
-| 70601 | Primary care / family doctor | 4.658 | 7.222 | 51 | 24 |
-| 70601 | Mental health & counseling | 5.156 | 8.433 | 64 | 41 |
-| 70601 | Heart / cardiology | 0.239 | 0.273 | 57 | 51 |
-| 70601 | Cancer care / oncology | 0.103 | 0.099 | 71 | 72 |
-| 70601 | Urgent care & emergency | 0.426 | 0.649 | 57 | 35 |
+| 70712 | Primary care / family doctor | 3.424 | 0.538 | 64 | 94 |
+| 70712 | Mental health & counseling | 2.228 | 0.000 | 84 | 100 |
+| 70712 | Heart / cardiology | 0.054 | 0.002 | 90 | 100 |
+| 70712 | Cancer care / oncology | 0.054 | 0.004 | 85 | 99 |
+| 70712 | Urgent care & emergency | 0.380 | 0.000 | 62 | 100 |
 
 ## Reading this
 
@@ -122,6 +122,6 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
 
-## Applied 2026-11-18
+## Applied 2026-11-19
 
-- 20760 rows (ZIP x specialty) stored in access_e2sfca for LA; market-score now uses drive-time access for these ZIPs.
+- 20840 rows (ZIP x specialty) stored in access_e2sfca for LA; market-score now uses drive-time access for these ZIPs.
