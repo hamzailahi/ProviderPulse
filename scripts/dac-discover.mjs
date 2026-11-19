@@ -23,13 +23,25 @@ function splitCsv(line) {
   cells.push(cur); return cells;
 }
 
-const meta = await (await fetch(ITEM)).json();
+// data.cms.gov answers some clients with an HTML block page; send ordinary
+// headers, try the metastore twice, and print what came back if it is not JSON.
+const HDRS = { 'User-Agent': 'Mozilla/5.0 (compatible; ProviderPulse-discovery)', Accept: 'application/json,text/csv,*/*' };
+async function getJson(u) {
+  for (let i = 0; i < 3; i++) {
+    const r = await fetch(u, { headers: HDRS });
+    const t = await r.text();
+    try { return JSON.parse(t); } catch { console.log(`attempt ${i + 1}: HTTP ${r.status}, not JSON:\n` + t.slice(0, 600)); }
+    await new Promise(z => setTimeout(z, 5000 * (i + 1)));
+  }
+  return null;
+}
+const meta = (await getJson(ITEM)) || (await getJson('https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items/mj5m-pzi6')) || {};
 const dist = (meta.distribution || []).find(d => /csv/i.test(d.mediaType || d.format || d.downloadURL || '')) || (meta.distribution || [])[0];
 const url = dist && (dist.downloadURL || (dist.data && dist.data.downloadURL));
 out.push(`- Title: ${meta.title}`, `- Modified: ${meta.modified}`, `- Download: ${url}`, '');
 if (!url) { out.push('No CSV distribution found; metastore item follows.', '```', JSON.stringify(meta).slice(0, 4000), '```'); writeFileSync('supabase/reference/dac-discovery.md', out.join('\n') + '\n'); process.exit(1); }
 
-const res = await fetch(url);
+const res = await fetch(url, { headers: HDRS });
 if (!res.ok) throw new Error('download ' + res.status);
 const rl = readline.createInterface({ input: Readable.fromWeb(res.body), crlfDelay: Infinity });
 let header = null, rows = 0;
