@@ -201,6 +201,7 @@ if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
   // util: fips, er_per_1000, readmission_rate, then the 7 PQI columns for ages 65 to 74
   const util = read('util').map(c => ({ fips: c[0], er: num(c[1]), readm: num(c[2]), pq: c.slice(3).map(num) }));
   pqiComposite(util);
+  console.log('util counties', util.length, 'non-null per admission rate', PQI_COLS.map((c, j) => c + ' ' + util.filter(u => u.pq[j] != null).length).join(', '), 'composite', util.filter(u => u.pqi != null).length);
   const rows = run(input), sum = summarize(rows);
   const now = run(input, { supply: 'all' }), out = outcomes(now, util);
   writeFileSync(arg('csv'), 'zip,specialty,need,access,need_score,pay,competition,viability,hpsa,entry_per_1k\n' + rows.map(r => [r.zip, '"' + r.specialty + '"', r.need ?? '', r.access ?? '', r.needScore ?? '', r.pay ?? '', r.competition ?? '', r.viability ?? '', r.hpsa ?? '', r.entryPer1k.toFixed(4)].join(',')).join('\n') + '\n');
