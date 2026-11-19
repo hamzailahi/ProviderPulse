@@ -1,6 +1,6 @@
 # E2SFCA access dry run: Virginia
 
-Run 2026-11-18 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-19 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
@@ -16,7 +16,7 @@ Compares the access factor the market model uses today (listings per adult withi
 
 Regional median: 3.21 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (8.03), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
 
-- Flagged: 95; re-anchored: 43; still implausible (left out of the rank comparison, marked in the CSV): 56 (15033, 15083, 15087, 15089, 15131, 15311, 15314, 15364, 15366, 15449, 15473, 15478, 15480, 15482, 15492, 15563, 15615, 15625, 15637, 15640, 15642, 15660, 15663, 15678, 15679, 15695, 15698, 16634, 16657, 16679, 17109, 21610, 21634, 21669, 21672, 21675, 21869, 22488, 25008, 25047, 25149, 43002, 43015, 43026, 43035, 43064, 43113, 43116, 43119, 43123, 43162, 43228, 43728, 43758, 45644, 45743)
+- Flagged: 95; re-anchored: 43; still implausible (left out of the rank comparison, still stored, marked in the CSV): 56 (15033, 15083, 15087, 15089, 15131, 15311, 15314, 15364, 15366, 15449, 15473, 15478, 15480, 15482, 15492, 15563, 15615, 15625, 15637, 15640, 15642, 15660, 15663, 15678, 15679, 15695, 15698, 16634, 16657, 16679, 17109, 21610, 21634, 21669, 21672, 21675, 21869, 22488, 25008, 25047, 25149, 43002, 43015, 43026, 43035, 43064, 43113, 43116, 43119, 43123, 43162, 43228, 43728, 43758, 45644, 45743)
 
 | ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
 |---|---|---|---|---|---|---|
@@ -194,11 +194,11 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 | 22903 | Heart / cardiology | 0.564 | 0.508 | 0 | 10 |
 | 22903 | Cancer care / oncology | 0.079 | 0.120 | 78 | 66 |
 | 22903 | Urgent care & emergency | 0.208 | 0.242 | 79 | 76 |
-| 24201 | Primary care / family doctor | 5.771 | 7.108 | 40 | 26 |
-| 24201 | Mental health & counseling | 4.228 | 3.968 | 70 | 72 |
-| 24201 | Heart / cardiology | 0.187 | 0.357 | 67 | 36 |
-| 24201 | Cancer care / oncology | 0.131 | 0.172 | 63 | 52 |
-| 24201 | Urgent care & emergency | 0.430 | 0.524 | 57 | 47 |
+| 22488 | Primary care / family doctor | 0.908 | 0.316 | 90 | 97 |
+| 22488 | Mental health & counseling | 0.568 | 0.829 | 96 | 94 |
+| 22488 | Heart / cardiology | 0.000 | 0.006 | 100 | 99 |
+| 22488 | Cancer care / oncology | 0.000 | 0.040 | 100 | 89 |
+| 22488 | Urgent care & emergency | 0.000 | 0.000 | 100 | 100 |
 
 ## Reading this
 
@@ -206,6 +206,6 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
 
-## Applied 2026-11-18
+## Applied 2026-11-19
 
-- 35200 rows (ZIP x specialty) stored in access_e2sfca for VA; market-score now uses drive-time access for these ZIPs.
+- 35240 rows (ZIP x specialty) stored in access_e2sfca for VA; market-score now uses drive-time access for these ZIPs.
