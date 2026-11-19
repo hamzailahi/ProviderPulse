@@ -1,6 +1,6 @@
 # E2SFCA access dry run: North Carolina
 
-Run 2026-11-18 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-19 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
@@ -16,7 +16,7 @@ Compares the access factor the market model uses today (listings per adult withi
 
 Regional median: 2.84 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (7.11), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
 
-- Flagged: 42; re-anchored: 13; still implausible (left out of the rank comparison, marked in the CSV): 31 (23347, 23354, 23405, 24712, 24731, 24740, 24828, 24878, 24892, 24894, 25922, 27950, 40447, 40481, 40486, 40806, 40815, 40818, 40862, 40913, 40941, 40965, 40977, 40997, 41367, 41534, 41560, 41660, 41731, 41821, 41833)
+- Flagged: 42; re-anchored: 13; still implausible (left out of the rank comparison, still stored, marked in the CSV): 31 (23347, 23354, 23405, 24712, 24731, 24740, 24828, 24878, 24892, 24894, 25922, 27950, 40447, 40481, 40486, 40806, 40815, 40818, 40862, 40913, 40941, 40965, 40977, 40997, 41367, 41534, 41560, 41660, 41731, 41821, 41833)
 
 | ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
 |---|---|---|---|---|---|---|
@@ -136,11 +136,11 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 | 28401 | Heart / cardiology | 0.373 | 0.392 | 34 | 30 |
 | 28401 | Cancer care / oncology | 0.250 | 0.169 | 30 | 52 |
 | 28401 | Urgent care & emergency | 0.411 | 0.507 | 59 | 49 |
-| 27858 | Primary care / family doctor | 7.267 | 4.570 | 24 | 52 |
-| 27858 | Mental health & counseling | 11.605 | 12.934 | 19 | 9 |
-| 27858 | Heart / cardiology | 0.636 | 0.449 | 0 | 20 |
-| 27858 | Cancer care / oncology | 0.424 | 0.200 | 0 | 44 |
-| 27858 | Urgent care & emergency | 1.219 | 0.543 | 0 | 45 |
+| 27950 | Primary care / family doctor | 1.608 | 0.000 | 83 | 100 |
+| 27950 | Mental health & counseling | 2.387 | 0.000 | 83 | 100 |
+| 27950 | Heart / cardiology | 0.000 | 0.003 | 100 | 100 |
+| 27950 | Cancer care / oncology | 0.000 | 0.013 | 100 | 96 |
+| 27950 | Urgent care & emergency | 0.049 | 0.000 | 95 | 100 |
 
 ## Reading this
 
@@ -148,6 +148,6 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
 
-## Applied 2026-11-18
+## Applied 2026-11-19
 
-- 32760 rows (ZIP x specialty) stored in access_e2sfca for NC; market-score now uses drive-time access for these ZIPs.
+- 32800 rows (ZIP x specialty) stored in access_e2sfca for NC; market-score now uses drive-time access for these ZIPs.
