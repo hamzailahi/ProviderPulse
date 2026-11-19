@@ -582,17 +582,28 @@ function placeWords(s) {
 }
 
 // Name search (2026-11-19): a doctor or clinic by name, or a 10-digit NPI.
-// The place is optional. With one, listings within 50 miles come first by
-// distance and up to 40 more from anywhere follow; without one, matches
-// nationwide. Both directory tables, through migration 050's name indexes.
+// The place is optional. With one, matches in the place's state are fetched
+// beside matches from anywhere, and the list leads with the nearest; without
+// one, matches nationwide. Both directory tables, through migration 050's
+// name indexes. A name filter plus a map box timed out on clinics (live,
+// 2026-11-19: 3.3s), while name alone answered in 0.3 to 0.5s and name plus
+// state in 0.4s, so distance is worked out here, never asked of the box.
 // A failed table makes the list partial, never "no one by that name".
-var NAME_NEAR_MILES = 50;
-function nameFetch(table, filter, limit) {
-  var url = SB_URL + '/rest/v1/' + table + '?' + filter + '&select=' + PROVIDER_ROW_SELECT + ',phone&limit=' + limit;
+var NAME_LIMIT = 1000;
+function nameFetch(table, filter) {
+  var url = SB_URL + '/rest/v1/' + table + '?' + filter + '&select=' + PROVIDER_ROW_SELECT + ',phone&limit=' + NAME_LIMIT;
   return fetch(url, { headers: { apikey: SB_KEY, Accept: 'application/json' }, signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (rows) { if (!Array.isArray(rows)) { var f = []; f.failed = true; return f; } return tagSrc(rows, table === 'clinics' ? 'clinic' : 'individual'); })
     .catch(function () { var f = []; f.failed = true; return f; });
+}
+// The two-letter state of a ZIP (census_acs_zcta), or null.
+function zipState(zip) {
+  if (!/^\d{5}$/.test(String(zip || ''))) return Promise.resolve(null);
+  return fetch(SB_URL + '/rest/v1/census_acs_zcta?zip=eq.' + zip + '&select=state&limit=1', { headers: { apikey: SB_KEY, Accept: 'application/json' } })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { var st = d && d[0] && d[0].state; return /^[A-Z]{2}$/.test(st || '') ? st : null; })
+    .catch(function () { return null; });
 }
 function runNameSearch() {
   var s = state.search;
@@ -603,21 +614,21 @@ function runNameSearch() {
   s.partial = false; s.truncated = false; s.dense = false; s.related = null; s.procedure = null; s.door = null;
   paintFind();
   var from = !hasPlace(s) ? Promise.resolve(null) : s.origin ? Promise.resolve({ lat: s.origin.lat, lng: s.origin.lng }) : locateZip(s.zip);
-  Promise.all([from, loadRegistered()]).then(function (res) {
+  Promise.all([from, loadRegistered(), q.npi || !hasPlace(s) ? null : zipState(s.zip)]).then(function (res) {
     if (seq !== s.seq) return;
-    var c = res[0], f = NameSearch.filter(q), tables = ['provider_individuals', 'clinics'];
+    var c = res[0], st = res[2], f = NameSearch.filter(q), tables = ['provider_individuals', 'clinics'];
     s.center = c;
     var asks = [];
     tables.forEach(function (t) {
-      if (c) { var b = milesBox(c, NAME_NEAR_MILES); asks.push(nameFetch(t, f + '&' + boxFilter(b), 150)); }
-      asks.push(nameFetch(t, f, c ? 40 : 150));
+      asks.push(nameFetch(t, f));
+      if (st) asks.push(nameFetch(t, f + '&state=eq.' + st));
     });
     return Promise.all(asks).then(function (sets) {
       if (seq !== s.seq) return;
       var byNpi = {}, failed = false, capped = false;
-      sets.forEach(function (rows, i) {
+      sets.forEach(function (rows) {
         if (rows.failed) failed = true;
-        if (rows.length >= (c && i % 2 === 0 ? 150 : c ? 40 : 150)) capped = true;
+        if (rows.length >= NAME_LIMIT) capped = true;
         rows.forEach(function (row) {
           var r = NameSearch.rank(row.name, q);
           if (r < 0 || !row.npi) return;
