@@ -207,6 +207,7 @@ exports.handler = async (event) => {
 
   const env = process.env;
   const zip = String((event.queryStringParameters || {}).zip || '').trim();
+  const weighted = String((event.queryStringParameters || {}).weighted || '') === '1';
   if (!/^\d{5}$/.test(zip)) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'A 5-digit zip is required' }) };
 
   const anon = { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` };
@@ -573,7 +574,11 @@ exports.handler = async (event) => {
           for (let i = 0; i < memberZips.length; i += CATCHMENT_ZIP_GROUP) groups.push(memberZips.slice(i, i + CATCHMENT_ZIP_GROUP));
           const out = { rows: [], truncated: false, failed: false };
           for (let i = 0; i < groups.length; i += CATCHMENT_PARALLEL) {
-            const one = g => pagedGet(`${table}?zip=in.(${variantsOf(g).join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude`,
+            // ?weighted=1 (test switch until the user approves the switch-over,
+            // 2026-11-19): clinicians come from the view carrying each one's
+            // site weight (migration 052).
+            const src = table === 'provider_individuals' && weighted ? 'provider_individuals_weighted' : table;
+            const one = g => pagedGet(`${src}?zip=in.(${variantsOf(g).join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude${src !== table ? ',w' : ''}`,
               'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000, strict: true });
             // A dense group can hit the 3s statement timeout (57014; four
             // Manhattan ZIPs, 2026-10-22): load its ZIPs one at a time instead.

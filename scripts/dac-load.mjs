@@ -48,6 +48,7 @@ await new Promise(z => out.end(z));
 const sec = new Map();
 for await (const l of readline.createInterface({ input: createReadStream(arg('secondary')) })) { const [n, c] = l.split(','); if (n) sec.set(n, Number(c)); }
 const codeOf = new Map(); let ind = 0;
+const wout = arg('weights') ? createWriteStream(arg('weights')) : null; let wn = 0;
 const tally = new Map(); // code -> {n, w, inDac, grad, old}
 const cutoff = new Date().getUTCFullYear() - 35;
 for await (const l of readline.createInterface({ input: createReadStream(arg('individuals')) })) {
@@ -55,8 +56,11 @@ for await (const l of readline.createInterface({ input: createReadStream(arg('in
   const d = map.get(npi);
   const w = siteWeight(d ? d.addrs.size : null, 1 + (sec.get(npi) || 0));
   let t = tally.get(code); if (!t) tally.set(code, t = { n: 0, w: 0, inDac: 0, grad: 0, old: 0 });
+  if (wout && w < 1 && !codeOf.has(npi)) { codeOf.set(npi, 1); wout.write(npi + ',' + w + '\n'); wn++; }
   t.n++; t.w += w; if (d) { t.inDac++; if (d.grad != null) { t.grad++; if (d.grad <= cutoff) t.old++; } }
 }
+if (wout) await new Promise(z => wout.end(z));
+console.log(`weights below 1: ${wn}`);
 const pct = (a, b) => b ? (100 * a / b).toFixed(1) + '%' : 'n/a';
 const lines = [`# Clinician status load: dry run`, '', `Run ${new Date().toISOString().slice(0, 10)} by scripts/dac-load.mjs. CMS Doctors and Clinicians file released ${release}.`, '',
   `- File rows: ${rows.toLocaleString()}; clinicians (NPIs): ${map.size.toLocaleString()}`,

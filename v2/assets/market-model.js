@@ -263,7 +263,12 @@
       /* ---- access ---- */
       var listings = bySpec[label] || [];
       var clin = listings.length;
-      var per1k = input.adults ? (clin / input.adults) * 1000 : null;
+      // Weighted supply (step 1 of the scoring upgrade, 2026-11-19): a
+      // clinician with several sites carries w = 0.6 at the main address;
+      // listings without a weight count 1.
+      var fte = 0;
+      listings.forEach(function (r) { fte += (typeof r.w === 'number' && r.w > 0) ? r.w : 1; });
+      var per1k = input.adults ? (fte / input.adults) * 1000 : null;
       var rate = bmSpecs[label] && bmSpecs[label].rate_per_1k;
       if (clin === 0 && input.adults > 0) {
         // Nobody within the radius is the thinnest supply there is, with or
@@ -282,7 +287,7 @@
           catchment_minutes: e2.catchment_minutes, crude_per_1k: per1k == null ? null : round2(per1k) };
       } else if (per1k != null && rate) {
         f.access = clamp(100 - (per1k / rate) * 50);
-        ev.access = { basis: 'specialty', per_1k: round2(per1k), national_per_1k: round2(rate), clinicians: clin };
+        ev.access = { basis: 'specialty', per_1k: round2(per1k), national_per_1k: round2(rate), clinicians: clin, weighted_clinicians: round2(fte) };
       } else if (input.groupAccess && input.groupAccess[group] != null) {
         f.access = clamp(input.groupAccess[group]);
         ev.access = { basis: 'group', per_1k: per1k == null ? null : round2(per1k), clinicians: clin };
