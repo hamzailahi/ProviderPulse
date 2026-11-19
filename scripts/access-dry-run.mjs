@@ -151,7 +151,13 @@ for (const [label] of SCORED) {
   for (const z of focus) {
     const a = A.get(z.zip), c = C.get(z.zip);
     const fa = accessFactor(a == null ? null : a * 1000, rate), fc = accessFactor(c == null ? null : c * 1000, rate);
-    if (a != null && !unreliable.has(z.zip)) load.push([z.zip, '"' + label.replace(/"/g, '""') + '"', (a * 1000).toFixed(4), d0].join(','));
+    // Every focus ZIP is stored (the user's rule, 2026-11-19: no ZIP left out).
+    // A ZIP with no road link to any supply is scored on its own listings and
+    // adults, the E2SFCA result for an isolated place; unreliable routing is
+    // stored as computed and still marked in the CSV and the report.
+    const own = z.adults > 0 ? (supply.get(z.zip) || 0) / z.adults : null;
+    const store = a ?? own;
+    if (store != null) load.push([z.zip, '"' + label.replace(/"/g, '""') + '"', (store * 1000).toFixed(4), d0].join(','));
     rows.push([label, z.zip, z.adults, fmt(c), fmt(a), fc ?? '', fa ?? '', d0, unreliable.has(z.zip) ? 'unreliable_routing' : ''].join(','));
     if (fa != null && fc != null && !unreliable.has(z.zip)) {
       pairs.push([fc, fa]);
@@ -182,7 +188,7 @@ const lines = [
   '- Catchment edges: 30 minutes for everyday care, 60 for most specialties, 90 for oncology, genetics, infectious disease and plastic surgery (reviewable assumptions, listed per row below)', '',
   '## Routing sanity check', '',
   `Regional median: ${gmed.toFixed(2)} drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above ${FLAG_X}x that (${(FLAG_X * gmed).toFixed(2)}), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.`, '',
-  `- Flagged: ${fixes.length}; re-anchored: ${fixes.filter(f => f.moved).length}; still implausible (left out of the rank comparison, marked in the CSV): ${unreliable.size}${unreliable.size ? ' (' + [...unreliable].join(', ') + ')' : ''}`, '',
+  `- Flagged: ${fixes.length}; re-anchored: ${fixes.filter(f => f.moved).length}; still implausible (left out of the rank comparison, still stored, marked in the CSV): ${unreliable.size}${unreliable.size ? ' (' + [...unreliable].join(', ') + ')' : ''}`, '',
   ...(fixes.length ? ['| ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |', '|---|---|---|---|---|---|---|',
     ...fixes.map(f => `| ${f.zip} | ${inFocus({ zip: f.zip }) ? 'yes' : 'no'} | ${Number.isFinite(f.before.med) ? f.before.med.toFixed(2) : 'none'} | ${Math.round(f.before.reach * 100)}% | ${Number.isFinite(f.after.med) ? f.after.med.toFixed(2) : 'none'} | ${Math.round(f.after.reach * 100)}% | ${f.moved ? 'yes (' + f.offMiles.toFixed(2) + ')' : 'no'} |`), ''] : []),
   '## By specialty', '',

@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-18. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-19. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -650,6 +650,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-19
+
+- Drive-time access no longer leaves any ZIP out. The island and ferry ZIPs that kept the 10-mile count (in Louisiana, West Virginia, North Carolina, South Carolina, Virginia and Maryland) now get their drive-time figure too, flagged in the state reports where the road times look doubtful.
 
 ### 2026-11-18
 

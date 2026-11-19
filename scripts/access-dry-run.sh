@@ -22,10 +22,12 @@ SQL
 echo "   $(($(wc -l < "$WORK/zips.csv") - 1)) ZIPs, $(($(wc -l < "$WORK/supply.csv") - 1)) ZIP x code supply rows"
 
 echo "== Roads (OpenStreetMap via Geofabrik, clipped to the region)"
+# Many states at once overwhelm Geofabrik: start at a random moment in 5 minutes.
+sleep $((RANDOM % 300))
 parts=()
 for s in $GEOFABRIK; do
   f="$WORK/osm/$(basename "$s").osm.pbf"
-  curl -sSfL --retry 6 --retry-all-errors --retry-delay 20 -o "$f" "https://download.geofabrik.de/north-america/$s-latest.osm.pbf"
+  curl -sSfL --retry 15 --retry-all-errors --retry-delay 30 -o "$f" "https://download.geofabrik.de/north-america/$s-latest.osm.pbf"
   osmium extract -b "$BBOX" "$f" -o "$f.clip.pbf" --overwrite -s smart >/dev/null
   rm -f "$f"; parts+=("$f.clip.pbf")
 done
