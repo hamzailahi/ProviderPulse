@@ -19,7 +19,7 @@ awk -F'\t' 'NR==1{for(i=1;i<=NF;i++){h=$i;gsub(/ /,"",h);c[h]=i};next} {g=$c["GE
 n=$(wc -l < "$WORK/gaz.csv"); echo "Gazetteer $year: $n ZCTAs"
 [ "$n" -ge 30000 ] || { echo "Too few ZCTAs"; exit 1; }
 [ "$MODE" = apply ] && psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -X -q -f supabase/migrations/054_zip_centres.sql
-TX=$([ "$MODE" = apply ] && echo "begin;" || echo "begin transaction read only;")
+TX="begin;"  # dry_run ends in rollback, so nothing is kept (a read-only transaction refuses temp tables)
 END=$([ "$MODE" = apply ] && echo "commit;" || echo "rollback;")
 psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -X -q -A -t > "$WORK/out.txt" <<SQL
 $TX
