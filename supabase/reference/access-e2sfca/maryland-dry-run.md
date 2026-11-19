@@ -1,6 +1,6 @@
 # E2SFCA access dry run: Maryland
 
-Run 2026-11-18 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-19 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
@@ -16,7 +16,7 @@ Compares the access factor the market model uses today (listings per adult withi
 
 Regional median: 3.37 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (8.44), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
 
-- Flagged: 9; re-anchored: 3; still implausible (left out of the rank comparison, marked in the CSV): 6 (08360, 21634, 21669, 21672, 22488, 23883)
+- Flagged: 9; re-anchored: 3; still implausible (left out of the rank comparison, still stored, marked in the CSV): 6 (08360, 21634, 21669, 21672, 22488, 23883)
 
 | ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
 |---|---|---|---|---|---|---|
@@ -93,21 +93,21 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 | 21401 | Heart / cardiology | 0.270 | 0.344 | 52 | 39 |
 | 21401 | Cancer care / oncology | 0.192 | 0.255 | 46 | 28 |
 | 21401 | Urgent care & emergency | 0.338 | 0.420 | 66 | 58 |
-| 21740 | Primary care / family doctor | 5.405 | 5.758 | 43 | 40 |
-| 21740 | Mental health & counseling | 8.515 | 9.372 | 40 | 34 |
-| 21740 | Heart / cardiology | 0.323 | 0.293 | 43 | 48 |
-| 21740 | Cancer care / oncology | 0.224 | 0.156 | 37 | 56 |
-| 21740 | Urgent care & emergency | 0.493 | 0.511 | 50 | 49 |
-| 21801 | Primary care / family doctor | 7.917 | 8.675 | 17 | 9 |
-| 21801 | Mental health & counseling | 12.118 | 13.773 | 15 | 3 |
-| 21801 | Heart / cardiology | 0.554 | 0.289 | 1 | 49 |
-| 21801 | Cancer care / oncology | 0.338 | 0.173 | 5 | 51 |
-| 21801 | Urgent care & emergency | 0.527 | 0.780 | 47 | 22 |
-| 21502 | Primary care / family doctor | 8.042 | 9.279 | 16 | 3 |
-| 21502 | Mental health & counseling | 10.868 | 12.272 | 24 | 14 |
-| 21502 | Heart / cardiology | 0.251 | 0.191 | 55 | 66 |
-| 21502 | Cancer care / oncology | 0.182 | 0.059 | 49 | 83 |
-| 21502 | Urgent care & emergency | 0.615 | 0.675 | 38 | 32 |
+| 21634 | Primary care / family doctor | 2.378 | 0.031 | 75 | 100 |
+| 21634 | Mental health & counseling | 5.350 | 0.000 | 62 | 100 |
+| 21634 | Heart / cardiology | 0.000 | 0.000 | 100 | 100 |
+| 21634 | Cancer care / oncology | 0.000 | 0.007 | 100 | 98 |
+| 21634 | Urgent care & emergency | 0.046 | 0.000 | 95 | 100 |
+| 21669 | Primary care / family doctor | 3.895 | 0.000 | 59 | 100 |
+| 21669 | Mental health & counseling | 7.163 | 0.000 | 50 | 100 |
+| 21669 | Heart / cardiology | 0.105 | 0.058 | 81 | 90 |
+| 21669 | Cancer care / oncology | 0.000 | 0.054 | 100 | 85 |
+| 21669 | Urgent care & emergency | 0.601 | 0.000 | 40 | 100 |
+| 21672 | Primary care / family doctor | 0.886 | 0.000 | 91 | 100 |
+| 21672 | Mental health & counseling | 0.295 | 0.000 | 98 | 100 |
+| 21672 | Heart / cardiology | 0.000 | 0.000 | 100 | 100 |
+| 21672 | Cancer care / oncology | 0.000 | 0.000 | 100 | 100 |
+| 21672 | Urgent care & emergency | 0.000 | 0.000 | 100 | 100 |
 
 ## Reading this
 
@@ -115,6 +115,6 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
 
-## Applied 2026-11-18
+## Applied 2026-11-19
 
-- 18360 rows (ZIP x specialty) stored in access_e2sfca for MD; market-score now uses drive-time access for these ZIPs.
+- 18480 rows (ZIP x specialty) stored in access_e2sfca for MD; market-score now uses drive-time access for these ZIPs.
