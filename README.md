@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-19
 
+- Groundwork for searching providers by name: migration 050 adds name indexes to the directory tables, built with the Concurrent indexes workflow.
 - Drive-time access no longer leaves any ZIP out. The island and ferry ZIPs that kept the 10-mile count (in Louisiana, West Virginia, North Carolina, South Carolina, Virginia and Maryland) now get their drive-time figure too, flagged in the state reports where the road times look doubtful.
 
 ### 2026-11-18
