@@ -77,3 +77,7 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - E2SFCA counts clinicians just outside a fixed 10-mile circle (with a smaller weight) and stops counting ones that are close in a straight line but a long drive away (across a river or mountain).
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
+
+## Applied 2026-11-19
+
+- 10160 rows (ZIP x specialty) stored in access_e2sfca for VT; market-score now uses drive-time access for these ZIPs.
