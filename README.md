@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-19
 
+- Started step 1 of the scoring upgrade: a read-only discovery job for CMS's Doctors and Clinicians file (active Medicare clinicians, every practice site, graduation year), before anything is loaded.
 - Look up a doctor or clinic by name or NPI. Patients get a "Find a doctor or clinic by name" tab beside "Find care": a ZIP or address is optional, nearby matches come first, closest name fit leads, and listings with no map location still appear. Providers get the same lookup on the portal's Competition page and behind a "Find a provider" button on the dashboard, with phone and fax, an optional state filter, and Show on map or Load this ZIP's market. Migration 050 adds the name indexes this needs (built the same day, 380 MB in all).
 - Drive-time access no longer leaves any ZIP out. The island and ferry ZIPs that kept the 10-mile count (in Louisiana, West Virginia, North Carolina, South Carolina, Virginia and Maryland) now get their drive-time figure too, flagged in the state reports where the road times look doubtful.
 
