@@ -1,5 +1,5 @@
 // node scripts/test-e2sfca.mjs: the E2SFCA access measure (scripts/lib/e2sfca.mjs).
-import { gaussian, e2sfca, crudeRatio, accessFactor, catchmentFor, spearman } from './lib/e2sfca.mjs';
+import { gaussian, e2sfca, e2sfcaMulti, crudeRatio, accessFactor, catchmentFor, spearman } from './lib/e2sfca.mjs';
 let pass = 0, fail = 0;
 const check = (l, c, d) => { if (c) { pass++; console.log('  PASS  ' + l); } else { fail++; console.log('  FAIL  ' + l + (d ? '\n        ' + d : '')); } };
 const near = (a, b, e = 1e-9) => Math.abs(a - b) < e;
@@ -47,5 +47,20 @@ check('access factor: unknown stays unknown', accessFactor(null, 1) === null && 
 check('primary care has a 30-minute catchment, oncology 90, others 60', catchmentFor('Primary care / family doctor') === 30 && catchmentFor('Cancer care / oncology') === 90 && catchmentFor('Urology') === 60);
 check('spearman: identical order is 1, reversed is -1', near(spearman([1, 2, 3, 4], [10, 20, 30, 40]), 1) && near(spearman([1, 2, 3, 4], [4, 3, 2, 1]), -1));
 
+{
+  // Multi-mode (Mao & Nekorchuk 2013): car and no-car groups.
+  const z = [{ zip: 'A', adults: 1000 }, { zip: 'B', adults: 1000 }];
+  const car = (x, y) => (x === y ? 2 : 10), walkFar = (x, y) => (x === y ? 5 : null);
+  const sup = new Map([['A', 4]]);
+  const one = e2sfca(z, sup, car, 30);
+  const allCar = e2sfcaMulti(z, sup, [{ minutes: car, share: () => 1 }, { minutes: walkFar, share: () => 0 }], 30);
+  check('multi-mode with everyone in a car equals plain E2SFCA', near(allCar.get('A').total, one.get('A')) && near(allCar.get('B').total, one.get('B')));
+  const split = e2sfcaMulti(z, sup, [{ minutes: car, share: zp => (zp === 'B' ? 0.6 : 1) }, { minutes: walkFar, share: zp => (zp === 'B' ? 0.4 : 0) }], 30);
+  check('people without a car in a ZIP with no supply they can walk to lower its access', split.get('B').total < one.get('B') && !split.get('B').byMode[1]);
+  const sumSupply = ['A', 'B'].reduce((t, k) => t + z.find(q => q.zip === k).adults * split.get(k).total, 0);
+  check('supply is still shared out in full across both groups', near(sumSupply, 4, 1e-6), String(sumSupply));
+  const slow = e2sfcaMulti(z, sup, [{ minutes: car, share: () => 0.5 }, { minutes: (x, y) => car(x, y) * 2.5, share: () => 0.5 }], 30);
+  check('a slower no-car mode gives less access than everyone driving', slow.get('B').total < one.get('B'));
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -93,6 +93,52 @@ export function e2sfca(zips, supply, minutes, d0) {
   return out;
 }
 
+/**
+ * Multi-mode E2SFCA (2026-11-19, the user's choice): Mao, L. & Nekorchuk, D.
+ * (2013). Measuring spatial accessibility to healthcare for populations with
+ * multiple transportation modes. Health & Place 24, 120-127.
+ * Each ZIP's adults are split into groups by travel mode (here: households
+ * with a car, and without one); every group competes for the same supply in
+ * step 1, each over its own travel times, and a ZIP's access is the
+ * group-weighted sum of each group's step-2 access.
+ *
+ * modes: [{ minutes(a, b), share(zip) -> 0..1 }], shares summing to 1 per ZIP.
+ * Returns Map zip -> { total, byMode: [..] } (null total when no mode reaches
+ * any supply ZIP, which is unknown, not zero).
+ */
+export function e2sfcaMulti(zips, supply, modes, d0) {
+  const ratio = new Map();
+  for (const j of zips) {
+    const s = supply.get(j.zip) || 0;
+    if (!s) continue;
+    let demand = 0;
+    for (const k of zips) for (const m of modes) {
+      const t = m.minutes(k.zip, j.zip);
+      if (t == null) continue;
+      demand += (k.adults || 0) * m.share(k.zip) * gaussian(t, d0);
+    }
+    ratio.set(j.zip, demand > 0 ? s / demand : null);
+  }
+  const out = new Map();
+  for (const i of zips) {
+    let total = 0, anyReach = false;
+    const byMode = modes.map(m => {
+      let a = 0, reach = false;
+      for (const [jz, r] of ratio) {
+        const t = m.minutes(i.zip, jz);
+        if (t == null) continue;
+        reach = true;
+        if (r != null) a += r * gaussian(t, d0);
+      }
+      if (reach) anyReach = true;
+      return reach || !ratio.size ? a : null;
+    });
+    modes.forEach((m, k) => { if (byMode[k] != null) total += m.share(i.zip) * byMode[k]; });
+    out.set(i.zip, { total: anyReach || !ratio.size ? total : null, byMode });
+  }
+  return out;
+}
+
 // The current model's access, approximated for comparison: listings per adult
 // in every ZIP whose centre is within 10 straight-line miles (at least the 10
 // nearest out to 25 miles, at most 60 ZIPs). Same units as e2sfca().

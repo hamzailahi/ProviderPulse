@@ -11,7 +11,7 @@
 // bench.csv  key,rate_per_1k           national specialty rates (market_benchmarks)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { e2sfca, crudeRatio, accessFactor, catchmentFor, milesBetween, spearman } from './lib/e2sfca.mjs';
+import { e2sfca, e2sfcaMulti, crudeRatio, accessFactor, catchmentFor, milesBetween, spearman } from './lib/e2sfca.mjs';
 const require = createRequire(import.meta.url);
 const TaxonomyMap = require('../v2/assets/taxonomy-map.js');
 const { SCORED } = require('../v2/assets/specialties.js');
@@ -122,6 +122,41 @@ for (let i = 0; i < N; i++) {
 let unroutable = 0;
 for (const z of focus) { const i = idx.get(z.zip); let any = false; for (let j = 0; j < N; j++) if (j !== i && Number.isFinite(T[i * N + j])) { any = true; break; } if (!any) unroutable++; }
 const minutes = (a, b) => { const v = T[idx.get(a) * N + idx.get(b)]; return Number.isFinite(v) ? v : null; };
+
+// ---- people without a car (2026-11-19, the user's choice: option 3). The
+// share of households with no vehicle (ACS B25044) is applied to each ZIP's
+// adults; that group is scored on walking times over OpenStreetMap paths
+// (OSRM foot profile), the same catchment edge in minutes as by car (Mao &
+// Nekorchuk 2013 use one time threshold per mode). A car-time slowdown
+// (SLOWDOWN x the drive) is computed beside it as a sensitivity check only.
+const SLOWDOWN = 2.5;
+const footUrl = arg('osrm-foot');
+let W = null, walkFailed = 0;
+if (footUrl) {
+  W = new Float32Array(N * N).fill(NaN);
+  for (let s0 = 0; s0 < N; s0 += SRC) for (let d = 0; d < N; d += DST) {
+    const src = zips.slice(s0, s0 + SRC), dst = zips.slice(d, d + DST);
+    const coords = src.concat(dst).map(z => `${z.lon.toFixed(5)},${z.lat.toFixed(5)}`).join(';');
+    const b = await getJson(`${footUrl}/table/v1/walking/${coords}?sources=${src.map((_, i) => i).join(';')}&destinations=${dst.map((_, i) => src.length + i).join(';')}&annotations=duration`);
+    if (!b) { walkFailed++; continue; }
+    b.durations.forEach((row, a) => row.forEach((sec, q) => { if (sec != null) W[(s0 + a) * N + d + q] = sec / 60; }));
+  }
+  if (walkFailed) throw new Error(`${walkFailed} walking table requests failed; not reporting a partial matrix`);
+  // Walking inside a ZIP: half the walk to its nearest other ZIP, 5 to 20 minutes.
+  for (let i = 0; i < N; i++) {
+    let m = Infinity;
+    for (let j = 0; j < N; j++) if (j !== i && W[i * N + j] > 0) m = Math.min(m, W[i * N + j]);
+    W[i * N + i] = Math.max(5, Math.min(20, Number.isFinite(m) ? m / 2 : 10));
+  }
+}
+const walkMinutes = (a, b) => { const v = W[idx.get(a) * N + idx.get(b)]; return Number.isFinite(v) ? v : null; };
+const slowMinutes = (a, b) => { const v = minutes(a, b); return v == null ? null : v * SLOWDOWN; };
+const noCar = new Map();
+if (arg('nocar')) for (const [z, sh] of csv(arg('nocar'))) { const v = +sh; if (/^\d{5}$/.test(z) && Number.isFinite(v)) noCar.set(z, Math.max(0, Math.min(1, v))); }
+const shareNoCar = z => noCar.get(z) ?? 0;   // no Census figure: scored as if every household has a car (counted below)
+const focusNoShare = focus.filter(z => !noCar.has(z.zip)).length;
+const focusAdults = focus.reduce((t, z) => t + z.adults, 0);
+const focusNoCarAdults = focus.reduce((t, z) => t + z.adults * shareNoCar(z.zip), 0);
 const miles = (a, b) => milesBetween(zips[idx.get(a)], zips[idx.get(b)]);
 
 // ---- supply per specialty per ZIP (listings whose code the reviewed table puts in it)
@@ -145,7 +180,12 @@ for (const [label] of SCORED) {
   const supply = new Map();
   for (const c of codes) for (const [z, n] of byCode.get(c) || []) supply.set(z, (supply.get(z) || 0) + n);
   const d0 = catchmentFor(label), rate = bench.get(label) || null;
-  const A = e2sfca(zips, supply, minutes, d0), C = crudeRatio(zips, supply, miles);
+  const A0 = e2sfca(zips, supply, minutes, d0), C = crudeRatio(zips, supply, miles);
+  // Scored: car for households with one, walking for those without.
+  const MM = W ? e2sfcaMulti(zips, supply, [{ minutes, share: z => 1 - shareNoCar(z) }, { minutes: walkMinutes, share: shareNoCar }], d0) : null;
+  const SS = W ? e2sfcaMulti(zips, supply, [{ minutes, share: z => 1 - shareNoCar(z) }, { minutes: slowMinutes, share: shareNoCar }], d0) : null;
+  const A = MM ? new Map([...MM].map(([z, v]) => [z, v.total])) : A0;
+  const sensPairs = [], carPairs = []; let movedByCar = 0; const carDrop = [];
   const pairs = [];
   let moved = 0, bigUp = [], bigDown = [];
   for (const z of focus) {
@@ -158,7 +198,12 @@ for (const [label] of SCORED) {
     const own = z.adults > 0 ? (supply.get(z.zip) || 0) / z.adults : null;
     const store = a ?? own;
     if (store != null) load.push([z.zip, '"' + label.replace(/"/g, '""') + '"', (store * 1000).toFixed(4), d0].join(','));
-    rows.push([label, z.zip, z.adults, fmt(c), fmt(a), fc ?? '', fa ?? '', d0, unreliable.has(z.zip) ? 'unreliable_routing' : ''].join(','));
+    const a0 = A0.get(z.zip), sv = SS ? SS.get(z.zip).total : null;
+    const f0 = accessFactor(a0 == null ? null : a0 * 1000, rate), fs = accessFactor(sv == null ? null : sv * 1000, rate);
+    if (fa != null && f0 != null && !unreliable.has(z.zip)) { carPairs.push([f0, fa]); if (Math.abs(fa - f0) >= 15) movedByCar++; carDrop.push([fa - f0, z.zip]); }
+    if (fa != null && fs != null && !unreliable.has(z.zip)) sensPairs.push([fa, fs]);
+    rows.push([label, z.zip, z.adults, fmt(c), fmt(a), fc ?? '', fa ?? '', d0, unreliable.has(z.zip) ? 'unreliable_routing' : '',
+      fmt(a0), f0 ?? '', fmt(sv), fs ?? '', noCar.has(z.zip) ? shareNoCar(z.zip).toFixed(3) : ''].join(','));
     if (fa != null && fc != null && !unreliable.has(z.zip)) {
       pairs.push([fc, fa]);
       if (Math.abs(fa - fc) >= 15) moved++;
@@ -167,11 +212,14 @@ for (const [label] of SCORED) {
   }
   const rho = spearman(pairs.map(p => p[0]), pairs.map(p => p[1]));
   bigUp.sort((a, b) => b[0] - a[0]); bigDown.sort((a, b) => a[0] - b[0]);
+  carDrop.sort((x, y) => y[0] - x[0]);
   summary.push({ label, d0, rate, n: pairs.length, rho, moved, up: bigUp.slice(0, 3), down: bigDown.slice(0, 3),
+    carRho: spearman(carPairs.map(p => p[0]), carPairs.map(p => p[1])), movedByCar, carN: carPairs.length, carWorst: carDrop.slice(0, 3),
+    sensRho: spearman(sensPairs.map(p => p[0]), sensPairs.map(p => p[1])),
     listings: [...supply.values()].reduce((x, y) => x + y, 0) });
 }
 if (arg('load')) writeFileSync(arg('load'), 'zip,specialty,per_1k,catchment_minutes\n' + load.join('\n') + '\n');
-writeFileSync(arg('csv'), 'specialty,zip,adults,crude_per_1k,e2sfca_per_1k,crude_access,e2sfca_access,catchment_minutes,flag\n' + rows.join('\n') + '\n');
+writeFileSync(arg('csv'), 'specialty,zip,adults,crude_per_1k,e2sfca_per_1k,crude_access,e2sfca_access,catchment_minutes,flag,car_only_per_1k,car_only_access,slowdown_per_1k,slowdown_access,no_car_share\n' + rows.join('\n') + '\n');
 
 // ---- report
 const r2 = v => (v == null ? 'n/a' : v.toFixed(2));
@@ -198,6 +246,16 @@ const lines = [
   ...summary.map(s => `| ${s.label} | ${s.d0} | ${s.listings.toLocaleString()} | ${r2(s.rate)} | ${r2(s.rho)} | ${s.moved} of ${s.n} | ${s.down.map(([d, z]) => `${z} (${d})`).join(', ')} | ${s.up.map(([d, z]) => `${z} (+${d})`).join(', ')} |`),
   '', 'In the last two columns a negative change means E2SFCA finds **better** access than the crude ratio (a lower access factor), a positive one **worse**.', ''
 ];
+if (W) {
+  lines.push('## People without a car', '',
+    `The stored figure (\`e2sfca\` above) splits each ZIP's adults by the share of households with no vehicle (ACS B25044) and routes that group on foot (OSRM foot profile on OpenStreetMap paths), with the same catchment edge in minutes as by car; both groups compete for the same clinicians (Mao & Nekorchuk 2013, multi-mode E2SFCA). Walking inside a ZIP is half the walk to its nearest neighbour, 5 to 20 minutes. Households are applied to adults (no ACS table gives vehicles per adult at ZIP level).`, '',
+    `- Adults in ${arg('label')} in households with no vehicle: about ${Math.round(focusNoCarAdults).toLocaleString()} of ${Math.round(focusAdults).toLocaleString()} (${(100 * focusNoCarAdults / Math.max(1, focusAdults)).toFixed(1)}%)`,
+    `- Focus ZIPs with no Census vehicle figure (scored as if every household has a car): ${focusNoShare}`,
+    `- Sensitivity check: the same split with the no-car group at ${SLOWDOWN}x the drive time instead of walking (a stand-in for transit, rides and waiting; an assumption, not a published figure). It is not stored.`, '',
+    '| Specialty | Rank agreement with car-only | ZIPs moved 15+ vs car-only | Most worsened by the no-car split | Rank agreement, walking vs slowdown |', '|---|---|---|---|---|',
+    ...summary.map(s => `| ${s.label} | ${r2(s.carRho)} | ${s.movedByCar} of ${s.carN} | ${s.carWorst.filter(([d]) => d > 0).map(([d, z]) => `${z} (+${d})`).join(', ')} | ${r2(s.sensRho)} |`), '',
+    'A positive change is worse access once people without a car are counted. Rank agreement near 1 between walking and the slowdown means the conclusion does not hinge on which no-car assumption is used.', '');
+}
 if (SAMPLE.length) {
   lines.push('## Sample ZIPs', '', '| ZIP | Specialty | Crude per 1k | E2SFCA per 1k | Crude access | E2SFCA access |', '|---|---|---|---|---|---|');
   const want = new Set(['Primary care / family doctor', 'Heart / cardiology', 'Cancer care / oncology', 'Mental health & counseling', 'Urgent care & emergency']);
