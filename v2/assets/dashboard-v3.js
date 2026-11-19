@@ -430,7 +430,7 @@ function paintInsights() {
 
   var m = d.metrics || {};
   var cls = d.score >= 70 ? 'under' : d.score >= 50 ? 'balanced' : 'served';
-  var meaning = cls === 'under' ? 'Fewer providers than the population and shortage data suggest it needs. A strong place to open or expand.'
+  var meaning = cls === 'under' ? 'Fewer providers than the population suggests it needs. A strong place to open or expand.'
     : cls === 'balanced' ? 'Supply roughly matches need. Growth depends on standing out: insurance, availability, specialty focus.'
     : 'Already well supplied. Expect competition; look at the specialty breakdown for gaps.';
 
@@ -494,7 +494,7 @@ function paintInsights() {
       fmtN((m.population || 0) - (m.insured_population || 0)) + ' residents uninsured.']);
   }
   if (m.hpsa_score != null) {
-    F.push([m.hpsa_score >= 14 ? 'good' : 'neutral', 'Federal shortage designation',
+    F.push(['neutral', 'Federal shortage designation (not scored)',
       'State median HPSA score ' + Math.round(m.hpsa_score) + ' of ~25 (higher means a more severe designated shortage, which can bring bonus Medicare payments and loan repayment).']);
   }
   if (d.medicare && d.medicare.available) {
@@ -512,7 +512,7 @@ function paintInsights() {
   if (m.providers_per_1k != null && !m.benchmark_per_1k) {
     F.push(['neutral', 'Provider supply',
       m.providers_per_1k.toFixed(1) + ' listings per 1,000 residents. ' + fmtN(m.organizations) + ' organizations and ' + fmtN(m.individual_physicians) +
-      ' individual clinicians. Not compared: the ' + (d.state || 'state') + ' benchmark has not been built yet, so this area\'s score rests on payer mix and shortage only.']);
+      ' individual clinicians. Not compared: the ' + (d.state || 'state') + ' benchmark has not been built yet, so this area\'s score rests on payer mix only.']);
   }
   // From the per-specialty model: the strongest scores among specialties that
   // already have listings here (unserved ones get their own line below), and
@@ -757,7 +757,6 @@ var FACTORS = [
   ['need', 'Health need', 'How common the conditions this specialty treats are here, vs US ZIPs'],
   ['access', 'Access gap', 'Higher when there are fewer clinicians per adult than nationally'],
   ['pay', 'Ability to pay', 'Insured rate and household income, ranked within the state'],
-  ['shortage', 'Federal shortage', 'HRSA shortage-area score for the matching discipline'],
   ['competition', 'Room from competitors', 'Higher when the nearest same-specialty listing is far away']
 ];
 function ordinal(v) {
@@ -857,6 +856,10 @@ function paintModel(p, d, M) {
         el('div', { class: 'ins-bar' }, el('i', { style: 'width:' + (missing ? 0 : v) + '%' })),
         el('div', { class: 'ins-fev' }, evidenceLine(f[0], h.evidence[f[0]])));
     })),
+    // HRSA's shortage designation is shown for comparison only (retired from
+    // the score 2026-11-19: it is a population-to-provider ratio itself).
+    h.evidence.hpsa_reference ? el('div', { class: 'ins-fev' }, 'For comparison, not scored: federal ' +
+      evidenceLine('shortage', h.evidence.hpsa_reference)) : null,
     h.caveats.length ? el('details', { class: 'ins-caveats' },
       el('summary', {}, 'Data notes (' + h.caveats.length + ')'),
       el('ul', {}, h.caveats.map(function (c) { return el('li', {}, c); }))) : null));

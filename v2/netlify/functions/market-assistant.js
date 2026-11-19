@@ -196,7 +196,7 @@ How to answer:
 - Independent tool calls can go in the same turn.
 
 The market model, for explaining results:
-- Each specialty is scored 0 to 100 from five factors: health need (30%, local rates of the conditions that specialty treats, and age mix, vs the US), access gap (30%, clinicians per 1,000 adults vs the national rate for that specialty; higher means thinner supply), ability to pay (20%, insured rate and household income within the state), federal shortage designation (10%), and room from competitors (10%, distance to the nearest same-specialty listing). Missing factors are left out, never assumed average.
+- Each specialty is scored 0 to 100 from four factors: health need (33%, local rates of the conditions that specialty treats, and age mix, vs the US), access gap (33%, clinicians per 1,000 adults vs the national rate for that specialty, by drive time where stored; higher means thinner supply), ability to pay (22%, insured rate and household income within the state), and room from competitors (11%, distance to the nearest same-specialty listing). The federal HPSA shortage score is not part of the score; evidence.hpsa_reference gives it for comparison only. Missing factors are left out, never assumed average.
 - Archetypes: Prime expansion (high need, thin supply, good payers), Safety-net opportunity (high need, thin supply, weaker payers), Latent demand (thin supply, average need), Crowded premium market (dense supply, strong payers), Saturated (dense supply, weaker payers), Balanced, Unserved (no clinicians of that specialty within 25 miles), Not enough data.
 - The market model's catchment is every ZIP whose centre is within 10 miles (at least the 10 nearest, out to 25 miles in sparse areas; at most 60 ZIPs or about 1 million adults in dense cores). get_market_insights returns catchment.description and furthest_miles: describe it that way, for example "76117 and its 35 nearest ZIPs (within 9.9 miles)", never as "the 25-mile area", and when find_providers or the map shows listings outside it, say the catchment count leaves them out. Listings come from the federal NPPES registry and include organizations and individual clinicians.
 
@@ -244,7 +244,7 @@ const TOOLS = [
   },
   {
     name: 'run_scenario',
-    description: 'What-if: re-scores one ZIP and specialty as if 1 to 5 more clinicians of that specialty opened at the centre of the ZIP. Returns the before and after score, archetype, factors, clinician count, listings per 1,000 adults and nearest competitor, plus the assumptions. Only supply changes; payers, need and shortage are held fixed. If the viewer has their own listing it is already left out of the before. Use for "what if I open here", "what happens if another practice opens" or "would this market still look good with N more".',
+    description: 'What-if: re-scores one ZIP and specialty as if 1 to 5 more clinicians of that specialty opened at the centre of the ZIP. Returns the before and after score, archetype, factors, clinician count, listings per 1,000 adults and nearest competitor, plus the assumptions. Only supply changes; payers and need are held fixed. If the viewer has their own listing it is already left out of the before. Use for "what if I open here", "what happens if another practice opens" or "would this market still look good with N more".',
     strict: true,
     input_schema: {
       type: 'object',

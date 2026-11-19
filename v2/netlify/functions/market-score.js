@@ -9,7 +9,7 @@
 // searches table exists and has accrued history — a fabricated demand figure
 // shown to a provider deciding where to invest is indefensible.
 //
-// Score = 40% under-supply + 30% payer mix + 30% designated shortage.
+// Score = 57% under-supply + 43% payer mix (HPSA shortage retired 2026-11-19; reported as components.hpsa_reference).
 // Each sub-score is 0-100 and the weights are declared in WEIGHTS below so the
 // formula can be audited rather than reverse-engineered.
 //
@@ -47,7 +47,9 @@ const CORS = {
   'Content-Type': 'application/json'
 };
 
-const WEIGHTS = { supply: 0.40, payer: 0.30, shortage: 0.30 };
+// The HPSA shortage term (0.30) was retired 2026-11-19 (circular: HPSA is a
+// population-to-provider ratio); it is still returned as components.hpsa_reference.
+const WEIGHTS = { supply: 0.57, payer: 0.43 };
 
 // Shared with the map so "provider" means the same thing in both places.
 // CDC PLACES -> per-taxonomy need, and the national supply rate. See that file
@@ -480,11 +482,11 @@ exports.handler = async (event) => {
     const payer = (insuredRate === null || stateRate === null) ? 50
       : clamp(50 + (insuredRate - stateRate) * 400, 0, 100);
     // Shortage: HPSA runs roughly 0-25; higher means more underserved.
-    const shortage = hpsaScore === null ? 50 : clamp((hpsaScore / 25) * 100, 0, 100);
+    const shortage = hpsaScore === null ? null : clamp((hpsaScore / 25) * 100, 0, 100);
 
     // Weighted mean over the terms we have. Without a benchmark the supply term
-    // (40%) drops out and payer and shortage carry the whole score.
-    const terms = [[supply, WEIGHTS.supply], [payer, WEIGHTS.payer], [shortage, WEIGHTS.shortage]].filter(t => t[0] !== null);
+    // (40%) drops out and payer carries the whole score.
+    const terms = [[supply, WEIGHTS.supply], [payer, WEIGHTS.payer]].filter(t => t[0] !== null);
     const wsum = terms.reduce((a, t) => a + t[1], 0);
     const score = Math.round(terms.reduce((a, t) => a + t[0] * t[1], 0) / wsum);
 
@@ -830,7 +832,7 @@ exports.handler = async (event) => {
                 before: pick(b0), after: pick(a0),
                 score_change: b0.score != null && a0.score != null ? a0.score - b0.score : null,
                 assumptions: 'Adds ' + addN + ' ' + want.toLowerCase() + ' listing' + (addN > 1 ? 's' : '') +
-                  ' at the centre of ZIP ' + zip + ' and re-scores the same catchment. Need, payers and shortage are unchanged. ' +
+                  ' at the centre of ZIP ' + zip + ' and re-scores the same catchment. Need and payers are unchanged. ' +
                   'Real results also depend on payer mix, practice size, hours and how patients choose, which this does not model.'
               };
             }
@@ -854,7 +856,7 @@ exports.handler = async (event) => {
         components: {
           supply: supply === null ? null : Math.round(supply),
           payer: Math.round(payer),
-          shortage: Math.round(shortage),
+          hpsa_reference: shortage === null ? null : Math.round(shortage),
           weights: WEIGHTS
         },
         metrics: {

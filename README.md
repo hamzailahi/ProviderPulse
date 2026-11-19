@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-19
 
+- The federal shortage-area (HPSA) score no longer counts toward any market score. HPSA is itself a population-to-provider ratio, the method the drive-time access figure improves on, so scoring with it was circular. Its weight is shared across need, access, payers and competition, and the HPSA figure still appears, marked "for comparison, not scored".
+
 - Puerto Rico can now be scored. ZIPs the CDC's health data leaves out get their centre from the Census and their adult count from Census age data, so market scores and drive-time access work there; need is scored from the age mix only, and each score says so.
 
 - Market scores in dense cities now count every competitor. A weekly job stores listing counts per ZIP and specialty code, and the score reads those totals instead of every listing, so areas like Manhattan no longer hit a row cap and refuse to score.

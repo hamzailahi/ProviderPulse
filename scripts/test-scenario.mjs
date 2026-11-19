@@ -80,9 +80,10 @@ check('ZIP-level clinicians count codes in the Individual section; organizations
 const mh = d.model.specialties.find(s => s.specialty === 'Mental health & counseling');
 const card = d.model.specialties.find(s => s.specialty === SPEC);
 check('shortage discipline is chosen per specialty (mental health -> mental 20, cardiology -> primary 5)',
-  mh.evidence.shortage && mh.evidence.shortage.discipline === 'mental' && mh.evidence.shortage.hpsa === 20 &&
-  card.evidence.shortage && card.evidence.shortage.discipline === 'primary' && card.evidence.shortage.hpsa === 5,
-  JSON.stringify([mh.evidence.shortage, card.evidence.shortage]));
+  mh.evidence.hpsa_reference && mh.evidence.hpsa_reference.discipline === 'mental' && mh.evidence.hpsa_reference.hpsa === 20 &&
+  card.evidence.hpsa_reference && card.evidence.hpsa_reference.discipline === 'primary' && card.evidence.hpsa_reference.hpsa === 5 &&
+  mh.factors.shortage === undefined,
+  JSON.stringify([mh.evidence.hpsa_reference, card.evidence.hpsa_reference]));
 check('no specialty falls back to a group basis', d.model.specialties.every(s => !s.evidence.access || s.evidence.access.basis !== 'group'));
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -42,9 +42,14 @@
 (function (global) {
   'use strict';
 
-  var VERSION = '2026-09-29.1';
+  var VERSION = '2026-11-19.1';
 
-  var WEIGHTS = { need: 0.30, access: 0.30, pay: 0.20, shortage: 0.10, competition: 0.10 };
+  // The HRSA shortage factor (HPSA score, 0.10) was retired 2026-11-19, the
+  // user's choice: HPSA is itself a population-to-provider ratio, the method
+  // the drive-time access factor replaces, so scoring with it was circular.
+  // Its weight was shared out in proportion; the HPSA figure is still
+  // reported (evidence.hpsa_reference) as an independent comparison.
+  var WEIGHTS = { need: 0.333, access: 0.333, pay: 0.222, competition: 0.112 };
 
   // Per-specialty need drivers. m: [PLACES measureid, weight, invert?],
   // d: [census proxy, weight]. Weights are relative within a specialty.
@@ -309,9 +314,8 @@
       var disc = SHORTAGE_DISCIPLINE[label] || 'primary';
       var sh = input.shortage && input.shortage[disc];
       if (sh && sh.score != null) {
-        f.shortage = clamp((sh.score / 25) * 100);
-        ev.shortage = { discipline: disc, hpsa: Math.round(sh.score * 10) / 10, basis: sh.basis };
-        if (sh.basis === 'state') caveats.push('Shortage uses the state median: this ZIP\'s county could not be matched to federal HPSA records.');
+        // Reference only, never scored (see WEIGHTS).
+        ev.hpsa_reference = { discipline: disc, hpsa: Math.round(sh.score * 10) / 10, basis: sh.basis };
       }
 
       /* ---- competition ---- */

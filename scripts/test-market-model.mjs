@@ -73,7 +73,9 @@ check('without benchmarks, access falls back to the group score', r.evidence.acc
 check('fallbacks are disclosed as caveats', r.caveats.some(c => /group level/.test(c)) && r.caveats.length >= 2);
 check('fallbacks lower confidence vs full benchmarks', r.confidence !== 'high' || full.confidence === 'high');
 r = one(base({ rows: cardRows(5, 6), shortage: { primary: { score: 12, basis: 'state' } } }));
-check('a state-median shortage is flagged', r.caveats.some(c => /state median/.test(c)));
+check('HPSA is reported for comparison but never scored (retired 2026-11-19)', r.factors.shortage === undefined && r.evidence.hpsa_reference && r.evidence.hpsa_reference.basis === 'state' && !('shortage' in r.factors), JSON.stringify(r.factors));
+const rNo = one(base({ rows: cardRows(5, 6) }));
+check('the score does not move with the HPSA score', rNo.score === r.score);
 
 console.log('\n4. Need measures');
 const prim = one(base({ specialties: [PRIMARY], groupOf: () => 'primary', places: { CHECKUP: 2 }, demo: {},
