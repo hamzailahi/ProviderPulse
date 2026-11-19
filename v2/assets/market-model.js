@@ -370,7 +370,8 @@
     if (clinicians === 0) return 'unserved';
     var need = f.need, acc = f.access, pay = f.pay;
     if (acc != null && acc >= 60 && need != null && need >= 60) return pay != null && pay < 50 ? 'safety_net' : 'prime';
-    if (acc != null && acc >= 60 && (need == null || need < 55)) return 'latent';
+    // Unknown need is not low need (Puerto Rico has no PLACES measures).
+    if (acc != null && acc >= 60 && need != null && need < 55) return 'latent';
     if (acc != null && acc < 40) return pay != null && pay >= 60 ? 'crowded_premium' : 'saturated';
     return 'balanced';
   }

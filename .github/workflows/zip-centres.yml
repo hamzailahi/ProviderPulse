@@ -1,0 +1,49 @@
+name: ZIP centres
+
+# Loads zip_centres (migration 054): Census Gazetteer points and ACS adults for
+# ZCTAs CDC PLACES lacks (Puerto Rico above all), read through the zip_geo view
+# by market-score and access-dry-run. Manual; dry_run reports only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+
+permissions:
+  contents: write
+
+jobs:
+  centres:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: Install psql 17
+        run: |
+          sudo apt-get -o Acquire::Retries=8 update -q
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Load
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          MODE: ${{ inputs.mode }}
+        run: bash scripts/zip-centres.sh
+      - name: Commit the report
+        if: success()
+        run: |
+          cat supabase/reference/zip-centres.md >> "$GITHUB_STEP_SUMMARY"
+          git add supabase/reference/zip-centres.md
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "ZIP centres ${{ inputs.mode }} $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

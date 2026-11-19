@@ -524,16 +524,21 @@ exports.handler = async (event) => {
     let catchment = null, model = null;
 
     try {
-      const home = await get(
+      // zip_geo (migration 054) = PLACES centres plus Census Gazetteer centres
+      // for ZIPs PLACES lacks (Puerto Rico). Before 054 exists, PLACES alone.
+      let home = await get(`zip_geo?zip=eq.${zip}&select=zip,lat,lon,pop_18plus,source&limit=1`, 5000);
+      const geoView = Array.isArray(home) && home.length > 0;
+      if (!geoView) home = await get(
         `cdc_places?zip=eq.${zip}&measureid=eq.${GEO_MEASURE}&select=zip,lat,lon,pop_18plus&limit=1`, 5000);
       const origin = home[0];
+      const noPlaces = !!(origin && origin.source && origin.source !== 'cdc_places');
 
       if (!origin || origin.lat === null || origin.lon === null) {
         // Puerto Rico is the expected case: PLACES publishes 32,520 ZCTAs and
         // not one begins with "00", while PR ZIPs are a real share of clinics.
         // Refusing is the point -- a neutral midpoint would rate every Puerto
         // Rican ZIP as average need, which is a fabricated finding.
-        model = { available: false, reason: 'CDC PLACES publishes no data for this ZIP (Puerto Rico and some territories are not covered)' };
+        model = { available: false, reason: 'No ZIP centre is on file for this ZIP, so its catchment cannot be drawn' };
       } else {
         const oLat = Number(origin.lat), oLon = Number(origin.lon);
         // Bounding box first so Postgres can use the lat/lon index, then an
@@ -541,7 +546,7 @@ exports.handler = async (event) => {
         const dLat = CATCHMENT_MAX_MILES / 69;
         const dLon = CATCHMENT_MAX_MILES / Math.max(1, 69 * Math.cos(oLat * Math.PI / 180));
         const boxPage = await pagedGet(
-          `cdc_places?measureid=eq.${GEO_MEASURE}` +
+          (geoView ? 'zip_geo?source=neq.none' : `cdc_places?measureid=eq.${GEO_MEASURE}`) +
           `&lat=gte.${(oLat - dLat).toFixed(4)}&lat=lte.${(oLat + dLat).toFixed(4)}` +
           `&lon=gte.${(oLon - dLon).toFixed(4)}&lon=lte.${(oLon + dLon).toFixed(4)}` +
           `&select=zip,lat,lon,pop_18plus`, 'zip', { cap: 4000, ms: 7000 });
@@ -774,6 +779,9 @@ exports.handler = async (event) => {
             learnedNeed, accessE2sfca
           };
           const scored = MarketModel.score(baseInput);
+          if (noPlaces) scored.specialties.forEach(x => {
+            x.caveats = (x.caveats || []).concat('CDC PLACES publishes no health measures for this ZIP (Puerto Rico is not covered), so need rests on the age mix alone, or is left out, and the score is re-weighted over the other factors.');
+          });
           const want = String((event.queryStringParameters || {}).specialty || '');
           model = {
             version: scored.version, weights: scored.weights,

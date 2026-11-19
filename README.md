@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-19
 
+- Puerto Rico can now be scored. ZIPs the CDC's health data leaves out get their centre from the Census and their adult count from Census age data, so market scores and drive-time access work there; need is scored from the age mix only, and each score says so.
+
 - Market scores in dense cities now count every competitor. A weekly job stores listing counts per ZIP and specialty code, and the score reads those totals instead of every listing, so areas like Manhattan no longer hit a row cap and refuse to score.
 
 - Loaded the site weights (migration 052): 1,273,119 clinicians count less than 1 at their main address. Corrected the docs: Puerto Rico's listings are in the directory; only the CDC health data is missing there.

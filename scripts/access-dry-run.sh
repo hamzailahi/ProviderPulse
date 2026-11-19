@@ -14,9 +14,9 @@ echo "== Export (read only)"
 psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X <<SQL
 begin transaction read only;
 set local statement_timeout = '30min';
-\\copy (select zip, avg(lat) lat, avg(lon) lon, max(pop_18plus) adults from public.cdc_places where measureid = 'DENTAL' and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON and zip ~ '^[0-9]{5}\$' group by zip order by zip) to '$WORK/zips.csv' with (format csv, header true)
+\\copy (select zip, avg(lat) lat, avg(lon) lon, max(pop_18plus) adults from public.zip_geo where true and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON and zip ~ '^[0-9]{5}\$' group by zip order by zip) to '$WORK/zips.csv' with (format csv, header true)
 \\copy (select key, data->>'rate_per_1k' from public.market_benchmarks where kind = 'specialty') to '$WORK/bench.csv' with (format csv, header true)
-\\copy (select z, taxonomy_code, sum(n) from (select left(zip, 5) z, taxonomy_code, count(*) n from public.clinics where taxonomy_code is not null and left(zip, 5) in (select zip from public.cdc_places where measureid = 'DENTAL' and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON) group by 1, 2 union all select left(zip, 5), taxonomy_code, count(*) from public.provider_individuals where taxonomy_code is not null and left(zip, 5) in (select zip from public.cdc_places where measureid = 'DENTAL' and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON) group by 1, 2) x group by 1, 2) to '$WORK/supply.csv' with (format csv, header true)
+\\copy (select z, taxonomy_code, sum(n) from (select left(zip, 5) z, taxonomy_code, count(*) n from public.clinics where taxonomy_code is not null and left(zip, 5) in (select zip from public.zip_geo where true and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON) group by 1, 2 union all select left(zip, 5), taxonomy_code, count(*) from public.provider_individuals where taxonomy_code is not null and left(zip, 5) in (select zip from public.zip_geo where true and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON) group by 1, 2) x group by 1, 2) to '$WORK/supply.csv' with (format csv, header true)
 commit;
 SQL
 echo "   $(($(wc -l < "$WORK/zips.csv") - 1)) ZIPs, $(($(wc -l < "$WORK/supply.csv") - 1)) ZIP x code supply rows"

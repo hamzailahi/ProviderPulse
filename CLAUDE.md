@@ -1257,6 +1257,7 @@ Tables:
   `classification`, `specialization`, `display_name`, `section`, CMS
   `cms_specialty_code` / `cms_specialty_name` (several joined with `; `),
   `patient_specialties text[]`, `show_on_map`, `nucc_version`. Public read.
+- `zip_centres` (054, 2026-11-19): the Census Gazetteer point for every ZCTA `cdc_places` lacks (Puerto Rico above all), adults from `census_acs_zcta` age bands (20+ plus two fifths of 15 to 19), loaded by `zip-centres.yml` (`scripts/zip-centres.sh`); the view `zip_geo` (security invoker) unions it with `cdc_places` DENTAL centres and is what market-score's catchment and `access-dry-run.sh` read (market-score falls back to `cdc_places` while the view is absent). A ZIP with no PLACES measures is scored with need from the age mix alone or left out, re-weighted, with a caveat on every specialty; unknown need never reads as `latent`.
 - `listing_counts_zip` (053, 2026-11-19): `clinics` and `provider_individuals` counted per ZIP (padded), NUCC code and table (`n`, site-weighted `w`, distinct `sites`, the pinned listings' middle `lat`/`lng`; key `k` = zip|code|src), public read, rebuilt by `listing-counts.yml` (weekly Thursday apply, `scripts/build-listing-counts.py`, COPY out, DuckDB, one-transaction load with a count check). market-score reads it for the catchment (`counts_basis: 'zip_totals'`), so dense cities (10001 hit the 60,000-row cap and refused) are counted whole; the nearest competitor is measured to each ZIP's middle of that code's listings; `?npi=` subtracts the viewer's own listing from its ZIP total; an empty, failed or capped read falls back to the listing rows (`'listings'`). `MarketModel` treats a row's `n`, `w` and `sites` as that many listings.
 - `access_e2sfca` (049, 2026-11-18): drive-time E2SFCA listings per 1,000 adults per ZIP and scored specialty (`per_1k`, `catchment_minutes`, `state`), public read, written only by `access-dry-run.yml` apply, read by market-score.
 - `market_benchmarks`: benchmarks for the market model (021), keyed
@@ -2256,8 +2257,7 @@ rate-limiting, not a real gap; verify with spaced-out requests before trusting
 a coverage hole. **Puerto Rico is loaded** (checked live 2026-11-19: 1,000+
 geocoded rows in each of `clinics` and `provider_individuals` with
 `state=eq.PR`; an earlier note here said it was not); `census_acs_zcta`
-holds 132 Puerto Rico ZCTAs, but `cdc_places` holds none, so the market
-model refuses there and the drive-time job has no ZIP centres for it.
+holds 132 Puerto Rico ZCTAs, but `cdc_places` holds none, so ZIP centres and adults come from `zip_centres` (054) and need is scored without PLACES there.
 
 ## Credentials
 
