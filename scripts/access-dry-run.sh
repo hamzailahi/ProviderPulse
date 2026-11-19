@@ -27,7 +27,7 @@ sleep $((RANDOM % 300))
 parts=()
 for s in $GEOFABRIK; do
   f="$WORK/osm/$(basename "$s").osm.pbf"
-  curl -sSfL --retry 15 --retry-all-errors --retry-delay 30 -o "$f" "https://download.geofabrik.de/north-america/$s-latest.osm.pbf"
+  curl -sSfL --retry 40 --retry-all-errors --retry-delay 45 -o "$f" "https://download.geofabrik.de/north-america/$s-latest.osm.pbf"
   osmium extract -b "$BBOX" "$f" -o "$f.clip.pbf" --overwrite -s smart >/dev/null
   rm -f "$f"; parts+=("$f.clip.pbf")
 done
