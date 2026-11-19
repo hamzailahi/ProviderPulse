@@ -52,9 +52,9 @@ jobs:
       - name: Install psql 17 and osmium
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q postgresql-common osmium-tool
+          sudo apt-get install -y -q -o Acquire::Retries=8 postgresql-common osmium-tool
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-          sudo apt-get install -y -q postgresql-client-17
+          sudo apt-get install -y -q -o Acquire::Retries=8 postgresql-client-17
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
       - name: Dry run
         env:
