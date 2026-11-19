@@ -1,0 +1,23 @@
+// node scripts/test-dac.mjs: Doctors and Clinicians helpers (scripts/lib/dac.mjs).
+import { addRow, siteWeight, splitCsv } from './lib/dac.mjs';
+let pass = 0, fail = 0;
+const check = (l, c) => { if (c) { pass++; console.log('  PASS  ' + l); } else { fail++; console.log('  FAIL  ' + l); } };
+const hdr = ['NPI', 'Ind_PAC_ID', 'Grd_yr', 'Telehlth', 'org_pac_id', 'adr_ln_1', 'ZIP Code', 'adrs_id', 'pri_spec'];
+const col = {}; hdr.forEach((h, i) => { col[h.toLowerCase()] = i; });
+const m = new Map();
+addRow(m, col, splitCsv('1003000142,99,1999,,195,"1360 ARROWHEAD DR",435371728,A1,ANESTHESIOLOGY'));
+addRow(m, col, splitCsv('1003000142,99,1999,Y,195,2600 NAVARRE AVE,436163207,A2,ANESTHESIOLOGY'));
+addRow(m, col, splitCsv('1003000142,99,1999,,195,2600 NAVARRE AVE,436163207,A2,ANESTHESIOLOGY'));
+const r = m.get('1003000142');
+check('rows fold into one NPI with distinct sites', r.addrs.size === 2 && r.orgs.size === 1);
+check('telehealth is true when any row says Y', r.tele === true);
+check('graduation year kept', r.grad === 1999);
+check('a bad NPI is skipped', addRow(m, col, splitCsv('12345,1,2000,,,,,,')) === false);
+addRow(m, col, splitCsv('1111111111,1,2035,,,,,,X'));
+check('an impossible graduation year is dropped', m.get('1111111111').grad === null);
+check('weight: one site is a full clinician', siteWeight(1, 1) === 1);
+check('weight: the larger site count wins', siteWeight(2, 4) === 0.25 && siteWeight(4, 1) === 0.25);
+check('weight: capped at five sites', siteWeight(12, 0) === 0.2);
+check('weight: not in the file uses NPPES alone', siteWeight(null, 2) === 0.5 && siteWeight(null, 0) === 1);
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);

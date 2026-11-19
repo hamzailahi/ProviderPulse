@@ -1,0 +1,52 @@
+name: Clinician status load
+
+# Step 1 of the scoring upgrade (2026-11-19): CMS Doctors and Clinicians file
+# into clinician_status (migration 051). dry_run reads only and writes
+# supabase/reference/clinician-status-dry-run.md; apply replaces the table.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+
+permissions:
+  contents: write
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q -o Acquire::Retries=8 postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q -o Acquire::Retries=8 postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Load
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          MODE: ${{ inputs.mode }}
+          WORK: ${{ runner.temp }}/dac
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: bash scripts/dac-load.sh
+      - name: Commit the report
+        if: always()
+        run: |
+          git add supabase/reference/clinician-status-dry-run.md 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Clinician status load $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

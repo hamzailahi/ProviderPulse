@@ -88,6 +88,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 048 | `048_org_fax.sql` | `org_fax`, `org_fax_npi`, `org_fax_name` (fax of the organization a clinician bills through at the same address; always null on `clinics`) | applied 2026-11-16 by `fax-via-org.yml` apply (150,116 clinicians) |
 | 049 | `049_access_e2sfca.sql` | `access_e2sfca`: drive-time E2SFCA access per ZIP and scored specialty, public read; market-score uses it where present | applied by `access-dry-run.yml` apply (Tennessee first, 2026-11-18) |
 | 050 | `050_name_search_indexes.sql` | pg_trgm and trigram GIN indexes on `clinics.name` and `provider_individuals.name` for name search; concurrent, run with `concurrent-indexes.yml` | applied 2026-11-19 by `concurrent-indexes.yml` in 2.6 minutes, both valid (clinics 115 MB, individuals 265 MB) |
+| 051 | `051_clinician_status.sql` | `clinician_status`: one row per NPI from CMS's Doctors and Clinicians file (graduation year, telehealth, practice sites, group PAC IDs); public read, written only by `dac-load.yml` | not applied (dac-load.yml `apply` runs it after the dry run is reviewed) |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

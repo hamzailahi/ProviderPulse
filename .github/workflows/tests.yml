@@ -167,3 +167,6 @@ jobs:
 
       - name: Name search
         run: node scripts/test-name-search.mjs
+
+      - name: Clinician status (CMS Doctors and Clinicians)
+        run: node scripts/test-dac.mjs
