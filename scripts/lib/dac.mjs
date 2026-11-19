@@ -27,9 +27,14 @@ export function addRow(map, col, r) {
   return true;
 }
 
-// Supply weight (the user's rule, 2026-11-19): split across the larger of the
-// CMS site count and the NPPES site count (primary + secondary), capped.
+// Supply weight at the clinician's main (NPPES) address. The user's rule,
+// 2026-11-19, revised the same day after the research brief (Badinski et al.
+// 2023: a physician's main region carries over 80% of their Medicare work):
+// one site counts 1; with more sites (the larger of the CMS file's count and
+// NPPES's primary + secondary), the main site keeps MAIN_SHARE and the rest is
+// spread over the extra sites, which market supply does not count.
+export const MAIN_SHARE = 0.6;
 export function siteWeight(dacSites, nppesSites) {
   const s = Math.min(MAX_SITES, Math.max(1, dacSites || 0, nppesSites || 0));
-  return 1 / s;
+  return s > 1 ? MAIN_SHARE : 1;
 }

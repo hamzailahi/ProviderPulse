@@ -16,8 +16,8 @@ check('a bad NPI is skipped', addRow(m, col, splitCsv('12345,1,2000,,,,,,')) ===
 addRow(m, col, splitCsv('1111111111,1,2035,,,,,,X'));
 check('an impossible graduation year is dropped', m.get('1111111111').grad === null);
 check('weight: one site is a full clinician', siteWeight(1, 1) === 1);
-check('weight: the larger site count wins', siteWeight(2, 4) === 0.25 && siteWeight(4, 1) === 0.25);
-check('weight: capped at five sites', siteWeight(12, 0) === 0.2);
-check('weight: not in the file uses NPPES alone', siteWeight(null, 2) === 0.5 && siteWeight(null, 0) === 1);
+check('weight: several sites keep 0.6 at the main site', siteWeight(2, 4) === 0.6 && siteWeight(4, 1) === 0.6);
+check('weight: many sites still keep the main share', siteWeight(12, 0) === 0.6);
+check('weight: not in the file uses NPPES alone', siteWeight(null, 2) === 0.6 && siteWeight(null, 0) === 1);
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

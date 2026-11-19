@@ -61,7 +61,7 @@ const pct = (a, b) => b ? (100 * a / b).toFixed(1) + '%' : 'n/a';
 const lines = [`# Clinician status load: dry run`, '', `Run ${new Date().toISOString().slice(0, 10)} by scripts/dac-load.mjs. CMS Doctors and Clinicians file released ${release}.`, '',
   `- File rows: ${rows.toLocaleString()}; clinicians (NPIs): ${map.size.toLocaleString()}`,
   `- Directory clinicians read: ${ind.toLocaleString()}`,
-  `- Site split: each clinician counts 1 / sites, sites = the larger of the file's practice addresses and NPPES (primary + secondary), capped at 5. Not in the file: NPPES alone.`,
+  `- Site split: a clinician at one site counts 1; at several (the larger of the file's practice addresses and NPPES primary + secondary) the main address keeps 0.6. Not in the file: NPPES alone.`,
   `- Supply at risk: share of clinicians in the file with a graduation year who graduated in ${cutoff} or earlier (35+ years). Provider side only.`, '',
   '| Specialty | Listings | After site split | Change | In CMS file | Graduated 35+ years ago |', '|---|---|---|---|---|---|'];
 let N = 0, W = 0;
