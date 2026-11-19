@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-19
 
+- Loaded the site weights (migration 052): 1,273,119 clinicians count less than 1 at their main address. Corrected the docs: Puerto Rico's listings are in the directory; only the CDC health data is missing there.
 - Drive-time access now covers 49 of 51 areas, Alaska and Hawaii included; California and Illinois failed on map downloads and rerun next. The job now reads OpenStreetMap extracts from the repo's own mirror (new job: OpenStreetMap extracts mirror) instead of hitting Geofabrik for every run.
 - Market score can now count a multi-site clinician as 0.6 at the main address (migration 052: `clinician_weight` and a `provider_individuals_weighted` view), behind a test switch (`?weighted=1`) until a before/after check of real markets is approved. A new read-only job, Site weighting before and after, compares them.
 - Loaded `clinician_status` (migration 051): 1,640,076 Medicare-enrolled clinicians with graduation year, telehealth and practice sites. The site weighting was revised the same day: a clinician with several sites now counts 0.6 at the main address (primary care -15%, cardiology -22%, GI -19%, pediatrics -6% nationally). Nothing reads it yet; the score switches only after a before/after check of real markets.
