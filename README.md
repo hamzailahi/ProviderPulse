@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-19
 
+- New manual job, Avoidable admission rates: fills the county table's empty avoidable-admission columns (heart failure, diabetes, COPD, high blood pressure, pneumonia, urinary infection, amputation, by age band) from CMS's Medicare Geographic Variation file, so the back-test can check the need score against them. Dry run first; apply writes only those columns.
 - The back-test now tests each half of the score against what it claims: the need half against avoidable hospital admissions, ER visits and readmissions by county, and the business half against where new clinicians started. Its first run found that new clinicians in 2021 to 2025 went mostly to areas already well supplied, not to the areas of greatest need.
 
 - A back-test job checks the need score against reality: it scores every ZIP as of the end of 2020 and compares that with where new clinicians started practising in 2021 to 2025, with the federal shortage designation tested the same way for comparison.

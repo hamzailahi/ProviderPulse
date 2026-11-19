@@ -1,0 +1,52 @@
+name: Avoidable admission rates
+
+# Manual (2026-11-19). Fills cms_county_utilization's *_admits_* columns from
+# CMS's Medicare Geographic Variation county file (scripts/import-gv-pqi.sh).
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry_run or apply'
+        default: 'dry_run'
+      gv_url:
+        description: 'Direct CSV URL (blank: from the CMS catalog)'
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  load:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - name: Install psql 17
+        run: |
+          sudo apt-get -o Acquire::Retries=8 update -q
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Load
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          MODE: ${{ inputs.mode }}
+          GV_URL: ${{ inputs.gv_url }}
+        run: bash scripts/import-gv-pqi.sh
+      - name: Commit the report
+        run: |
+          cat supabase/reference/gv-pqi-load.md >> "$GITHUB_STEP_SUMMARY"
+          git add supabase/reference/gv-pqi-load.md
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Avoidable admission rates load $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main
