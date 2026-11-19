@@ -16,7 +16,13 @@ create temp table s (fips text, year text, $DEFS);
 \copy s from '$W/pqi.csv' with (format csv, header true)
 select 'staged', count(*), count(distinct year), min(year), max(year) from s;
 select 'table years', string_agg(year || ':' || n, ' ' order by year) from (select year, count(*) n from public.cms_county_utilization group by year) y;
-with u as (update public.cms_county_utilization c set $SETS, pqi_year = s.year from s where c.fips = s.fips and c.year = s.year returning c.chf_admits_65_74) select 'rows updated', count(*), count(chf_admits_65_74) from u;
+select 'year coverage (rows with heart failure 65-74 / diabetes 65-74)', string_agg(year || ':' || a || '/' || b, ' ' order by year) from (select year, count(chf_admits_65_74) a, count(diabetes_admits_65_74) b from s group by year) y;
+-- The newest year whose rates are filled, per county (CMS leaves the newest
+-- release's PQI columns blank); written onto every row of that county,
+-- with that year in pqi_year.
+create temp table p as select distinct on (fips) * from s where num_nonnulls($COLS) >= 4 order by fips, year desc;
+select 'counties with rates', count(*), string_agg(distinct year, ',') from p;
+with u as (update public.cms_county_utilization c set $(echo "$SETS" | sed 's/= s\./= p./g'), pqi_year = p.year from p where c.fips = p.fips returning c.chf_admits_65_74, c.pqi_year) select 'rows updated', count(*), count(chf_admits_65_74), string_agg(distinct pqi_year, ',') from u;
 $END;
 SQL
 )
