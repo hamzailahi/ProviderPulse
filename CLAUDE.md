@@ -1257,6 +1257,7 @@ Tables:
   `classification`, `specialization`, `display_name`, `section`, CMS
   `cms_specialty_code` / `cms_specialty_name` (several joined with `; `),
   `patient_specialties text[]`, `show_on_map`, `nucc_version`. Public read.
+- `listing_counts_zip` (053, 2026-11-19): `clinics` and `provider_individuals` counted per ZIP (padded), NUCC code and table (`n`, site-weighted `w`, distinct `sites`, the pinned listings' middle `lat`/`lng`; key `k` = zip|code|src), public read, rebuilt by `listing-counts.yml` (weekly Thursday apply, `scripts/build-listing-counts.py`, COPY out, DuckDB, one-transaction load with a count check). market-score reads it for the catchment (`counts_basis: 'zip_totals'`), so dense cities (10001 hit the 60,000-row cap and refused) are counted whole; the nearest competitor is measured to each ZIP's middle of that code's listings; `?npi=` subtracts the viewer's own listing from its ZIP total; an empty, failed or capped read falls back to the listing rows (`'listings'`). `MarketModel` treats a row's `n`, `w` and `sites` as that many listings.
 - `access_e2sfca` (049, 2026-11-18): drive-time E2SFCA listings per 1,000 adults per ZIP and scored specialty (`per_1k`, `catchment_minutes`, `state`), public read, written only by `access-dry-run.yml` apply, read by market-score.
 - `market_benchmarks`: benchmarks for the market model (021), keyed
   `(kind, key)`: `measure`, `specialty`, `state_density` (needs 022; first written 2026-09-30, 114 rows) and `care_type` (needs 042, 2026-10-25). The live constraint also allows `demand_model`, so 025 was in fact applied. Public read,
@@ -2281,7 +2282,7 @@ function, asset and script and a `require` of every function.
 node scripts/test-accuracy-signals.mjs    # 83: scoring, incl. the Number(null) case and patient reports
 node scripts/test-query-plan.mjs          # 61: the market-memo allowlist
 node scripts/test-claimed-relevance.mjs   # 49: specialty gating (imports the real practisesAny), NPPES board-name results
-node scripts/test-market-model.mjs        # 51: the market opportunity model, incl. bucketing by code; places patients go (organizations only, verdicts, no rate no verdict, floors)
+node scripts/test-market-model.mjs        # 53: ZIP totals count like listings; the market opportunity model, incl. bucketing by code; places patients go (organizations only, verdicts, no rate no verdict, floors)
 node scripts/test-demand-model.mjs        # 45: the learned demand model, trainer end to end, and scoring
 node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick
 node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking

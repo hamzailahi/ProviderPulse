@@ -157,5 +157,14 @@ console.log('E2SFCA drive-time access (049)');
   check('a what-if listing still adds supply on top of the drive-time figure', what.evidence.access.per_1k === 0.11, String(what.evidence.access.per_1k));
   check('the reason says drive time', /minutes' drive/.test(JSON.stringify(e2.reasons || [])) || /minutes' drive/.test(JSON.stringify(e2)));
 }
+console.log('ZIP totals (053)');
+{
+  const rows = cardRows(10, 6);
+  const listed = one(base({ rows }));
+  const total = one(base({ rows: [Object.assign({}, rows[0], { n: 10, w: 10, sites: 10 })] }));
+  check('a ZIP total of n counts the same as n listings', total.clinicians === 10 && total.evidence.access.per_1k === listed.evidence.access.per_1k, JSON.stringify(total.evidence.access));
+  const wt = one(base({ rows: [Object.assign({}, rows[0], { n: 10, w: 6, sites: 10 })] }));
+  check('its weighted sum sets the rate, the head count stays n', wt.clinicians === 10 && wt.evidence.access.weighted_clinicians === 6);
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

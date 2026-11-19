@@ -1,0 +1,74 @@
+name: Listing counts
+
+# Rebuilds listing_counts_zip (migration 053): directory listings per ZIP,
+# NUCC code and table, with site-weighted totals, read by market-score so a
+# dense catchment is never capped. Weekly after the NPPES refresh and the
+# unmapped-listings pass (apply); a manual run defaults to dry_run.
+
+on:
+  schedule:
+    - cron: '13 11 * * 4'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry_run (report only) or apply (run 053 and load)'
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+
+permissions:
+  contents: write
+
+concurrency:
+  group: listing-counts
+  cancel-in-progress: false
+
+jobs:
+  counts:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install DuckDB
+        run: pip install duckdb==1.1.3
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "::error::Add the repository secret SUPABASE_DB_URL."; exit 1; fi
+      - name: Install psql 17
+        run: |
+          sudo apt-get -o Acquire::Retries=8 update -q
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Migration 053
+        if: github.event_name == 'schedule' || inputs.mode == 'apply'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -X -q -f supabase/migrations/053_listing_counts_zip.sql
+      - name: Build
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          MODE: ${{ github.event_name == 'schedule' && 'apply' || inputs.mode }}
+        run: python3 scripts/build-listing-counts.py --mode "$MODE"
+      - name: Summary
+        if: always()
+        run: cat supabase/reference/listing-counts.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - name: Commit the report
+        if: success()
+        run: |
+          git add supabase/reference/listing-counts.md
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Listing counts $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

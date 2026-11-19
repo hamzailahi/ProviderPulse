@@ -594,9 +594,42 @@ exports.handler = async (event) => {
           return out;
         };
 
+        // ZIP totals first (listing_counts_zip, migration 053, 2026-11-19): one
+        // row per ZIP, code and table, so a dense city catchment is a few
+        // thousand rows and never capped. Each row stands for n listings at
+        // their middle point. An empty or failed read falls back to the rows.
+        const selfNpiQ = /^\d{10}$/.test(String((event.queryStringParameters || {}).npi || '')) ? String(event.queryStringParameters.npi) : '';
+        const loadCounts = async () => {
+          const groups = [];
+          for (let i = 0; i < memberZips.length; i += 20) groups.push(memberZips.slice(i, i + 20));
+          const parts = await Promise.all(groups.map(g => pagedGet(`listing_counts_zip?zip=in.(${g.join(',')})&select=k,zip,taxonomy_code,src,n,w,sites,lat,lng`,
+            'k', { cap: 60000, ms: 8000, strict: true })));
+          if (parts.some(p => p.failed || p.truncated)) return null;
+          const all = parts.flatMap(p => p.rows);
+          if (!all.length) return null;
+          // ?npi= is the viewer: take their own listing out of its ZIP total.
+          if (selfNpiQ) {
+            const own = (await Promise.all([
+              get(`clinics?npi=eq.${selfNpiQ}&select=zip,taxonomy_code&limit=1`, 4000).then(r => (r || []).map(x => ({ ...x, src: 'c', w: 1 }))),
+              get(`${weighted ? 'provider_individuals_weighted' : 'provider_individuals'}?npi=eq.${selfNpiQ}&select=zip,taxonomy_code${weighted ? ',w' : ''}&limit=1`, 4000)
+                .then(r => (r || []).map(x => ({ ...x, src: 'i' })))
+            ])).flat();
+            own.forEach(o => {
+              const z = String(o.zip || '').replace(/\D.*$/, '').slice(0, 5).padStart(5, '0');
+              const row = all.find(r => r.zip === z && r.src === o.src && r.taxonomy_code === (o.taxonomy_code || ''));
+              if (row) { row.n -= 1; row.w -= Number(o.w) || 1; row.sites = Math.max(0, row.sites - 1); }
+            });
+          }
+          const pick = src => all.filter(r => r.src === src && r.n > 0).map(r => ({
+            npi: 'zip:' + r.k, taxonomy_code: r.taxonomy_code || null, latitude: r.lat, longitude: r.lng,
+            n: r.n, w: weighted ? Math.max(0, Number(r.w)) : r.n, sites: r.sites
+          }));
+          return [{ rows: pick('c'), truncated: false, failed: false }, { rows: pick('i'), truncated: false, failed: false }];
+        };
+        const counted = await loadCounts().catch(() => null);
         const [clinicPage, individualPage, placesPage, catchAcsPage] = await Promise.all([
-          loadListings('clinics'),
-          loadListings('provider_individuals'),
+          counted ? counted[0] : loadListings('clinics'),
+          counted ? counted[1] : loadListings('provider_individuals'),
           pagedGet(`cdc_places?zip=in.(${memberZips.join(',')})` +
             `&measureid=in.(${MarketModel.measureIds().join(',')})` +
             `&select=zip,measureid,value,pop_18plus,data_year`, 'zip', { cap: 4000, ms: 7000 }),
@@ -619,6 +652,7 @@ exports.handler = async (event) => {
           listings_failed: !!(clinicPage.failed || individualPage.failed),
           listings_error: clinicPage.failed || individualPage.failed ? lastListingError : undefined,
           furthest_miles: members.length > 1 ? Number(members[members.length - 1].miles.toFixed(1)) : 0,
+          counts_basis: counted ? 'zip_totals' : 'listings',
           clinic_rows: clinicPage.rows.length,
           individual_rows: individualPage.rows.length,
           truncated: clinicPage.truncated || individualPage.truncated || placesPage.truncated || boxPage.truncated,
@@ -730,7 +764,7 @@ exports.handler = async (event) => {
           const baseInput = {
             specialties: SPECIALTIES,
             // ?npi= is the viewing provider: their own listing is not a competitor.
-            rows: clinicPage.rows.concat(individualPage.rows).filter(r => !selfNpi || String(r.npi) !== selfNpi),
+            rows: clinicPage.rows.concat(individualPage.rows).filter(r => counted || !selfNpi || String(r.npi) !== selfNpi),
             codesFor: label => TaxonomyMap.codesFor(label),
             taxMatches: (stored, terms) => terms.some(t => (' ' + taxNorm(stored)).includes(' ' + taxNorm(t))),
             milesBetween, center: { lat: oLat, lng: oLon }, adults: catchmentAdults,

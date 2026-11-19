@@ -90,6 +90,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 050 | `050_name_search_indexes.sql` | pg_trgm and trigram GIN indexes on `clinics.name` and `provider_individuals.name` for name search; concurrent, run with `concurrent-indexes.yml` | applied 2026-11-19 by `concurrent-indexes.yml` in 2.6 minutes, both valid (clinics 115 MB, individuals 265 MB) |
 | 051 | `051_clinician_status.sql` | `clinician_status`: one row per NPI from CMS's Doctors and Clinicians file (graduation year, telehealth, practice sites, group PAC IDs); public read, written only by `dac-load.yml` | applied 2026-11-19 by `dac-load.yml` apply: 1,640,076 clinicians (CMS file released 2026-10-30) |
 | 052 | `052_clinician_weight.sql` | `clinician_weight` (NPIs with a site weight below 1) and the `provider_individuals_weighted` view; public read, written only by `dac-load.yml` | applied 2026-11-19 by `dac-load.yml` apply: 1,273,119 clinicians with a weight below 1 |
+| 053 | `053_listing_counts_zip.sql` | `listing_counts_zip`: listings per ZIP, code and table for market-score; public read, written only by `listing-counts.yml` | not yet applied (run `listing-counts.yml` apply) |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

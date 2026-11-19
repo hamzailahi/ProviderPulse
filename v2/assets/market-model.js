@@ -262,12 +262,15 @@
 
       /* ---- access ---- */
       var listings = bySpec[label] || [];
-      var clin = listings.length;
+      // A row may be a listing or a ZIP total (listing_counts_zip, migration
+      // 053) carrying n listings and their weighted sum w.
+      var clin = 0;
+      listings.forEach(function (r) { clin += (typeof r.n === 'number' && r.n > 0) ? r.n : 1; });
       // Weighted supply (step 1 of the scoring upgrade, 2026-11-19): a
       // clinician with several sites carries w = 0.6 at the main address;
       // listings without a weight count 1.
       var fte = 0;
-      listings.forEach(function (r) { fte += (typeof r.w === 'number' && r.w > 0) ? r.w : 1; });
+      listings.forEach(function (r) { fte += (typeof r.w === 'number' && r.w > 0) ? r.w : ((typeof r.n === 'number' && r.n > 0) ? r.n : 1); });
       var per1k = input.adults ? (fte / input.adults) * 1000 : null;
       var rate = bmSpecs[label] && bmSpecs[label].rate_per_1k;
       if (clin === 0 && input.adults > 0) {
@@ -476,7 +479,7 @@
       ts.forEach(function (t) {
         var a = acc[t], key = String(r.npi) + '|' + (r.latitude || '') + '|' + (r.longitude || '');
         if (a.seen[key]) return;
-        a.seen[key] = true; a.sites++;
+        a.seen[key] = true; a.sites += (typeof r.sites === 'number' && r.sites > 0) ? r.sites : 1;
         // Presence, not truthiness: a coordinate can be 0.
         if (i.center && i.milesBetween && r.latitude != null && r.latitude !== '' && r.longitude != null && r.longitude !== '') {
           var d = i.milesBetween(i.center.lat, i.center.lng, +r.latitude, +r.longitude);
