@@ -511,7 +511,7 @@
   }
 
   var API = {
-    VERSION: VERSION, WEIGHTS: WEIGHTS, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES,
+    VERSION: VERSION, WEIGHTS: WEIGHTS, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
     score: score, classify: classify, pct: pct, rankIn: rankIn, measureIds: measureIds, MEASURE_NAME: MEASURE_NAME,
     FACILITY_TYPES: FACILITY_TYPES, facilities: facilities, facilityCodes: facilityCodes
   };

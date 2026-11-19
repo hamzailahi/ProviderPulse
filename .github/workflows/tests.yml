@@ -170,3 +170,6 @@ jobs:
 
       - name: Clinician status (CMS Doctors and Clinicians)
         run: node scripts/test-dac.mjs
+
+      - name: Back-test scorer
+        run: node scripts/test-backtest.mjs

@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-19
 
+- A back-test job checks the need score against reality: it scores every ZIP as of the end of 2020 and compares that with where new clinicians started practising in 2021 to 2025, with the federal shortage designation tested the same way for comparison.
+
 - Drive-time access now counts people without a car. Each ZIP's adults are split by the Census share of households with no vehicle; that group is measured on walking times over real street and path networks, and both groups compete for the same clinicians (the multi-mode method of Mao and Nekorchuk, 2013). A version with transit-like slower travel is reported beside it as a check, not scored. States take this on at their next drive-time run.
 
 - The federal shortage-area (HPSA) score no longer counts toward any market score. HPSA is itself a population-to-provider ratio, the method the drive-time access figure improves on, so scoring with it was circular. Its weight is shared across need, access, payers and competition, and the HPSA figure still appears, marked "for comparison, not scored".

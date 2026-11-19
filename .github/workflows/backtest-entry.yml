@@ -1,0 +1,59 @@
+name: Back-test need score
+
+# Manual, read only (2026-11-19). Scores every ZIP as of the end of 2020 and
+# checks it, and HPSA, against where clinicians entered in 2021 to 2025
+# (scripts/backtest-entry.sh). Commits supabase/reference/backtest-entry.md and
+# keeps the per-ZIP CSV as a 7-day artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      nppes_url:
+        description: 'NPPES monthly file URL (blank: newest found)'
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - name: Install psql 17
+        run: |
+          sudo apt-get -o Acquire::Retries=8 update -q
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Back-test
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          NPPES_URL: ${{ inputs.nppes_url }}
+        run: bash scripts/backtest-entry.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backtest-entry
+          path: /tmp/backtest/backtest-entry.csv.gz
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Commit the report
+        if: success()
+        run: |
+          cat supabase/reference/backtest-entry.md >> "$GITHUB_STEP_SUMMARY"
+          git add supabase/reference/backtest-entry.md
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Back-test need score $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main
