@@ -1,10 +1,11 @@
 # ZIP centres where CDC PLACES has none
 
-Run 2026-11-19, mode dry_run, Census Gazetteer 2025 (33791 ZCTAs).
+Run 2026-11-19, mode apply, Census Gazetteer 2025 (33791 ZCTAs).
 
 - ZCTAs with no PLACES centre: 1271
 - Of those, with Census age data: 1254 (2739634 adults)
 - Puerto Rico: 132 ZCTAs, 2710671 adults
+- Loaded into zip_centres: 775
 - Sample:
   - 00601 18.181,-66.750 adults 13748
   - 00602 18.362,-67.176 adults 31670
