@@ -14,8 +14,9 @@ done
 [ -n "$year" ] || { echo "No Gazetteer file found"; exit 1; }
 unzip -o -q "$WORK/gaz.zip" -d "$WORK"
 f=$(ls "$WORK"/*Gaz_zcta_national*.txt | head -1)
-# Tab separated, header GEOID ... INTPTLAT INTPTLONG (trailing spaces).
-awk -F'\t' 'NR==1{for(i=1;i<=NF;i++){h=$i;gsub(/ /,"",h);c[h]=i};next} {g=$c["GEOID"];la=$c["INTPTLAT"];lo=$c["INTPTLONG"];gsub(/ /,"",la);gsub(/ /,"",lo);print g","la","lo}' "$f" > "$WORK/gaz.csv"
+# Tab separated until 2024, pipe separated from 2025; header GEOID ... INTPTLAT INTPTLONG.
+DELIM=$'\t'; head -1 "$f" | grep -q '|' && DELIM='|'
+awk -F"$DELIM" 'NR==1{for(i=1;i<=NF;i++){h=$i;gsub(/ /,"",h);c[h]=i};next} {g=$c["GEOID"];la=$c["INTPTLAT"];lo=$c["INTPTLONG"];gsub(/[ \r]/,"",la);gsub(/[ \r]/,"",lo);if(g~/^[0-9]{5}$/ && la!="" && lo!="")print g","la","lo}' "$f" > "$WORK/gaz.csv"
 n=$(wc -l < "$WORK/gaz.csv"); echo "Gazetteer $year: $n ZCTAs"
 [ "$n" -ge 30000 ] || { echo "Too few ZCTAs"; exit 1; }
 [ "$MODE" = apply ] && psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -X -q -f supabase/migrations/054_zip_centres.sql
