@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-19
 
+- The back-test now tests each half of the score against what it claims: the need half against avoidable hospital admissions, ER visits and readmissions by county, and the business half against where new clinicians started. Its first run found that new clinicians in 2021 to 2025 went mostly to areas already well supplied, not to the areas of greatest need.
+
 - A back-test job checks the need score against reality: it scores every ZIP as of the end of 2020 and compares that with where new clinicians started practising in 2021 to 2025, with the federal shortage designation tested the same way for comparison.
 
 - Drive-time access now counts people without a car. Each ZIP's adults are split by the Census share of households with no vehicle; that group is measured on walking times over real street and path networks, and both groups compete for the same clinicians (the multi-mode method of Mao and Nekorchuk, 2013). A version with transit-like slower travel is reported beside it as a check, not scored. States take this on at their next drive-time run.

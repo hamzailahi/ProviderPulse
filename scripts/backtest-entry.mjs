@@ -45,14 +45,30 @@ const STATE_NAMES = {
 };
 export const MIN_ADULTS = 1000;
 
-export function run(input) {
+export function run(input, opts = {}) {
   const { counts, zips, places, bench, hpsa, zipcounty } = input;
+  const supplyAll = opts.supply === 'all';   // 'before' (2020, the default) or 'all' (today)
+  // Ability to pay, like the live model: insured rate (70%) and median income
+  // (30%) as percentiles within the ZIP's state (ACS).
+  const payOf = new Map();
+  const acs = input.acs || [];
+  const byState = new Map();
+  for (const a of acs) { if (!a.state) continue; (byState.get(a.state) || byState.set(a.state, []).get(a.state)).push(a); }
+  for (const [, rs] of byState) {
+    const ins = rs.map(a => a.insured).filter(v => v != null), inc = rs.map(a => a.income).filter(v => v != null);
+    if (ins.length < 30) continue;
+    for (const a of rs) {
+      const ip = a.insured == null ? null : MarketModel.rankIn(ins, a.insured), cp = a.income == null || inc.length < 30 ? null : MarketModel.rankIn(inc, a.income);
+      if (ip != null) payOf.set(a.zip, { insuredPct: ip, incomePct: cp });
+    }
+  }
   const Z = zips.filter(z => Number.isFinite(z.lat) && Number.isFinite(z.lon));
   const zipIdx = new Map(Z.map(z => [z.zip, z]));
   // Supply as of the cutoff (both tables, like the live model) and clinician entrants after it.
   const before = new Map(), entered = new Map();   // zip -> Map code -> n
   for (const r of counts) {
-    if (r.before) { const m = before.get(r.zip) || new Map(); m.set(r.code, (m.get(r.code) || 0) + r.before); before.set(r.zip, m); }
+    const sup = supplyAll ? r.before + r.entered : r.before;
+    if (sup) { const m = before.get(r.zip) || new Map(); m.set(r.code, (m.get(r.code) || 0) + sup); before.set(r.zip, m); }
     if (r.entered && r.entity === '1') { const m = entered.get(r.zip) || new Map(); m.set(r.code, (m.get(r.code) || 0) + r.entered); entered.set(r.zip, m); }
   }
   const P = new Map();
@@ -66,6 +82,7 @@ export function run(input) {
     const o = hp.get(k) || {}; o[d] = Math.max(o[d] || 0, h.score || 0); hp.set(k, o);
   }
   const hpCounties = new Set([...hp.keys()]);
+  const fipsOf = new Map(zipcounty.map(r => [r.zip, r.fips]));
   const zc = new Map(zipcounty.map(r => [r.zip, (STATE_NAMES[String(r.state).toUpperCase()] || r.state) + '|' + countyKey(r.county)]));
 
   // Grid of ZIP centres, half a degree square, for the catchment search.
@@ -91,13 +108,15 @@ export function run(input) {
       for (const [code, n] of entered.get(x.y.zip) || []) for (const l of codeSpec.get(code) || []) ent[l] = (ent[l] || 0) + n;
     }
     const s = MarketModel.score({ specialties: SCORED, rows, codesFor: l => TaxonomyMap.codesFor(l), center: { lat: z.lat, lng: z.lon },
-      adults, places: pl, benchmarks, milesBetween: (a, b, c, d) => milesBetween({ lat: a, lon: b }, { lat: c, lon: d }) });
+      adults, places: pl, benchmarks, pay: payOf.get(z.zip), milesBetween: (a, b, c, d) => milesBetween({ lat: a, lon: b }, { lat: c, lon: d }) });
     const ck = zc.get(z.zip);
     for (const sp of s.specialties) {
       const f = sp.factors, need = f.need ?? null, access = f.access ?? null;
       const disc = MarketModel.SHORTAGE_DISCIPLINE[sp.specialty] || 'primary';
       const hpsaScore = ck == null ? null : hpCounties.has(ck) ? (hp.get(ck)[disc] || 0) : 0;
-      out.push({ zip: z.zip, specialty: sp.specialty, need, access, needScore: need != null && access != null ? (need + access) / 2 : null,
+      const pay = f.pay ?? null, comp = f.competition ?? null;
+      out.push({ zip: z.zip, fips: fipsOf.get(z.zip) || null, specialty: sp.specialty, need, access, needScore: need != null && access != null ? (need + access) / 2 : null,
+        pay, competition: comp, viability: pay != null && comp != null ? (pay + comp) / 2 : null,
         hpsa: hpsaScore, hpsaMatched: ck != null, entryPer1k: (ent[sp.specialty] || 0) / adults * 1000, adults });
     }
   }
@@ -117,8 +136,39 @@ export function summarize(rows) {
       rhoNeed: spearman(ok.map(r => r.need), ok.map(r => r.entryPer1k)),
       rhoAccess: spearman(ok.map(r => r.access), ok.map(r => r.entryPer1k)),
       liftScore: quint('needScore'),
+      rhoViab: spearman(rs.filter(r => r.viability != null).map(r => r.viability), rs.filter(r => r.viability != null).map(r => r.entryPer1k)),
+      liftViab: (() => { const v = rs.filter(r => r.viability != null).sort((a, b) => a.viability - b.viability); const q = Math.floor(v.length / 5); if (q < 5) return null;
+        const m = a => a.reduce((t, r) => t + r.entryPer1k, 0) / a.length; const lo = m(v.slice(0, q)); return lo > 0 ? m(v.slice(-q)) / lo : null; })(),
+      nViab: rs.filter(r => r.viability != null).length,
       nHpsa: hm.length, rhoHpsa: spearman(hm.map(r => r.hpsa), hm.map(r => r.entryPer1k)),
       rhoScoreSame: spearman(hm.filter(r => r.needScore != null).map(r => r.needScore), hm.filter(r => r.needScore != null).map(r => r.entryPer1k)) });
+  }
+  return res;
+}
+
+// County outcomes: the need score (today's supply), averaged over the county's
+// ZIPs by adults, against avoidable hospital admissions (the seven ambulatory
+// care sensitive conditions CMS publishes for ages 65 to 74), ER visits and
+// readmissions per county; HPSA (the county's own score) on the same counties.
+export const PQI_COLS = ['chf', 'diabetes', 'copd', 'htn', 'pneumonia', 'uti', 'amputation'];
+export function outcomes(rows, util) {
+  const by = new Map();
+  for (const r of rows) { if (!r.fips) continue; const k = r.specialty + '|' + r.fips; const a = by.get(k) || { s: r.specialty, f: r.fips, h: null, n: 0, w: 0, need: 0, nw: 0, acc: 0, aw: 0, sc: 0, sw: 0 };
+    if (r.hpsaMatched && r.hpsa != null) a.h = Math.max(a.h ?? 0, r.hpsa);
+    if (r.needScore != null) { a.sc += r.needScore * r.adults; a.sw += r.adults; }
+    if (r.need != null) { a.need += r.need * r.adults; a.nw += r.adults; }
+    if (r.access != null) { a.acc += r.access * r.adults; a.aw += r.adults; }
+    by.set(k, a); }
+  const U = new Map(util.map(u => [u.fips, u]));
+  const per = new Map();
+  for (const a of by.values()) { const u = U.get(a.f); if (!u || !a.sw) continue; (per.get(a.s) || per.set(a.s, []).get(a.s)).push({ score: a.sc / a.sw, need: a.nw ? a.need / a.nw : null, access: a.aw ? a.acc / a.aw : null, u, hpsa: a.h }); }
+  const res = [];
+  for (const [label, cs] of per) {
+    const rho = (key, out) => { const v = cs.filter(c => c[key] != null && c.u[out] != null); return v.length < 30 ? null : spearman(v.map(c => c[key]), v.map(c => c.u[out])); };
+    const rhoH = out => { const v = cs.filter(c => c.hpsa != null && c.u[out] != null); return v.length < 30 ? null : spearman(v.map(c => c.hpsa), v.map(c => c.u[out])); };
+    res.push({ label, counties: cs.length,
+      pqi: rho('score', 'pqi'), pqiNeed: rho('need', 'pqi'), pqiAccess: rho('access', 'pqi'), pqiHpsa: rhoH('pqi'),
+      er: rho('score', 'er'), erHpsa: rhoH('er'), readm: rho('score', 'readm'), readmHpsa: rhoH('readm') });
   }
   return res;
 }
@@ -131,26 +181,39 @@ if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
     places: read('places').map(([zip, measureid, value]) => ({ zip, measureid, value: num(value) })).filter(r => r.value != null),
     bench: read('bench').map(([kind, key, data]) => ({ kind, key, data: JSON.parse(data) })),
     hpsa: read('hpsa').map(([state, county, discipline, score]) => ({ state, county, discipline, score: num(score) || 0 })),
-    zipcounty: read('zipcounty').map(([zip, county, state]) => ({ zip, county, state }))
+    zipcounty: read('zipcounty').map(([zip, fips, county, state]) => ({ zip, fips, county, state })),
+    acs: read('acs').map(([zip, state, uni, unins, inc]) => ({ zip, state, insured: num(uni) > 0 && num(unins) != null ? 1 - num(unins) / num(uni) : null, income: num(inc) }))
   };
+  // util: fips, er_per_1000, readmission_rate, then the 7 PQI columns for ages 65 to 74
+  const util = read('util').map(c => { const pq = c.slice(3).map(num); return { fips: c[0], er: num(c[1]), readm: num(c[2]), pqi: pq.every(v => v != null) ? pq.reduce((a, b) => a + b, 0) : null }; });
   const rows = run(input), sum = summarize(rows);
-  writeFileSync(arg('csv'), 'zip,specialty,need,access,need_score,hpsa,entry_per_1k\n' + rows.map(r => [r.zip, '"' + r.specialty + '"', r.need ?? '', r.access ?? '', r.needScore ?? '', r.hpsa ?? '', r.entryPer1k.toFixed(4)].join(',')).join('\n') + '\n');
-  const f = v => (v == null ? 'n/a' : v.toFixed(2));
+  const now = run(input, { supply: 'all' }), out = outcomes(now, util);
+  writeFileSync(arg('csv'), 'zip,specialty,need,access,need_score,pay,competition,viability,hpsa,entry_per_1k\n' + rows.map(r => [r.zip, '"' + r.specialty + '"', r.need ?? '', r.access ?? '', r.needScore ?? '', r.pay ?? '', r.competition ?? '', r.viability ?? '', r.hpsa ?? '', r.entryPer1k.toFixed(4)].join(',')).join('\n') + '\n');
+  const f = v => (v == null ? 'n/a' : v.toFixed(2)), x = v => (v == null ? 'n/a' : v.toFixed(2) + 'x');
   const meta = JSON.parse(process.env.NPPES_STATS || '{}');
-  const lines = ['# Back-test: the need score against where clinicians entered', '',
+  const lines = ['# Back-test: need against health outcomes, viability against entry', '',
     `Run ${new Date().toISOString().slice(0, 10)} by scripts/backtest-entry.mjs. Read only.`, '',
-    'Each ZIP with at least 1,000 adults is scored as of the end of 2020: the live model\'s need factor (CDC PLACES measures against national percentiles; age mix is left out here) and its access factor (listings per adult in the 10-mile catchment against the national rate, counting only NPIs enumerated by the end of 2020). "Patients need care here" is their average. The outcome is clinicians (NPI-1) enumerated in 2021 to 2025 per 1,000 adults in the same catchment. HPSA (the county\'s designation score for the specialty\'s discipline, 0 when the county has none) is tested the same way.', '',
+    'Two scores, each against the outcome it claims to predict (2026-11-19, the user\'s choice after the first run showed new clinicians going to already-supplied areas):', '',
+    '- **Patients need care here** = the mean of the need factor (CDC PLACES against national percentiles; age mix left out here) and the access factor (listings per adult in the 10-mile catchment against the national rate). Tested with today\'s supply against county outcomes that thin access is known to raise: avoidable hospital admissions (the sum of CMS\'s seven ambulatory-care-sensitive admission rates for ages 65 to 74: heart failure, diabetes, COPD, high blood pressure, pneumonia, urinary infection, diabetic amputation), ER visits per 1,000 and readmission rate (Medicare fee-for-service, newest year). County score = adult-weighted mean of its ZIPs (HUD main county). Higher correlation is better: a need score should rise with avoidable admissions.',
+    '- **A practice can make it here** = the mean of ability to pay (insured rate 70% and median income 30%, percentiles in the state, ACS) and room from competitors (nearest same-specialty listing). Tested as of the end of 2020 against clinicians (NPI-1) enumerated in 2021 to 2025 per 1,000 adults in the catchment.',
+    '- HPSA (the county\'s score for the specialty\'s discipline, 0 when a matched county has none) gets the same tests on the same counties and ZIPs.', '',
     '## Limits', '',
-    '- Supply in 2020 counts NPIs still active today at today\'s address: clinicians who retired or moved since are missing or misplaced (NPPES blanks deactivated records), so 2020 supply is understated and survivors are placed where they are now.',
-    '- Need uses today\'s PLACES and today\'s adults; both change slowly, but they are not 2020 figures.',
-    '- Entry is an NPI being issued, mostly new graduates and newly licensed clinicians. It measures where clinicians start practising, which reflects jobs and training sites as much as need.',
-    '- A positive correlation means the score points where clinicians went; a negative one means they went to already-supplied places. Neither alone proves the score right or wrong; the comparison with HPSA on the same ZIPs is the fair test.', '',
-    `- NPPES rows read: ${meta.rows ? meta.rows.toLocaleString() : 'n/a'}; deactivated (not placeable): ${meta.deactivated ? meta.deactivated.toLocaleString() : 'n/a'}; enumerated by 2020 and active: ${meta.before ? meta.before.toLocaleString() : 'n/a'}; entered 2021 to 2025: ${meta.entered ? meta.entered.toLocaleString() : 'n/a'}`,
-    `- ZIP x specialty rows scored: ${rows.length.toLocaleString()}`, '',
-    '## By specialty', '',
-    'Rank correlation (Spearman) with entry per 1,000 adults. "Top vs bottom fifth" is the mean entry rate in the highest-scoring fifth of ZIPs over the lowest. The last two columns use only ZIPs whose county matched HPSA records, so the score and HPSA are compared on the same ZIPs.', '',
-    '| Specialty | ZIPs | Need score | Need alone | Access alone | Top vs bottom fifth | ZIPs with county | HPSA | Need score, same ZIPs |', '|---|---|---|---|---|---|---|---|---|',
-    ...sum.map(s => `| ${s.label} | ${s.n.toLocaleString()} | ${f(s.rhoScore)} | ${f(s.rhoNeed)} | ${f(s.rhoAccess)} | ${s.liftScore == null ? 'n/a' : s.liftScore.toFixed(2) + 'x'} | ${s.nHpsa.toLocaleString()} | ${f(s.rhoHpsa)} | ${f(s.rhoScoreSame)} |`), ''];
+    '- 2020 supply counts NPIs still active today at today\'s address (deactivated records carry no address).',
+    '- Need uses today\'s PLACES; the outcomes are Medicare fee-for-service only and county-wide, so a ZIP-level score is averaged up and loses detail.',
+    '- Correlation is not cause: poorer, older counties have both more need and more avoidable admissions. Need alone and access alone are shown so the two can be told apart.', '',
+    `- NPPES rows read: ${meta.rows ? meta.rows.toLocaleString() : 'n/a'}; enumerated by 2020 and active: ${meta.before ? meta.before.toLocaleString() : 'n/a'}; entered 2021 to 2025: ${meta.entered ? meta.entered.toLocaleString() : 'n/a'}`,
+    `- Counties with outcomes: ${util.length.toLocaleString()}`, '',
+    '## 1. Patients need care here vs county outcomes', '',
+    'Spearman across counties. Avoidable admissions columns: the score, need alone, access alone, then HPSA.', '',
+    '| Specialty | Counties | Avoidable admits: score | need | access | HPSA | ER visits: score | HPSA | Readmissions: score | HPSA |', '|---|---|---|---|---|---|---|---|---|---|',
+    ...out.map(o => `| ${o.label} | ${o.counties.toLocaleString()} | ${f(o.pqi)} | ${f(o.pqiNeed)} | ${f(o.pqiAccess)} | ${f(o.pqiHpsa)} | ${f(o.er)} | ${f(o.erHpsa)} | ${f(o.readm)} | ${f(o.readmHpsa)} |`), '',
+    '## 2. A practice can make it here vs clinician entry 2021 to 2025', '',
+    '| Specialty | ZIPs | Viability score | Top vs bottom fifth | HPSA (same ZIPs) |', '|---|---|---|---|---|',
+    ...sum.map(s2 => `| ${s2.label} | ${s2.nViab.toLocaleString()} | ${f(s2.rhoViab)} | ${x(s2.liftViab)} | ${f(s2.rhoHpsa)} |`), '',
+    '## 3. For reference: patients need care here vs entry (the first run\'s finding)', '',
+    'Negative means new clinicians went where supply was already dense, not where the need score pointed.', '',
+    '| Specialty | ZIPs | Need score | Need alone | Access alone | Top vs bottom fifth |', '|---|---|---|---|---|---|',
+    ...sum.map(s2 => `| ${s2.label} | ${s2.n.toLocaleString()} | ${f(s2.rhoScore)} | ${f(s2.rhoNeed)} | ${f(s2.rhoAccess)} | ${x(s2.liftScore)} |`), ''];
   writeFileSync(arg('report'), lines.join('\n'));
-  console.log(lines.slice(-sum.length - 3).join('\n'));
+  console.log(lines.slice(0, 40).join('\n'));
 }

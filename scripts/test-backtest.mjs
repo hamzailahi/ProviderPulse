@@ -1,5 +1,5 @@
 // Back-test scorer on synthetic data: entry, catchments, HPSA matching.
-import { run, summarize, parseCsv } from './backtest-entry.mjs';
+import { run, summarize, parseCsv, outcomes } from './backtest-entry.mjs';
 let pass = 0, fail = 0;
 const check = (n, ok, d = '') => { if (ok) { pass++; console.log('  PASS  ' + n); } else { fail++; console.log('  FAIL  ' + n + (d ? ' :: ' + d : '')); } };
 const PC = '207Q00000X';   // family medicine
@@ -24,5 +24,19 @@ const s = summarize(withNeed)[0];
 check('score and entry agree when entrants go to thin supply', s.rhoScore > 0.8, String(s.rhoScore));
 check('HPSA compared on the same ZIPs', s.nHpsa === 30 && s.rhoHpsa > 0.5, String(s.rhoHpsa));
 check('CSV reader keeps commas inside quotes', parseCsv('a,b\n"x, y",{"k":1}\n')[0][0] === 'x, y');
+{
+  // Ability to pay and competition give the viability score; ZIP-level ACS ranked within the state.
+  const acs = zips.map((z, i) => ({ zip: z.zip, state: 'TN', insured: 0.8 + i * 0.005, income: 40000 + i * 1000 }));
+  const zc2 = zips.map((z, i) => ({ zip: z.zip, fips: i < 15 ? '47001' : '47003', county: i < 15 ? 'West County' : 'East County', state: 'TN' }));
+  const r2 = run({ counts, zips, places: [], bench, hpsa, zipcounty: zc2, acs }).filter(r => r.specialty === 'Primary care / family doctor');
+  check('pay and competition make the viability score', r2.every(r => r.pay != null && r.competition != null && r.viability === (r.pay + r.competition) / 2));
+  check('state names follow two-letter codes for HPSA', r2.find(r => r.zip === '10029').hpsa === 18);
+  const all = run({ counts, zips, places: [], bench, hpsa, zipcounty: zc2, acs }, { supply: 'all' }).filter(r => r.specialty === 'Primary care / family doctor');
+  check('today\'s supply adds the entrants to the 2020 supply', all.find(r => r.zip === '10029').access <= r2.find(r => r.zip === '10029').access);
+  const scored = all.map(r => ({ ...r, needScore: r.access }));
+  const util = [{ fips: '47001', er: 500, readm: 15, pqi: 1000 }, { fips: '47003', er: 900, readm: 18, pqi: 3000 }];
+  const o = outcomes(scored, util);
+  check('counties under 30 give no correlation, never a made-up one', o[0].counties === 2 && o[0].pqi === null);
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
