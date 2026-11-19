@@ -28,17 +28,17 @@ Run 2026-11-19 by scripts/live/weight-compare.mjs (read only). "Before" counts e
 
 | Specialty | Clinicians | 10-mile per 1k before | after | US per 1k | Access factor (current basis) | Score | Verdict |
 |---|---|---|---|---|---|---|---|
-| Primary care / family doctor | 317 | 5.36 | 4.76 | 4.78 | e2sfca 0 | 37 | Crowded premium market |
+| Primary care / family doctor | 317 | 5.36 | 4.76 | 4.78 | e2sfca 0 | 38 | Crowded premium market |
 | Heart / cardiology | 9 | 0.15 | 0.14 | 0.28 | e2sfca 65 | 58 | Latent demand |
 | Digestive / gastroenterology | 3 | 0.05 | 0.05 | 0.13 | e2sfca 82 | 67 | Latent demand |
 
 ## 10001
 
-36 ZIPs within 2.9 mi, 1005577 adults (capped: counts are floors)
+36 ZIPs within 2.9 mi, 1005577 adults
 
 | Specialty | Clinicians | 10-mile per 1k before | after | US per 1k | Access factor (current basis) | Score | Verdict |
 |---|---|---|---|---|---|---|---|
-| Primary care / family doctor | n/a | | | | | |  | |
-| Heart / cardiology | n/a | | | | | |  | |
-| Digestive / gastroenterology | n/a | | | | | |  | |
+| Primary care / family doctor | 10414 | 10.36 | 9.23 | 4.78 | e2sfca 27 | 35 | Saturated |
+| Heart / cardiology | 910 | 0.9 | 0.76 | 0.28 | e2sfca 2 | 26 | Saturated |
+| Digestive / gastroenterology | 539 | 0.54 | 0.46 | 0.13 | e2sfca 0 | 28 | Saturated |
 
