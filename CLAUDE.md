@@ -1233,7 +1233,7 @@ Tables:
   (B01003 from the release five years earlier, for growth; pre-2021 releases
   use 2010 ZCTAs, so the dashboard hides swings above 50%) and `signals` jsonb
   `{key: {n, of}}` for `disability`, `employer`, `direct`, `tricare`, `va`,
-  `seniors_alone` (`SIGNAL_RULES` in `scripts/lib/acs.mjs`, found by label with
+  `seniors_alone`, `no_vehicle` (households with no vehicle, ACS B25044 owners plus renters over all households, added 2026-11-19 for the no-car access split) (`SIGNAL_RULES` in `scripts/lib/acs.mjs`, found by label with
   the same B-then-C fallback; seniors' universe is people 65+ in households).
   Coverage types overlap: never add them. The dashboard shows a signal only when
   every ZIP in view has it. First load 2026-10-06: every B27004/5/8/9 table
@@ -2285,7 +2285,7 @@ node scripts/test-claimed-relevance.mjs   # 49: specialty gating (imports the re
 node scripts/test-market-model.mjs        # 53: ZIP totals count like listings; the market opportunity model, incl. bucketing by code; places patients go (organizations only, verdicts, no rate no verdict, floors)
 node scripts/test-demand-model.mjs        # 45: the learned demand model, trainer end to end, and scoring
 node scripts/test-sahie.mjs               # 14: SAHIE parsing, importer, and market-score's county pick
-node scripts/test-acs.mjs                 # 46: the ACS import and the richer income ranking
+node scripts/test-acs.mjs                 # 47: households with no vehicle (B25044); the ACS import and the richer income ranking
 node scripts/test-scenario.mjs            # 18: the what-if re-score changes supply only; no six-group breakdown, clinicians by code section, shortage per specialty
 node scripts/test-market-assistant.mjs    # 69: the assistant, figure repair, tracing, reports in parts (needs npm ci in v2/)
 node scripts/test-answer-check.mjs        # 38: which figures count as traced

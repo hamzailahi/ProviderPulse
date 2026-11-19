@@ -183,5 +183,12 @@ acsRows = 'throw';
 pay = await payOf();
 check('a failed or missing ACS read never breaks the score', pay && pay.income_basis !== 'acs');
 
+{
+  const { pickSignalVars } = await import('./lib/acs.mjs');
+  const labels = { B25044_001E: 'Estimate!!Total:', B25044_002E: 'Estimate!!Total:!!Owner occupied:', B25044_003E: 'Estimate!!Total:!!Owner occupied:!!No vehicle available',
+    B25044_004E: 'Estimate!!Total:!!Owner occupied:!!1 vehicle available', B25044_009E: 'Estimate!!Total:!!Renter occupied:', B25044_010E: 'Estimate!!Total:!!Renter occupied:!!No vehicle available' };
+  const sv = pickSignalVars(labels, { no_vehicle: 'B25044' });
+  check('households with no vehicle add owners and renters over all households', sv && sv.no_vehicle && sv.no_vehicle.cells.join() === 'B25044_003E,B25044_010E' && sv.no_vehicle.universe.join() === 'B25044_001E', JSON.stringify(sv));
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

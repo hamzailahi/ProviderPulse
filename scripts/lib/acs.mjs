@@ -173,7 +173,10 @@ export const SIGNAL_RULES = {
   direct: { tables: ['B27005', 'C27005'], match: /!!With direct-purchase health insurance$/ },
   tricare: { tables: ['B27008', 'C27008'], match: /!!With TRICARE\/military health coverage$/ },
   va: { tables: ['B27009', 'C27009'], match: /!!With VA Health Care$/i },
-  seniors_alone: { tables: ['B09021'], match: /65 years and over:!!Lives alone$/, universe: /!!65 years and over:$/ }
+  seniors_alone: { tables: ['B09021'], match: /65 years and over:!!Lives alone$/, universe: /!!65 years and over:$/ },
+  // Households with no vehicle, owners plus renters (2026-11-19): the share of
+  // adults the drive-time access figure cannot assume has a car.
+  no_vehicle: { tables: ['B25044'], match: /!!No vehicle available$/ }
 };
 
 // labels: { id: label } for every table fetched; found: { key: table actually used }.
