@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 414 changes over 68 working days, 2026-05-13 to 2026-11-20.
-- 2026-08-19 onward: from the README changelog (240 entries, written for a reader).
+- 415 changes over 68 working days, 2026-05-13 to 2026-11-20.
+- 2026-08-19 onward: from the README changelog (241 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 79 |
+| November 2026 | 80 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-20
+
+- New read-only dry run that measures how concentrated each local market is (HHI) by Medicare group and by hospital-linked health system, starting with Memphis and Fort Worth.
 
 - Clinicians who moved to another state now show at their current Medicare address: 138,150 moved (115,647 on the map), and 1,002,333 other Medicare offices feed "Also practises at".
 

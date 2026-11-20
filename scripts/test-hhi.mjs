@@ -1,0 +1,12 @@
+import { hhi, band, mode, firmOf } from './lib/hhi.mjs';
+let p = 0, f = 0; const ok = (c, m) => { if (c) p++; else { f++; console.log('FAIL', m); } };
+ok(hhi(new Map([['a', 1]])) === 10000, 'monopoly 10,000');
+ok(hhi(new Map([['a', 1], ['b', 1]])) === 5000, 'two equal 5,000');
+ok(hhi(new Map()) === null, 'empty is unknown, not zero');
+ok(band(999) === 'unconcentrated' && band(1800) === 'moderate' && band(1801) === 'high', 'bands');
+ok(mode(['x', 'y', 'y', null]) === 'y' && mode([]) === null, 'mode');
+const s = new Map([['100001', 'H1']]);
+ok(firmOf({ npi: '1', group: 'P', ccns: ['100001'] }, s).system === 'SH1', 'hospital system wins');
+ok(firmOf({ npi: '1', group: 'P', ccns: ['999999'] }, s).system === 'GP', 'no system: group');
+ok(firmOf({ npi: '1', ccns: [] }, s).group === 'N1', 'solo is its own firm');
+console.log(`${p} passed, ${f} failed`); process.exit(f ? 1 : 0);

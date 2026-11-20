@@ -174,3 +174,6 @@ jobs:
 
       - name: Back-test scorer
         run: node scripts/test-backtest.mjs
+
+      - name: Market concentration (HHI)
+        run: node scripts/test-hhi.mjs

@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-20
 
+- New read-only dry run that measures how concentrated each local market is (HHI) by Medicare group and by hospital-linked health system, starting with Memphis and Fort Worth.
+
 - Clinicians who moved to another state now show at their current Medicare address: 138,150 moved (115,647 on the map), and 1,002,333 other Medicare offices feed "Also practises at".
 
 - The project log now reaches back to the first upload on 2026-05-13: the months before this changelog began are filled in from the code history, so the log covers 412 changes over 68 working days.
