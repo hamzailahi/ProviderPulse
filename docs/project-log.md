@@ -2,17 +2,18 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 237 changes over 35 working days, 2026-08-19 to 2026-11-20.
+- 238 changes over 35 working days, 2026-08-19 to 2026-11-20.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 76 |
+| November 2026 | 77 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 2 |
 
 ## 2026-11-20
 
+- New manual job, AHRQ health systems discovery: records what AHRQ's Compendium of U.S. Health Systems files contain (which hospitals and physician groups belong to which system), the first step toward showing when competitors in an area share an owner.
 - Clinicians whose Medicare enrollment shows they moved to another state are now listed at their Medicare address only. Clinicians in the right state but at other offices get an "Also practises at" list. The check reruns every month on CMS's new file, and anyone who no longer qualifies goes back to the registry address. The weekly registry refresh no longer overwrites a corrected address.
 - New: docs/project-log.md, every change since the project began with its date, for review. It is generated from this changelog and kept in step automatically.
 - New manual job, Clinician address check: compares every clinician's listed state and ZIP with their current Medicare enrollment (CMS, monthly) and counts how many look moved, as a dry run before any listing changes. Prompted by doctors found listed in states they left years ago; the national registry keeps whatever address a clinician last entered.
