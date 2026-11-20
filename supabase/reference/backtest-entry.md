@@ -59,48 +59,50 @@ Spearman across counties. Preventable stays columns: the score, need alone, acce
 
 ## 2. A practice can make it here vs clinician entry 2021 to 2025
 
-| Specialty | ZIPs | Viability score | Pay alone | Competition alone | Top vs bottom fifth | HPSA (same ZIPs) |
-|---|---|---|---|---|---|---|
-| Primary care / family doctor | 20,588 | -0.01 | 0.06 | -0.18 | 0.97x | 0.21 |
-| Pediatrics (children) | 20,588 | -0.25 | 0.08 | -0.42 | 0.46x | 0.22 |
-| Women's health / OB-GYN | 20,588 | -0.26 | 0.10 | -0.43 | 0.53x | 0.15 |
-| Mental health & counseling | 20,588 | -0.03 | 0.11 | -0.30 | 0.93x | 0.19 |
-| Dental | 20,588 | -0.07 | 0.09 | -0.26 | 0.85x | 0.27 |
-| Eye care | 20,588 | -0.16 | 0.09 | -0.30 | 0.65x | 0.16 |
-| Chiropractic | 20,588 | -0.03 | 0.20 | -0.26 | 1.00x | 0.06 |
-| Physical & occupational therapy | 20,588 | 0.05 | 0.21 | -0.26 | 1.08x | 0.05 |
-| Orthopedics & sports injury | 20,588 | -0.17 | 0.11 | -0.31 | 0.74x | 0.04 |
-| Heart / cardiology | 20,588 | -0.36 | 0.03 | -0.47 | 0.24x | 0.25 |
-| Skin / dermatology | 20,588 | -0.38 | 0.09 | -0.55 | 0.26x | 0.22 |
-| Allergy & immunology | 20,588 | -0.30 | 0.01 | -0.40 | 0.16x | 0.17 |
-| Lung, breathing & sleep | 20,588 | -0.32 | 0.07 | -0.47 | 0.39x | 0.25 |
-| Digestive / gastroenterology | 20,588 | -0.33 | 0.01 | -0.44 | 0.22x | 0.20 |
-| Kidney / nephrology | 20,588 | -0.31 | -0.00 | -0.40 | 0.27x | 0.24 |
-| Diabetes & hormones | 20,588 | -0.34 | 0.03 | -0.48 | 0.41x | 0.18 |
-| Cancer care / oncology | 20,588 | -0.35 | 0.05 | -0.49 | 0.21x | 0.22 |
-| Arthritis / rheumatology | 20,588 | -0.36 | -0.01 | -0.46 | 0.21x | 0.21 |
-| Brain & nerves / neurology | 20,588 | -0.41 | 0.11 | -0.60 | 0.26x | 0.22 |
-| Ear, nose & throat | 20,588 | -0.33 | 0.01 | -0.44 | 0.21x | 0.23 |
-| Urology | 20,588 | -0.34 | 0.01 | -0.45 | 0.25x | 0.18 |
-| Foot & ankle / podiatry | 20,588 | -0.32 | 0.08 | -0.47 | 0.43x | 0.17 |
-| Pain management | 20,588 | -0.28 | 0.06 | -0.41 | 0.42x | 0.18 |
-| Plastic & reconstructive surgery | 20,588 | -0.37 | 0.02 | -0.48 | 0.21x | 0.24 |
-| Speech & language therapy | 20,588 | -0.09 | 0.16 | -0.33 | 0.85x | 0.15 |
-| Nutrition & dietitian | 20,588 | -0.23 | 0.18 | -0.46 | 0.58x | 0.13 |
-| Acupuncture, massage & naturopathy | 20,588 | -0.29 | 0.14 | -0.50 | 0.45x | 0.13 |
-| Urgent care & emergency | 20,588 | -0.22 | 0.02 | -0.30 | 0.47x | 0.20 |
-| Imaging & lab | 20,588 | -0.30 | 0.06 | -0.44 | 0.32x | 0.29 |
-| Pharmacy | 20,588 | -0.05 | 0.07 | -0.22 | 0.90x | 0.20 |
-| Home health & in-home care | 20,588 | -0.16 | 0.02 | -0.27 | 0.45x | 0.23 |
-| Nursing & assisted living | 20,588 | -0.10 | 0.04 | -0.20 | 0.60x | 0.25 |
-| Medical equipment & supplies | 20,588 | -0.20 | 0.08 | -0.35 | 0.49x | 0.27 |
-| Hearing & audiology | 20,588 | -0.23 | 0.16 | -0.46 | 0.64x | 0.12 |
-| Behavior therapy (ABA) | 20,588 | -0.36 | 0.14 | -0.59 | 0.32x | 0.22 |
-| Care coordination & community health | 20,588 | -0.27 | 0.01 | -0.38 | 0.46x | 0.18 |
-| General surgery | 20,588 | -0.30 | 0.09 | -0.47 | 0.38x | 0.21 |
-| Infectious disease | 20,588 | -0.33 | 0.01 | -0.45 | 0.23x | 0.21 |
-| Genetics & genetic counseling | 20,588 | -0.43 | 0.06 | -0.74 | 0.14x | 0.25 |
-| Hospice & palliative care | 20,588 | -0.30 | 0.02 | -0.40 | 0.44x | 0.23 |
+Payer yield (dry run, 2026-11-20): coverage weighted by what it pays relative to Medicare (commercial 1.43, Medicare 1.0, Medicaid 0.72, uninsured 0; published national averages), then 70% yield and 30% income as percentiles in the state, beside the live pay factor (insured rate and income).
+
+| Specialty | ZIPs | Viability score | Pay alone (live) | Payer yield (dry run) | Pay: top vs bottom fifth | Yield: top vs bottom fifth | Competition alone | HPSA (same ZIPs) |
+|---|---|---|---|---|---|---|---|---|
+| Primary care / family doctor | 20,588 | -0.01 | 0.06 | 0.12 | 1.08x | 1.18x | -0.18 | 0.21 |
+| Pediatrics (children) | 20,588 | -0.25 | 0.08 | 0.15 | n/a | n/a | -0.42 | 0.22 |
+| Women's health / OB-GYN | 20,588 | -0.26 | 0.10 | 0.17 | n/a | n/a | -0.43 | 0.15 |
+| Mental health & counseling | 20,588 | -0.03 | 0.11 | 0.18 | 1.20x | 1.29x | -0.30 | 0.19 |
+| Dental | 20,588 | -0.07 | 0.09 | 0.16 | 1.14x | 1.26x | -0.26 | 0.27 |
+| Eye care | 20,588 | -0.16 | 0.09 | 0.14 | 1.15x | 1.29x | -0.30 | 0.16 |
+| Chiropractic | 20,588 | -0.03 | 0.20 | 0.27 | 1.73x | 2.00x | -0.26 | 0.06 |
+| Physical & occupational therapy | 20,588 | 0.05 | 0.21 | 0.30 | 1.39x | 1.57x | -0.26 | 0.05 |
+| Orthopedics & sports injury | 20,588 | -0.17 | 0.11 | 0.18 | 1.27x | 1.44x | -0.31 | 0.04 |
+| Heart / cardiology | 20,588 | -0.36 | 0.03 | 0.09 | 1.02x | 1.31x | -0.47 | 0.25 |
+| Skin / dermatology | 20,588 | -0.38 | 0.09 | 0.16 | n/a | n/a | -0.55 | 0.22 |
+| Allergy & immunology | 20,588 | -0.30 | 0.01 | 0.05 | 1.20x | 1.73x | -0.40 | 0.17 |
+| Lung, breathing & sleep | 20,588 | -0.32 | 0.07 | 0.11 | 0.84x | 0.86x | -0.47 | 0.25 |
+| Digestive / gastroenterology | 20,588 | -0.33 | 0.01 | 0.07 | 1.04x | 1.37x | -0.44 | 0.20 |
+| Kidney / nephrology | 20,588 | -0.31 | -0.00 | 0.05 | 0.79x | 1.04x | -0.40 | 0.24 |
+| Diabetes & hormones | 20,588 | -0.34 | 0.03 | 0.09 | 0.97x | 1.14x | -0.48 | 0.18 |
+| Cancer care / oncology | 20,588 | -0.35 | 0.05 | 0.10 | 1.06x | 1.31x | -0.49 | 0.22 |
+| Arthritis / rheumatology | 20,588 | -0.36 | -0.01 | 0.04 | 1.01x | 1.41x | -0.46 | 0.21 |
+| Brain & nerves / neurology | 20,588 | -0.41 | 0.11 | 0.18 | 1.64x | 2.03x | -0.60 | 0.22 |
+| Ear, nose & throat | 20,588 | -0.33 | 0.01 | 0.06 | 1.15x | 1.52x | -0.44 | 0.23 |
+| Urology | 20,588 | -0.34 | 0.01 | 0.06 | 1.09x | 1.32x | -0.45 | 0.18 |
+| Foot & ankle / podiatry | 20,588 | -0.32 | 0.08 | 0.14 | 1.19x | 1.29x | -0.47 | 0.17 |
+| Pain management | 20,588 | -0.28 | 0.06 | 0.11 | 1.30x | 1.84x | -0.41 | 0.18 |
+| Plastic & reconstructive surgery | 20,588 | -0.37 | 0.02 | 0.07 | n/a | n/a | -0.48 | 0.24 |
+| Speech & language therapy | 20,588 | -0.09 | 0.16 | 0.25 | 1.40x | 1.57x | -0.33 | 0.15 |
+| Nutrition & dietitian | 20,588 | -0.23 | 0.18 | 0.27 | 1.52x | 1.75x | -0.46 | 0.13 |
+| Acupuncture, massage & naturopathy | 20,588 | -0.29 | 0.14 | 0.22 | 1.49x | 1.70x | -0.50 | 0.13 |
+| Urgent care & emergency | 20,588 | -0.22 | 0.02 | 0.08 | 0.80x | 0.87x | -0.30 | 0.20 |
+| Imaging & lab | 20,588 | -0.30 | 0.06 | 0.12 | 1.01x | 1.19x | -0.44 | 0.29 |
+| Pharmacy | 20,588 | -0.05 | 0.07 | 0.12 | 1.09x | 1.15x | -0.22 | 0.20 |
+| Home health & in-home care | 20,588 | -0.16 | 0.02 | 0.04 | 0.80x | 0.91x | -0.27 | 0.23 |
+| Nursing & assisted living | 20,588 | -0.10 | 0.04 | 0.07 | 0.96x | 0.89x | -0.20 | 0.25 |
+| Medical equipment & supplies | 20,588 | -0.20 | 0.08 | 0.13 | 1.14x | 1.21x | -0.35 | 0.27 |
+| Hearing & audiology | 20,588 | -0.23 | 0.16 | 0.22 | 1.42x | 1.60x | -0.46 | 0.12 |
+| Behavior therapy (ABA) | 20,588 | -0.36 | 0.14 | 0.22 | n/a | n/a | -0.59 | 0.22 |
+| Care coordination & community health | 20,588 | -0.27 | 0.01 | 0.05 | 0.91x | 0.93x | -0.38 | 0.18 |
+| General surgery | 20,588 | -0.30 | 0.09 | 0.17 | 1.20x | 1.46x | -0.47 | 0.21 |
+| Infectious disease | 20,588 | -0.33 | 0.01 | 0.05 | n/a | n/a | -0.45 | 0.21 |
+| Genetics & genetic counseling | 20,588 | -0.43 | 0.06 | 0.14 | n/a | n/a | -0.74 | 0.25 |
+| Hospice & palliative care | 20,588 | -0.30 | 0.02 | 0.07 | 0.98x | 1.10x | -0.40 | 0.23 |
 
 ## 3. For reference: patients need care here vs entry (the first run's finding)
 
