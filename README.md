@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-20
 
+- The back-test now also tries a "payer yield" version of ability to pay: each area's insurance mix weighted by what each kind of coverage typically pays (commercial above Medicare, Medicaid below, uninsured nothing). It is a test only; the live score is unchanged until it proves better.
 - The opportunity score now weights nearby supply per specialty, learned from the back-test. For everyday care (dental, mental health, eye care, therapy, chiropractic, nutrition, hearing) access still counts fully; for orthopedics, diabetes care, podiatry and general surgery it counts half; for specialists patients usually travel to (cardiology, GI, kidney, neurology and others, and also primary care, where local health need predicted outcomes far better than the head count) it is shown but not counted, because it did not track preventable hospital stays. Seven specialties whose score did not track that outcome at all (allergy, oncology, rheumatology, ENT, urgent care, imaging, hospice) now carry a caution and lower confidence.
 - New: preventable hospital stays per county from County Health Rankings (3,069 counties), used to test the need score.
 ### 2026-11-19

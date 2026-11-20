@@ -1,5 +1,5 @@
 // Back-test scorer on synthetic data: entry, catchments, HPSA matching.
-import { run, summarize, parseCsv, outcomes } from './backtest-entry.mjs';
+import { run, summarize, parseCsv, outcomes, payerYield } from './backtest-entry.mjs';
 let pass = 0, fail = 0;
 const check = (n, ok, d = '') => { if (ok) { pass++; console.log('  PASS  ' + n); } else { fail++; console.log('  FAIL  ' + n + (d ? ' :: ' + d : '')); } };
 const PC = '207Q00000X';   // family medicine
@@ -39,6 +39,13 @@ check('CSV reader keeps commas inside quotes', parseCsv('a,b\n"x, y",{"k":1}\n')
   check('counties under 30 give no correlation, never a made-up one', o[0].counties === 2 && o[0].pqi === null);
 }
 {
+}
+{
+  const all = payerYield({ insured: 1, employer: 100, direct: 0, tricare: 0, medicare: 0, medicaid: 0 });
+  const mcd = payerYield({ insured: 1, employer: 0, direct: 0, tricare: 0, medicare: 0, medicaid: 100 });
+  const half = payerYield({ insured: 0.5, employer: 100, direct: 0, tricare: 0, medicare: 0, medicaid: 0 });
+  check('payer yield: commercial pays more than Medicaid, uninsured scales it down', all === 1.43 && mcd === 0.72 && half === 0.715, JSON.stringify([all, mcd, half]));
+  check('payer yield: missing coverage counts give no figure', payerYield({ insured: 1, employer: null, medicare: 1, medicaid: 1 }) === null);
 }
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
