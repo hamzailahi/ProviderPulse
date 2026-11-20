@@ -10,7 +10,7 @@ Our clinician listings (NPPES NPI-1) compared with CMS Doctors and Clinicians (M
 | same state other zip | 527,868 | 7.0% | 32.2% |
 | other state only | 119,952 | 1.6% | 7.3% |
 | other state but nppes lists it | 18,918 | 0.3% | 1.2% |
-| not in medicare file | 5,914,377 | 78.3% |  |
+| not in medicare file | 5,914,380 | 78.3% |  |
 
 "other state only": every Medicare enrollment address is in a state our listing does not show, and NPPES lists no secondary site there. These are the likeliest moves.
 
@@ -295,3 +295,18 @@ Our clinician listings (NPPES NPI-1) compared with CMS Doctors and Clinicians (M
 | Dental | 3,459 | 59.2% | 29.9% | 10.1% |
 | Hospice & palliative care | 2,733 | 65.3% | 26.6% | 6.5% |
 | Genetics & genetic counseling | 628 | 71.5% | 20.7% | 5.4% |
+
+## What the apply step would do
+
+- Show the Medicare address for 138,150 clinicians whose Medicare enrollment is only in other states (the NPPES address is kept beside it).
+- List 1,002,366 other Medicare offices for clinicians in the right state but another ZIP ("also practises at").
+- Put the NPPES address back for 0 clinicians shown at a Medicare address who no longer qualify.
+
+## Applied 2026-11-20 (CMS release 2026-10-30)
+
+```
+moved|138150|115647
+restored|0
+other offices|1002333
+shown at a Medicare address now|138150
+```
