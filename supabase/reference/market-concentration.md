@@ -44,3 +44,7 @@ Run 2026-11-20 by scripts/hhi-build.mjs. CMS Doctors and Clinicians released 202
 | Hospice & palliative care | 121 | 101 (83%) |
 | Genetics & genetic counseling | 16 | 15 (94%) |
 | Behavior therapy (ABA) | 1 | 0 (0%) |
+
+## Applied 2026-11-20
+
+- 16938 cells stored in market_concentration.
