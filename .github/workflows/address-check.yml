@@ -1,0 +1,61 @@
+name: Clinician address check
+
+# Manual, read only (2026-11-20). Compares every clinician listing's state and
+# ZIP with CMS Doctors and Clinicians (Medicare enrollment, monthly) and
+# commits counts to supabase/reference/address-check.md; the per-NPI list is a
+# 7-day artifact. NPIs in check_npis are printed in the job log only.
+on:
+  workflow_dispatch:
+    inputs:
+      check_npis:
+        description: 'NPIs to print in the log (comma separated)'
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - name: Install psql 17
+        run: |
+          sudo apt-get -o Acquire::Retries=8 update -q
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Check
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          CHECK: ${{ inputs.check_npis }}
+        run: |
+          set -euo pipefail
+          W=/tmp/addr; mkdir -p $W
+          psql "$SUPABASE_DB_URL" -X -q -c "set default_transaction_read_only=on" -c "\copy (select npi, state, zip, city, taxonomy_code from public.provider_individuals) to '$W/ours.csv' csv"
+          psql "$SUPABASE_DB_URL" -X -q -c "set default_transaction_read_only=on" -c "\copy (select distinct parent_npi, state from public.clinic_secondary_locations where entity_type = '1') to '$W/secondary.csv' csv"
+          node --max-old-space-size=6144 scripts/address-check.mjs --ours $W/ours.csv --secondary $W/secondary.csv --report supabase/reference/address-check.md --csv $W/address-mismatches.csv --check "$CHECK"
+          gzip -f $W/address-mismatches.csv
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: address-mismatches
+          path: /tmp/addr/address-mismatches.csv.gz
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Commit the report
+        run: |
+          cat supabase/reference/address-check.md >> "$GITHUB_STEP_SUMMARY"
+          git add supabase/reference/address-check.md
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Clinician address check $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

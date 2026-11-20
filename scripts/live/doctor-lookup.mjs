@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { catalog, baseTitle } from '../lib/cms-catalog.mjs';
 
 const rows = readFileSync(process.argv[2], 'utf8').trim().split('\n').filter(Boolean).map(l => l.split('\t'));
-const get = async (u) => { try { const r = await fetch(u, { headers: { 'User-Agent': 'ProviderPulse-lookup' }, signal: AbortSignal.timeout(30000) }); return r.ok ? await r.json() : { _status: r.status }; } catch (e) { return { _error: e.message }; } };
+const get = async (u) => { try { const r = await fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProviderPulse-loader)', Accept: 'application/json' }, signal: AbortSignal.timeout(30000) }); return r.ok ? await r.json() : { _status: r.status }; } catch (e) { return { _error: e.message }; } };
 
 let pufApi = null;
 try {

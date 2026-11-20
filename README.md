@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-20
 
+- New manual job, Clinician address check: compares every clinician's listed state and ZIP with their current Medicare enrollment (CMS, monthly) and counts how many look moved, as a dry run before any listing changes. Prompted by doctors found listed in states they left years ago; the national registry keeps whatever address a clinician last entered.
 - New manual job, Doctor address lookup: for named clinicians, shows our listing beside the live national registry (with its last-updated date), their current Medicare enrollment addresses and where they billed Medicare, to check reports of outdated locations. Output stays in the job log.
 - Ability to pay now uses payer yield: the area's mix of commercial, Medicare, Medicaid and uninsured residents, weighted by what each kind of coverage typically pays, plus household income. It predicted where new clinicians set up better than the old insured rate in every specialty. Insights shows the coverage mix behind it.
 - The back-test now also tries a "payer yield" version of ability to pay: each area's insurance mix weighted by what each kind of coverage typically pays (commercial above Medicare, Medicaid below, uninsured nothing). It is a test only; the live score is unchanged until it proves better.
