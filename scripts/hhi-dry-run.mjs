@@ -52,10 +52,11 @@ const byNpi = new Map(); for (const c of clin.values()) { if (!byNpi.has(c.npi))
 const fa = await cmsUrl('27ea-46a8'); console.log('Facility affiliation', fa.release, fa.title);
 let FK = null, affRows = 0, hospRows = 0;
 for await (const o of rows(fa.url)) {
-  if (!FK) { FK = { npi: pick(o, /^npi$/), type: pick(o, /facility_type$/), ccn: pick(o, /affiliations?_certification/) || pick(o, /certification/) }; console.log('affiliation columns', Object.keys(o).join(','), FK); }
+  if (!FK) { FK = { npi: pick(o, /^npi$/), type: pick(o, /facility_type$/), ccns: Object.keys(o).filter(k => /certification/.test(k)) }; console.log('affiliation columns', Object.keys(o).join(','), FK); }
   affRows++; const cs = byNpi.get(o[FK.npi]); if (!cs) continue;
   if (!/hospital/i.test(o[FK.type] || '')) continue;
-  hospRows++; for (const c of cs) c.ccns.push(String(o[FK.ccn] || '').padStart(6, '0'));
+  hospRows++; for (const k of FK.ccns) { const v = String(o[k] || '').trim(); if (v) for (const c of cs) c.ccns.push(v.padStart(6, '0')); }
+  if (hospRows === 1) console.log('sample affiliation', JSON.stringify(o));
 }
 
 // 3. AHRQ hospital linkage (CCN to system). Direct, else the archive's copy.
@@ -68,7 +69,8 @@ const sysOf = new Map(), sysName = new Map();
 const lines = readFileSync(f, 'utf8').split(/\r?\n/); const h = splitCsv(lines[0]).map(x => x.trim().toLowerCase());
 const ix = (n) => h.indexOf(n);
 for (const l of lines.slice(1)) { if (!l) continue; const r = splitCsv(l); const id = r[ix('health_sys_id')]; if (!id) continue; sysOf.set(String(r[ix('ccn')]).padStart(6, '0'), id); sysName.set(id, r[ix('health_sys_name')]); }
-console.log('AHRQ hospitals in a system', sysOf.size);
+console.log('AHRQ hospitals in a system', sysOf.size, 'sample', [...sysOf].slice(0, 3));
+{ const all = [...clin.values()].flatMap(c => c.ccns); console.log('affiliation CCNs', all.length, 'matched', all.filter(x => sysOf.has(x)).length, 'sample', all.slice(0, 5)); }
 
 // 4. HHI per area and specialty.
 const out = [`# Market concentration (HHI): dry run`, '', `Run ${new Date().toISOString().slice(0, 10)} by scripts/hhi-dry-run.mjs. Read only; nothing written to the database.`, '',
