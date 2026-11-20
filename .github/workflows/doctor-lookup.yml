@@ -1,0 +1,49 @@
+name: Doctor address lookup
+
+# Manual, read only (2026-11-20). For each name, every NPI-1 listing that
+# matches, beside the live NPPES record, CMS Doctors and Clinicians and the
+# Medicare by-provider file (scripts/live/doctor-lookup.mjs). Output goes to
+# the job log only: named people are not committed to this public repo.
+on:
+  workflow_dispatch:
+    inputs:
+      names:
+        description: 'Names separated by semicolons'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  lookup:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - name: Install psql 17
+        run: |
+          sudo apt-get -o Acquire::Retries=8 update -q
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get -o Acquire::Retries=8 install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Lookup
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          NAMES: ${{ inputs.names }}
+        run: |
+          set -euo pipefail
+          : > /tmp/rows.tsv
+          IFS=';' read -ra LIST <<< "$NAMES"
+          for n in "${LIST[@]}"; do
+            n=$(echo "$n" | xargs)
+            [ -z "$n" ] && continue
+            cond=$(echo "$n" | tr '[:lower:]' '[:upper:]' | tr -cd 'A-Z \n' | xargs -n1 | awk '{printf "%sname ilike '"'"'%%%s%%'"'"'", (NR>1?" and ":""), $0}')
+            psql "$SUPABASE_DB_URL" -X -q -At -F $'\t' -c "set default_transaction_read_only = on; select npi, name, address, city, state, zip, primary_taxonomy from public.provider_individuals where $cond limit 20" >> /tmp/rows.tsv
+          done
+          echo "matches: $(wc -l < /tmp/rows.tsv)"
+          node scripts/live/doctor-lookup.mjs /tmp/rows.tsv
