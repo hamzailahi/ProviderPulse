@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 413 changes over 68 working days, 2026-05-13 to 2026-11-20.
-- 2026-08-19 onward: from the README changelog (239 entries, written for a reader).
+- 414 changes over 68 working days, 2026-05-13 to 2026-11-20.
+- 2026-08-19 onward: from the README changelog (240 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 78 |
+| November 2026 | 79 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-20
+
+- Clinicians who moved to another state now show at their current Medicare address: 138,150 moved (115,647 on the map), and 1,002,333 other Medicare offices feed "Also practises at".
 
 - The project log now reaches back to the first upload on 2026-05-13: the months before this changelog began are filled in from the code history, so the log covers 412 changes over 68 working days.
 - New manual job, AHRQ health systems discovery: records what AHRQ's Compendium of U.S. Health Systems files contain (which hospitals and physician groups belong to which system), the first step toward showing when competitors in an area share an owner.
