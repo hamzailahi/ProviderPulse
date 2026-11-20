@@ -1,12 +1,21 @@
 name: Clinician address check
 
-# Manual, read only (2026-11-20). Compares every clinician listing's state and
-# ZIP with CMS Doctors and Clinicians (Medicare enrollment, monthly) and
-# commits counts to supabase/reference/address-check.md; the per-NPI list is a
-# 7-day artifact. NPIs in check_npis are printed in the job log only.
+# Compares every clinician listing's state and ZIP with CMS Doctors and
+# Clinicians (Medicare enrollment, monthly) and commits counts to
+# supabase/reference/address-check.md; the per-NPI list is a 7-day artifact.
+# NPIs in check_npis are printed in the job log only. mode apply (and the
+# monthly schedule, the user's choice 2026-11-20) shows moved clinicians at
+# their Medicare address, keeps the NPPES one beside it, puts back any that no
+# longer qualify and refreshes their other Medicare offices
+# (scripts/address-apply.sh, migration 056).
 on:
+  schedule:
+    - cron: '23 6 4 * *'
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'dry_run or apply'
+        default: 'dry_run'
       check_npis:
         description: 'NPIs to print in the log (comma separated)'
         default: ''
@@ -18,7 +27,7 @@ jobs:
   check:
     if: github.repository_owner == 'hamzailahi'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -35,13 +44,8 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           CHECK: ${{ inputs.check_npis }}
-        run: |
-          set -euo pipefail
-          W=/tmp/addr; mkdir -p $W
-          psql "$SUPABASE_DB_URL" -X -q -c "set default_transaction_read_only=on" -c "\copy (select npi, state, zip, city, taxonomy_code from public.provider_individuals) to '$W/ours.csv' csv"
-          psql "$SUPABASE_DB_URL" -X -q -c "set default_transaction_read_only=on" -c "\copy (select distinct parent_npi, state from public.clinic_secondary_locations where entity_type = '1') to '$W/secondary.csv' csv"
-          node --max-old-space-size=6144 scripts/address-check.mjs --ours $W/ours.csv --secondary $W/secondary.csv --report supabase/reference/address-check.md --csv $W/address-mismatches.csv --check "$CHECK"
-          gzip -f $W/address-mismatches.csv
+          MODE: ${{ github.event_name == 'schedule' && 'apply' || inputs.mode }}
+        run: bash scripts/address-apply.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:

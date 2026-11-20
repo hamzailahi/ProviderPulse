@@ -1,0 +1,1194 @@
+# ProviderPulse project log
+
+Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
+
+- 237 changes over 35 working days, 2026-08-19 to 2026-11-20.
+
+| Month | Changes |
+|---|---|
+| November 2026 | 76 |
+| October 2026 | 131 |
+| September 2026 | 28 |
+| August 2026 | 2 |
+
+## 2026-11-20
+
+- Clinicians whose Medicare enrollment shows they moved to another state are now listed at their Medicare address, with a note on their page that the national registry still shows the old place. Clinicians in the right state but at other offices get an "Also practises at" list. The check reruns every month on CMS's new file, and anyone who no longer qualifies goes back to the registry address. The weekly registry refresh no longer overwrites a corrected address.
+- New: docs/project-log.md, every change since the project began with its date, for review. It is generated from this changelog and kept in step automatically.
+- New manual job, Clinician address check: compares every clinician's listed state and ZIP with their current Medicare enrollment (CMS, monthly) and counts how many look moved, as a dry run before any listing changes. Prompted by doctors found listed in states they left years ago; the national registry keeps whatever address a clinician last entered.
+- New manual job, Doctor address lookup: for named clinicians, shows our listing beside the live national registry (with its last-updated date), their current Medicare enrollment addresses and where they billed Medicare, to check reports of outdated locations. Output stays in the job log.
+- Ability to pay now uses payer yield: the area's mix of commercial, Medicare, Medicaid and uninsured residents, weighted by what each kind of coverage typically pays, plus household income. It predicted where new clinicians set up better than the old insured rate in every specialty. Insights shows the coverage mix behind it.
+- The back-test now also tries a "payer yield" version of ability to pay: each area's insurance mix weighted by what each kind of coverage typically pays (commercial above Medicare, Medicaid below, uninsured nothing). It is a test only; the live score is unchanged until it proves better.
+- The opportunity score now weights nearby supply per specialty, learned from the back-test. For everyday care (dental, mental health, eye care, therapy, chiropractic, nutrition, hearing) access still counts fully; for orthopedics, diabetes care, podiatry and general surgery it counts half; for specialists patients usually travel to (cardiology, GI, kidney, neurology and others, and also primary care, where local health need predicted outcomes far better than the head count) it is shown but not counted, because it did not track preventable hospital stays. Seven specialties whose score did not track that outcome at all (allergy, oncology, rheumatology, ENT, urgent care, imaging, hospice) now carry a caution and lower confidence.
+- New: preventable hospital stays per county from County Health Rankings (3,069 counties), used to test the need score.
+## 2026-11-19
+
+- The market opportunity score no longer rewards distance from competitors. The back-test showed new clinicians set up near existing ones, so "room from competitors" predicted the wrong direction. It is now shown as a fact (nearest same-specialty practice) and the score is health need, access gap and ability to pay, a third each. Insights also shows two plain scores: "Patients need care here" (need and access) and "A practice can make it here" (ability to pay).
+- New manual job, Preventable hospital stays: loads County Health Rankings' per-county count of hospital stays that good outpatient care usually prevents (per 100,000 Medicare enrollees), so the back-test can check the "patients need care here" score against it. CMS's own county rates for this are published as blank, so a CMS-based job was tried and removed.
+- The back-test now tests each half of the score against what it claims: the need half against avoidable hospital admissions, ER visits and readmissions by county, and the business half against where new clinicians started. Its first run found that new clinicians in 2021 to 2025 went mostly to areas already well supplied, not to the areas of greatest need.
+
+- A back-test job checks the need score against reality: it scores every ZIP as of the end of 2020 and compares that with where new clinicians started practising in 2021 to 2025, with the federal shortage designation tested the same way for comparison.
+
+- Drive-time access now counts people without a car. Each ZIP's adults are split by the Census share of households with no vehicle; that group is measured on walking times over real street and path networks, and both groups compete for the same clinicians (the multi-mode method of Mao and Nekorchuk, 2013). A version with transit-like slower travel is reported beside it as a check, not scored. States take this on at their next drive-time run.
+
+- The federal shortage-area (HPSA) score no longer counts toward any market score. HPSA is itself a population-to-provider ratio, the method the drive-time access figure improves on, so scoring with it was circular. Its weight is shared across need, access, payers and competition, and the HPSA figure still appears, marked "for comparison, not scored".
+
+- Puerto Rico can now be scored. ZIPs the CDC's health data leaves out get their centre from the Census and their adult count from Census age data, so market scores and drive-time access work there; need is scored from the age mix only, and each score says so.
+
+- Market scores in dense cities now count every competitor. A weekly job stores listing counts per ZIP and specialty code, and the score reads those totals instead of every listing, so areas like Manhattan no longer hit a row cap and refuse to score.
+
+- Loaded the site weights (migration 052): 1,273,119 clinicians count less than 1 at their main address. Corrected the docs: Puerto Rico's listings are in the directory; only the CDC health data is missing there.
+- Drive-time access now covers 49 of 51 areas, Alaska and Hawaii included; California and Illinois failed on map downloads and rerun next. The job now reads OpenStreetMap extracts from the repo's own mirror (new job: OpenStreetMap extracts mirror) instead of hitting Geofabrik for every run.
+- Market score can now count a multi-site clinician as 0.6 at the main address (migration 052: `clinician_weight` and a `provider_individuals_weighted` view), behind a test switch (`?weighted=1`) until a before/after check of real markets is approved. A new read-only job, Site weighting before and after, compares them.
+- Loaded `clinician_status` (migration 051): 1,640,076 Medicare-enrolled clinicians with graduation year, telehealth and practice sites. The site weighting was revised the same day: a clinician with several sites now counts 0.6 at the main address (primary care -15%, cardiology -22%, GI -19%, pediatrics -6% nationally). Nothing reads it yet; the score switches only after a before/after check of real markets.
+- Built the loader for step 1 of the scoring upgrade (dry run first, nothing written yet): CMS's Doctors and Clinicians file becomes a `clinician_status` table (migration 051), one row per clinician with graduation year, telehealth and practice sites. A clinician with several practice sites will count 0.6 at their main address instead of 1 (the larger of CMS's and NPPES's site count decides), and the share who graduated 35+ years ago will show on the provider side only, never to patients.
+- Started step 1 of the scoring upgrade: a read-only discovery job for CMS's Doctors and Clinicians file (active Medicare clinicians, every practice site, graduation year), before anything is loaded.
+- Look up a doctor or clinic by name or NPI. Patients get a "Find a doctor or clinic by name" tab beside "Find care": a ZIP or address is optional, nearby matches come first, closest name fit leads, and listings with no map location still appear. Providers get the same lookup on the portal's Competition page and behind a "Find a provider" button on the dashboard, with phone and fax, an optional state filter, and Show on map or Load this ZIP's market. Migration 050 adds the name indexes this needs (built the same day, 380 MB in all).
+- Drive-time access no longer leaves any ZIP out. The island and ferry ZIPs that kept the 10-mile count (in Louisiana, West Virginia, North Carolina, South Carolina, Virginia and Maryland) now get their drive-time figure too, flagged in the state reports where the road times look doubtful.
+
+## 2026-11-18
+
+- Drive-time access now covers the whole Census South: Louisiana, Oklahoma, Texas, Kentucky, Georgia, Florida, South Carolina, North Carolina, Virginia, West Virginia, Maryland, Delaware and DC joined Tennessee, Arkansas, Mississippi and Alabama. A few island and ferry ZIPs whose road times could not be trusted keep the 10-mile count.
+- Drive-time access now covers Arkansas, Mississippi and Alabama as well as Tennessee: market scores for ZIPs in all four states measure access by drive time instead of a 10-mile count.
+- Market scores in **Tennessee** now measure access by drive time. Each specialty's supply is the E2SFCA drive-time figure (clinicians weighted by how far they are by road and shared with every community that drives to them), stored per ZIP in a new table (migration 049) by the access job's `apply` mode. Other states keep the 10-mile count until their own run, and Insights says which method a score used.
+
+## 2026-11-17
+
+- Added a read-only drive-time access study, `access-dry-run.yml`: the Enhanced Two-Step Floating Catchment Area method (E2SFCA, Luo & Qi 2009) with a Gaussian distance decay and specialty-specific catchments (30, 60 or 90 minutes), routed on OpenStreetMap roads with OSRM. It compares that method with the market score's current 10-mile access ratio for every ZIP in one state, starting with Tennessee. The live score is unchanged until the results are reviewed.
+- The access study now checks its own routing: a ZIP whose drives are implausibly long for their straight-line distance (its centre snapped onto a road cut off from the network) is moved to the best-connected nearby road and routed again, and any still implausible is listed and left out of the comparison.
+- Added `state-listings-export.yml` (manual, read only): per state, a CSV of every organization and clinician with phone, fax and the organization fax, plus a second CSV of only those with a fax.
+
+## 2026-11-16
+
+- Added a `fax` column to `clinics` and `provider_individuals` (migration 047), filled from the NPPES monthly file by a new manual job, `fax-backfill.yml`. Fax numbers previously only showed up as a live lookup in the dashboard's popup and were never stored or searchable. The first check found fax numbers for about 1.05 million organizations and 2.49 million clinicians; the job can fill one table at a time so it fits the database's free disk.
+- The fax backfill finished on 2026-11-16. 1,051,651 of 1,992,043 organizations and 2,490,990 of 7,546,513 clinicians now have a stored fax number.
+- Providers now see fax numbers in the portal: beside each nearby competitor on the Competition tab, and for their own listing in the registry box on My listing. Patients do not see fax numbers.
+- **Fax via organization applied (migration 048):** 150,116 clinicians with no fax of their own now show the fax of the organization they work for, always labelled "via <organization>". Each one bills through that organization in Medicare and lists the same practice address. It shows in the portal (My listing, Competition), the dashboard map popups and Ask AI's provider lists and CSV (`fax_via_org` columns).
+- Added a read-only dry run, `fax-via-org.yml`, that counts how many clinicians with no fax of their own could show their organization's fax. It counts a clinician only when Medicare's reassignment list says they bill through that organization **and** their own practice address is that organization's address, and the fax would be labelled with the organization's name. Nothing is written yet.
+- The PECOS check found that CMS's public PECOS files carry no fax numbers. Only the Provider of Services file (facilities only, keyed by CMS certification number) has them.
+- Added a read-only check, `pecos-fax-discover.yml`, that lists CMS's PECOS and provider files and whether any carries a fax number.
+- Ask AI can now list providers with their contact numbers: `find_providers` searches up to 100 miles (25 before), shows phone and fax beside the nearest listings, counts how many carry a fax, and offers the whole list (name, NPI, address, phone, fax, distance; up to 5,000 rows) as a **Download CSV** card under the answer. Example: "list orthopedic clinics and doctors with fax numbers within 100 miles of 38018".
+- The market dashboard's map popups now show the stored phone and fax (labelled) straight away, before the slower live registry lookup finishes.
+
+## 2026-11-11
+
+- Fixed every nearby competitor in the Competition tab showing as "Your practice." Both `assets/directory.js` and `assets/portal.js` load as plain scripts and each declared a function named `displayName` with a different shape; portal.js's version (loaded second) shadowed directory.js's name-cleanup function for every call made from inside portal.js, including Competition's row builder, so a real competitor's name had no `.org_name`/`.first_name`/`.last_name` to read and fell back to the "your own listing" label. Renamed portal.js's helper to `listingName`; added a regression check to `scripts/test-display-names.mjs`.
+- Fixed "NPI null" on My NPIs and My listing for an account with no NPI on file (the admin/viewer demo listing): both now read "No NPI on file" instead of concatenating a null NPI into the text.
+
+## 2026-11-10
+
+- The weekly Census placement job was run over every listing still without a pin: 2,230 of 46,103 placed (1,035 exact, 1,195 the same address written another way). About 43,900 remain.
+- A read-only test of another free address source, Overture Maps' open address points (`overture-dry-run.yml`), reports how many of the remaining listings it could place, by state and by each record's source and licence. It writes nothing. Result: 740 of 43,873 (1.7%), a good share from sources marked proprietary, so nothing was loaded.
+- A read-only test of Nominatim, OpenStreetMap's free geocoder (`nominatim-sample.yml`): 500 unpinned listings, one request a second, counting only real buildings with the same house number and ZIP. Result: 132 of 500 matched, 41 within 50 m of the ArcGIS point.
+- The full Nominatim pass now runs in daily batches (`nominatim-run.yml`, about 3,000 listings a day, one request a second) over the 17,119 unpinned listings ArcGIS placed at a building. It records where the two sources agree within 50 m and writes nothing to the database; pins go in only after the operator has seen the final count.
+- Viewer accounts for marketing and partners: one login per person, listed in the new `VIEWER_EMAILS` Netlify setting and created by the operator in Supabase. A viewer gets the admin's "View as" switch between the patient app (as a guest), the provider portal's read-only demo listing and the market dashboard (Ask AI and Reports included), without the OIG review queue, and can save nothing.
+- A second check for the ArcGIS pins taken back because their ZIP has no Census area (single-institution ZIPs such as UCSF's 94143 and UConn Health's 06030): a pin goes back on the map only when another listing at the same street address already has a pin from another source, a point no other address shares, and the ArcGIS point is within 150 m of it (`arcgis-anchor.sh`, workflow modes `anchor_dry_run` and `anchor_apply`). Its dry run found 155 that would qualify, but almost all of them only agreed with an earlier ArcGIS pin, so by the operator's choice none were put back.
+
+## 2026-11-08
+
+- 66,371 more listings now have a map pin (56,144 clinicians, 10,222 organizations, 5 second practice addresses) from the operator's own ArcGIS run, loaded by the operator's decision without an Esri storage licence. Only building-level matches went in (the building itself or a suite in it, score 90 or more, in the listing's own ZIP, within 25 miles of the ZIP's centre); street-level estimates and ZIP or town centres were left out and handed back for review. About 33,000 listings still have no pin.
+- A stricter cut for those ArcGIS pins, at the operator's request (only points that are exactly the place): a pin stays only when ArcGIS scored the match 100 and the point lies inside the full-resolution 2020 Census area of the listing's own ZIP. Pins that fail go back to no pin and to the operator's review list (`arcgis-revert.sh`, workflow modes `strict_dry_run` and `strict_apply`; record of what was taken back in `supabase/reference/arcgis-reverted.csv`, no coordinates). Applied the same day: 53,322 pins stay; 13,049 were taken back (7,267 scored under 100, 4,456 fell outside their own ZIP area, 1,326 in ZIPs with no Census area to check against). About 46,000 listings now have no pin.
+
+## 2026-11-07
+
+- A new job, ArcGIS points apply, checks and then loads map pins the operator geocoded with ArcGIS on their own machine for listings no free source could place. It first runs a read-only accuracy check (is each point inside its ZIP, how far from the Census's point for the same address, how far from the ZIP centre), then can write only address-level matches to listings that still have no pin. The operator chose to load these from ArcGIS's keyless service without an Esri storage licence. Only the list of rows written, not the coordinates, is kept in the repository.
+
+## 2026-11-06
+
+- Address points from the National Address Database can now also be used in the partly public states, county by county: only counties the U.S. Department of Transportation's county status map shows wholly in the database with no non-public piece (all of North Dakota, most of Illinois, Kansas, Maryland, Colorado and Minnesota, two South Carolina counties, one South Dakota county). Counties marked not public domain, or split between the two, stay out. The first run placed 7,745 more listings. Baltimore City is now listed apart from Baltimore County (both public), so its listings can be placed too; that placed the last 170 Maryland listings the database could reach.
+- A new read-only job, NAD status discovery, saves what the U.S. Department of Transportation publishes about which parts of its National Address Database are public domain, so the partly public states can be checked county by county before any of their address points are used.
+
+## 2026-11-05
+
+- Listings without a map pin in the states whose National Address Database data is public domain now get the address point that database holds for them, when the ZIP, the house number and the street agree (the same one-word rule as the Census placement). Only rows still without a pin are touched, a point more than 25 miles from its ZIP's centre is refused, and every row written is listed so it can be found again. Partly public states (CO, IL, KS, MD, MN, ND, SC, SD) and non-public ones (HI, MI, NH, OR) are left for later.
+
+## 2026-11-04
+
+- A new read-only job, Export unplaced listings, writes every listing that still has no map pin to one CSV (public NPPES fields: NPI, name, specialty, address, phone), so the remainder can be reviewed or sent to another geocoder.
+- Listings without a map pin are now matched to an exact street address more often: the suite, unit or floor is dropped before the Census lookup, since it never changes the building. The first placement run after the NPPES catch-up had placed only 31 of 60,000 listings, half of them missed because of suite numbers.
+- A new read-only check, NAD dry run, measures how many of the listings without a map pin the U.S. Department of Transportation's National Address Database could place at their real address point, state by state, and how closely its points agree with the Census pins we already have. It writes nothing; loading would come only after the numbers are reviewed.
+- A second pass over hospital campus candidates (80 busy addresses not on the first list) found three hospitals already findable and one real gap: Phoenix Indian Medical Center now shows under Emergency rooms & hospitals, with a note that its 24-hour emergency room treats anyone while other care is for eligible American Indian and Alaska Native patients.
+- Ask AI and its reports now read Medicare procedures from the summed per-ZIP table when a question covers every specialty or the map is large, so the answer covers every ZIP on the map instead of stopping at a page limit and ranking whichever specialties came first alphabetically. A specialty or code question still reads clinician by clinician, and switches to the summed table if that read times out.
+- A whole-state search on the dashboard no longer stops partway on big states. Texas used to time out after 14,000 individual clinicians and say the map was partly loaded; when that happens now, the rest of the state loads ZIP by ZIP, spread across the whole state, up to the usual 25,000 per listing type.
+- The Procedures tab now loads Medicare billing for large areas (more than 100 ZIPs, a whole state included) from a table already summed per ZIP, specialty and code, so they no longer time out half loaded. Smaller areas still load clinician by clinician, which the Insights card needs, and switch to the summed table when a dense ZIP such as 02114 times out. The figures are the same either way. On a large area the Insights card says billing is read as ZIP totals instead of claiming it did not load (migration 046, applied and loaded the same day: 4.1 million summed rows, totals checked against the source, 1.2 GB).
+- More listings get a map pin: when the Census finds the same house number in the same ZIP and the street differs only by one small word (a missing North or South, "210" for "210th", "FL-54" for "State Rd 54", "Base Line" for "Baseline"), the pin is placed. A different street type or a misspelling still leaves the listing unplaced, so "New Creek Hwy" never lands on "New Creek Dr". The suite fix alone took the last placement run from 31 placed listings to 9,996. The first run with this rule placed 11,434 more, 9,770 of them through it.
+- The repository now ignores Python's `__pycache__` folders, so local test runs leave nothing to commit.
+- A new read-only job, Procedure summary, measures how small a per-ZIP Medicare procedures summary would be. It copies the procedures table out as a plain scan and adds it up on the GitHub runner, so the database does no sorting, and it writes nothing back. This is the first step toward a Procedures tab that loads whole states and dense ZIPs without timing out.
+- `docs/hipaa-readiness.md` lists every service that would see patient information (Supabase, Netlify Functions, the Anthropic API, Supabase's auth emails), what each vendor's BAA requires as far as their public pages say, and the order to sign them before patient sign-up opens.
+- After a city or multi-ZIP search, the dashboard now offers "+ Add neighbors", which adds a ring of bordering ZIPs around the whole searched area (up to 150 ZIPs). Before, the button only appeared after clicking one ZIP, and a new search no longer carries over rings from the last one.
+- The NPPES refresh and the weekly unmapped-listings job now wait out short Census geocoder outages (retrying after 30 seconds, then 1, 2 and 4 minutes) instead of stopping after two quick failures. The March-to-now catch-up had stopped three times on brief Census errors; each run kept what it had applied, about 38,000 to 380,000 changes at a time.
+- The dashboard's Ask AI tab matches the new design: "Ask about this market" with a plain note that every figure is checked and answers are a starting point, suggestion chips that wrap, and an Ask button.
+- The dashboard's map key has a new "Shade ZIPs by" picker: residents 65 and over, uninsured share, median household income, or listings shown per 10,000 residents. ZIPs fall into five bands with about the same number of ZIPs each, and ZIPs with no figure stay unshaded and are counted. The design's per-ZIP opportunity shading is not offered, because it would need a separate model run for every ZIP.
+
+## 2026-11-03
+
+- Hospital campus review: a shortlist of 165 likely campuses (a hospital-named organization at a hospital department code, 50+ clinicians at the address) is saved beside the full candidate list, and the read-only candidates job has a new "parents" step that lists the hospital-coded listings within about 20 miles of each, so the hospital NPI a campus bills under can be found before it is checked and added by hand. A third step, "lookup", prints what the directory holds for a list of NPIs.
+- Three hospitals now show under Emergency rooms & hospitals where patient search had none: Ascension Via Christi St. Joseph (Wichita), Harris Health LBJ Hospital (Houston) and Kaiser Permanente Ontario. Each bills under a parent hospital's NPI registered elsewhere, so the registry listed only pharmacies or units at the site. The review of the rest of the shortlist is in `supabase/reference/hospital-campus-review.md`.
+- Deaconess Midtown Hospital in Evansville now sits on its own campus on the map; its registry record carries the wrong ZIP and had been placed about 3.5 miles west (migration 045).
+- The dashboard's Demographics tab follows the new design: an area summary (population with its change since 2019, households, insured, uninsured, Medicare and Medicaid with a reminder that the last two overlap), an age-by-sex pyramid, coverage signals, household income across all 16 Census bands with the median's band marked, income and education shares, and a By ZIP table you can sort and click to see one ZIP while the rest of the area stays listed. Everything comes from the Census rows the tab already read; a failed lookup now says so with Try again instead of hiding the section.
+- The Health tab follows the new design too. It leads with the CDC PLACES measures the market model uses for your specialty, then six chronic conditions, each as the share of adults across the map's ZIPs (weighted by adults), the estimated number of adults, and a tick for the US median ZIP. Below that, a county card shows Original Medicare use (ER visits, inpatient stays, readmission rate, spending per person) and the Medicare Advantage share for each county holding the map's residents, with a picker between them. The full list of PLACES measures is still there, folded under "Every CDC PLACES measure".
+- The Procedures tab has the new look: a heading with how many ZIPs it covers, the four sources as large buttons with a line on what each one counts, a labelled search box, and examples to try (colonoscopy, skin biopsy, a list of codes, office visit). The result tables are larger and use one colour. Searching, code lists, the three views and the Excel download work as before. The live dashboard audit now also prints what the Demographics and Health tabs show.
+- The Reports tab follows the new design: report types as cards you pick, a larger "What should it focus on?" box with a hint and a counter, a separate box for procedure codes that says which codes it read, and the area in a strip with a link back to the map search. Codes pasted there go into the report's code lookup the same way codes in the focus box always have.
+- Insights opens with the new verdict card: the archetype as a badge with its strategy, the opportunity score large with a bar, confidence as signal bars, and the model's reasons numbered. "Places patients go" gains a bar showing how many kinds of place are missing, thin, typical or above the US rate, and the procedures card lists its top codes as a table with patient counts and average Medicare payment.
+
+## 2026-10-30
+
+- New look, from the design system the operator drew up: Inter for reading, a serif for headings, solid teal for actions and places, indigo for clinicians, 8px corners and soft shadows. Every page is now light only, and body text is 16px.
+- Patient search: labelled fields ("What do you need?", "Near", distance, insurance) instead of one fused bar, white result cards with numbered markers that match the map pins (indigo circle for a clinician, teal square for a place), and calmer loading, empty and error states.
+- The provider detail opens as a right-hand panel on desktop and a bottom sheet on phones, with Call (or Request appointment, for claimed listings) at the top instead of the bottom. Emoji icons are gone from the patient app.
+- Provider portal: the same look, with line icons in the side menu, serif page titles and a new **Next steps** card at the top of Overview. Its ring tracks four things: a complete listing, insurance added, the accuracy check run (remembered in this browser), and any other NPIs added.
+- Sign in and sign up: a two-column page with a short pitch beside the form that changes with the Patient / Provider tab (it folds to a headline on phones), underlined role tabs and sentence-case labels. The provider pitch page, the review queue and the not-found page share the new form styling.
+- Market dashboard: restyled to the same palette (teal actions and selected tabs, ink text, 8px corners) without changing its layout or density, and its status messages and buttons no longer start with emoji. The live dashboard audit now treats a status line that does not end in "..." as a finished result.
+- Fixes from the first live audit of the new design: the Near box is announced as a combobox (an accessibility error), the specialty and related-search chips are back to 44px tap targets on phones, the Sort menu is 16px so iOS no longer zooms, and the "Sign in" link under the sign-up form is a full-size target. The patient audit script now taps the start screen's specialty chips, which replaced the old tiles.
+- The dashboard's state and city status line no longer starts with a check mark (it was written as an escape code, so the first pass missed it); a load with failed parts now reads "Partly loaded" instead of a warning sign.
+
+## 2026-10-28
+
+- Patient sign-up can now be opened to named testers only (`PATIENT_SIGNUP_EMAILS`), so the operator can try the patient account with their own information while sign-up stays closed to everyone else. Document uploads stay off.
+
+## 2026-10-27
+
+- **An admin account with a "View as" switch.** One account, set by the new
+  `ADMIN_EMAILS` setting, gets a small menu on every page to move between the
+  patient app (seen as a guest), the provider portal, the market dashboard
+  and the review queue, which it opens without the shared password. The
+  switch only moves between pages; each page still checks on the server what
+  the account may do. In the provider portal the admin sees a read-only
+  demo practice, so every view can be looked at; nothing it changes is saved.
+
+## 2026-10-25
+
+- **A typed address no longer jumps to a random place.** The map service
+  always offers some match, so nonsense text once moved a search to a
+  street in Oklahoma. Typed text now has to fit the match (house number,
+  ZIP, and street or town names); otherwise the patient is asked to pick
+  from the suggestions or enter a ZIP.
+  A number that is not a 5-digit ZIP ("1234") now says so instead of
+  searching around some street number.
+- **Baptist Memorial Hospital-Collierville now appears under Emergency rooms
+  & hospitals.** Some hospital campuses have no registry entry of their own:
+  they bill under a parent hospital's number at another address, so the
+  federal registry lists the site only as, say, its pharmacy. A short
+  reviewed list adds those campuses to patient search, each with a note that
+  it bills under its parent. A new read-only job lists likely campuses for
+  review before any more are added.
+  The live patient app audit now also searches the hospitals door at 38017,
+  searches by street address, and tries an address that cannot be found.
+- **Listings that never appeared on the map now get placed.** A weekly job
+  finds directory listings stored without coordinates (mostly ones added by
+  the searched-ZIP backfill) and gives each an exact location from the
+  Census geocoder, up to 60,000 a week. Addresses with no exact match stay
+  off the map rather than at a guessed point. Each run's summary says why
+  the rest did not match (no match, a fuzzy match, another ZIP).
+- **The server no longer writes searched addresses into its logs.** The
+  geocoder used to log the address it looked up, and patient searches can
+  contain a home address. It now logs only which service answered.
+- **Rejecting an added NPI in admin review now takes it off the account.**
+  Before, a rejected NPI stayed attached as blocked, so the real practice
+  could never claim it. The rejection and its reason are kept in the audit
+  log, and the confirmation says what will happen.
+- **The retired medicalpracticemap site no longer rebuilds.** It was disabled
+  in Netlify, and its build settings now skip every build, so pushes to the
+  repo only deploy providerpulse-v2.
+- **My NPIs reads more clearly.** The add form and its result now sit inside
+  their card, and a listing held for review says plainly whose name the
+  registry shows and whose name the account is in.
+- **The directory now refreshes itself from NPPES every week.** A new
+  scheduled job reads NPPES's weekly files and adds new organizations,
+  clinicians and secondary sites, updates listings that moved or changed
+  name, phone or specialty, and removes NPIs that NPPES deactivated. New and
+  moved addresses get coordinates only from an exact Census match; an
+  address the Census cannot match exactly is kept off the map rather than
+  pinned at a guess. When CMS's download site is down it falls
+  back to the NPI Registry API, it refuses to write a week whose numbers look
+  abnormal, and each run's summary is committed to the repo.
+- **The directory will catch up on everything since March as soon as CMS's
+  NPPES download site is back.** It has been down for maintenance since
+  2026-10-24. A daily check notices the monthly file the morning it returns
+  and applies every new, changed and deactivated NPI since the March load,
+  continuing across runs until done.
+- **Patients can search from a street address or their current location.**
+  The Near box now takes a ZIP, an address (with suggestions as you type) or
+  the location button. Distances on results and in the detail sheet are
+  measured from that point in straight-line miles. The address stays in the
+  browser for this visit only; our servers see the ZIP and nothing else.
+- **One provider account can now hold many NPIs.** A practice with several
+  offices, a pharmacy chain or a group with several clinicians adds each
+  NPI on the portal's new My NPIs page. We check each one against the
+  federal registry and the OIG exclusion list like a new sign-up. It goes
+  live at once when the registry lists the account holder (as the clinician,
+  or the organization's authorized official); otherwise it waits in the
+  admin review queue with the reason shown. Each NPI keeps its own listing
+  (hours, insurance, availability), edited in My listing through a switcher,
+  shows on the patient map as a verified listing once approved, and can be
+  booked; the provider sees which NPI each request was for. New tables
+  `provider_npis` and `provider_npi_insurance` (migration 044, applied
+  the same day, so adding NPIs is switched on).
+- **Security fix: signed-in users could change columns the app never lets
+  them change.** Through the database's public API, a provider could clear
+  their own OIG review hold or change their NPI, mark a location verified,
+  and a patient could confirm their own appointment request. Migration 043
+  limits signed-in users to the exact columns the app writes and checks
+  appointment status changes in the database by who is asking. Nothing the
+  app does changed.
+
+- **The start screen no longer lists care twice.** Under the 13 kinds of
+  care, a second grid repeated dental, mental health and urgent care. It is
+  now one line of specialties no door already covers (primary care, skin,
+  eyes, children, heart, orthopedics, women's health) plus a link to all 44.
+
+- **Search understands more of what patients type.** Misspelled specialties
+  ("dermotologist", "cardiolgist") now find the right one, as do
+  "obstetrician", "midwife", "opthamologist", pharmacy names such as
+  Walgreens and CVS, "covid test" (urgent care) and "help at home" (home and
+  senior care). Result cards no longer repeat the city when a listing
+  stores its whole address in the street line. Found by today's live audit,
+  which also confirmed "knee pain" now leads with orthopedic and sports
+  medicine physicians, "pharmacy" with pharmacies and "urgent care" with
+  urgent care clinics.
+
+- **Market Insights shows the places patients go.** A new card counts the
+  pharmacies, urgent cares, hospitals, labs, home and senior care agencies,
+  equipment suppliers, low-cost clinics and other facilities in the same
+  area the market score uses, per 10,000 adults, against the national rate,
+  and flags what is thin or missing ("Thin or missing here: urgent care,
+  low-cost clinics"), with the nearest site for each. Ask AI reads the same
+  figures. The national rates come from the quarterly benchmark job (new
+  migration 042; first written today, 101,251 pharmacies nationally, 3.9
+  per 10,000 adults). Live for Haltom City (76117): pharmacies typical (322),
+  labs above the US rate, mental health and addiction below, low-cost
+  clinics thin (25 sites, 0.32 per 10,000 adults against 1.57).
+- **Market scores reflect the re-filed care types.** Benchmarks were rebuilt
+  after the change, so urgent care no longer counts surgery centers and
+  ambulances, and pharmacy no longer counts pharmacies the public cannot use.
+
+- **Providers can check their own listing's accuracy.** A "Listing accuracy
+  check" card on the portal Overview runs the same engine as the Directory
+  Accuracy audit on the provider's own NPI and address: the federal
+  registry, Medicare activity, saved locations and patient reports. It
+  shows a plain verdict and what to fix, such as adding the registered
+  address as a location or updating NPPES after a move. Nothing is saved,
+  and nobody can check another provider's listing.
+
+- **Providers see their Medicare footprint.** The portal's Overview now
+  lists a provider's top Medicare codes for 2024 (services, patients,
+  average payment) next to the same codes within 10 miles: how many other
+  clinicians and centers bill them, the provider's share, and what doctors
+  and facilities were paid nearby, shown separately because a blended
+  figure mixes the two. If the nearby figures fail to load, only the
+  provider's own are shown.
+
+- **Patients can report a wrong listing.** Every provider's detail sheet has
+  "Report a wrong listing": one tap says it is closed, moved, has the wrong
+  phone or specialty, or is not taking patients. Nothing else is collected
+  (no text, no account, no IP address). The Directory Accuracy audit now
+  counts the last year's reports as weak evidence, never a verdict on its
+  own. New table `listing_reports` (migration 041), applied by a new manual
+  "Apply migration" job.
+
+- **Searching a condition offers the rest of the care that goes with it.**
+  "Diabetes" still lists diabetes specialists, with a row of one-tap
+  searches under the count: primary care, dietitians, a diabetic eye exam,
+  foot care, pharmacies and supplies. Fifteen conditions have one (heart
+  health, recovery from addiction, pregnancy, cancer, back and joint pain,
+  breathing, memory, kidney care, autism, stroke and others), and the row
+  stays while the patient works through it. Fixed in the same change:
+  switching from a specialty search to a procedure search could stop the
+  results from drawing.
+
+- **Provider pages say whether a clinician still sees Medicare patients.**
+  The detail sheet now shows "Billed Medicare in 2024 (812 services)" or
+  "Last billed Medicare in 2019 ... call to check", and whether they are
+  enrolled in Medicare, from CMS's public claims and enrollment files. A new
+  public lookup, `npi-activity`, returns only those fields; a clinician with
+  no record shows nothing rather than "inactive".
+
+- **Patients can search by procedure.** Typing "colonoscopy", "cataract
+  surgery", "mammogram", "knee replacement" or about 25 other procedures
+  lists the clinicians and centers nearby who billed traditional Medicare
+  for it in 2024, the busiest first ("Billed Medicare 468 times in 2024, at
+  least 98 patients"). A note says what the numbers leave out (mostly 65
+  and over; CMS hides anyone under 11 patients for a code) and links to the
+  whole specialty. Nearest first is one tap away.
+
+- **Patients start from what they need.** The start screen leads with 13
+  kinds of care, and typed words go to them: "pharmacy" now lists
+  pharmacies instead of individual pharmacists, "urgent care" lists urgent
+  care centers instead of emergency doctors and surgery centers, "x-ray"
+  and "blood test" list labs and imaging centers. "Doctors & clinics" opens
+  the specialty list. Results are in "best match" order, so "knee pain"
+  leads with orthopedic and sports medicine physicians rather than athletic
+  trainers; "Nearest first" is one tap away. Listings at one address fold
+  into one card ("+5 more at this address"). A **Low-cost clinics** filter
+  appears whenever a search finds FQHCs, community or rural health clinics
+  or health departments, and "free clinic" or "no insurance" turns it on.
+  Emergency and ambulance searches say to call 911. A ZIP typed into the
+  search bar now counts when a tile is tapped.
+
+- **Every listing type now has a care type ("door"), approved from the
+  care-types spreadsheet.** Thirteen doors, from Doctors & clinics to Rides &
+  transport, each built from official NUCC codes, with a low-cost flag on
+  FQHCs, community, migrant and rural health clinics, health departments and
+  charities, and a note on who can use VA, military and tribal sites. 21
+  specialty assignments changed with it: surgery centers and ambulances are
+  no longer "urgent care" (an urgent care search had returned about 13,900
+  surgery centers), four pharmacy types the public cannot walk into left
+  Pharmacy, and 13 facility types that belonged nowhere (adult mental health
+  clinics, birth centers, MRI centers, pain clinics and others) now have a
+  specialty. The benchmarks were rebuilt the same day.
+
+- **The monthly Medicare enrollment import works again.** CMS started adding
+  a release date to its dataset titles, so the import could no longer find
+  "Medicare Monthly Enrollment" and its October 18 run failed. It now ignores
+  the date, as the other CMS imports already did.
+## 2026-10-24
+
+- **Pharmacies, urgent cares, clinics and hospitals now show a phone
+  number.** The organization phone job ran: 1,894,376 of 1,901,951
+  organizations (99.6%) got their practice phone from the federal NPI
+  Registry, and patient search shows it with a Call button on phones.
+- **Busy areas load instead of timing out.** In dense places such as
+  Manhattan or central Fort Worth, a 10-mile search could exceed the
+  database's 3-second limit on one part of the directory, so results came
+  back incomplete or not at all. A part that times out is now asked again
+  as four smaller areas, then sixteen, then 64, for up to about seven
+  seconds; after that the list shows what loaded as "At least N". Only what still
+  fails after that is reported as missing. The portal's Competition tab
+  uses the same search.
+- **Provider details show who else is at the same address.** Opening a
+  listing now lists the other registry entries at that spot, places first,
+  with their type and phone number, and says they may be separate
+  practices, since the registry doesn't record who works where. The
+  details also show the official type name instead of the stored text.
+- **Map pins match the list.** The results on screen get numbered pins that
+  match their cards, teal for places (clinics, pharmacies, hospitals) and
+  indigo for individual clinicians, with a key in the corner. Results
+  further down the list are small dots. Hovering a card raises its pin.
+- **On phones the search folds away after you search.** The form, which
+  used to fill two thirds of the screen above the results, folds into one
+  line ("Dental · 76117 · 10 mi"). Tap it to change the search. The first
+  result now starts near the top of the screen.
+- **Compact result cards.** A desktop screen now holds about six results
+  instead of three and a half. Cards drop the initials circle, show the
+  official name of what each provider is ("General Practice Dentistry",
+  "Urgent Care Clinic"), and put the phone number in the details line. On
+  phones a Call button carries it. A colored left edge tells places (teal)
+  from individual clinicians (indigo).
+- **Anyone can search for care without signing in.** The find-care app used
+  to open on a sign-in card, and with patient sign-up closed a visitor
+  could not get past it. Now search, results, provider details and phone
+  numbers are open to everyone. Requesting an appointment, viewing
+  requests, the account page and the AI helper ask you to sign in. Searches
+  by visitors who are not signed in are not added to the demand log.
+- **Search results say what they really know.** The "Accepting new
+  patients", insurance, telehealth and verified filters only work on
+  practices that have claimed their listing, so they now appear only when a
+  search finds some, each showing how many it would keep. When part of the
+  directory doesn't answer, the count reads "At least N" and the note offers
+  Try again.
+- **Listing names read like names, not legal filings.** Results and the
+  portal's Competition list drop suffixes such as PLLC, Inc. and P.A.
+  ("Haltom Dental, P.A." shows as "Haltom Dental"), keep acronyms like CVS
+  in capitals, and write "FT WORTH" as Fort Worth.
+- **On phones the Map button no longer covers results.** It used to float
+  over the list and sat on the first result's Call button. It now sits in
+  the results count row, which stays pinned under the header while you
+  scroll. On the map it still floats at the bottom, where nothing is under it.
+- **The find-care app is easier to use with a keyboard, a screen reader or a
+  thumb.** Each page now has a main heading, and the results count is a
+  heading too. The sign-in card's "Create an account" link and the
+  initials circles meet contrast standards. Filter chips and result cards
+  show a focus ring, and Enter or Space on a focused card selects it. On
+  phones, buttons and chips are at least 44px tall. The sign-up form's
+  labels grew from 11px to 12.5px.
+- **Phones no longer zoom in when you tap a search field.** The find-care
+  search bar, the sort menu and the "Not sure who to see?" box used text
+  smaller than 16px, so iPhones zoomed the page on every tap. They are 16px
+  on phones and small tablets now.
+- **A live audit of the patient app.** A new manual job, "Live patient app
+  audit", opens the deployed find-care app as a visitor and as a placeholder
+  patient, on a desktop and on a phone (once on slow 4G). It runs about a
+  dozen real searches and opens provider details, then records timings,
+  result counts, phone coverage, accessibility problems and phone layout
+  issues. It writes nothing: search logging and the AI helper are answered
+  locally.
+- **A job to give organizations a phone number.** Pharmacies, urgent cares,
+  hospitals and other organizations have no phone in the directory. The new
+  "Organization phone backfill" job reads each one's practice phone from the
+  NPPES monthly file. Run `dry_run` first: it writes nothing and reports how
+  many would get a number. `apply` adds the column (migration 040) and fills
+  it in batches, and it refuses unless the free disk you enter covers the
+  rewrite. Patient search shows organization phones once it has run.
+  Both NPPES jobs now find the monthly file more reliably: when the download
+  page offers no recognizable link, they print the page's text, then try the
+  standard file names for the last three months and log each answer, instead
+  of stopping without a message.
+- **Organization phones can come from the NPI Registry API.** CMS's NPPES
+  download site is down for maintenance, and every monthly file returns "not
+  found". The phone job now has a `source` choice: `api` asks the federal NPI
+  Registry for every ZIP in the directory instead (a few hours). Large ZIPs
+  are split so none is cut off at the API's 1,200-result limit, and a ZIP
+  that fails is reported, never counted as having no organizations. A full
+  `api` dry run keeps its results for a week, so `apply` can reuse them with
+  `from_run` instead of asking again. `zip_limit` tries the largest ZIPs
+  only, as a quick test. The registry turned the first full pass away for
+  asking too fast, so the job now paces itself (about 4 requests a second)
+  and backs off whenever it is refused.
+- **Patient search shows clinicians' phone numbers.** Results now carry the
+  practice phone from the federal registry for individual clinicians, with a
+  tap-to-call link; before, only claimed listings showed one. Organizations
+  have no phone in the data yet.
+- **"Claim this listing" fills in the NPI.** The dashboard's claim link opens
+  the pitch page, and its sign-up button now opens the provider form with the
+  NPI already entered (it still has to pass the registry check).
+- **Competitor counts list every ZIP.** Ask AI's competitor lookup showed
+  only the 20 ZIPs with the most listings, so a report read ZIPs missing from
+  that list as having no GI listings. Every ZIP is now listed; on a map
+  search each map ZIP appears, with 0 only when the lookup completed and
+  "unknown" when it did not.
+## 2026-10-22
+
+- **"Missed screening" figures now show the share that missed.** For colon
+  screening, checkups and dental visits, low uptake is what signals need, so
+  the model labels them "missed colon screening" and so on, but it reported
+  the share who were screened. A Haltom City report said 58.8% of adults had
+  missed colon screening when 58.8% were screened (about 41% missed). The
+  model now reports the share missing with the uptake beside it, and Insights
+  no longer reads "low missed colon screening".
+- **The opportunity score now counts every ZIP within 10 miles.** It used to
+  count the ZIP and its 10 nearest ZIPs, which in a city span only a few
+  miles, while Insights and Ask AI called the area "within 25 miles". A Haltom
+  City report put 9 GI clinicians in "the 25-mile catchment" while listing 62
+  in Fort Worth's medical district 6 miles away. Now the score counts every
+  ZIP within 10 miles (at least the 10 nearest, out to 25 miles in rural
+  areas; at most 60 ZIPs or about 1 million adults in dense cores), and
+  Insights and Ask AI describe it by its real reach. Every specialty's score
+  can move. Haltom City GI: 36 ZIPs within 9.9 miles, 122 clinicians, score 45
+  (saturated), where it read 9 clinicians and 60 (balanced). A listing load
+  that fails even after a retry now refuses to score instead of undercounting
+  competitors. Measured live: 0.8 to 2.5 seconds for Haltom City, Fort Worth,
+  Collierville and Helena, 13 seconds for Manhattan (capped, with a caveat).
+  The procedures panel check runs this score live for five ZIPs.
+- **Competitor lists no longer read a failed lookup as "no practices".** One
+  failed request for organizations made a report say no GI practices or
+  surgery centers came back. A failed page is now retried once, and if it
+  still fails the organization count is reported as unknown, not zero.
+- **The organization side of a Medicare fee is labelled by who billed it.**
+  For scopes it is the surgery center's facility fee, but for pathology it is
+  labs and for ultrasound imaging centers. The assistant now gets those
+  biller types, plus a note that these averages run below the fee schedule
+  (Medicare pays 80% after sequestration, and a second scope in a session is
+  paid less).
+- **Each report starts a fresh conversation.** The Reports tab used to write
+  into whatever Ask AI chat was open, so a new report inherited the old
+  chat's tool calls and notes (one repeated an earlier chat's batched code
+  lookups and its stale "the list exceeded the query length" note). Write it
+  now sends no earlier messages; the old chat stays on screen above a divider.
+- **Capped incomes read "$250,000 or more".** The Census caps a ZIP's median
+  household income and stores the cap as 250,001, which a report printed as
+  "$250,001" for Southlake (76092). The Demographics tab, Insights and Ask AI
+  now say "$250,000+", and an area average that includes a capped ZIP says it
+  is a floor.
+- **The live dashboard audit's report scenario records which brief is
+  live**: whether the deployed report brief checks codes against the lookup's
+  echo, and how many earlier chat messages a report sends. Its neighbor ring
+  steps still time out (no ZIP is selected after a city search); a first
+  attempt to click 76117 before them hung the run and was taken out.
+- **City searches keep ZIPs with no official centre.** A ZIP that Census
+  maps do not place, such as a PO-box ZIP like 76199 in Fort Worth, stays
+  in the area rather than being treated as a stray. A few mistyped ZIPs on
+  listings stay too (26109, 75179 and 76100 in a Fort Worth search), which
+  is the price of never dropping real ones.
+- **Doctor fee and facility fee are shown apart.** A procedure done in a
+  surgery center is billed twice: the physician's professional fee and the
+  center's facility fee. The blended average mixed them (colonoscopy with
+  biopsy, 45380, read $236 while the doctor's own fee was about $103). The
+  Procedures tab's code list now has Doctor fee and Facility fee columns, the
+  Excel download adds both averages and both estimated totals, and Ask AI and
+  reports quote the clinician's fee for what a physician is paid.
+- **A pasted code list reaches Ask AI whole.** The assistant's procedure
+  lookup cut its search text at 80 characters, about 13 codes, so a 46-code
+  list arrived chopped mid-code and the AI split it into chunks, then
+  misreported which codes it had asked for. A list of up to 100 codes now
+  goes through in one call per source, and the result echoes the codes
+  requested, those with rows and those without, so the AI checks gaps against
+  that list. A code list sent to a hospital source is refused with advice to
+  search by words, since hospitals report payment groups.
+- **Competitor lists in Ask AI and reports are now complete.** The lookup
+  used to load every listing nearby, stop at 4,000 per table and only then
+  pick the specialty, so around Fort Worth it named 9 GI organizations and
+  no gastroenterologist, and a 25-mile search that timed out read as "none
+  found". It now asks only for the specialty's codes, covers a radius or
+  every ZIP on the map, lists practices and surgery centers separately from
+  individual clinicians with counts per ZIP, and says when a lookup was
+  incomplete instead of calling the area empty.
+- **Medicaid amounts per claim come with a warning.** A Medicaid claim line
+  can carry several units, so paid per claim line is not a price per
+  service. Where it runs more than three times Medicare's local average for
+  the same code (an ECG showed $205.76 per claim line against about $10),
+  the AI, the code-list view and the Excel file flag it as unreliable.
+
+- **Reports cover the whole map and everything you ask.** Four fixes after
+  a Haltom City report came back thin. Clicking one ZIP to see its numbers
+  no longer shrinks the AI's area to that ZIP; the search and every neighbor
+  ring always count, and the Report builder now says "N ZIPs on the map".
+  The Focus box takes 2,000 characters with a counter (it silently kept only
+  the first 400, which dropped half of that request). Procedures are read
+  across the map's ZIPs instead of within 10 miles, and a pasted list of
+  codes is reported code by code, naming the ones with no data. Reports gain
+  a Medicare population section: the Medicare-eligible age bands (60-64, then
+  65-69 up to 85 and over) and the Health tab's county Medicare figures
+  (traditional vs Medicare Advantage enrollment, ER visits, hospital stays,
+  readmissions, nursing facility, home health and hospice use). The live
+  area-profile check prints both.
+
+- **The live dashboard audit can run one diagnostic on its own.** Its new
+  `only: report-context` option searches "haltom city, tx", adds two
+  neighbor rings, presses Write it on the Reports tab and records which ZIPs
+  the request tells the AI are on the map. It was added after a Haltom City
+  report covered 8 ZIPs while the map held many more.
+
+## 2026-10-21
+
+- **Download all for a code list.** With codes pasted into the Procedures
+  tab, a Download all (Excel) button saves one spreadsheet: notes, Medicare
+  by code, by clinician (everyone, not just the top 200) and every raw row,
+  Medicaid by code and by row, totals by ZIP, and the hospital outpatient and
+  inpatient payment groups at the nearest hospitals that match your codes'
+  topics (GI codes bring the Upper, Lower and Complex GI groups and the GI
+  inpatient groups, for example). Hospitals report payment groups rather
+  than CPT codes, so the hospital toggles now say why a code list shows
+  Medicare clinicians and Medicaid. Copy as CSV still copies the view on
+  screen.
+
+- **City searches no longer pull in far-off ZIPs.** A few mis-addressed
+  listings used to drag distant ZIPs onto the map: "Fort Worth, TX" brought
+  in an Austin ZIP, one in West Virginia and Stephenville, and they flowed
+  into Demographics, Health, Procedures and the AI's area (Austin's ZIP was
+  the third busiest in a Fort Worth code list). Most were mistyped ZIPs on
+  listings that really are in Fort Worth. A ZIP with under 1% of the
+  listings whose official centre lies more than 25 miles from every main ZIP
+  of the search is now kept out of Demographics, Health, Procedures and the
+  AI's area; the listings stay on the map where their addresses are, and
+  only listings that are themselves far away are removed. The map says
+  which. ZIP and state searches are unchanged, and searches of several
+  cities keep each city whole.
+
+- **Paste a list of codes into the Procedures tab.** Type or paste two or
+  more CPT or HCPCS codes into the Procedures search box (commas, spaces or a
+  column straight from a spreadsheet) and the tab switches to a code list for
+  every ZIP on the map: by code (Medicare billers, patients, services, office
+  vs facility, average allowed and paid, estimated Medicare paid, then
+  Medicaid claim lines and paid), by clinician (who bills them, ranked by
+  estimated Medicare paid) and by ZIP, each with a Copy as CSV button. Codes
+  with no rows are named with the reason. It loads only those codes, so it is
+  quicker than the full procedures load. A single code or a word works as
+  before.
+- **The live dashboard audit now tries a code list.** It searches Fort
+  Worth, pastes a GI practice's 46 codes into the Procedures tab and records
+  each view, its timing and every request.
+
+- **Procedure codes around a ZIP, as a spreadsheet.** A new manual job
+  pulls any list of CPT or HCPCS codes within a chosen radius of a ZIP:
+  traditional Medicare by clinician (patients, services, average allowed
+  and paid, office or facility), Medicaid by ZIP and specialty, and the
+  gastrointestinal and endoscopy payment groups at nearby hospitals. It
+  reads only and leaves its CSVs on the run. First used for a GI code set
+  around Haltom City and Fort Worth.
+
+## 2026-10-20
+
+- **Longer reports, with a health section.** Reports now run to about
+  1,200 words instead of 450. Writing that much at once would hit the
+  server's time limit, so the AI writes a report in two or three parts
+  and they join into one document card (it says "the rest is on its way"
+  until the last part lands). Every report also gets a "Health of the
+  area" section from the CDC health survey on the Health tab: the
+  measures behind the specialty's need score first, then diabetes,
+  obesity, high blood pressure, depression, heart disease and COPD, each
+  as a share of adults and an estimated number of adults for the area.
+  Memos asked for in chat stay short.
+- **Ask AI and reports look at the whole area, not one ZIP.** A new
+  area profile reads every ZIP loaded on the map (the search plus any
+  neighbor rings). When the map holds fewer than 8, the nearest ZIPs are
+  added and named. It returns people, households, income, poverty, age,
+  insurance coverage, education and population change; every CDC PLACES
+  health survey measure as a share of adults and an estimated count; and
+  Medicare and Medicaid procedure totals and top codes. Each comes as
+  area totals plus a line per ZIP, so an answer can say which neighbor is
+  oldest, least insured or busiest. Market questions and every report now
+  use it, and reports gain an "Area profile" section. A failed read is
+  reported as incomplete, never as zero. The procedures tool can also
+  search the map's ZIPs instead of a radius.
+- **Procedures on the Market tab.** The Insights view that the portal's
+  Market tab opens on now has a "Procedures and reimbursement" card for the
+  specialty in focus: how many of its clinicians on the map billed
+  traditional Medicare, their services, about what Medicare paid, the top
+  five codes with patients and average payment, and a Medicaid line where
+  Medicaid pays that specialty here, with links to the full Procedures tab
+  and to Ask AI. Clinicians are matched by their own NPI and specialty code,
+  the same definition the map and the scores use.
+- **Ask AI and reports can read procedure data.** The assistant used to
+  say ProviderPulse had no procedure volumes or reimbursement. It now has a
+  procedures tool over the same four sources as the Procedures tab (Medicare
+  clinicians, Medicaid, Medicare hospital outpatient and inpatient), so it
+  can answer "what do gastroenterologists bill within 10 miles of 76104 and
+  what does Medicare pay?" with real codes, patients, services and average
+  payments (43239, 2,762 patients, $60.65 average Medicare payment), and it
+  carries each source's limits (traditional Medicare only, small counts
+  withheld). Reports now include a "Procedures and reimbursement" section.
+  Commercial insurance rates are still not available.
+- **Why Fort Worth shows no Medicaid deliveries under 59400.** Texas
+  Medicaid does not bill the global delivery codes (59400, 59510, 59610) at
+  all. Providers bill the parts separately: 59409 (vaginal delivery only,
+  28,202 claim lines statewide in 2024), 59514 (cesarean delivery only),
+  59430 (postpartum care) and 59025 (fetal non-stress test). In Fort Worth's 58
+  ZIPs that is 627 claim lines for 59409, 70 for 59514 and 1,273 for 59430.
+  Those are floors: HHS withholds any provider, code and month with fewer
+  than 12 patients, and most obstetricians deliver fewer than 12 Medicaid
+  babies a month, so much of the volume never reaches the public file.
+  Nationally only 32 states bill 59400 at all (15,083 claim lines in 2024). Search those
+  codes, or "delivery" or "postpartum" (now understood too), to see Texas
+  deliveries. A new read-only probe job
+  looks codes up in HHS's raw file.
+- **The demographics tab leads with numbers.** Every box now shows a count
+  first (52,966 insured, 3,490 uninsured, 13,050 households at $100k or
+  more, 20,000 adults with a bachelor's degree) with its share in small
+  type underneath, and the charts count people and households instead of
+  percentages; hovering a bar shows its share.
+- **One market dashboard instead of two modes.** The My market / Explore
+  switch is gone. A provider's dashboard opens on their own ZIP and
+  specialty as before, and searching anywhere else now happens on the same
+  screen: the Insights tab keeps showing where they stand in their
+  specialty for whatever area is scored, and a *My market* button in the
+  top bar brings them back. A specialty picked in the filters now carries
+  over to the next search instead of the map quietly showing everything
+  under a filter that still named one specialty.
+- **The procedures search understands the words clinicians use.** CMS
+  writes its own plain-language descriptions, so a colonoscopy reads
+  "Biopsy of large bowel using a flexible endoscope" and searching
+  "colonoscopy" found almost nothing, although Fort Worth gastroenterologists
+  bill thousands of them to Medicare. Common words (colonoscopy, EGD, ERCP,
+  Pap smear, mammogram, pregnancy ultrasound, delivery, echo, EKG, knee
+  replacement and others) now reach CMS's wording, and every one is tested
+  against CMS's real descriptions.
+- **One search covers every procedure source.** Searching in any source now
+  adds a line saying how many matching codes the other sources hold for the
+  same area (Medicare clinicians, hospital outpatient, hospital inpatient,
+  Medicaid), and one click switches source with the search kept. Medicaid
+  now loads 50 ZIPs per request, so a state search no longer fails.
+- **An empty search says why.** Traditional Medicare covers people 65 and
+  older, and CMS drops any code a clinician billed for fewer than 11
+  Medicare patients, so pregnancy care barely appears there: Fort Worth has
+  no Medicare rows for deliveries or pregnancy ultrasounds, while Medicaid
+  holds thousands of ultrasound claims. The panel now says this, and notes
+  that hospital sources list payment groups rather than CPT codes.
+- **A check for missing procedure data.** A manual, read-only job replays
+  the Medicare procedures panel for a city and compares what it loads with
+  the table itself and with CMS's own file. For Fort Worth the panel loaded
+  every row the table holds (266 OB-GYN rows from 57 clinicians, all the GI
+  codes), and the table matches CMS's 2024 release exactly.
+- **The dashboard's address follows the search.** After each search the
+  link names the area and specialty, so a refresh, a bookmark or a shared
+  link reopens the same view, and the browser's Back button returns to the
+  previous search. Bordering ZIPs added on top are not part of the link.
+- **Explore searches by city or state show every provider again.** A live
+  audit of the dashboard found that searching a city ("Collierville, TN",
+  "Memphis") or a state ("RI") loaded organizations only: the individual
+  clinician and secondary-address tables had no city or state index, timed
+  out, and the map said "Loaded" anyway (Collierville showed 221 listings
+  against 988 for its ZIP). Migration 039 adds those indexes. When part of
+  the directory does not answer, a notice on the map now says what is
+  missing, and very large areas stop at 25,000 listings per table with a
+  note instead of paging without end.
+- **The Medicare procedures panel no longer hammers the database on large
+  areas.** For a state it asked for every ZIP at once, timed out, and then
+  retried without end because it read the error as data. It now asks ten
+  ZIPs at a time, stops on an error and says what did not load.
+- **Health measures load for large areas.** The Health tab asked CDC for a
+  whole state's ZIPs in one request (1,381 for Texas), which the browser
+  refused. It now asks 100 ZIPs at a time and notes any group that did not
+  answer.
+- **City scores anchor on the city itself.** A city search also picks up
+  listings filed under the same city name elsewhere, and the score could
+  land on one of those ZIPs ("Memphis" was scored on 37066, Gallatin). The
+  anchor is now the most populous ZIP among those holding at least 1% of
+  the listings on the map.
+- **ZIP outlines for big states retry once.** Texas's outline file is large
+  and its download was seen cutting off, leaving nothing to click; the map
+  now tries a second time.
+- **A live audit of the dashboard.** A manual, read-only job drives the
+  deployed dashboard through every kind of search and tab, plus a
+  provider's home with a stand-in profile, and reports what failed or ran
+  slow.
+
+## 2026-10-13
+
+- **Competition and patient search no longer show "none nearby" by
+  mistake.** Searching an area for a specialty asked the database for every
+  listing in a map box, and with no location index on the two main provider
+  tables that query ran past the database's 3-second limit. The page read
+  the failure as zero results, so the portal's Competition tab showed no
+  primary care doctors within any distance of 38017. Migration 038 adds the
+  missing location indexes (applied; the same query now answers in under
+  2 seconds with 980 primary care listings within 10 miles of 38017), and
+  both pages now say when the directory did not answer instead of
+  claiming there is nobody there.
+- **A check for directory queries.** A manual, read-only job runs one query
+  as the browser does and shows whether it returned nothing or failed.
+
+## 2026-10-12
+
+- **Hospital procedures now show the nearest hospitals.** The Medicare
+  hospital outpatient and inpatient views came up empty for most ZIPs
+  (Collierville, 38017, had none), because each hospital is listed only at
+  the address it bills Medicare under, often a system's main campus. They
+  now list hospitals within 25 miles of the area in view (50 if none),
+  closest first, each with its distance (3,084 hospitals loaded, 2,977 of
+  them placed on the map). A new read-only check job shows what the
+  panel receives for any ZIP.
+
+## 2026-10-11
+
+- **Procedures now cover Medicaid and Medicare hospitals.** The Procedures
+  tab has a switch: Medicare clinicians (what it showed before), Medicare
+  hospital outpatient (by payment group), Medicare hospital inpatient (by
+  diagnosis group) and Medicaid. Medicaid comes from the provider spending
+  file HHS released in February 2026, newest year (2024), placed at each
+  provider's ZIP and specialty in our directory, with claims, total paid and
+  paid per claim. HHS withholds small cells (under 12 patients), and its
+  monthly patient counts cannot be added into a head count, so the panel
+  shows "patient-months" and says why. Junk rows in the source (malformed
+  codes, impossible amounts) are dropped and counted, never shown. Private
+  insurance has no public equivalent: insurers publish prices, not volumes.
+  Loaded 2026-10-11: 3.1 million Medicaid rows covering $189B of 2024
+  spending across 21,013 ZIPs, and 208,000 hospital rows from about 3,000
+  hospitals.
+- **Procedure data beyond Medicare Part B, step one.** A new manual,
+  read-only job describes the files the Procedures panel will add: the
+  Medicaid provider spending by procedure that HHS released in February
+  2026, and Medicare's hospital outpatient and inpatient files. It records
+  their columns, sizes and quirks so the importers are written against the
+  real files. Nothing is loaded yet.
+- **Insurance list cleanup.** A second read of the newly loaded plans found
+  a few that slipped through review: "Banner|Aetna" in Arizona showed with a
+  stray bar (now "Banner Aetna"), four entries were not plan names at all
+  (a reinsurer, a counseling program, a placeholder and an unrecognisable
+  legal name) and five plans appeared twice under slightly different names
+  in one state (CDPHP, The Health Plan of West Virginia, Baylor Scott &
+  White, Fallon Health, HealthPartners). Migration 035 fixes them; anyone
+  who already picked a renamed plan keeps it under the new name. (Its first
+  version failed harmlessly in the Supabase SQL editor and changed nothing;
+  it now runs as one block, and is applied.)
+- **Which new insurance plans were already listed.** A read-only query,
+  `supabase/queries/034_overlaps.sql`, lists the plans from the October
+  insurance load whose name was already in that state's list under another
+  type (mostly Medicare Advantage brands), so the load left them as they
+  were.
+- **Mental health searches no longer suggest neurologists.** The national
+  registry files psychiatrists and neurologists under one board, "Psychiatry
+  & Neurology", so the care navigator's search for a psychiatrist also
+  returned neurologists (about a quarter of results in a live check), and a
+  neurology search returned psychiatrists. Those results are now dropped
+  before the navigator sees them, and the search widens to nearby ZIPs when
+  too few remain.
+- **Checking the registry search terms.** A new manual, read-only job sends
+  every specialty's registry search term to the live NPPES API, the way the
+  care navigator does, and records how many providers come back and whether
+  they really practise that specialty. First run: all 44 terms pass,
+  including the 11 categories added in October, which could not be checked
+  when they were written.
+- **Insurance plan list approved.** The review removed carriers that are
+  not medical plans (Reliance Standard Life, Nippon Life, State Farm, and
+  TennCare's dental and pharmacy managers) and merged duplicate names, so
+  each plan appears once per state under the name on the member card: state
+  suffixes are gone ("Molina Healthcare of Texas" is "Molina Healthcare"),
+  Medicaid plans read UnitedHealthcare Community Plan, Aetna Better Health,
+  Humana Healthy Horizons and so on, and regional variants fold together
+  (Partnership HealthPlan, WellSense, Kaiser Permanente). A migration
+  generated from the approved list (390 new state plans: 150 commercial,
+  33 marketplace-only, 207 Medicaid) is applied, so they are in every plan
+  picker now; 271 more were already listed.
+- **More insurance plans, step one.** A new manual, read-only job finds
+  the official CMS files listing every company selling private, employer
+  and marketplace health insurance in each state, and every Medicaid
+  managed care plan, and records what they contain. The expanded plan list
+  will be built from them, shown as card brand names, limited to insurers
+  with at least 1,000 members in a state, and reviewed as a spreadsheet
+  before it reaches the plan pickers. Medicare Advantage plans already load
+  monthly from CMS. The first proposal covers 760 state plans (private,
+  employer, marketplace and Medicaid managed care) and is out for review.
+- **Health-need profiles for the new categories reviewed.** Hospice now
+  weighs cognitive disability (dementia is its leading diagnosis), as does
+  speech therapy; care coordination is driven by social need (no insurance,
+  food insecurity, no reliable transport, diabetes) instead of frailty.
+  Nursing and Physician assistant are no longer scored as markets, since
+  nurses are employed and most PAs already count toward primary care; both
+  stay fully searchable. The model now scores 40 categories. The national
+  benchmarks were rebuilt so the three new measures have national
+  percentiles (food insecurity and transport are published for about
+  24,000 of 30,000 areas; elsewhere those parts are left out, never
+  guessed).
+- **The old six provider groups are retired.** The opportunity panels no
+  longer score Primary care, Specialty, Surgical, Dental and Behavioral as
+  broad groups (their national rates were counted from organizations only
+  and understated supply). Everything now comes from the per-specialty
+  model: Insights shows where a provider's own specialty stands, the
+  biggest openings among specialties already present, and which ones have
+  no listing nearby; the pitch page lists the six strongest openings and how
+  many specialties are absent. Clinician counts follow each listing's
+  official classification, and the federal shortage score used for each
+  specialty is chosen per specialty. No keyword-based classifier is left.
+- **Market scores count providers by their official code.** The market
+  model, the AI assistant's provider lookups, the national benchmark job
+  and the (parked) demand trainer now decide a listing's specialty from its
+  NUCC code through the approved table, the same way patient search does.
+  The model now scores 42 categories: the 33 it scored before (speech
+  therapy under its new name) and nine of the new ones, each with a
+  provisional health-need profile. Hospital-based clinicians and Other
+  health services stay searchable but are not scored.
+- **National benchmarks rebuilt by code.** The "Build market benchmarks"
+  job reran on all 9 million listings, so every scored category, new ones
+  included, is compared against a national rate counted the same way as
+  the local one (for example primary care 4.78 listings per 1,000 adults,
+  orthopedics 0.42 now that general surgeons count under General surgery).
+
+## 2026-10-09
+
+- **Patient search finds providers by their official code.** Picking or
+  typing a specialty now finds every listing whose NUCC code belongs to it,
+  per the approved table, instead of matching words in the taxonomy name.
+  Eleven new categories are searchable (among them Hearing & audiology,
+  Behavior therapy (ABA), Nursing, Physician assistant and General surgery),
+  and "Speech & hearing" is now "Speech & language therapy". The same
+  change covers the provider portal's Competition tab and the dashboard's
+  specialty filter. Typed searches match whole words: "primary care doctor"
+  works as before, "hearing" now finds audiologists instead of ear, nose
+  and throat doctors, "knee surgery" stays with orthopedics, and generic
+  words such as "physician" or "hospital" go to the AI helper rather than a
+  wrong category. Market scores still use the previous 33 categories until
+  their benchmarks are rebuilt on codes.
+- **Patient specialties by official code approved.** The reviewed table
+  is now the record of which search category each code belongs to, and a
+  test fails if any visible clinician code is left without one. Patient
+  search switches over in the next step, together with a fix so that
+  typing "hearing" no longer lands on Ear, nose & throat.
+- **Patient specialties by official code: proposal ready for review.** A
+  draft assigns every one of the 883 NUCC codes to patient search
+  categories, so that every visible individual clinician can be found
+  (today about 3.3 million listings belong to no category). It keeps the
+  existing categories, splits hearing out of speech therapy, and adds
+  eleven, including Behavior therapy (ABA), Nursing, Physician assistant,
+  Care coordination, Hospital-based clinicians and General surgery. 45
+  codes are flagged for a decision. Patient search does not change until
+  the proposal is approved.
+- **The map now groups providers by their official classification.** Dots
+  are colored by the NUCC grouping of each listing's own taxonomy code,
+  read from the code rather than guessed from the name: vivid colors for
+  individual clinicians, muted ones for organizations. The map key lists
+  every grouping in view with a count and a checkbox to hide or show it.
+  Popups and tooltips show the full path (for example Ambulatory Health
+  Care Facilities › Clinic/Center › Primary Care) and the code. Students
+  are left off the map. A listing with a missing or unrecognized code is
+  hidden and counted in the key rather than dropped into a catch-all
+  group. Search by specialty and the market scores are unchanged for now;
+  they move to codes in phase 3, after review.
+- **Every listing now carries its official taxonomy code.** The backfill
+  gave 10,175,696 of 10,175,703 listings their NUCC code from the September
+  NPPES file (7 remain, all old labels with no exact NUCC match, listed for
+  review), and the code columns are indexed. Nothing on the map or in search
+  changes yet; the next step colors the map by the official NUCC groupings.
+- **Procedures summary tried and dropped.** Shrinking the 4 GB Medicare
+  procedures table into a ZIP-level summary turned out too slow and too heavy
+  for the database's disk, and briefly broke the Procedures panel while it
+  ran. It is cancelled and cleaned up (migration 033); the panel reads the
+  original table again, exactly as before. The disk was grown to 18 GB, which
+  makes room for the taxonomy backfill instead.
+- **Ambiguous taxonomy names get their general code.** Listings whose name
+  NUCC uses for two codes (Pharmacist, Psychologist, Podiatrist, Clinical
+  Neuropsychologist, Military Hospital) get the general code from a short
+  reviewed list, rather than being left without one.
+- **Database size report.** A new manual, read-only job lists where the
+  database's disk goes (each table's data and indexes, dead rows left by
+  updates, unused indexes, write-ahead log), so decisions about compacting
+  or growing the disk start from numbers.
+## 2026-10-08
+
+- **Official taxonomy codes, phase 1 of 3.** Listings are moving from
+  keyword-based groups to the official NUCC classification. This step adds
+  the groundwork only; the map and search behave exactly as before. A
+  `taxonomy_map` table holds every NUCC code with its official grouping,
+  classification and specialization, the matching Medicare specialty, and
+  whether it shows on the map (students are hidden). Every listing gets a
+  `taxonomy_code` taken from NPPES by NPI, through a new manual job that
+  first checks there is enough database disk for the rewrite (tables,
+  staging and write-ahead log). Anything it
+  cannot place goes to an exceptions file with a reason, never into a
+  default group. New hourly backfill rows get their code too. Next:
+  phase 2 colors the map by the official groupings, and phase 3 rebuilds
+  patient specialty search on codes after a review of every assignment.
+Newest first. Every change pushed to `main` gets an entry here.
+
+## 2026-10-06
+- **Taxonomy inventory.** First run: 909 distinct taxonomy names over
+  about 10.2 million listings, 893 of them official NUCC names. A new manual job records every taxonomy name the
+  directory stores, how many listings carry it, and the official NUCC code
+  list, so naming and grouping can be reviewed against the real data. The
+  directory itself stores names only, not NUCC codes.
+- **Security fix applied: migration 028.** The first schema snapshot showed
+  that two tables left over from the retired v1 site, `access_requests`
+  (names, emails, organizations) and `access_codes` (emails and access
+  codes), could be read by anyone with the site's public key. Nothing uses
+  them any more. 028 removes the public rules and privileges and keeps the
+  rows. It is applied, and the next snapshot confirmed the public access is
+  gone. The snapshot also confirmed migration 016 is applied and found three
+  CMS tables made in the dashboard that are now documented.
+- **The database structure is now kept in git.** Supabase doesn't save SQL
+  run in its editor, and the core tables were made by clicking in the
+  dashboard, so nothing recorded them. A new weekly job dumps the live
+  structure (tables, indexes, security policies, grants; never data) to
+  `supabase/schema/public.sql` and commits only when it changed. It refuses
+  to write a dump that looks incomplete or contains a credential. Needs the
+  GitHub secret `SUPABASE_DB_URL`. For a one-off copy without the secret,
+  `supabase/schema-snapshot.sql` is a read-only query for the SQL editor.
+  The migrations README now lists all 27 files with their status.
+- **Census signals and SAHIE are live.** Migrations 026 and 027 are applied
+  and both imports ran. ZIP 38017 now shows growth since 2019 (+3.2%),
+  disability (9.4%), coverage by type (employer 72.3%, individual 16.1%,
+  TRICARE 2.8%, VA 1.8%) and seniors living alone (22.5% of people 65+).
+  Its county, Shelby, reads 12.6% uninsured under 65 (SAHIE 2024, plus or
+  minus 0.8). That is higher than the ZIP's own 6.2% because it covers a
+  whole county and only people under 65.
+- **County uninsured rate from Census SAHIE.** Insights now shows the
+  uninsured rate for people under 65 in the county where most of the ZIP's
+  homes are, with its margin of error and year. SAHIE is the Census Bureau's
+  model-based estimate, which blends survey and administrative records and is
+  steadier than survey data alone for small counties. To switch it on, apply
+  migration 027 and run "Import Census SAHIE" once.
+- **More Census signals by ZIP.** The Census detail block on the Demographics
+  tab now also shows population change over five years, the share of people
+  with a disability, employer, individual-purchase, TRICARE and VA insurance,
+  and the share of people 65 and over who live alone. Insurance types overlap,
+  so those shares are not meant to add up. A signal is only shown when every
+  ZIP in view has it, and a five-year change above 50% is hidden because it
+  usually means the ZIP's boundary changed in 2020. To switch it on, apply
+  migration 026 and run "Import Census ACS detail" again.
+- **Learned demand model parked; health need stays hand-weighted.** The
+  reworked model's dry run found no specialty where population (age, income,
+  insurance, education, CDC health measures) predicts Medicare use beyond what
+  local supply already explains. Supply and urbanity alone explained 40 to 78
+  percent of the variation; population added under 3 points, and the one
+  near-pass (eye care) had diabetes pointing the wrong way. This is the
+  well-known pattern that Medicare use follows where doctors are. Health need
+  keeps its CDC-and-age score, the training workflow is now manual only, and
+  migration 025 does not need to be applied.
+- **Demand model reworked before switching it on.** The first training run
+  showed the model mostly learning where doctors cluster, not where patients
+  need care: older and sicker areas came out as low demand, because Medicare
+  counts patients where the doctor practises and people travel to hubs. Each
+  training area is now a county plus everything within 25 miles; local supply
+  and urbanity are accounted for during training and held at average when
+  scoring; a model must add accuracy beyond supply alone; and a specialty's
+  own conditions must push demand the right way (more heart disease cannot
+  mean less cardiology). The kidney measure, which has no data, no longer
+  knocks out Kidney and Urology. Nothing is live yet: run "Train demand
+  model" as a dry run again first.
+
+## 2026-10-05
+- **CMS file lookup fixed for both Medicare jobs.** The CMS data catalog now
+  adds a release date to the end of dataset titles, so the lookup for the
+  Medicare claims file found nothing and the first demand-model training run
+  stopped. Titles are now matched without that date, which also keeps the
+  monthly Medicare activity import working. "Train demand model" also accepts
+  a direct link to the file as a fallback.
+- **A learned demand model.** For each specialty, a model now learns how many
+  Medicare patients its doctors actually see per 1,000 Medicare enrollees in a
+  county, from real CMS claims, and what about the local population predicts
+  that: age, income, poverty, insurance, education and the CDC health measures
+  for that specialty. It is tested on whole states it never saw, and only
+  specialties that pass replace the hand-weighted "health need" factor. Where
+  it is used, Insights says "learned from Medicare use", shows the expected
+  patients per 1,000 enrollees and the three inputs that drove it, and notes
+  that it only sees traditional Medicare. Children's care, OB-GYN and dental
+  are never trained this way. To switch it on, apply migration 025, then run
+  "Train demand model" (use the dry run first to read each specialty's score).
+- **Census insurance import fixed.** The first run skipped Medicare and
+  Medicaid because the Census does not publish the detailed Medicare table for
+  ZIPs in the 2024 release. The import now falls back to the Census's collapsed
+  tables and keeps whichever figures it finds instead of dropping all three.
+
+## 2026-10-01
+- **Insurance from the Census, including Medicare and Medicaid.** The Census
+  detail block now shows how many people are uninsured, on Medicare and on
+  Medicaid, each with its share, from the American Community Survey. The
+  Uninsured and Insured Rate boxes at the top use the Census's own uninsured
+  count when it covers everything in view, instead of subtracting the older
+  insured figure from total population. Medicare and Medicaid overlap (people
+  with both appear in each), so the two must not be added. To switch it on,
+  apply migration 024, then run "Import Census ACS detail" again.
+- **Demographics tab trimmed.** The two older charts that the Census detail
+  now covers better (age distribution and household income, both capped at
+  coarse bands) are gone. The insurance-rate charts by age, income and race
+  stay, because the detailed Census data has no insurance figures.
+- **The Census import needs a free API key.** The first runs failed because
+  the Census refuses data requests without one ("Missing Key"). The workflow
+  now checks for the `CENSUS_API_KEY` secret up front and says how to get one.
+- **The Census import now explains and survives a bad API key.** The Census
+  answers an invalid or not-yet-activated key with a web page rather than data,
+  which made the first import run crash with a confusing error. It now prints
+  what the Census said and retries without the key.
+- **Detailed Census data by ZIP.** The Demographics tab has a new "Census
+  detail" block: household income in eight bands up to $200k+ (the Census
+  stores sixteen), median household income, poverty rate, the share of
+  households at $100k and $200k and over, age by sex in 18 five-year bands,
+  race and ethnicity, and education. For a selected ZIP it is exact; for an
+  area it sums the ZIPs in view. The Census does not publish ZIP-level
+  household income above $200,000, so there is no $200-500k split, and it
+  does not publish insurance by income beyond $100k+, so the existing
+  insurance-by-income chart is unchanged. To switch it on, apply migration
+  023, then run "Import Census ACS detail" once.
+- **Ability to pay uses the richer income.** Where the new data is loaded,
+  the income half of that factor is median household income, the share of
+  households at $100k and over, and low poverty, each ranked within the
+  state. Scores for those ZIPs can move. Without the data it falls back to the
+  share at $75k and over, as before, and the evidence line says which was used.
+
+## 2026-09-30
+- **Tidied the "Opportunity by specialty group" card on Insights.** It used to
+  run the group names into their labels in one unstyled block. Each group now
+  has its own row with a name, a bar for the score and a coloured label. The
+  explanatory sentence lost its dash too.
+- **"What if?" on Insights and in Ask AI.** Under the score breakdown, pick
+  "1 more", "2 more" or "3 more" to see how the chosen specialty would score
+  in this ZIP if that many clinicians opened at its centre: score, type,
+  clinicians nearby, listings per 1,000 adults, room from competitors and
+  access. Ask AI answers "what if I open here" the same way. Only supply
+  changes; payer mix, practice size and capacity are not modelled, and the
+  result says so. If you are signed in, your own listing is left out of "Now".
+- **State benchmarks are live.** The benchmark build completed after migration 022 and wrote 114 rows, including a listings-per-1,000 figure for every state. Insights now compares a market with its own state's average.
+- **Fixed the state benchmark build failing on save.** The first run computed
+  every state's listings per 1,000 residents but the database refused to store
+  them, because the table only allowed two kinds of row. Migration 022 widens
+  it. Run it in the Supabase SQL editor, then re-run "Build market benchmarks".
+- **The Ask AI assistant now checks its own numbers.** Every figure in an
+  answer or a generated document has to come from a market lookup made in that
+  conversation, or be a sum, difference, ratio or percent change shown beside
+  the figures it comes from. An answer with an untraceable figure is sent back
+  for one rewrite before you see it. A document that cannot be fixed is still
+  issued, with the figures flagged on its card. Answers show "N figures checked
+  against the data". Figures written as words ("two cardiologists") are not
+  checked.
+- **Assistant usage is now measured.** The function logs record, per step, how
+  long each model call and lookup took, token counts, an estimated cost and how
+  many figures failed the check. They never contain the question, the answer,
+  a document or who asked.
+- **Long assistant answers no longer time out.** Asking for a document
+  (an expansion one-pager, for example) ended in "That took too long"
+  whenever the assistant had spent its first seconds on lookups, because the
+  write started with only about 11 seconds left. A model call now starts only
+  when it has close to a full clock, and the step is handed back to continue
+  with a fresh one otherwise. Documents are also asked to stay under 450
+  words. If it still says it took too long, try a narrower question.
+- **"Provider supply" now compares a market with its own state.** Insights
+  used to compare listings per 1,000 residents with one hard-coded national
+  figure (5.8) that counted organizations only, while the local number also
+  counted individual clinicians, so nearly every market looked well
+  supplied. The comparison is now this state's listings per 1,000 residents,
+  built from the same tables and the same counting rule, and the text says
+  which state ("42% below the TN average of 24.9"). The whole-area score
+  (40% of it is this comparison) and its label change accordingly. If a
+  state's benchmark has not been built, the comparison is left out and the
+  score rests on payer mix and shortage, rather than assuming an average.
+  **Run the "Build market benchmarks" workflow once to create the state
+  figures** (it is the same job as before and reads the same tables).
+- **Patient sign-up is now closed by default.** It previously stayed open
+  unless `PATIENT_SIGNUP_ENABLED` was set to `false`, contrary to the docs,
+  so an unset variable allowed health information to be collected before the
+  Supabase BAA. It now opens only when the variable is exactly `true`, the
+  same rule the document endpoints use. Sign-in for existing accounts and
+  provider registration are unaffected, and the sign-up form tells visitors
+  they can still search for care without an account.
+- **Neighboring ZIPs fixed.** "Add Neighbors" on the dashboard now adds
+  only ZIPs that share a border with the selected one, instead of every ZIP
+  whose bounding box overlaps it. Clicking again adds the next ring out.
+  A double click no longer ends in a false "No neighboring ZIPs found", and
+  when every bordering ZIP is already loaded it says so. Area totals now
+  cover every ZIP loaded, not just the latest ring.
+- **Filters survive loading neighbors.** A specialty or taxonomy filter
+  used to reset to "everything" when neighboring ZIPs loaded. It now stays;
+  taxonomies that appear for the first time join it only if they match the
+  chosen specialty, and every new taxonomy gets its checkbox.
+
+## 2026-09-29
+- **Reports runs on the assistant.** The Reports tab is now a builder:
+  choose a market memo, expansion one-pager or client pitch, the specialty,
+  ZIPs to compare, the audience and a focus question, and the assistant
+  writes it from the market model. Documents collect in the tab for copy,
+  download and print. The old single-shot report writer, which only saw
+  clinics loaded in the browser, is retired.
+- Documented that the Anthropic API key belongs to the project's own
+  account, separate from personal accounts.
+- **Market assistant.** Ask AI on the dashboard is rebuilt as a
+  conversational assistant that uses the market model, compares ZIPs,
+  finds nearby providers, moves the map, and writes memos, one-pagers and
+  client pitches you can copy, download or print. It replaces the old
+  single-question chat and the separate Memo button, which only saw the
+  clinics loaded in the browser. The functions now carry one dependency,
+  Anthropic's SDK, which Netlify installs on deploy.
+- The map's zoom buttons no longer sit under the dashboard sidebar.
+- **Engineering notes restored.** The project's `CLAUDE.md` (architecture
+  rules, security boundaries, data gotchas, incident history) is back in the
+  repo, updated for this week's changes. Secrets and local machine details
+  were left out, since the repo is public.
+- **National benchmarks built.** The first full run wrote benchmarks for 29
+  health measures and all 33 specialties, so the Insights tab now compares
+  each specialty against its own national rate. The builder's log
+  undercounted rows read (a race between parallel workers); the saved
+  benchmarks were unaffected, and the count and its sanity floor are fixed.
+- **Market opportunity model.** The Insights tab now classifies all 33
+  specialties with a score, archetype, strategy, confidence, reasons and
+  data notes (see [above](#the-market-opportunity-model)). Adds
+  `market_benchmarks` (migration 021), `scripts/build-market-benchmarks.mjs`
+  and the quarterly `market-benchmarks.yml` job. The benchmark builder
+  counts specialties by paging through the provider tables on their NPI
+  index, after a first version timed out on unindexed text searches.
+- **Market dashboard redesign.** My market and Explore modes, Insights
+  first, collapsible filters with a specialty picker, six-group map colors
+  with a key, a lighter map style, and a layout matching the portal.
+  Staff demo access through `STAFF_EMAILS`.
+- **Provider portal.** New `/portal` with Overview, Appointments, My
+  listing, Locations, Competition and Market. Providers can set the
+  appointment time when confirming. The registration page became a pitch
+  that sends signed-in providers to the portal.
+- **Patient side redesign.** Search-first layout with a full-size map,
+  5/10/25/50-mile radius, filters, detail sheets and an optional AI helper.
+- **Medicare credentials on detail sheets.** Fixed "Credential lookup is
+  unavailable" (a client timeout shorter than the server's, and CMS errors
+  being cached as misses). Organizations are now recognized from the
+  NPPES enumeration type rather than the table a row came from.
+
+## 2026-09-28
+- **Patient and provider sides split.** Patients get a request-to-book
+  flow; the dashboard became provider-only; roles are checked against
+  `provider_profiles`, never user-editable metadata.
+- **Full audit.** Security and correctness fixes across functions,
+  frontend and migrations (escaping, auth on AI endpoints, input
+  validation, 1,000-row paging, briefing access). Removed the dead
+  `map.html`.
+- **CI.** Added `tests.yml`, running on every pull request and push to main.
+
+## 2026-09-17
+- **Google geocoding.** Consolidated three copies of the geocoding chain
+  into `lib/geocode.js`, with Google as the primary geocoder and Nominatim
+  as fallback.
+- A 3D Google Maps view was added to the dashboard and reverted the same
+  day.
+
+## 2026-09-16
+- **Map tiles.** Moved from CARTO to Esri Canvas, then to MapTiler.
+
+## 2026-08-19
+- **Medicare Advantage payers.** Monthly import of MA plan brands per state
+  from CMS.
+- **ZIP-level Medicare mix.** Added the HUD ZIP-county crosswalk and used
+  it to make the Medicare mix ZIP-level.

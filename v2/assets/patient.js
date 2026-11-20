@@ -1956,6 +1956,31 @@ function detailSheet(npi) {
     });
   }
 
+  // Where the address comes from (migration 056, 2026-11-20): a clinician whose
+  // Medicare enrollment is only in other states is shown at the Medicare
+  // address, and one in the right state but another ZIP gets their other
+  // Medicare offices. Both reads fail silently (nothing is shown).
+  var addrNote = h('div'), offices = h('div');
+  if (!p.campus && /^\d{10}$/.test(String(p.npi || ''))) {
+    tableQuery('provider_individuals', 'address_source,address_checked,nppes_city,nppes_state', 'npi=eq.' + p.npi).then(function (rows) {
+      var r = rows && rows[0];
+      if (!rows.failed && r && r.address_source === 'medicare') {
+        addrNote.appendChild(h('p', { class: 'muted', style: 'font-size:13px;margin-top:4px' },
+          'Address from Medicare enrollment' + (r.address_checked ? ', ' + new Date(r.address_checked + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }) : '') +
+          '. The national registry still lists ' + [cityName(r.nppes_city), r.nppes_state].filter(Boolean).join(', ') + ', which looks out of date.'));
+      }
+    });
+    tableQuery('clinician_medicare_sites', 'address,city,state,zip,facility', 'npi=eq.' + p.npi).then(function (rows) {
+      if (rows.failed || !rows.length) return;
+      offices.appendChild(h('div', { class: 'sec-label' }, 'Also practises at'));
+      offices.appendChild(h('ul', { class: 'here-list' }, rows.slice(0, 6).map(function (x) {
+        return h('li', {}, h('span', { class: 'here-name' }, [titleCase(x.address), cityName(x.city), x.state, x.zip].filter(Boolean).join(', ')),
+          x.facility ? h('span', { class: 'here-type' }, displayName(x.facility)) : null);
+      })));
+      offices.appendChild(h('p', { class: 'muted', style: 'font-size:13px' }, 'From Medicare enrollment. Call to confirm which office they see patients at.'));
+    });
+  }
+
   var info = codeInfo(p);
   return sheet(p.name || 'Provider', [
     h('div', { class: 'badges', style: 'margin-top:0' }, badgesFor(p)),
@@ -1977,12 +2002,13 @@ function detailSheet(npi) {
       h('dt', {}, 'Specialty'), h('dd', {}, plainType(p) || '—'),
       h('dt', {}, 'NPI'), p.campus ? h('dd', {}, p.campus.note ? 'Registered under NPI ' + p.campus.billing_npi + ', ' + p.campus.billing_name + ', with a non-hospital code.' : 'None of its own. It bills under NPI ' + p.campus.billing_npi + ', ' + p.campus.billing_name + '.')
         : h('dd', {}, p.npi),
-      h('dt', {}, 'Address'), h('dd', {}, [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ') || '—'),
+      h('dt', {}, 'Address'), h('dd', {}, [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ') || '—', addrNote),
       p.miles != null ? h('dt', {}, 'Distance') : null, p.miles != null ? h('dd', {}, fmtMiles(p.miles) + ' from ' + placeWords(state.search) + (state.search.origin ? ' (straight line)' : '')) : null,
       h('dt', {}, 'Phone'), phoneDd,
       (p.registered && p.payers && p.payers.length) ? h('dt', {}, 'Accepts') : null,
       (p.registered && p.payers && p.payers.length) ? h('dd', {}, p.payers.join(', ')) : null),
     h('div', { class: 'sec-label' }, 'From Medicare records'), activity, cms,
+    offices,
     p.lat && p.lng ? h('div', { class: 'sec-label' }, 'Also at this address') : null, p.lat && p.lng ? here : null,
     p.campus ? null : reportEl(p)
   ]);

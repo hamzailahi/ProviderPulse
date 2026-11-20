@@ -93,6 +93,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 053 | `053_listing_counts_zip.sql` | `listing_counts_zip`: listings per ZIP, code and table for market-score; public read, written only by `listing-counts.yml` | applied 2026-11-19 by `listing-counts.yml` apply: 1,883,409 rows, 9,548,758 listings |
 | 054 | `054_zip_centres.sql` | `zip_centres` (Census Gazetteer centres and ACS adults for ZCTAs PLACES lacks) and the `zip_geo` view; public read, written only by `zip-centres.yml` | applied 2026-11-19 by `zip-centres.yml` apply: 775 ZCTAs with adults (Puerto Rico 132, 2.71M adults), Gazetteer 2025 |
 | 055 | `055_county_preventable_stays.sql` | `county_preventable_stays` (County Health Rankings preventable hospital stays per county), public read, written only by `chr-preventable-stays.yml` | applied 2026-11-20 by `chr-preventable-stays.yml` apply: 3,069 counties, CHR 2025 release, median 2,743 per 100,000 |
+| 056 | `056_clinician_medicare_address.sql` | Medicare address columns on `provider_individuals` (`address_source`, `address_checked`, `nppes_*`) and `clinician_medicare_sites`, public read; written only by `address-check.yml` apply | not yet applied (the job's apply runs it) |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

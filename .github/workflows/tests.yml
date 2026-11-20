@@ -82,6 +82,7 @@ jobs:
         run: |
           node scripts/build-taxonomy-map.mjs --check
           node scripts/build-hospital-campuses.mjs --check
+          node scripts/build-project-log.mjs --check
           node scripts/test-taxonomy-map.mjs
           node scripts/test-patient-query.mjs
 

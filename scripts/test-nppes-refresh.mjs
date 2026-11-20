@@ -304,5 +304,15 @@ const fs2 = existsSync(join(dir, 'full.json')) ? JSON.parse(readFileSync(join(di
 eq([res.code, fs2.full_done && fs2.full_done.file, fs2.last_week_end], [0, 'NPPES_Data_Dissemination_November_2026.zip', undefined], 'a finished catch-up is recorded, and sets no week');
 server.close();
 
+// Medicare address kept (056)
+{
+  const old = { npi: '1111111111', name: 'A B', address: '1700 SPRINGHILL AVE', city: 'MOBILE', state: 'AL', zip: '36604', latitude: 30.7, longitude: -88.1,
+    address_source: 'medicare', nppes_address: '1514 JEFFERSON HWY', nppes_city: 'NEW ORLEANS', nppes_state: 'LA', nppes_zip: '70121' };
+  const same = { npi: '1111111111', type: 1, name: 'A B', address: '1514 JEFFERSON HWY', city: 'NEW ORLEANS', state: 'LA', zip: '70121' };
+  ok(!changes(old, same).includes('address'), 'a Medicare-addressed clinician whose NPPES address is unchanged is unchanged');
+  const nw = Object.assign({}, same, { address: '9 NEW RD', city: 'METAIRIE', zip: '70001' });
+  const row = rowFor(nw, old, { lat: 1, lng: 2 }, 'now');
+  ok(changes(old, nw).includes('address') && row.address === old.address && row.state === 'AL' && row.latitude === 30.7 && row.nppes_address === '9 NEW RD' && row.nppes_zip === '70001', 'an NPPES move updates only the stored NPPES copy');
+}
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

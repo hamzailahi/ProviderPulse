@@ -145,10 +145,16 @@ export const moved = (old, rec) => !same(old.address, rec.address) || !same(old.
 
 // What changed between a stored row and a fresh record. A blank incoming
 // phone or taxonomy never blanks a stored one.
+// A clinician shown at a Medicare enrollment address (migration 056,
+// address_source 'medicare') keeps it; NPPES is compared with the stored NPPES
+// copy instead, and a change updates only that copy (the monthly address
+// check decides what is shown).
+const nppesSide = old => (old && old.address_source === 'medicare'
+  ? { address: old.nppes_address, city: old.nppes_city, state: old.nppes_state, zip: old.nppes_zip } : old);
 export function changes(old, rec) {
   const out = [];
   if (rec.name && !same(old.name, rec.name)) out.push('name');
-  if (moved(old, rec)) out.push('address');
+  if (moved(nppesSide(old), rec)) out.push('address');
   if (rec.phone && (old.phone || '') !== rec.phone) out.push('phone');
   if (rec.code && (old.taxonomy_code || '') !== rec.code) out.push('taxonomy');
   return out;
@@ -156,19 +162,22 @@ export function changes(old, rec) {
 
 // The database row for a record. coords: {lat, lng} or null (not drawn).
 export function rowFor(rec, old, coords, now) {
-  const keep = old && !moved(old, rec);
+  const medicare = old && old.address_source === 'medicare';
+  const keep = old && (medicare || !moved(old, rec));
   const lat = keep ? old.latitude ?? null : coords ? coords.lat : null;
   const lng = keep ? old.longitude ?? null : coords ? coords.lng : null;
   const row = {
     npi: rec.npi,
     name: rec.name ?? old?.name ?? null,
-    address: rec.address, city: rec.city, state: rec.state, zip: rec.zip,
+    address: medicare ? old.address : rec.address, city: medicare ? old.city : rec.city,
+    state: medicare ? old.state : rec.state, zip: medicare ? old.zip : rec.zip,
     phone: rec.phone || old?.phone || null,
     primary_taxonomy: rec.code ? rec.taxonomy : old?.primary_taxonomy ?? null,
     taxonomy_code: rec.code || old?.taxonomy_code || null,
     taxonomy_code_source: rec.code ? rec.src : old?.taxonomy_code_source ?? null,
     latitude: lat, longitude: lng
   };
+  if (medicare) Object.assign(row, { nppes_address: rec.address, nppes_city: rec.city, nppes_state: rec.state, nppes_zip: rec.zip });
   if (rec.type === 1) {
     row.refreshed_at = now;
     if (!old) { row.enumeration_type = 'NPI-1'; row.source = 'nppes_weekly'; }
@@ -205,7 +214,7 @@ export function planChunk(records, existing) {
     for (const k of c) bump('changed_' + k);
     bump(table === 'clinics' ? 'updated_organizations' : 'updated_clinicians');
     p.updates.push({ rec, old });
-    if (c.includes('address')) p.geocode.push(rec);
+    if (c.includes('address') && old.address_source !== 'medicare') p.geocode.push(rec);
   }
   return p;
 }

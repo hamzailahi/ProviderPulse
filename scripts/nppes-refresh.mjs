@@ -73,13 +73,15 @@ async function pool(items, n, fn) {
 }
 const chunks = (a, n) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
 const COLS = 'npi,name,address,city,state,zip,phone,primary_taxonomy,taxonomy_code,taxonomy_code_source,latitude,longitude';
+// provider_individuals also carries the Medicare address columns (056).
+const IND_COLS = COLS + ',address_source,nppes_address,nppes_city,nppes_state,nppes_zip';
 
 async function existingFor(npis) {
   const out = { clinics: new Map(), provider_individuals: new Map() };
   const jobs = [];
   for (const t of Object.keys(out)) for (const c of chunks(npis, 300)) jobs.push([t, c]);
   await pool(jobs, 8, async ([t, c]) => {
-    for (const r of await sb('GET', `${t}?npi=in.(${c.join(',')})&select=${COLS}`)) out[t].set(String(r.npi), r);
+    for (const r of await sb('GET', `${t}?npi=in.(${c.join(',')})&select=${t === 'provider_individuals' ? IND_COLS : COLS}`)) out[t].set(String(r.npi), r);
   });
   return out;
 }
