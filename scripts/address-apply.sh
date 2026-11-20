@@ -27,8 +27,13 @@ node scripts/address-geocode.mjs $W/moves.csv $W/moves_geo.csv
 REL=$(cat $W/release.txt)
 OUT=$(psql "$SUPABASE_DB_URL" -X -qAt -v ON_ERROR_STOP=1 <<SQL
 begin;
+-- 138,000 row updates outlast the role's statement timeout (the first apply,
+-- 2026-11-20, was cancelled after 2 minutes and wrote nothing).
+set local statement_timeout = 0;
+set local lock_timeout = '60s';
 create temp table mv (npi text, address text, city text, state text, zip text, facility text, lat numeric, lng numeric);
 \copy mv from '$W/moves_geo.csv' csv
+create index on mv (npi); analyze mv;
 create temp table rs (npi text);
 \copy rs from '$W/restore.csv' csv
 create temp table st (npi text, address text, city text, state text, zip text, facility text);
