@@ -845,7 +845,7 @@ function paintModel(p, d, M) {
   if (anchorNote) p.appendChild(el('p', { class: 'ins-note' }, anchorNote));
 
   // Factor breakdown: every input, its weight, and the evidence behind it
-  var W = M.weights || {};
+  var W = h.weights || M.weights || {};   // per specialty since 2026-11-20
   p.appendChild(el('div', { class: 'ins-card' },
     el('div', { class: 'ins-eyebrow' }, 'How the score is built'),
     el('div', { class: 'ins-factors' }, FACTORS.map(function (f) {
@@ -854,7 +854,7 @@ function paintModel(p, d, M) {
       return el('div', { class: 'ins-factor' + (missing ? ' missing' : ''), title: f[2] },
         el('div', { class: 'ins-fhead' },
           el('b', {}, f[1]),
-          el('span', { class: 'ins-fw' }, Math.round((W[f[0]] || 0) * 100) + '% weight'),
+          el('span', { class: 'ins-fw' }, W[f[0]] ? Math.round(W[f[0]] * 100) + '% weight' : 'shown, not counted'),
           el('span', { class: 'ins-fv' }, missing ? 'n/a' : String(v))),
         el('div', { class: 'ins-bar' }, el('i', { style: 'width:' + (missing ? 0 : v) + '%' })),
         el('div', { class: 'ins-fev' }, evidenceLine(f[0], h.evidence[f[0]])));

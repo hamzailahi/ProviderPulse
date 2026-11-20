@@ -90,7 +90,7 @@ check('every scored specialty has a profile', SPECIALTIES.every(s => M.PROFILES[
 
 console.log('\n5. Reasons');
 r = one(base({ rows: cardRows(5, 6) }));
-check('three reasons, strongest first', r.reasons.length === 3 && r.reasons.every(x => x.text.length > 10));
+check('a reason per weighted factor (cardiology: access carries no weight), strongest first', r.reasons.length === 2 && !r.reasons.some(x => x.factor === 'access') && r.reasons.every(x => x.text.length > 10));
 check('reasons name the driving condition', r.reasons.some(x => /heart disease|blood pressure|cholesterol|stroke/.test(x.text)), JSON.stringify(r.reasons));
 r = one(base({ rows: cardRows(5, 6), pay: { insuredPct: 91, incomePct: 72 } }));
 check('percentiles read as ordinals (91st, 72nd)', JSON.stringify(r.reasons).includes('91st') || JSON.stringify(r.reasons).includes('72nd') || !r.reasons.some(x => /percentile/.test(x.text)), JSON.stringify(r.reasons));
@@ -157,7 +157,7 @@ console.log('E2SFCA drive-time access (049)');
   check('another specialty\'s figure is never used', other.evidence.access.basis === 'specialty');
   const what = one(base({ rows: cardRows(5, 6).concat([{ npi: 'scenario', primary_taxonomy: 'Cardiovascular Disease Physician', latitude: 35, longitude: -90 }]), accessE2sfca: { 'Heart / cardiology': { per_1k: 0.1, catchment_minutes: 60 } } }));
   check('a what-if listing still adds supply on top of the drive-time figure', what.evidence.access.per_1k === 0.11, String(what.evidence.access.per_1k));
-  check('the reason says drive time', /minutes' drive/.test(JSON.stringify(e2.reasons || [])) || /minutes' drive/.test(JSON.stringify(e2)));
+  check('the drive-time basis is recorded', e2.evidence.access.basis === 'e2sfca');
 }
 console.log('ZIP totals (053)');
 {
@@ -174,8 +174,19 @@ console.log('Two scores, competition as a fact (2026-11-19)');
   check('competition is not weighted', !('competition' in M.WEIGHTS) && Math.abs(M.WEIGHTS.need + M.WEIGHTS.access + M.WEIGHTS.pay - 1) < 1e-9);
   check('competition is still returned as a fact', r.factors.competition != null && r.evidence.competition != null);
   check('no reason cites competition', !(r.reasons || []).some(x => x.factor === 'competition'));
-  const pn = Math.round([r.factors.need, r.factors.access].filter(v => v != null).reduce((a, b, _, A) => a + b / A.length, 0));
-  check('patient_need is the mean of need and access', r.scores.patient_need === pn, JSON.stringify(r.scores));
+  check('cardiology patient_need is need alone (access share 0)', r.scores.patient_need === Math.round(r.factors.need), JSON.stringify(r.scores));
+}
+console.log('Learned access weight (2026-11-20)');
+{
+  const w = M.weightsFor('Dental'), z = M.weightsFor('Heart / cardiology'), h = M.weightsFor('Orthopedics & sports injury'), u = M.weightsFor('Pediatrics (children)');
+  check('full share keeps the thirds', Math.abs(w.access - 0.333) < 1e-9 && Math.abs(w.need + w.access + w.pay - 1) < 1e-9);
+  check('no share drops access and renormalises', z.access === 0 && Math.abs(z.need + z.pay - 1) < 1e-9 && Math.abs(z.need - 0.333 / 0.667) < 1e-9);
+  check('half share is between', h.access > 0 && h.access < w.access);
+  check('a specialty with no outcome test keeps full weight', u.access_share === 1);
+  check('every table entry is a scored specialty', Object.keys(M.ACCESS_SHARE).concat(Object.keys(M.UNVALIDATED)).every(l => SPECIALTIES.some(s => s[0] === l)));
+  const r = one(base({ rows: cardRows(5, 6) }));
+  check('per-specialty weights are returned', r.weights && r.weights.access === 0);
+  check('the score ignores access when its share is 0', Math.abs(r.score - (r.factors.need * z.need + r.factors.pay * z.pay) / (z.need + z.pay)) <= 1, JSON.stringify([r.score, r.factors]));
   check('viability is ability to pay', r.scores.viability === (r.factors.pay == null ? null : Math.round(r.factors.pay)));
 }
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-19. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-20. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -651,6 +651,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
 
+### 2026-11-20
+
+- The opportunity score now weights nearby supply per specialty, learned from the back-test. For everyday care (dental, mental health, eye care, therapy, chiropractic, nutrition, hearing) access still counts fully; for orthopedics, diabetes care, podiatry and general surgery it counts half; for specialists patients usually travel to (cardiology, GI, kidney, neurology and others, and also primary care, where local health need predicted outcomes far better than the head count) it is shown but not counted, because it did not track preventable hospital stays. Seven specialties whose score did not track that outcome at all (allergy, oncology, rheumatology, ENT, urgent care, imaging, hospice) now carry a caution and lower confidence.
+- New: preventable hospital stays per county from County Health Rankings (3,069 counties), used to test the need score.
 ### 2026-11-19
 
 - The market opportunity score no longer rewards distance from competitors. The back-test showed new clinicians set up near existing ones, so "room from competitors" predicted the wrong direction. It is now shown as a fact (nearest same-specialty practice) and the score is health need, access gap and ability to pay, a third each. Insights also shows two plain scores: "Patients need care here" (need and access) and "A practice can make it here" (ability to pay).

@@ -42,7 +42,7 @@
 (function (global) {
   'use strict';
 
-  var VERSION = '2026-11-19.2';
+  var VERSION = '2026-11-20.1';
 
   // The HRSA shortage factor (HPSA score, 0.10) was retired 2026-11-19, the
   // user's choice: HPSA is itself a population-to-provider ratio, the method
@@ -61,6 +61,44 @@
   // and access, tested against county ER use; scores.viability = pay, the
   // only part that ran positive against entry).
   var WEIGHTS = { need: 0.333, access: 0.333, pay: 0.334 };
+
+  // How much the access factor counts, per specialty (2026-11-20, the user's
+  // go-ahead: learned weights from the back-test, supabase/reference/
+  // backtest-entry.md section 1). Access alone was correlated with county
+  // preventable hospital stays (County Health Rankings) across about 2,900
+  // counties: 0.15 or more keeps full weight (1), 0.05 to 0.15 half (0.5),
+  // under 0.05 none (0). Patients travel for most specialists, so a
+  // 10-mile supply count says little there. A specialty not in the table
+  // (no outcome test: pediatrics, OB-GYN, dermatology ...) keeps 1. Access
+  // is still computed and shown, and still drives the archetype. Rerun the
+  // back-test after the drive-time rerun and update this table.
+  var ACCESS_SHARE = {
+    'Mental health & counseling': 1, 'Dental': 1, 'Eye care': 1, 'Chiropractic': 1,
+    'Physical & occupational therapy': 1, 'Nutrition & dietitian': 1,
+    'Acupuncture, massage & naturopathy': 1, 'Hearing & audiology': 1,
+    'Orthopedics & sports injury': 0.5, 'Diabetes & hormones': 0.5,
+    'Foot & ankle / podiatry': 0.5, 'General surgery': 0.5,
+    'Primary care / family doctor': 0, 'Heart / cardiology': 0, 'Allergy & immunology': 0,
+    'Lung, breathing & sleep': 0, 'Digestive / gastroenterology': 0, 'Kidney / nephrology': 0,
+    'Cancer care / oncology': 0, 'Arthritis / rheumatology': 0, 'Brain & nerves / neurology': 0,
+    'Ear, nose & throat': 0, 'Urology': 0, 'Pain management': 0, 'Speech & language therapy': 0,
+    'Urgent care & emergency': 0, 'Imaging & lab': 0, 'Pharmacy': 0,
+    'Home health & in-home care': 0, 'Nursing & assisted living': 0,
+    'Medical equipment & supplies': 0, 'Care coordination & community health': 0,
+    'Hospice & palliative care': 0
+  };
+  // Specialties whose combined score did not track preventable stays
+  // (correlation under 0.10): a caveat and a confidence penalty.
+  var UNVALIDATED = {
+    'Allergy & immunology': 1, 'Cancer care / oncology': 1, 'Arthritis / rheumatology': 1,
+    'Ear, nose & throat': 1, 'Urgent care & emergency': 1, 'Imaging & lab': 1,
+    'Hospice & palliative care': 1
+  };
+  function weightsFor(label) {
+    var a = ACCESS_SHARE.hasOwnProperty(label) ? ACCESS_SHARE[label] : 1;
+    var w = { need: WEIGHTS.need, access: WEIGHTS.access * a, pay: WEIGHTS.pay }, t = w.need + w.access + w.pay;
+    return { need: w.need / t, access: w.access / t, pay: w.pay / t, access_share: a };
+  }
 
   // Per-specialty need drivers. m: [PLACES measureid, weight, invert?],
   // d: [census proxy, weight]. Weights are relative within a specialty.
@@ -347,8 +385,9 @@
       }
 
       /* ---- combine ---- */
+      var W = weightsFor(label);
       var tw = 0, total = 0;
-      Object.keys(WEIGHTS).forEach(function (k) { if (f[k] != null) { total += f[k] * WEIGHTS[k]; tw += WEIGHTS[k]; } });
+      Object.keys(WEIGHTS).forEach(function (k) { if (f[k] != null && W[k] > 0) { total += f[k] * W[k]; tw += W[k]; } });
       var sc = tw ? Math.round(total / tw) : null;
 
       /* ---- confidence ---- */
@@ -356,19 +395,22 @@
       if (ev.need && ev.need.basis !== 'specialty' && ev.need.basis !== 'learned') conf -= 0.15;
       if (ev.access && ev.access.basis === 'group') conf -= 0.15;
       if (input.catchmentTruncated) { conf -= 0.1; caveats.push('This area has more listings than one request returns, so supply counts are a floor.'); }
+      if (UNVALIDATED[label]) { conf -= 0.15; caveats.push('In our back-test this specialty\'s score did not track preventable hospital stays, so read it with care.'); }
       if (input.adults != null && input.adults < 5000) { conf -= 0.15; caveats.push('Fewer than 5,000 adults in the catchment: small numbers swing the result.'); }
       var confidence = conf >= 0.8 ? 'high' : conf >= 0.55 ? 'medium' : 'low';
 
       var arche = classify(f, clin, confidence);
-      var pn = [f.need, f.access].filter(function (v) { return v != null; });
-      var scores = {
-        patient_need: pn.length ? Math.round(pn.reduce(function (a, b) { return a + b; }, 0) / pn.length) : null,
+            var scores = {
+        patient_need: (function () {
+          var nw = f.need != null ? 1 : 0, aw = f.access != null ? W.access_share : 0;
+          return nw + aw ? Math.round(((f.need || 0) * nw + (f.access || 0) * aw) / (nw + aw)) : null;
+        })(),
         viability: f.pay != null ? Math.round(f.pay) : null
       };
       out.push({
-        specialty: label, group: group, score: sc, scores: scores, archetype: arche, archetype_name: ARCHETYPES[arche].name,
+        specialty: label, group: group, score: sc, scores: scores, weights: { need: r3(W.need), access: r3(W.access), pay: r3(W.pay) }, archetype: arche, archetype_name: ARCHETYPES[arche].name,
         strategy: ARCHETYPES[arche].strategy, confidence: confidence, factors: roundAll(f), evidence: ev,
-        reasons: reasons(f, ev, label), caveats: dedupe(caveats), clinicians: clin
+        reasons: reasons(f, ev, label, W), caveats: dedupe(caveats), clinicians: clin
       });
     });
 
@@ -397,11 +439,12 @@
   }
 
   // The three factors that moved the score furthest from the middle, in words.
-  function reasons(f, ev, label) {
-    var list = [];
+  function r3(v) { return Math.round(v * 1000) / 1000; }
+  function reasons(f, ev, label, W) {
+    var list = []; W = W || WEIGHTS;
     Object.keys(WEIGHTS).forEach(function (k) {
-      if (f[k] == null) return;
-      list.push({ k: k, pull: (f[k] - 50) * WEIGHTS[k] });
+      if (f[k] == null || !W[k]) return;
+      list.push({ k: k, pull: (f[k] - 50) * W[k] });
     });
     list.sort(function (a, b) { return Math.abs(b.pull) - Math.abs(a.pull); });
     return list.slice(0, 3).map(function (x) {
@@ -527,7 +570,7 @@
   }
 
   var API = {
-    VERSION: VERSION, WEIGHTS: WEIGHTS, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
+    VERSION: VERSION, WEIGHTS: WEIGHTS, ACCESS_SHARE: ACCESS_SHARE, UNVALIDATED: UNVALIDATED, weightsFor: weightsFor, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
     score: score, classify: classify, pct: pct, rankIn: rankIn, measureIds: measureIds, MEASURE_NAME: MEASURE_NAME,
     FACILITY_TYPES: FACILITY_TYPES, facilities: facilities, facilityCodes: facilityCodes
   };
