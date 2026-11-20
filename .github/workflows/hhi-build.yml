@@ -1,0 +1,55 @@
+name: Market concentration build
+
+# Step 7 (2026-11-20): HHI by Medicare billing group per ZIP3 and specialty
+# into market_concentration (migration 057). dry_run reads only and writes
+# supabase/reference/market-concentration.md; apply
+# replaces the table. Monthly on the 6th after the CMS file refreshes.
+
+on:
+  schedule:
+    - cron: '37 9 6 * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+
+permissions:
+  contents: write
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install psql 17
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q -o Acquire::Retries=8 postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q -o Acquire::Retries=8 postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Load
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          MODE: ${{ inputs.mode || 'apply' }}
+          WORK: ${{ runner.temp }}/hhi
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: bash scripts/hhi-build.sh
+      - name: Commit the report
+        if: always()
+        run: |
+          git add supabase/reference/market-concentration.md 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Market concentration $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

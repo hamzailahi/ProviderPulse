@@ -118,3 +118,4 @@ values ('Some Regional Plan', 'TN', 'commercial', 60);
 Plan names, Medicaid brands and Blue Cross licensees change. A missing plan
 degrades gracefully (both forms offer "Other"), but a wrong name looks worse
 than a missing one, so review the list before launch.
+| 057 | `057_market_concentration.sql` | `market_concentration`: HHI by Medicare billing group per ZIP3 and specialty, public read; written only by `hhi-build.yml` | not yet applied (the job's apply runs it) |

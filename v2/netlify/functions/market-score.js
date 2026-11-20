@@ -810,6 +810,20 @@ exports.handler = async (event) => {
             specialties: scored.specialties
           };
 
+          // Market concentration (migration 057, 2026-11-20): HHI by Medicare
+          // billing group in this ZIP's ZIP3. A fact, never scored; a missing
+          // table, row or failed read means no line.
+          try {
+            const mc = await get(`market_concentration?zip3=eq.${zip.slice(0, 3)}&select=specialty,clinicians,groups,hhi,top_group,top_share,release_date`, 4000);
+            const byS = new Map((Array.isArray(mc) ? mc : []).map(r => [r.specialty, r]));
+            scored.specialties.forEach(x => {
+              const r = byS.get(x.specialty); if (!r) return;
+              x.evidence.concentration = { area: 'ZIP3 ' + zip.slice(0, 3), clinicians: r.clinicians, groups: r.groups, hhi: r.hhi,
+                level: r.hhi > 1800 ? 'high' : r.hhi >= 1000 ? 'moderate' : 'low', top_group: r.top_group,
+                top_share: r.top_share == null ? null : Math.round(Number(r.top_share) * 100), as_of: r.release_date, scored: false };
+            });
+          } catch (_) { /* no figure */ }
+
           // Places patients go (2026-10-25): organizations per care type in the
           // same catchment against the national rate (benchmark kind care_type).
           // A supply reading with no opportunity score; no national rate, no verdict.

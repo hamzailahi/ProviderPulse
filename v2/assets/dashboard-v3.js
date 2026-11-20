@@ -764,6 +764,11 @@ function ordinal(v) {
   var n = Math.round(v), t = n % 100, u = n % 10;
   return n + (t >= 11 && t <= 13 ? 'th' : u === 1 ? 'st' : u === 2 ? 'nd' : u === 3 ? 'rd' : 'th');
 }
+function concLine(c) {
+  const lvl = c.level === 'high' ? 'highly concentrated' : c.level === 'moderate' ? 'moderately concentrated' : 'not concentrated';
+  return lvl + ' (HHI ' + c.hhi.toLocaleString() + ', ' + c.clinicians.toLocaleString() + ' Medicare clinicians in ' + c.groups.toLocaleString() + ' groups, ' + c.area + ')' +
+    (c.top_group && c.top_share != null ? '. Largest group: ' + c.top_group + ', ' + c.top_share + '%' : '');
+}
 function evidenceLine(k, e) {
   if (!e) return 'No data for this area';
   if (k === 'need' && e.basis === 'learned') {
@@ -868,6 +873,7 @@ function paintModel(p, d, M) {
     h.evidence.hpsa_reference ? el('div', { class: 'ins-fev' }, 'For comparison, not scored: federal ' +
       evidenceLine('shortage', h.evidence.hpsa_reference)) : null,
     h.evidence.competition ? el('div', { class: 'ins-fev' }, 'Competitors, not scored: ' + evidenceLine('competition', h.evidence.competition)) : null,
+    h.evidence.concentration ? el('div', { class: 'ins-fev' }, 'Market concentration, not scored: ' + concLine(h.evidence.concentration)) : null,
     h.caveats.length ? el('details', { class: 'ins-caveats' },
       el('summary', {}, 'Data notes (' + h.caveats.length + ')'),
       el('ul', {}, h.caveats.map(function (c) { return el('li', {}, c); }))) : null));

@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-20
 
+- Insights will show market concentration for each specialty (how much of the local Medicare clinicians the largest billing groups hold), as a fact beside competitors and never part of the score. A monthly job computes it for every ZIP3 area in the country.
+
 - Market concentration dry run now links doctors to health systems through their hospitals: about 55% of Medicare clinicians in Memphis and Fort Worth tie to a system, and Memphis reads far more concentrated by system than by practice group (Baptist alone holds 40 to 79% in many specialties).
 
 - New read-only dry run that measures how concentrated each local market is (HHI) by Medicare group and by hospital-linked health system, starting with Memphis and Fort Worth.
