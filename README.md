@@ -653,7 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-20
 
-- Clinicians whose Medicare enrollment shows they moved to another state are now listed at their Medicare address, with a note on their page that the national registry still shows the old place. Clinicians in the right state but at other offices get an "Also practises at" list. The check reruns every month on CMS's new file, and anyone who no longer qualifies goes back to the registry address. The weekly registry refresh no longer overwrites a corrected address.
+- Clinicians whose Medicare enrollment shows they moved to another state are now listed at their Medicare address only. Clinicians in the right state but at other offices get an "Also practises at" list. The check reruns every month on CMS's new file, and anyone who no longer qualifies goes back to the registry address. The weekly registry refresh no longer overwrites a corrected address.
 - New: docs/project-log.md, every change since the project began with its date, for review. It is generated from this changelog and kept in step automatically.
 - New manual job, Clinician address check: compares every clinician's listed state and ZIP with their current Medicare enrollment (CMS, monthly) and counts how many look moved, as a dry run before any listing changes. Prompted by doctors found listed in states they left years ago; the national registry keeps whatever address a clinician last entered.
 - New manual job, Doctor address lookup: for named clinicians, shows our listing beside the live national registry (with its last-updated date), their current Medicare enrollment addresses and where they billed Medicare, to check reports of outdated locations. Output stays in the job log.
