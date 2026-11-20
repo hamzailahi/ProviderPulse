@@ -1,15 +1,15 @@
-name: Avoidable admission rates
+name: Preventable hospital stays
 
-# Manual (2026-11-19). Fills cms_county_utilization's *_admits_* columns from
-# CMS's Medicare Geographic Variation county file (scripts/import-gv-pqi.sh).
+# Manual (2026-11-20). Loads County Health Rankings' preventable hospital
+# stays per county into county_preventable_stays (scripts/import-chr.sh).
 on:
   workflow_dispatch:
     inputs:
       mode:
         description: 'dry_run or apply'
         default: 'dry_run'
-      gv_url:
-        description: 'Direct CSV URL (blank: from the CMS catalog)'
+      chr_url:
+        description: 'Direct CSV URL (blank: newest analytic_data file found)'
         default: ''
 
 permissions:
@@ -38,15 +38,15 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           MODE: ${{ inputs.mode }}
-          GV_URL: ${{ inputs.gv_url }}
-        run: bash scripts/import-gv-pqi.sh
+          CHR_URL: ${{ inputs.chr_url }}
+        run: bash scripts/import-chr.sh
       - name: Commit the report
         run: |
-          cat supabase/reference/gv-pqi-load.md >> "$GITHUB_STEP_SUMMARY"
-          git add supabase/reference/gv-pqi-load.md
+          cat supabase/reference/chr-preventable-stays.md >> "$GITHUB_STEP_SUMMARY"
+          git add supabase/reference/chr-preventable-stays.md
           if git diff --cached --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -q -m "Avoidable admission rates load $(date -u +%F) [skip netlify]"
+          git commit -q -m "Preventable hospital stays load $(date -u +%F) [skip netlify]"
           git pull -q --rebase origin main
           git push origin HEAD:main

@@ -149,22 +149,10 @@ export function summarize(rows) {
 }
 
 // County outcomes: the need score (today's supply), averaged over the county's
-// ZIPs by adults, against avoidable hospital admissions (the seven ambulatory
-// care sensitive conditions CMS publishes for ages 65 to 74), ER visits and
+// ZIPs by adults, against preventable hospital stays (County Health Rankings,
+// stays for ambulatory-care-sensitive conditions per 100,000 Medicare
+// enrollees; CMS's own county PQI rates are published as NA), ER visits and
 // readmissions per county; HPSA (the county's own score) on the same counties.
-// CMS suppresses small cells, so few counties carry all seven rates. Each
-// condition is ranked across counties (0 to 100) and a county's composite is
-// the mean of the ranks it has, when it has at least 4 of the 7.
-export function pqiComposite(util) {
-  const k = (util[0] && util[0].pq || []).length;
-  for (let j = 0; j < k; j++) {
-    const v = util.map(u => u.pq[j]).filter(x => x != null).sort((a, b) => a - b);
-    for (const u of util) if (u.pq[j] != null) { (u.r = u.r || []).push(v.length > 1 ? 100 * v.filter(x => x < u.pq[j]).length / (v.length - 1) : 50); }
-  }
-  for (const u of util) u.pqi = u.r && u.r.length >= 4 ? u.r.reduce((a, b) => a + b, 0) / u.r.length : null;
-  return util;
-}
-export const PQI_COLS = ['chf', 'diabetes', 'copd', 'htn', 'pneumonia', 'uti', 'amputation'];
 export function outcomes(rows, util) {
   const by = new Map();
   for (const r of rows) { if (!r.fips) continue; const k = r.specialty + '|' + r.fips; const a = by.get(k) || { s: r.specialty, f: r.fips, h: null, n: 0, w: 0, need: 0, nw: 0, acc: 0, aw: 0, sc: 0, sw: 0 };
@@ -199,9 +187,8 @@ if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
     acs: read('acs').map(([zip, state, uni, unins, inc]) => ({ zip, state, insured: num(uni) > 0 && num(unins) != null ? 1 - num(unins) / num(uni) : null, income: num(inc) }))
   };
   // util: fips, er_per_1000, readmission_rate, then the 7 PQI columns for ages 65 to 74
-  const util = read('util').map(c => ({ fips: c[0], er: num(c[1]), readm: num(c[2]), pq: c.slice(3).map(num) }));
-  pqiComposite(util);
-  console.log('util counties', util.length, 'non-null per admission rate', PQI_COLS.map((c, j) => c + ' ' + util.filter(u => u.pq[j] != null).length).join(', '), 'composite', util.filter(u => u.pqi != null).length);
+  const util = read('util').map(c => ({ fips: c[0], er: num(c[1]), readm: num(c[2]), pqi: num(c[3]) }));
+  console.log('util counties', util.length, 'with preventable stays', util.filter(u => u.pqi != null).length);
   const rows = run(input), sum = summarize(rows);
   const now = run(input, { supply: 'all' }), out = outcomes(now, util);
   writeFileSync(arg('csv'), 'zip,specialty,need,access,need_score,pay,competition,viability,hpsa,entry_per_1k\n' + rows.map(r => [r.zip, '"' + r.specialty + '"', r.need ?? '', r.access ?? '', r.needScore ?? '', r.pay ?? '', r.competition ?? '', r.viability ?? '', r.hpsa ?? '', r.entryPer1k.toFixed(4)].join(',')).join('\n') + '\n');
@@ -210,18 +197,18 @@ if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
   const lines = ['# Back-test: need against health outcomes, viability against entry', '',
     `Run ${new Date().toISOString().slice(0, 10)} by scripts/backtest-entry.mjs. Read only.`, '',
     'Two scores, each against the outcome it claims to predict (2026-11-19, the user\'s choice after the first run showed new clinicians going to already-supplied areas):', '',
-    '- **Patients need care here** = the mean of the need factor (CDC PLACES against national percentiles; age mix left out here) and the access factor (listings per adult in the 10-mile catchment against the national rate). Tested with today\'s supply against county outcomes that thin access is known to raise: avoidable hospital admissions (CMS\'s seven ambulatory-care-sensitive admission rates for ages 65 to 74, each ranked across counties and averaged where a county has at least 4 of the 7, since small counts are suppressed: heart failure, diabetes, COPD, high blood pressure, pneumonia, urinary infection, diabetic amputation), ER visits per 1,000 and readmission rate (Medicare fee-for-service, newest year). County score = adult-weighted mean of its ZIPs (HUD main county). Higher correlation is better: a need score should rise with avoidable admissions.',
+    '- **Patients need care here** = the mean of the need factor (CDC PLACES against national percentiles; age mix left out here) and the access factor (listings per adult in the 10-mile catchment against the national rate). Tested with today\'s supply against county outcomes that thin access is known to raise: preventable hospital stays (County Health Rankings: stays for conditions good outpatient care usually prevents, per 100,000 Medicare enrollees; CMS publishes its own county rates as NA), ER visits per 1,000 and readmission rate (Medicare fee-for-service, newest year). County score = adult-weighted mean of its ZIPs (HUD main county). Higher correlation is better: a need score should rise with preventable stays.',
     '- **A practice can make it here** = the mean of ability to pay (insured rate 70% and median income 30%, percentiles in the state, ACS) and room from competitors (nearest same-specialty listing). Tested as of the end of 2020 against clinicians (NPI-1) enumerated in 2021 to 2025 per 1,000 adults in the catchment.',
     '- HPSA (the county\'s score for the specialty\'s discipline, 0 when a matched county has none) gets the same tests on the same counties and ZIPs.', '',
     '## Limits', '',
     '- 2020 supply counts NPIs still active today at today\'s address (deactivated records carry no address).',
     '- Need uses today\'s PLACES; the outcomes are Medicare fee-for-service only and county-wide, so a ZIP-level score is averaged up and loses detail.',
-    '- Correlation is not cause: poorer, older counties have both more need and more avoidable admissions. Need alone and access alone are shown so the two can be told apart.', '',
+    '- Correlation is not cause: poorer, older counties have both more need and more preventable stays. Need alone and access alone are shown so the two can be told apart.', '',
     `- NPPES rows read: ${meta.rows ? meta.rows.toLocaleString() : 'n/a'}; enumerated by 2020 and active: ${meta.before ? meta.before.toLocaleString() : 'n/a'}; entered 2021 to 2025: ${meta.entered ? meta.entered.toLocaleString() : 'n/a'}`,
     `- Counties with outcomes: ${util.length.toLocaleString()}`, '',
     '## 1. Patients need care here vs county outcomes', '',
-    'Spearman across counties. Avoidable admissions columns: the score, need alone, access alone, then HPSA.', '',
-    '| Specialty | Counties | Avoidable admits: score | need | access | HPSA | ER visits: score | HPSA | Readmissions: score | HPSA |', '|---|---|---|---|---|---|---|---|---|---|',
+    'Spearman across counties. Preventable stays columns: the score, need alone, access alone, then HPSA.', '',
+    '| Specialty | Counties | Preventable stays: score | need | access | HPSA | ER visits: score | HPSA | Readmissions: score | HPSA |', '|---|---|---|---|---|---|---|---|---|---|',
     ...out.map(o => `| ${o.label} | ${o.counties.toLocaleString()} | ${f(o.pqi)} | ${f(o.pqiNeed)} | ${f(o.pqiAccess)} | ${f(o.pqiHpsa)} | ${f(o.er)} | ${f(o.erHpsa)} | ${f(o.readm)} | ${f(o.readmHpsa)} |`), '',
     '## 2. A practice can make it here vs clinician entry 2021 to 2025', '',
     '| Specialty | ZIPs | Viability score | Pay alone | Competition alone | Top vs bottom fifth | HPSA (same ZIPs) |', '|---|---|---|---|---|---|---|',

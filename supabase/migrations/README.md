@@ -92,6 +92,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 052 | `052_clinician_weight.sql` | `clinician_weight` (NPIs with a site weight below 1) and the `provider_individuals_weighted` view; public read, written only by `dac-load.yml` | applied 2026-11-19 by `dac-load.yml` apply: 1,273,119 clinicians with a weight below 1 |
 | 053 | `053_listing_counts_zip.sql` | `listing_counts_zip`: listings per ZIP, code and table for market-score; public read, written only by `listing-counts.yml` | applied 2026-11-19 by `listing-counts.yml` apply: 1,883,409 rows, 9,548,758 listings |
 | 054 | `054_zip_centres.sql` | `zip_centres` (Census Gazetteer centres and ACS adults for ZCTAs PLACES lacks) and the `zip_geo` view; public read, written only by `zip-centres.yml` | applied 2026-11-19 by `zip-centres.yml` apply: 775 ZCTAs with adults (Puerto Rico 132, 2.71M adults), Gazetteer 2025 |
+| 055 | `055_county_preventable_stays.sql` | `county_preventable_stays` (County Health Rankings preventable hospital stays per county), public read, written only by `chr-preventable-stays.yml` | not yet applied (the job's apply runs it) |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

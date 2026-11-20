@@ -1,5 +1,5 @@
 // Back-test scorer on synthetic data: entry, catchments, HPSA matching.
-import { run, summarize, parseCsv, outcomes, pqiComposite } from './backtest-entry.mjs';
+import { run, summarize, parseCsv, outcomes } from './backtest-entry.mjs';
 let pass = 0, fail = 0;
 const check = (n, ok, d = '') => { if (ok) { pass++; console.log('  PASS  ' + n); } else { fail++; console.log('  FAIL  ' + n + (d ? ' :: ' + d : '')); } };
 const PC = '207Q00000X';   // family medicine
@@ -39,8 +39,6 @@ check('CSV reader keeps commas inside quotes', parseCsv('a,b\n"x, y",{"k":1}\n')
   check('counties under 30 give no correlation, never a made-up one', o[0].counties === 2 && o[0].pqi === null);
 }
 {
-  const u = pqiComposite([{ pq: [1, 1, 1, 1, null, null, null] }, { pq: [3, 3, 3, 3, 3, null, null] }, { pq: [2, null, null, null, 2, 2, 2] }]);
-  check('avoidable admissions: ranks averaged over the rates a county has, 4 or more', u[0].pqi === 0 && u[1].pqi === 100 && u[2].pqi === 37.5, JSON.stringify(u.map(x => x.pqi)));
 }
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
