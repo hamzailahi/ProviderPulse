@@ -27,4 +27,4 @@ $END;
 SQL
 )
 echo "$OUT"
-{ echo "# Avoidable admission rates load ($MODE, $(date -u +%F))"; echo; echo "Source: CMS Medicare Geographic Variation by county, BENE_AGE_LVL All. Only the *_admits_* columns and pqi_year of rows matching (fips, year) are written."; echo; echo '```'; echo "$OUT"; echo '```'; } > supabase/reference/gv-pqi-load.md
+{ echo "# Avoidable admission rates load ($MODE, $(date -u +%F))"; echo; echo "Source: CMS Medicare Geographic Variation by county, BENE_AGE_LVL All. Only the *_admits_* columns and pqi_year are written, per county from its newest year with rates."; echo; echo '```'; echo "$OUT"; echo '```'; } > supabase/reference/gv-pqi-load.md
