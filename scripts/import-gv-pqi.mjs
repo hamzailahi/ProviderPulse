@@ -28,6 +28,7 @@ for await (const row of fetchCsvRows(url, 'gv')) {
   if (!/^county$/i.test(lvl) || !/^all$/i.test(String(age).trim())) continue;
   const fips = String(row[idx('BENE_GEO_CD')]).trim().padStart(5, '0');
   if (!/^\d{5}$/.test(fips)) continue;
+  if (kept < 3 || (kept % 5000 === 0)) console.log('sample', fips, row[idx('YEAR')], Object.entries(m.map).slice(0, 6).map(([c, i]) => c + '=' + JSON.stringify(row[i])).join(' '));
   const vals = COLUMNS.map(c => (c in m.map ? num(row[m.map[c]]) : null));
   out.write([fips, String(row[idx('YEAR')]).trim(), ...vals.map(v => v ?? '')].join(',') + '\n'); kept++;
 }
