@@ -94,7 +94,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 054 | `054_zip_centres.sql` | `zip_centres` (Census Gazetteer centres and ACS adults for ZCTAs PLACES lacks) and the `zip_geo` view; public read, written only by `zip-centres.yml` | applied 2026-11-19 by `zip-centres.yml` apply: 775 ZCTAs with adults (Puerto Rico 132, 2.71M adults), Gazetteer 2025 |
 | 055 | `055_county_preventable_stays.sql` | `county_preventable_stays` (County Health Rankings preventable hospital stays per county), public read, written only by `chr-preventable-stays.yml` | applied 2026-11-20 by `chr-preventable-stays.yml` apply: 3,069 counties, CHR 2025 release, median 2,743 per 100,000 |
 | 056 | `056_clinician_medicare_address.sql` | Medicare address columns on `provider_individuals` (`address_source`, `address_checked`, `nppes_*`) and `clinician_medicare_sites`, public read; written only by `address-check.yml` apply | applied 2026-11-20 by `address-check.yml` apply: 138,150 clinicians shown at their Medicare address (115,647 with a pin), 1,002,333 other Medicare offices |
-| 057 | `057_market_concentration.sql` | `market_concentration`: HHI by Medicare billing group per ZIP3 and specialty, public read; written only by `hhi-build.yml` | not yet applied (the job's apply runs it) |
+| 057 | `057_market_concentration.sql` | `market_concentration`: HHI by Medicare billing group per ZIP3 and specialty, public read; written only by `hhi-build.yml` | applied 2026-11-20 by `hhi-build.yml` apply: 16,938 cells |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

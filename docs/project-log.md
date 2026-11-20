@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 417 changes over 68 working days, 2026-05-13 to 2026-11-20.
-- 2026-08-19 onward: from the README changelog (243 entries, written for a reader).
+- 418 changes over 68 working days, 2026-05-13 to 2026-11-20.
+- 2026-08-19 onward: from the README changelog (244 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 82 |
+| November 2026 | 83 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-20
+
+- Market concentration is live on Insights: 16,938 ZIP3 and specialty figures nationwide, shown beside competitors and never scored.
 
 - Insights will show market concentration for each specialty (how much of the local Medicare clinicians the largest billing groups hold), as a fact beside competitors and never part of the score. A monthly job computes it for every ZIP3 area in the country.
 
