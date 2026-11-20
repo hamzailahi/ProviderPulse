@@ -24,6 +24,9 @@ Every change that lands on `main` must update `README.md` in the same push:
 3. Bump the "Last updated" date near the top.
 4. Run `node scripts/build-project-log.mjs` to regenerate `docs/project-log.md`
    (the dated review log the user asked for, 2026-11-20); CI runs `--check`.
+   Work before the changelog (2026-05-13 to 2026-08-16) comes from git, saved
+   once to `docs/project-log-early.md` by `--from-git 2026-08-19` (needs a full
+   clone); do not regenerate it from a shallow clone.
 
 Keep this file current too. When a change makes a section below wrong, fix
 the section in the same commit.
