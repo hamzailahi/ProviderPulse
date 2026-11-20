@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 415 changes over 68 working days, 2026-05-13 to 2026-11-20.
-- 2026-08-19 onward: from the README changelog (241 entries, written for a reader).
+- 416 changes over 68 working days, 2026-05-13 to 2026-11-20.
+- 2026-08-19 onward: from the README changelog (242 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 80 |
+| November 2026 | 81 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-20
+
+- Market concentration dry run now links doctors to health systems through their hospitals: about 55% of Medicare clinicians in Memphis and Fort Worth tie to a system, and Memphis reads far more concentrated by system than by practice group (Baptist alone holds 40 to 79% in many specialties).
 
 - New read-only dry run that measures how concentrated each local market is (HHI) by Medicare group and by hospital-linked health system, starting with Memphis and Fort Worth.
 
