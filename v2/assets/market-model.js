@@ -42,7 +42,7 @@
 (function (global) {
   'use strict';
 
-  var VERSION = '2026-11-20.1';
+  var VERSION = '2026-11-20.2';
 
   // The HRSA shortage factor (HPSA score, 0.10) was retired 2026-11-19, the
   // user's choice: HPSA is itself a population-to-provider ratio, the method
@@ -94,6 +94,28 @@
     'Ear, nose & throat': 1, 'Urgent care & emergency': 1, 'Imaging & lab': 1,
     'Hospice & palliative care': 1
   };
+  // Payer yield (2026-11-20, the user's go-ahead after the back-test: it beat
+  // the insured rate against clinician entry in all 40 specialties). What an
+  // average resident's coverage pays a practice relative to Medicare: Census
+  // coverage counts weighted by published payment levels (commercial 1.43,
+  // MedPAC / KFF; Medicaid 0.72, Urban Institute fee index; Medicare 1.0;
+  // uninsured 0), averaged over coverage counts because types overlap, times
+  // the insured share. Null when any count is missing.
+  var YIELD = { commercial: 1.43, medicare: 1.0, medicaid: 0.72 };
+  function payerYield(a) {
+    if (!a || a.insured == null || a.medicare == null || a.medicaid == null || a.employer == null) return null;
+    var c = (a.employer || 0) + (a.direct || 0) + (a.tricare || 0), n = c + a.medicare + a.medicaid;
+    if (!(n > 0)) return null;
+    return a.insured * (c * YIELD.commercial + a.medicare * YIELD.medicare + a.medicaid * YIELD.medicaid) / n;
+  }
+  function payerMix(a) {
+    if (!a || a.medicare == null || a.medicaid == null || a.employer == null) return null;
+    var c = (a.employer || 0) + (a.direct || 0) + (a.tricare || 0), n = c + a.medicare + a.medicaid;
+    if (!(n > 0)) return null;
+    var r = function (v) { return Math.round(v / n * 100); };
+    return { commercial_pct: r(c), medicare_pct: r(a.medicare), medicaid_pct: r(a.medicaid), uninsured_pct: Math.round((1 - a.insured) * 100) };
+  }
+
   function weightsFor(label) {
     var a = ACCESS_SHARE.hasOwnProperty(label) ? ACCESS_SHARE[label] : 1;
     var w = { need: WEIGHTS.need, access: WEIGHTS.access * a, pay: WEIGHTS.pay }, t = w.need + w.access + w.pay;
@@ -353,10 +375,13 @@
 
       /* ---- pay ---- */
       var pay = input.pay || {};
-      if (pay.insuredPct != null) {
-        f.pay = clamp(pay.incomePct != null ? pay.insuredPct * 0.7 + pay.incomePct * 0.3 : pay.insuredPct);
+      var payBase = pay.yieldPct != null ? pay.yieldPct : pay.insuredPct;
+      if (payBase != null) {
+        f.pay = clamp(pay.incomePct != null ? payBase * 0.7 + pay.incomePct * 0.3 : payBase);
         ev.pay = { insured_pct: Math.round(pay.insuredPct), income_pct: pay.incomePct == null ? null : Math.round(pay.incomePct),
-          income_basis: pay.incomePct == null ? null : (pay.incomeBasis || 'census75'), income_detail: pay.incomeDetail || null };
+          income_basis: pay.incomePct == null ? null : (pay.incomeBasis || 'census75'), income_detail: pay.incomeDetail || null,
+          basis: pay.yieldPct != null ? 'payer_yield' : 'insured', yield_pct: pay.yieldPct == null ? null : Math.round(pay.yieldPct), payer_mix: pay.payerMix || null };
+        if (pay.insuredPct == null) ev.pay.insured_pct = null;
       }
 
       /* ---- shortage ---- */
@@ -570,7 +595,7 @@
   }
 
   var API = {
-    VERSION: VERSION, WEIGHTS: WEIGHTS, ACCESS_SHARE: ACCESS_SHARE, UNVALIDATED: UNVALIDATED, weightsFor: weightsFor, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
+    VERSION: VERSION, WEIGHTS: WEIGHTS, YIELD: YIELD, payerYield: payerYield, payerMix: payerMix, ACCESS_SHARE: ACCESS_SHARE, UNVALIDATED: UNVALIDATED, weightsFor: weightsFor, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
     score: score, classify: classify, pct: pct, rankIn: rankIn, measureIds: measureIds, MEASURE_NAME: MEASURE_NAME,
     FACILITY_TYPES: FACILITY_TYPES, facilities: facilities, facilityCodes: facilityCodes
   };

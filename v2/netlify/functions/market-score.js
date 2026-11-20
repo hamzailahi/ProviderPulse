@@ -89,7 +89,7 @@ function demoShares(r) {
 // income half of the ability-to-pay factor when this ZIP and enough of its
 // state have it; otherwise the coarser demographics_raw share above is used and
 // the evidence says so. ACS top-codes ZIP household income at $200,000 or more.
-const ACS_COLS = 'zip,households,median_hh_income,poverty_universe,poverty_below,income_bands';
+const ACS_COLS = 'zip,households,median_hh_income,poverty_universe,poverty_below,income_bands,ins_universe,ins_uninsured,ins_medicare,ins_medicaid,signals';
 function acsShares(r) {
   if (!r) return null;
   const hh = Number(r.households) || 0;
@@ -713,6 +713,24 @@ exports.handler = async (event) => {
                 low_poverty_pct: arank('poverty') == null ? null : Math.round(100 - arank('poverty'))
               };
             }
+          }
+
+          // Payer yield (2026-11-20): replaces the insured rate in the pay factor
+          // when this ZIP and 30+ ZIPs in its state have coverage counts.
+          const coverage = r => {
+            if (!r) return null;
+            const u = Number(r.ins_universe), sig = r.signals || {}, n = k => (sig[k] && sig[k].n != null ? Number(sig[k].n) : null);
+            return {
+              insured: u > 0 && r.ins_uninsured != null ? 1 - Number(r.ins_uninsured) / u : null,
+              medicare: r.ins_medicare == null ? null : Number(r.ins_medicare), medicaid: r.ins_medicaid == null ? null : Number(r.ins_medicaid),
+              employer: n('employer'), direct: n('direct'), tricare: n('tricare')
+            };
+          };
+          const myCov = coverage(acsRows.find(r => String(r.zip).padStart(5, '0') === zip));
+          const myYield = MarketModel.payerYield(myCov);
+          if (myYield != null) {
+            const ys = acsRows.map(r => MarketModel.payerYield(coverage(r))).filter(v => v != null && isFinite(v));
+            if (ys.length >= ACS_MIN_SAMPLE) { pay.yieldPct = MarketModel.rankIn(ys, myYield); pay.payerMix = MarketModel.payerMix(myCov); }
           }
 
           // Federal shortage for this ZIP's own county when it can be matched,

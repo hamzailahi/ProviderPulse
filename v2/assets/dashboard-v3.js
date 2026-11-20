@@ -756,7 +756,7 @@ var ARCH_TONE = { prime: 'good', unserved: 'good', safety_net: 'warm', latent: '
 var FACTORS = [
   ['need', 'Health need', 'How common the conditions this specialty treats are here, vs US ZIPs'],
   ['access', 'Access gap', 'Higher when there are fewer clinicians per adult than nationally'],
-  ['pay', 'Ability to pay', 'Insured rate and household income, ranked within the state']
+  ['pay', 'Ability to pay', 'What local coverage typically pays (commercial, Medicare, Medicaid, uninsured) and household income, ranked within the state']
 ];
 // Competition is shown as a fact, not scored (2026-11-19: the back-test found
 // new clinicians set up near competitors, not away from them).
@@ -780,7 +780,11 @@ function evidenceLine(k, e) {
   if (k === 'access') return fmtN(e.clinicians) + ' within the catchment' + (e.per_1k != null ? ', ' + e.per_1k + ' per 1,000 adults' : '') +
     (e.national_per_1k ? ' vs ' + e.national_per_1k + ' nationally' : ' (compared at group level)');
   if (k === 'pay') {
-    var det = e.income_detail;
+    var det = e.income_detail, mx = e.payer_mix;
+    if (e.basis === 'payer_yield' && mx) {
+      return 'Payer yield ' + ordinal(e.yield_pct) + ' in state · coverage ' + mx.commercial_pct + '% commercial, ' + mx.medicare_pct + '% Medicare, ' + mx.medicaid_pct + '% Medicaid, ' + mx.uninsured_pct + '% uninsured' +
+        (det && det.median_income != null ? ' · median household income ' + (det.median_income > 250000 ? '$250,000+' : '$' + fmtN(det.median_income)) : '') + ' (coverage types overlap)';
+    }
     if (e.income_basis === 'acs' && det) {
       return 'Insured ' + ordinal(e.insured_pct) + (det.median_income != null ? ' · median household income ' + (det.median_income > 250000 ? '$250,000+' : '$' + fmtN(det.median_income)) + ' (' + ordinal(det.median_pct) + ')' : '') +
         (det.share_100k != null ? ' · ' + det.share_100k + '% of households at $100k+ (' + ordinal(det.share_100k_pct) + ')' : '') +

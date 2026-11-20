@@ -52,14 +52,8 @@ export const MIN_ADULTS = 1000;
 // review), Medicaid 0.72x (Urban Institute Medicaid-to-Medicare fee index,
 // national), Medicare 1.0, uninsured 0. Coverage types overlap, so the
 // weights are averaged over coverage counts and scaled by the insured share.
-export const YIELD = { commercial: 1.43, medicare: 1.0, medicaid: 0.72 };
-export function payerYield(a) {
-  if (a.insured == null) return null;
-  const c = (a.employer || 0) + (a.direct || 0) + (a.tricare || 0), m = a.medicare, d = a.medicaid;
-  if (m == null || d == null || a.employer == null) return null;
-  const n = c + m + d; if (!(n > 0)) return null;
-  return a.insured * (c * YIELD.commercial + m * YIELD.medicare + d * YIELD.medicaid) / n;
-}
+export const YIELD = MarketModel.YIELD;
+export const payerYield = MarketModel.payerYield;
 
 export function run(input, opts = {}) {
   const { counts, zips, places, bench, hpsa, zipcounty } = input;

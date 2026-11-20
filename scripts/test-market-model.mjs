@@ -189,5 +189,14 @@ console.log('Learned access weight (2026-11-20)');
   check('the score ignores access when its share is 0', Math.abs(r.score - (r.factors.need * z.need + r.factors.pay * z.pay) / (z.need + z.pay)) <= 1, JSON.stringify([r.score, r.factors]));
   check('viability is ability to pay', r.scores.viability === (r.factors.pay == null ? null : Math.round(r.factors.pay)));
 }
+console.log('Payer yield (2026-11-20)');
+{
+  const lo = one(base({ rows: cardRows(5, 6), pay: { insuredPct: 90, incomePct: 50, yieldPct: 20 } }));
+  const hi = one(base({ rows: cardRows(5, 6), pay: { insuredPct: 90, incomePct: 50, yieldPct: 80 } }));
+  check('yield replaces the insured rate in pay', lo.factors.pay === 29 && hi.factors.pay === 71 && hi.evidence.pay.basis === 'payer_yield', JSON.stringify([lo.factors.pay, hi.factors.pay]));
+  const old = one(base({ rows: cardRows(5, 6), pay: { insuredPct: 90, incomePct: 50 } }));
+  check('no yield keeps the insured rate', old.factors.pay === 78 && old.evidence.pay.basis === 'insured');
+  check('payer mix shares', JSON.stringify(M.payerMix({ insured: 0.9, employer: 60, direct: 0, tricare: 0, medicare: 25, medicaid: 15 })) === '{"commercial_pct":60,"medicare_pct":25,"medicaid_pct":15,"uninsured_pct":10}');
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
