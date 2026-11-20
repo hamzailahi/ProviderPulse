@@ -62,13 +62,14 @@ for await (const o of rows(fa.url)) {
 // 3. AHRQ hospital linkage (CCN to system). Direct, else the archive's copy.
 const ahrq = 'https://www.ahrq.gov/sites/default/files/wysiwyg/chsp/compendium/chsp-hospital-linkage-2023.csv';
 const f = '/tmp/ahrq-hosp.csv';
-const okF = () => existsSync(f) && statSync(f).size > 100000 && !/<html/i.test(readFileSync(f, 'utf8').slice(0, 500));
-for (const u of [ahrq, 'https://web.archive.org/web/2026id_/' + ahrq]) { if (okF()) break; try { execSync(`curl -sSL --retry 3 -A "Mozilla/5.0" -o ${f} "${u}"`); } catch {} }
+const okF = () => existsSync(f) && statSync(f).size > 100000 && !/<(!doctype|html)/i.test(readFileSync(f, 'utf8').slice(0, 2000));
+for (const u of [ahrq, 'https://web.archive.org/web/2026id_/' + ahrq]) { if (okF()) break; try { execSync(`curl -sSL --compressed --retry 3 -A "Mozilla/5.0" -o ${f} "${u}"`); } catch {} }
 if (!okF()) throw new Error('AHRQ hospital linkage did not download');
 const sysOf = new Map(), sysName = new Map();
-const lines = readFileSync(f, 'utf8').split(/\r?\n/); const h = splitCsv(lines[0]).map(x => x.trim().toLowerCase());
+const lines = readFileSync(f, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/); const h = splitCsv(lines[0]).map(x => x.replace(/^"|"$/g, '').trim().toLowerCase());
+console.log('AHRQ header', h.join(','), '| line 1', lines[1]);
 const ix = (n) => h.indexOf(n);
-for (const l of lines.slice(1)) { if (!l) continue; const r = splitCsv(l); const id = r[ix('health_sys_id')]; if (!id) continue; sysOf.set(String(r[ix('ccn')]).padStart(6, '0'), id); sysName.set(id, r[ix('health_sys_name')]); }
+for (const l of lines.slice(1)) { if (!l) continue; const r = splitCsv(l); const id = (r[ix('health_sys_id')] || '').trim(); const ccn = (r[ix('ccn')] || '').trim(); if (!id || !ccn) continue; sysOf.set(ccn.padStart(6, '0'), id); sysName.set(id, r[ix('health_sys_name')]); }
 console.log('AHRQ hospitals in a system', sysOf.size, 'sample', [...sysOf].slice(0, 3));
 { const all = [...clin.values()].flatMap(c => c.ccns); console.log('affiliation CCNs', all.length, 'matched', all.filter(x => sysOf.has(x)).length, 'sample', all.slice(0, 5)); }
 
