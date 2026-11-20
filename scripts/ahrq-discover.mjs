@@ -32,5 +32,6 @@ for (const f of csvs) {
   const n = execSync(`wc -l < "${f}"`).toString().trim();
   out.push(`## ${f.split('/').pop()}`, '', `- rows: ${n}`, '- columns: ' + head[0].trim(), '', '```', ...head.slice(1, 4).map(x => x.slice(0, 600)), '```', '');
 }
+mkdirSync('supabase/reference/ahrq', { recursive: true });
 writeFileSync('supabase/reference/ahrq/discovery.md', out.join('\n'));
 console.log(out.join('\n'));
