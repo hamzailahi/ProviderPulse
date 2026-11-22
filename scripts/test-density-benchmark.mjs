@@ -47,16 +47,16 @@ check('benchmark is the state figure, labelled as a state benchmark', m.benchmar
 check('the finding names the state, never "national"', /TN average/.test(d.finding) && !/national/i.test(d.finding), d.finding);
 check('a market far below its state reads as "fewer than"', /fewer than the TN average/.test(d.finding), d.finding);
 check('supply term is used', typeof c.supply === 'number' && c.supply > 90, String(c.supply));
-const expected = Math.round(c.supply * 0.4 + c.payer * 0.3 + c.shortage * 0.3);
-check('score is the 40/30/30 blend', Math.abs(d.score - expected) <= 1, `${d.score} vs ${expected}`);
+const expected = Math.round(c.supply * 0.57 + c.payer * 0.43);
+check('score is the 57/43 supply and payer blend (shortage retired 2026-11-19)', Math.abs(d.score - expected) <= 1, `${d.score} vs ${expected}`);
 
 console.log('\n2. Benchmark missing: unknown is never average');
 stateBench = null;
 d = await run();
 check('no benchmark is reported as null, not a stand-in number', d.metrics.benchmark_per_1k === null && d.metrics.benchmark_scope === 'state');
 check('the supply term is left out, not set to 50', d.components.supply === null);
-const exp2 = Math.round((d.components.payer * 0.3 + d.components.shortage * 0.3) / 0.6);
-check('the score re-weights over payer and shortage', Math.abs(d.score - exp2) <= 1, `${d.score} vs ${exp2}`);
+const exp2 = Math.round(d.components.payer);
+check('the score re-weights over payer alone', Math.abs(d.score - exp2) <= 1, `${d.score} vs ${exp2}`);
 check('the finding still reports the density and says it was not compared', /0\.3 providers per 1,000 residents/.test(d.finding) && /not compared/.test(d.finding), d.finding);
 check('the finding makes no national or state comparison claim', !/national|fewer than|more than|in line with/i.test(d.finding), d.finding);
 

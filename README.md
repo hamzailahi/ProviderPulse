@@ -654,6 +654,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ### 2026-11-22
 
 - Dropped two database indexes nothing used, freeing about 140 MB of disk.
+- Fixed a stale test that still expected the retired shortage factor in the ZIP score.
 
 ### 2026-11-20
 
