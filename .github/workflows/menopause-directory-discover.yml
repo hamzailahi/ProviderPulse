@@ -1,0 +1,23 @@
+name: Menopause directory discovery
+# Read only (2026-11-22, the user's ask): records how The Menopause Society's
+# practitioner directory works (search form, robots.txt, terms of use) so a
+# licensing decision can be made. Saves no practitioner records.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Discover
+        run: bash scripts/menopause-directory-discover.sh
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add supabase/reference/menopause
+          git diff --cached --quiet || git commit -m "Menopause directory discovery [skip netlify]"
+          git pull --no-rebase --no-edit && git push
