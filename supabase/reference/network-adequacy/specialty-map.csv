@@ -1,0 +1,27 @@
+label,cms_code,cms_specialty,note
+Primary care / family doctor,S03,Primary Care,
+Women's health / OB-GYN,016,"Gynecology, OB/GYN",
+Mental health & counseling,029,Psychiatry,CMS also sets 036 Clinical Psychology and 037 Clinical Social Work; our label mixes all three
+Eye care,023,Ophthalmology,our label includes optometrists
+Chiropractic,010,Chiropractor,
+Physical & occupational therapy,F049,Physical Therapy,a facility standard in CMS
+Orthopedics & sports injury,025,Orthopedic Surgery,
+Heart / cardiology,008,Cardiology,
+Skin / dermatology,011,Dermatology,
+Allergy & immunology,007,Allergy and Immunology,
+"Lung, breathing & sleep",030,Pulmonology,
+Digestive / gastroenterology,014,Gastroenterology,
+Kidney / nephrology,018,Nephrology,
+Diabetes & hormones,012,Endocrinology,
+Cancer care / oncology,021,"Oncology - Medical, Surgical",
+Arthritis / rheumatology,031,Rheumatology,
+Brain & nerves / neurology,019,Neurology,
+"Ear, nose & throat",013,ENT/Otolaryngology,
+Urology,033,Urology,
+Foot & ankle / podiatry,028,Podiatry,
+Plastic & reconstructive surgery,027,Plastic Surgery,
+Speech & language therapy,F051,Speech Therapy,a facility standard in CMS
+Imaging & lab,F047,Diagnostic Radiology,a facility standard; our label includes labs
+Nursing & assisted living,F046,Skilled Nursing Facilities,
+General surgery,015,General Surgery,
+Infectious disease,017,Infectious Diseases,

@@ -18,6 +18,7 @@ set local statement_timeout = '30min';
 \\copy (select key, data->>'rate_per_1k' from public.market_benchmarks where kind = 'specialty') to '$WORK/bench.csv' with (format csv, header true)
 \\copy (select z, taxonomy_code, sum(n) from (select left(zip, 5) z, taxonomy_code, count(*) n from public.clinics where taxonomy_code is not null and left(zip, 5) in (select zip from public.zip_geo where true and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON) group by 1, 2 union all select left(zip, 5), taxonomy_code, count(*) from public.provider_individuals where taxonomy_code is not null and left(zip, 5) in (select zip from public.zip_geo where true and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON) group by 1, 2) x group by 1, 2) to '$WORK/supply.csv' with (format csv, header true)
 \\copy (select zip, (signals->'no_vehicle'->>'n')::numeric / nullif((signals->'no_vehicle'->>'of')::numeric, 0) as share from public.census_acs_zcta where signals ? 'no_vehicle' and (signals->'no_vehicle'->>'of')::numeric > 0) to '$WORK/nocar.csv' with (format csv, header true)
+\\copy (select distinct on (x.zip) x.zip, e.state, e.county from public.zip_county_crosswalk x join public.medicare_county_enrollment e on e.fips = x.fips order by x.zip, x.res_ratio desc) to '$WORK/zipcounty.csv' with (format csv, header true)
 commit;
 SQL
 echo "   $(($(wc -l < "$WORK/zips.csv") - 1)) ZIPs, $(($(wc -l < "$WORK/supply.csv") - 1)) ZIP x code supply rows"
@@ -63,8 +64,9 @@ echo "== E2SFCA"
 slug=$(echo "${STATE_LABEL:-region}" | tr 'A-Z ' 'a-z-')
 node scripts/access-dry-run.mjs --zips "$WORK/zips.csv" --supply "$WORK/supply.csv" --bench "$WORK/bench.csv" \
   --osrm http://127.0.0.1:5000 --osrm-foot http://127.0.0.1:5001 --nocar "$WORK/nocar.csv" --focus "$FOCUS" --label "${STATE_LABEL:-region}" --sample "${SAMPLE:-}" \
+  --td supabase/reference/network-adequacy/time-distance.csv --specmap supabase/reference/network-adequacy/specialty-map.csv --zipcounty "$WORK/zipcounty.csv" --burden "$WORK/$slug-burden.csv" \
   --report "$REF/$slug-dry-run.md" --csv "$WORK/$slug-access.csv" --load "$WORK/load.csv"
-gzip -kf "$WORK/$slug-access.csv"
+gzip -kf "$WORK/$slug-access.csv"; [ -f "$WORK/$slug-burden.csv" ] && gzip -kf "$WORK/$slug-burden.csv"
 docker rm -f osrm osrmfoot >/dev/null || true
 
 # ---- apply (the user's go-ahead for Tennessee, 2026-11-18): store the

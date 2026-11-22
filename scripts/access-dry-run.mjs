@@ -221,6 +221,43 @@ for (const [label] of SCORED) {
 if (arg('load')) writeFileSync(arg('load'), 'zip,specialty,per_1k,catchment_minutes\n' + load.join('\n') + '\n');
 writeFileSync(arg('csv'), 'specialty,zip,adults,crude_per_1k,e2sfca_per_1k,crude_access,e2sfca_access,catchment_minutes,flag,car_only_per_1k,car_only_access,slowdown_per_1k,slowdown_access,no_car_share\n' + rows.join('\n') + '\n');
 
+
+// ---- step 8 (2026-11-22): travel burden against CMS Medicare Advantage time
+// standards. Per focus ZIP and mapped specialty: drive minutes from the ZIP
+// centre to the nearest ZIP holding a listing, against CMS's maximum minutes
+// for the ZIP's main county (HUD crosswalk, most homes), matched to the HSD
+// file by state and county name (the HSD file keys counties by SSA code, and
+// no FIPS is in it). A fact for review, not a score.
+const qcsv = p => readFileSync(p, 'utf8').trim().split('\n').slice(1).map(l => { const o = []; let cur = '', q = false; for (const ch of l) { if (ch === '"') q = !q; else if (ch === ',' && !q) { o.push(cur); cur = ''; } else cur += ch; } o.push(cur); return o; });
+const normCounty = s => String(s || '').toLowerCase().replace(/\b(county|parish|borough|census area|municipality|city and borough)\b/g, '').replace(/^st\.? /, 'saint ').replace(/[^a-z]/g, '');
+let burden = null;
+if (arg('td') && arg('specmap') && arg('zipcounty')) {
+  const td = new Map();   // state|county|code -> {min, des}
+  for (const [, st, county, des, code, , mx] of qcsv(arg('td'))) td.set(`${st}|${normCounty(county)}|${code}`, { max: +mx, des });
+  const zc = new Map(qcsv(arg('zipcounty')).map(([z, st, county]) => [z, { st, county }]));
+  const smap = qcsv(arg('specmap')).map(([label, code]) => [label, code]);
+  burden = { rows: [], unmatched: new Set(), out: [] };
+  for (const [label, code] of smap) {
+    const supply = new Map();
+    for (const c of TaxonomyMap.codesFor(label)) for (const [z, n] of byCode.get(c) || []) supply.set(z, (supply.get(z) || 0) + n);
+    const has = [...supply.keys()].filter(z => idx.has(z)).map(z => idx.get(z));
+    const agg = {}; let ok = 0, over = 0, adOk = 0, adOver = 0, none = 0;
+    for (const z of focus) {
+      const c = zc.get(z.zip); const lim = c && td.get(`${c.st}|${normCounty(c.county)}|${code}`);
+      if (!lim) { if (c) burden.unmatched.add(`${c.st} ${c.county}`); continue; }
+      const i = idx.get(z.zip); let m = Infinity;
+      for (const j of has) { const v = T[i * N + j]; if (Number.isFinite(v) && v < m) m = v; }
+      const a = agg[lim.des] || (agg[lim.des] = { n: 0, over: 0, ad: 0, adOver: 0 });
+      a.n++; a.ad += z.adults;
+      if (!Number.isFinite(m)) none++;
+      const bad = !Number.isFinite(m) || m > lim.max;
+      if (bad) { over++; adOver += z.adults; a.over++; a.adOver += z.adults; burden.out.push([label, z.zip, c.county, lim.des, Number.isFinite(m) ? m.toFixed(0) : 'none', lim.max, z.adults]); }
+      else { ok++; adOk += z.adults; }
+    }
+    burden.rows.push({ label, code, n: ok + over, over, ad: adOk + adOver, adOver, none, agg });
+  }
+}
+
 // ---- report
 const r2 = v => (v == null ? 'n/a' : v.toFixed(2));
 const SAMPLE = (arg('sample') || '').split(/[ ,]+/).filter(z => idx.has(z));
@@ -261,6 +298,16 @@ if (SAMPLE.length) {
   const want = new Set(['Primary care / family doctor', 'Heart / cardiology', 'Cancer care / oncology', 'Mental health & counseling', 'Urgent care & emergency']);
   for (const z of SAMPLE) for (const r of rows) { const c = r.split(','); if (c[1] === z && want.has(c[0])) lines.push(`| ${z} | ${c[0]} | ${c[3]} | ${c[4]} | ${c[5]} | ${c[6]} |`); }
   lines.push('');
+}
+if (burden) {
+  const pct = (a, b) => (b ? (100 * a / b).toFixed(1) + '%' : 'n/a');
+  lines.push('## Travel burden against CMS Medicare Advantage limits', '',
+    'Drive minutes from each ZIP centre to the nearest ZIP with a listing in the specialty, against the maximum minutes CMS sets for Medicare Advantage networks (2026 HSD Reference File) in the ZIP\'s main county. The CMS limit applies to a plan\'s network; here it is read against every listing, so a ZIP over the limit has no clinician of that kind within the limit at all. Specialty pairs are in `supabase/reference/network-adequacy/specialty-map.csv` (reviewable). Not scored.', '',
+    `- Counties not matched by name to the HSD file: ${burden.unmatched.size}${burden.unmatched.size ? ' (' + [...burden.unmatched].slice(0, 20).join(', ') + ')' : ''}`, '',
+    '| Specialty | CMS code | ZIPs over the limit | Adults in them | Large Metro | Metro | Micro | Rural | CEAC |', '|---|---|---|---|---|---|---|---|---|',
+    ...burden.rows.map(r => `| ${r.label} | ${r.code} | ${r.over} of ${r.n} | ${Math.round(r.adOver).toLocaleString()} (${pct(r.adOver, r.ad)}) | ${['Large Metro', 'Metro', 'Micro', 'Rural', 'CEAC'].map(d => r.agg[d] ? `${r.agg[d].over}/${r.agg[d].n}` : '').join(' | ')} |`), '',
+    'Designation cells are ZIPs over the limit out of ZIPs of that county type.', '');
+  if (arg('burden')) writeFileSync(arg('burden'), 'specialty,zip,county,designation,nearest_minutes,cms_max_minutes,adults\n' + burden.out.map(r => r.map((v, k) => k === 0 || k === 2 ? '"' + String(v).replace(/"/g, '""') + '"' : v).join(',')).join('\n') + '\n');
 }
 lines.push('## Reading this', '',
   '- E2SFCA counts clinicians just outside a fixed 10-mile circle (with a smaller weight) and stops counting ones that are close in a straight line but a long drive away (across a river or mountain).',

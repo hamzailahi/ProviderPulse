@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 422 changes over 69 working days, 2026-05-13 to 2026-11-22.
-- 2026-08-19 onward: from the README changelog (248 entries, written for a reader).
+- 423 changes over 69 working days, 2026-05-13 to 2026-11-22.
+- 2026-08-19 onward: from the README changelog (249 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 87 |
+| November 2026 | 88 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -18,6 +18,7 @@ Every change to the product, newest first, with the date it shipped. Generated f
 
 ## 2026-11-22
 
+- The drive-time access job now also checks travel burden: for each ZIP and specialty, minutes to the nearest clinician against CMS's 2026 Medicare Advantage time limit for that county type. Read only, shown in the state report for review, not scored.
 - Dropped two database indexes nothing used, freeing about 140 MB of disk.
 - 9,834 more listings now have an exact map pin from the National Address Database, including many doctors moved to their current Medicare address.
 - Started step 8: a read-only job finds CMS's Medicare Advantage travel time and distance limits per specialty, so each area can be checked against them.
