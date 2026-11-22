@@ -2,19 +2,23 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 418 changes over 68 working days, 2026-05-13 to 2026-11-20.
-- 2026-08-19 onward: from the README changelog (244 entries, written for a reader).
+- 419 changes over 69 working days, 2026-05-13 to 2026-11-22.
+- 2026-08-19 onward: from the README changelog (245 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 83 |
+| November 2026 | 84 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
 | July 2026 | 37 |
 | June 2026 | 22 |
 | May 2026 | 31 |
+
+## 2026-11-22
+
+- Dropped two database indexes nothing used, freeing about 140 MB of disk.
 
 ## 2026-11-20
 

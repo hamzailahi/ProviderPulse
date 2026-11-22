@@ -651,6 +651,10 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
 
+### 2026-11-22
+
+- Dropped two database indexes nothing used, freeing about 140 MB of disk.
+
 ### 2026-11-20
 
 - Market concentration is live on Insights: 16,938 ZIP3 and specialty figures nationwide, shown beside competitors and never scored.
