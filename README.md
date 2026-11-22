@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-22
 
+- Patients typing "perimenopause", "hot flashes" or "HRT" now get women's health clinicians, as "menopause" already did.
 - Added a read-only check of The Menopause Society's practitioner directory (its search form, robots rules and terms of use) to decide whether its list can be licensed or linked. It saves no practitioner records.
 - The travel-burden check now judges mental health three ways, as CMS does: psychiatrists, psychologists and social workers each against their own drive-time limit.
 - The drive-time access job now also checks travel burden: for each ZIP and specialty, minutes to the nearest clinician against CMS's 2026 Medicare Advantage time limit for that county type. Read only, shown in the state report for review, not scored.

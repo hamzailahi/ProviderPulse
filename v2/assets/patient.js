@@ -288,7 +288,7 @@ var CONDITION_HINTS = [
   [/\b(physical therap|rehab|occupational therap)/, 'Physical & occupational therapy'],
   [/\b(knee|shoulder|hip|fracture|sprain|sports injur|ortho|broken bone)/, 'Orthopedics & sports injury'],
   [/\b(kid|child|baby|infant|toddler|pediatr)/, 'Pediatrics (children)'],
-  [/\b(pregnan|prenatal|obgyn|ob-gyn|gyne|obstetric|midwi|women'?s health|period|menopaus)/, "Women's health / OB-GYN"],
+  [/\b(pregnan|prenatal|obgyn|ob-gyn|gyne|obstetric|midwi|women'?s health|period|menopaus|perimenopaus|hot flash|hormone replacement|hrt\b)/, "Women's health / OB-GYN"],
   [/\b(asthma|copd|lung|breath|sleep apnea|snor|pulmon)/, 'Lung, breathing & sleep'],
   [/\b(stomach|gut|acid reflux|reflux|ibs|colon|gastro|digest|crohn)/, 'Digestive / gastroenterology'],
   [/\b(kidney|renal|nephro|dialysis)/, 'Kidney / nephrology'],
