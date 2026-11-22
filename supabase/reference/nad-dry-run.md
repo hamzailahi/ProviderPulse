@@ -1,6 +1,6 @@
 # National Address Database: dry run
 
-Run 2026-11-22 19:33 UTC by scripts/nad-dry-run.sh. Nothing was written to the database.
+Run 2026-11-22 20:22 UTC by scripts/nad-dry-run.sh. Nothing was written to the database.
 
 Rule: the same ZIP, the same house number, and the same street or one of the placement job's one-word differences (scripts/lib/nad-match.mjs). Several matching points count as one place only within 100 m of each other.
 
@@ -287,8 +287,8 @@ How NAD placed the points it matched (its own `Placement` field):
 | (M | 1 | 0 (0.0%) |  |
 | VR | 1 | 0 (0.0%) |  |
 | GO | 1 | 0 (0.0%) |  |
-| IB | 1 | 0 (0.0%) |  |
 | IR | 1 | 0 (0.0%) |  |
+| IB | 1 | 0 (0.0%) |  |
 | PL | 1 | 0 (0.0%) |  |
 | BR | 1 | 0 (0.0%) |  |
 | SG | 1 | 0 (0.0%) |  |
@@ -297,21 +297,21 @@ How NAD placed the points it matched (its own `Placement` field):
 | UR | 1 | 0 (0.0%) |  |
 | ? | 1 | 0 (0.0%) |  |
 | JU | 1 | 0 (0.0%) |  |
-| OU | 1 | 0 (0.0%) |  |
 | TR | 1 | 0 (0.0%) |  |
+| OU | 1 | 0 (0.0%) |  |
 | IM | 1 | 0 (0.0%) |  |
 | 6T | 1 | 0 (0.0%) |  |
-| QA | 1 | 0 (0.0%) |  |
 | HU | 1 | 0 (0.0%) |  |
+| QA | 1 | 0 (0.0%) |  |
 | JJ | 1 | 0 (0.0%) |  |
-| RN | 1 | 0 (0.0%) |  |
-| 1  | 1 | 0 (0.0%) |  |
-| CL | 1 | 0 (0.0%) |  |
 | KL | 1 | 0 (0.0%) |  |
+| 1  | 1 | 0 (0.0%) |  |
+| RN | 1 | 0 (0.0%) |  |
+| CL | 1 | 0 (0.0%) |  |
 
 ## Agreement with the Census
 
-Of 3,000 listings the Census already placed exactly, NAD matched 1,601. Distance from the Census pin to the NAD point: median 66 m, 75th percentile 110 m, 90th percentile 200 m, 99th percentile 576 m; 22 more than 500 m apart.
+Of 3,000 listings the Census already placed exactly, NAD matched 1,485. Distance from the Census pin to the NAD point: median 61 m, 75th percentile 110 m, 90th percentile 196 m, 99th percentile 539 m; 18 more than 500 m apart.
 
 ## Examples (public listing addresses)
 
