@@ -56,3 +56,26 @@ for l in links:
 os.makedirs('supabase/reference/network-adequacy', exist_ok=True)
 open('supabase/reference/network-adequacy/discovery.md', 'w').write('\n'.join(out) + '\n')
 print('\n'.join(out[:40]))
+
+# Parse the newest file's "Provider Time & Distance" sheet into a long CSV:
+# ssacd, state, county, designation, code, specialty, max_minutes, max_miles.
+newest = next((l for l in links if l.lower().endswith('.xlsx')), None)
+if newest:
+  b = get(newest)
+  if len(b) < 1000 or b[:200].lower().find(b'<html') >= 0: b = get('https://web.archive.org/web/2026id_/' + newest)
+  wb = openpyxl.load_workbook(io.BytesIO(b), read_only=True, data_only=True)
+  rows_out = []
+  for sheet in ('Provider Time & Distance', 'Facility Time & Distance'):
+    ws = wb[sheet]; rows = list(ws.iter_rows(values_only=True))
+    names, codes = rows[1], rows[2]
+    pairs = [(i, str(codes[i]).strip(), str(names[i] or '').replace('(see Notes)', '').replace('\n', ' ').strip()) for i in range(5, len(codes)) if codes[i] not in (None, '')]
+    for r in rows[4:]:
+      if not r or not r[3]: continue
+      for i, code, name in pairs:
+        t, d = r[i], r[i + 1] if i + 1 < len(r) else None
+        if t in (None, '', 'NA') : continue
+        rows_out.append([str(r[3]).zfill(5), r[1], r[0], r[4], ('F' if sheet.startswith('Facility') else '') + code.zfill(3), name, t, d])
+  import csv
+  with open('supabase/reference/network-adequacy/time-distance.csv', 'w', newline='') as f:
+    w = csv.writer(f); w.writerow(['ssacd', 'state', 'county', 'designation', 'code', 'specialty', 'max_minutes', 'max_miles']); w.writerows(rows_out)
+  print('time-distance rows', len(rows_out), 'from', newest)
