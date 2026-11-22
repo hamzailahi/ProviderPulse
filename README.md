@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-22
 
+- The travel-burden check now judges mental health three ways, as CMS does: psychiatrists, psychologists and social workers each against their own drive-time limit.
 - The drive-time access job now also checks travel burden: for each ZIP and specialty, minutes to the nearest clinician against CMS's 2026 Medicare Advantage time limit for that county type. Read only, shown in the state report for review, not scored.
 - Dropped two database indexes nothing used, freeing about 140 MB of disk.
 - 9,834 more listings now have an exact map pin from the National Address Database, including many doctors moved to their current Medicare address.

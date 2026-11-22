@@ -235,11 +235,15 @@ if (arg('td') && arg('specmap') && arg('zipcounty')) {
   const td = new Map();   // state|county|code -> {min, des}
   for (const [, st, county, des, code, , mx] of qcsv(arg('td'))) td.set(`${st}|${normCounty(county)}|${code}`, { max: +mx, des });
   const zc = new Map(qcsv(arg('zipcounty')).map(([z, st, county]) => [z, { st, county }]));
-  const smap = qcsv(arg('specmap')).map(([label, code]) => [label, code]);
+  // A row may narrow the label to NUCC classifications (mental health is split
+  // into CMS's psychiatry, clinical psychology and clinical social work).
+  const smap = qcsv(arg('specmap')).map(([label, code, cms, , cls]) => [label, code, cms, (cls || '').split(';').filter(Boolean)]);
   burden = { rows: [], unmatched: new Set(), out: [] };
-  for (const [label, code] of smap) {
+  for (const [label0, code, cms, cls] of smap) {
+    const label = cls.length ? `${label0}: ${cms}` : label0;
+    const codes = TaxonomyMap.codesFor(label0).filter(c => !cls.length || cls.includes((TaxonomyMap.get(c) || {}).classification));
     const supply = new Map();
-    for (const c of TaxonomyMap.codesFor(label)) for (const [z, n] of byCode.get(c) || []) supply.set(z, (supply.get(z) || 0) + n);
+    for (const c of codes) for (const [z, n] of byCode.get(c) || []) supply.set(z, (supply.get(z) || 0) + n);
     const has = [...supply.keys()].filter(z => idx.has(z)).map(z => idx.get(z));
     const agg = {}; let ok = 0, over = 0, adOk = 0, adOver = 0, none = 0;
     for (const z of focus) {
