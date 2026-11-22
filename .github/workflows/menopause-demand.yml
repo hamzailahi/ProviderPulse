@@ -1,0 +1,36 @@
+name: Menopause demand dry run
+# Read only (2026-11-22, the user's ask): women aged 45 to 59 per menopause-care
+# clinician within 10 miles, per ZIP in one state. Commits the report only.
+on:
+  workflow_dispatch:
+    inputs:
+      state:
+        description: Two-letter state code
+        default: "TN"
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - run: sudo apt-get -o Acquire::Retries=8 install -y postgresql-client >/dev/null
+      - run: bash scripts/menopause-demand.sh
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          STATE: ${{ inputs.state }}
+      - name: Commit the report
+        run: |
+          git add supabase/reference/menopause
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Menopause demand dry run $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main

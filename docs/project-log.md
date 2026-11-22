@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 426 changes over 69 working days, 2026-05-13 to 2026-11-22.
-- 2026-08-19 onward: from the README changelog (252 entries, written for a reader).
+- 427 changes over 69 working days, 2026-05-13 to 2026-11-22.
+- 2026-08-19 onward: from the README changelog (253 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 91 |
+| November 2026 | 92 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -18,6 +18,7 @@ Every change to the product, newest first, with the date it shipped. Generated f
 
 ## 2026-11-22
 
+- New read-only menopause care demand check: women aged 45 to 59 per gynecology and women's health clinician within 10 miles of each ZIP, one state at a time. The Menopause Society's directory forbids unauthorized use, so none of its listings are copied.
 - Patients typing "perimenopause", "hot flashes" or "HRT" now get women's health clinicians, as "menopause" already did.
 - Added a read-only check of The Menopause Society's practitioner directory (its search form, robots rules and terms of use) to decide whether its list can be licensed or linked. It saves no practitioner records.
 - The travel-burden check now judges mental health three ways, as CMS does: psychiatrists, psychologists and social workers each against their own drive-time limit.

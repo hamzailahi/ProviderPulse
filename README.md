@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-22
 
+- New read-only menopause care demand check: women aged 45 to 59 per gynecology and women's health clinician within 10 miles of each ZIP, one state at a time. The Menopause Society's directory forbids unauthorized use, so none of its listings are copied.
 - Patients typing "perimenopause", "hot flashes" or "HRT" now get women's health clinicians, as "menopause" already did.
 - Added a read-only check of The Menopause Society's practitioner directory (its search form, robots rules and terms of use) to decide whether its list can be licensed or linked. It saves no practitioner records.
 - The travel-burden check now judges mental health three ways, as CMS does: psychiatrists, psychologists and social workers each against their own drive-time limit.
