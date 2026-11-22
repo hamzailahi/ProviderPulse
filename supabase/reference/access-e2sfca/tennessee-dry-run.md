@@ -191,7 +191,9 @@ Drive minutes from each ZIP centre to the nearest ZIP with a listing in the spec
 |---|---|---|---|---|---|---|---|---|
 | Primary care / family doctor | S03 | 39 of 620 | 65,736 (1.2%) |  | 19/292 | 16/202 | 4/126 |  |
 | Women's health / OB-GYN | 016 | 3 of 620 | 7,664 (0.1%) |  | 3/292 | 0/202 | 0/126 |  |
-| Mental health & counseling | 029 | 2 of 620 | 3,495 (0.1%) |  | 2/292 | 0/202 | 0/126 |  |
+| Mental health & counseling: Psychiatry | 029 | 11 of 620 | 32,180 (0.6%) |  | 4/292 | 6/202 | 1/126 |  |
+| Mental health & counseling: Clinical Psychology | 036 | 5 of 620 | 8,465 (0.2%) |  | 3/292 | 2/202 | 0/126 |  |
+| Mental health & counseling: Clinical Social Work | 037 | 19 of 620 | 43,781 (0.8%) |  | 16/292 | 3/202 | 0/126 |  |
 | Eye care | 023 | 24 of 620 | 84,908 (1.6%) |  | 22/292 | 2/202 | 0/126 |  |
 | Chiropractic | 010 | 3 of 620 | 4,122 (0.1%) |  | 3/292 | 0/202 | 0/126 |  |
 | Physical & occupational therapy | F049 | 2 of 620 | 3,495 (0.1%) |  | 2/292 | 0/202 | 0/126 |  |
