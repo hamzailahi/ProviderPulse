@@ -654,6 +654,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ### 2026-11-22
 
 - Dropped two database indexes nothing used, freeing about 140 MB of disk.
+- Started step 8: a read-only job finds CMS's Medicare Advantage travel time and distance limits per specialty, so each area can be checked against them.
 - Fixed a stale test that still expected the retired shortage factor in the ZIP score.
 
 ### 2026-11-20

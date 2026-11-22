@@ -1,0 +1,31 @@
+name: Network adequacy discovery
+
+# Manual, read only (2026-11-22, step 8): CMS Medicare Advantage time and
+# distance standards (HSD Reference File) to supabase/reference/network-adequacy/.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  discover:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q openpyxl
+      - run: python scripts/network-adequacy-discover.py
+      - name: Commit
+        run: |
+          git add supabase/reference/network-adequacy
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Network adequacy discovery $(date -u +%F) [skip netlify]"
+          git pull -q --rebase origin main
+          git push origin HEAD:main
