@@ -3,6 +3,7 @@
 # and no practitioner record is saved.
 set -uo pipefail
 OUT=supabase/reference/menopause/discovery.md
+mkdir -p "$(dirname "$OUT")"
 UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36'
 T=$(mktemp -d)
 get() { curl -sSL -A "$UA" --max-time 40 -o "$T/$2" -w '%{http_code} %{url_effective}' "$1" 2>&1 || true; }
