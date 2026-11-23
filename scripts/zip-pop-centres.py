@@ -5,6 +5,7 @@ Blocks with population 0 add nothing; a ZCTA whose blocks are all empty
 falls back to the unweighted mean of its block points (pop 0 in the output)."""
 import csv, io, os, sys, urllib.request, zipfile, time
 import pyogrio
+import pyogrio.raw
 
 W, OUT = sys.argv[1], sys.argv[2]
 UA = {'User-Agent': 'Mozilla/5.0 (ProviderPulse data job)'}
@@ -41,9 +42,12 @@ for st in STATES:
     get(f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_{st}_tabblock20.zip', z)
     with zipfile.ZipFile(z) as zf: zf.extractall(os.path.join(W, st))
     shp = [n for n in os.listdir(os.path.join(W, st)) if n.endswith('.shp')][0]
-    df = pyogrio.read_dataframe(os.path.join(W, st, shp), read_geometry=False, columns=['GEOID20', 'POP20', 'INTPTLAT20', 'INTPTLON20'])
+    cols = ['GEOID20', 'POP20', 'INTPTLAT20', 'INTPTLON20']
+    meta, _, _, field_data = pyogrio.raw.read(os.path.join(W, st, shp), read_geometry=False, columns=cols)
+    fd = dict(zip(meta['fields'], field_data))
+    df = fd['GEOID20']
     n = 0
-    for g, p, la, lo in zip(df['GEOID20'], df['POP20'], df['INTPTLAT20'], df['INTPTLON20']):
+    for g, p, la, lo in zip(fd['GEOID20'], fd['POP20'], fd['INTPTLAT20'], fd['INTPTLON20']):
         zc = block_zip.get(g)
         if not zc: continue
         la, lo, p = float(la), float(lo), int(p or 0)
