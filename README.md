@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-23
 
+- Drive-time start points now sit where each ZIP's people live (2020 Census blocks weighted by population) for all 33,774 ZIPs. The typical start point moved under a mile; big rural ZIPs moved much more.
 - Drive times will start from each ZIP's population-weighted centre (where its residents live, from 2020 Census blocks) instead of the middle of the ZIP's shape. A new job builds these points; the drive-time job uses them once loaded.
 - Market benchmarks now also store a site-weighted national rate per specialty (clinicians who split time across offices count 0.6 at their main address). The live score still reads the plain rate until every state's drive-time figures are rerun with the same weighting.
 - The drive-time job now counts clinicians by site weight and measures travel burden to the practices' own locations rather than ZIP centres.
