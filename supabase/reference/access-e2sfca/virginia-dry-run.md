@@ -1,120 +1,38 @@
 # E2SFCA access dry run: Virginia
 
-Run 2026-11-19 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-23 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
 ## Inputs
 
-- ZIP areas in the region (focus plus a border strip of about 60 miles): 4,375; in Virginia: 881
-- Drive times: OSRM on OpenStreetMap roads (car profile), 4,375 x 4,375 ZIP centre pairs; travel inside a ZIP is half the drive to its nearest neighbour, 2 to 10 minutes
+- ZIP areas in the region (focus plus a border strip of about 60 miles): 4,769; in Virginia: 889
+- Drive times: OSRM on OpenStreetMap roads (car profile), 4,769 x 4,769 ZIP centre pairs; travel inside a ZIP is half the drive to its nearest neighbour, 2 to 10 minutes
 - Focus ZIPs with no road link to any other ZIP (islands, unrouted centres): 0
-- Listings read: 1,144,928; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
+- Listings read: 1,234,865.398; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
 - Catchment edges: 30 minutes for everyday care, 60 for most specialties, 90 for oncology, genetics, infectious disease and plastic surgery (reviewable assumptions, listed per row below)
 
 ## Routing sanity check
 
-Regional median: 3.21 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (8.03), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
+Regional median: 3.03 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (7.58), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
 
-- Flagged: 95; re-anchored: 43; still implausible (left out of the rank comparison, still stored, marked in the CSV): 56 (15033, 15083, 15087, 15089, 15131, 15311, 15314, 15364, 15366, 15449, 15473, 15478, 15480, 15482, 15492, 15563, 15615, 15625, 15637, 15640, 15642, 15660, 15663, 15678, 15679, 15695, 15698, 16634, 16657, 16679, 17109, 21610, 21634, 21669, 21672, 21675, 21869, 22488, 25008, 25047, 25149, 43002, 43015, 43026, 43035, 43064, 43113, 43116, 43119, 43123, 43162, 43228, 43728, 43758, 45644, 45743)
+- Flagged: 13; re-anchored: 10; still implausible (left out of the rank comparison, still stored, marked in the CSV): 3 (21627, 21669, 27927)
 
 | ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
 |---|---|---|---|---|---|---|
-| 15033 | no | 27.73 | 100% | 23.81 | 100% | no |
-| 15083 | no | 31.16 | 100% | 14.95 | 100% | yes (35.51) |
-| 15087 | no | 13.53 | 100% | 27.53 | 100% | no |
-| 15089 | no | 10.84 | 100% | 10.84 | 100% | no |
-| 15131 | no | 8.81 | 100% | 8.81 | 100% | no |
-| 15132 | no | 10.04 | 100% | 7.43 | 100% | yes (33.13) |
-| 15311 | no | 14.63 | 100% | 15.35 | 100% | no |
-| 15314 | no | 22.21 | 100% | 23.82 | 100% | no |
-| 15324 | no | 20.55 | 100% | 0.00 | 100% | yes (23.78) |
-| 15345 | no | 9.78 | 100% | 0.00 | 100% | yes (19.20) |
-| 15360 | no | 23.39 | 100% | 0.00 | 100% | yes (23.15) |
-| 15364 | no | 9.02 | 100% | 9.02 | 100% | no |
-| 15366 | no | 17.07 | 100% | 12.53 | 100% | yes (26.58) |
-| 15422 | no | 14.50 | 100% | 0.00 | 100% | yes (17.16) |
-| 15449 | no | 16.17 | 100% | 10.51 | 100% | yes (16.15) |
-| 15473 | no | 14.57 | 100% | 10.55 | 100% | yes (23.26) |
-| 15478 | no | 8.27 | 100% | 8.27 | 100% | no |
-| 15480 | no | 15.24 | 100% | 10.50 | 100% | yes (17.08) |
-| 15482 | no | 13.31 | 100% | 9.92 | 100% | yes (22.28) |
-| 15484 | no | 13.67 | 100% | 0.00 | 100% | yes (11.08) |
-| 15492 | no | 13.09 | 100% | 13.37 | 100% | no |
-| 15563 | no | 8.24 | 100% | 8.24 | 100% | no |
-| 15615 | no | 11.28 | 100% | 39.41 | 100% | no |
-| 15622 | no | 10.26 | 100% | 0.00 | 100% | yes (20.71) |
-| 15625 | no | 12.48 | 100% | 12.48 | 100% | no |
-| 15637 | no | 20.19 | 100% | 19.88 | 100% | no |
-| 15640 | no | 11.74 | 100% | 11.74 | 100% | no |
-| 15642 | no | 49.55 | 100% | 23.98 | 100% | yes (40.11) |
-| 15660 | no | 34.45 | 100% | 38.50 | 100% | no |
-| 15663 | no | 14.67 | 100% | 14.67 | 100% | no |
-| 15678 | no | 21.89 | 100% | 21.89 | 100% | no |
-| 15679 | no | 10.84 | 100% | 10.84 | 100% | no |
-| 15695 | no | 11.35 | 100% | 11.35 | 100% | no |
-| 15698 | no | 14.65 | 100% | 14.65 | 100% | no |
-| 16634 | no | 8.27 | 100% | 8.27 | 100% | no |
-| 16657 | no | 8.20 | 100% | 8.20 | 100% | no |
-| 16679 | no | 8.27 | 100% | 8.27 | 100% | no |
-| 17070 | no | 8.83 | 100% | 0.00 | 100% | yes (31.46) |
-| 17109 | no | 9.32 | 100% | 9.32 | 100% | no |
-| 19610 | no | 8.51 | 100% | 0.00 | 100% | yes (40.94) |
-| 21610 | no | 8.10 | 100% | 8.10 | 100% | no |
-| 21634 | no | 14.65 | 100% | 14.65 | 100% | no |
-| 21669 | no | 13.08 | 100% | 13.08 | 100% | no |
-| 21672 | no | 8.49 | 100% | 8.49 | 100% | no |
-| 21675 | no | 8.28 | 100% | 8.28 | 100% | no |
-| 21869 | no | 8.24 | 100% | 8.24 | 100% | no |
-| 22488 | yes | 13.01 | 100% | 13.01 | 100% | no |
-| 24150 | yes | 9.44 | 100% | 4.26 | 100% | yes (1.57) |
-| 24823 | no | 9.96 | 100% | 5.79 | 100% | yes (2.29) |
-| 24868 | no | 8.08 | 100% | 5.49 | 100% | yes (1.45) |
-| 25008 | no | 8.06 | 100% | 8.06 | 100% | no |
-| 25021 | no | 8.27 | 100% | 5.76 | 100% | no |
-| 25022 | no | 8.51 | 100% | 4.75 | 100% | yes (1.65) |
-| 25047 | no | 9.17 | 100% | 10.75 | 100% | no |
-| 25057 | no | 9.25 | 100% | 3.73 | 100% | yes (1.36) |
-| 25114 | no | 8.85 | 100% | 4.62 | 100% | yes (1.92) |
-| 25148 | no | 9.80 | 100% | 6.58 | 100% | yes (2.00) |
-| 25149 | no | 8.44 | 100% | 8.44 | 100% | no |
-| 25152 | no | 9.20 | 100% | 5.75 | 100% | yes (1.99) |
-| 25183 | no | 8.92 | 100% | 5.44 | 100% | yes (1.43) |
-| 25204 | no | 8.07 | 100% | 7.85 | 100% | no |
-| 25628 | no | 9.83 | 100% | 3.87 | 100% | yes (0.80) |
-| 25646 | no | 8.92 | 100% | 5.34 | 100% | yes (1.70) |
-| 25864 | no | 11.19 | 100% | 3.54 | 100% | yes (1.99) |
-| 26259 | no | 8.15 | 100% | 3.22 | 100% | yes (1.60) |
-| 26261 | no | 9.60 | 100% | 3.76 | 100% | yes (1.49) |
-| 27927 | no | 10.61 | 100% | 2.33 | 100% | yes (2.74) |
-| 27950 | no | 8.23 | 100% | 7.26 | 100% | no |
-| 41250 | no | 9.11 | 100% | 5.42 | 100% | yes (1.44) |
-| 41554 | no | 8.99 | 100% | 4.87 | 100% | yes (1.89) |
-| 43002 | no | 25.22 | 100% | 25.22 | 100% | no |
-| 43015 | no | 0.00 | 42% | 0.00 | 33% | no |
-| 43026 | no | 20.57 | 100% | 22.01 | 100% | no |
-| 43035 | no | 0.00 | 42% | 0.00 | 33% | no |
-| 43064 | no | 22.01 | 100% | 22.01 | 100% | no |
-| 43068 | no | 0.00 | 42% | 0.00 | 58% | yes (74.61) |
-| 43113 | no | 9.25 | 100% | 9.25 | 100% | no |
-| 43116 | no | 13.77 | 100% | 13.77 | 100% | no |
-| 43119 | no | 14.31 | 100% | 15.98 | 100% | no |
-| 43123 | no | 16.17 | 100% | 16.77 | 100% | no |
-| 43162 | no | 14.95 | 100% | 16.66 | 100% | no |
-| 43204 | no | 32.82 | 100% | 0.00 | 100% | yes (84.32) |
-| 43228 | no | 23.38 | 100% | 24.27 | 100% | no |
-| 43230 | no | 0.00 | 25% | 0.00 | 75% | yes (81.89) |
-| 43240 | no | 0.00 | 33% | 0.00 | 67% | yes (91.26) |
-| 43728 | no | 2.00 | 42% | 2.00 | 42% | no |
-| 43739 | no | 0.00 | 42% | 2.40 | 58% | yes (52.92) |
-| 43758 | no | 2.67 | 42% | 2.67 | 42% | no |
-| 45644 | no | 10.28 | 100% | 10.60 | 100% | no |
-| 45647 | no | 9.22 | 100% | 2.52 | 100% | yes (39.82) |
-| 45672 | no | 10.80 | 100% | 2.65 | 100% | yes (33.52) |
-| 45739 | no | 1.57 | 42% | 3.97 | 58% | yes (1.05) |
-| 45743 | no | 2.49 | 42% | 2.91 | 25% | no |
-| 45764 | no | 0.00 | 33% | 0.00 | 67% | yes (29.64) |
-| 45770 | no | 2.30 | 17% | 4.03 | 83% | yes (2.44) |
+| 08045 | no | 9.27 | 100% | 2.83 | 100% | yes (0.53) |
+| 15450 | no | 9.77 | 100% | 3.94 | 100% | yes (0.53) |
+| 15466 | no | 9.48 | 100% | 3.17 | 100% | yes (0.74) |
+| 17517 | no | 9.34 | 100% | 2.36 | 100% | yes (1.07) |
+| 21627 | no | 9.45 | 100% | 9.45 | 100% | no |
+| 21669 | no | 13.40 | 100% | 13.40 | 100% | no |
+| 24726 | no | 8.81 | 100% | 4.28 | 100% | yes (1.09) |
+| 24823 | no | 8.92 | 100% | 4.73 | 100% | yes (1.45) |
+| 25848 | no | 7.88 | 100% | 3.94 | 100% | yes (1.55) |
+| 25864 | no | 8.64 | 100% | 3.08 | 100% | yes (1.46) |
+| 27927 | no | 8.73 | 100% | 8.73 | 100% | no |
+| 28805 | no | none | 0% | 3.14 | 100% | yes (1.78) |
+| 41317 | no | 8.53 | 100% | 3.97 | 100% | yes (1.29) |
 
 ## By specialty
 
@@ -122,83 +40,145 @@ Rank agreement is Spearman's rho between the two access factors across the state
 
 | Specialty | Catchment (min) | Listings in region | US rate per 1k | Rank agreement | ZIPs moved 15+ | Most improved access (new minus old) | Most worsened |
 |---|---|---|---|---|---|---|---|
-| Primary care / family doctor | 30 | 151,866 | 4.78 | 0.62 | 396 of 880 | 22922 (-75), 23123 (-58), 24459 (-58) | 24065 (+87), 22952 (+84), 24279 (+84) |
-| Pediatrics (children) | 30 | 37,548 | 1.13 | 0.72 | 345 of 880 | 22964 (-58), 22922 (-51), 24651 (-51) | 24065 (+93), 22920 (+89), 24079 (+70) |
-| Women's health / OB-GYN | 60 | 17,205 | 0.55 | 0.78 | 308 of 880 | 22546 (-54), 23047 (-52), 24174 (-50) | 23009 (+84), 22952 (+78), 22580 (+77) |
-| Mental health & counseling | 30 | 231,990 | 7.13 | 0.71 | 272 of 880 | 22949 (-76), 24210 (-63), 24013 (-37) | 24065 (+70), 24127 (+51), 23059 (+48) |
-| Dental | 30 | 45,603 | 1.64 | 0.67 | 369 of 880 | 24315 (-62), 22482 (-61), 24651 (-52) | 22746 (+78), 24079 (+70), 22935 (+67) |
-| Eye care | 30 | 18,820 | 0.65 | 0.64 | 426 of 880 | 20117 (-76), 22949 (-70), 23970 (-60) | 22746 (+89), 22637 (+80), 20106 (+75) |
-| Chiropractic | 30 | 13,716 | 0.64 | 0.62 | 255 of 880 | 24473 (-72), 24151 (-59), 22482 (-55) | 24067 (+69), 24602 (+60), 24065 (+56) |
-| Physical & occupational therapy | 30 | 88,143 | 2.73 | 0.63 | 402 of 880 | 22949 (-69), 24326 (-54), 23604 (-52) | 23106 (+85), 22920 (+82), 23009 (+80) |
-| Orthopedics & sports injury | 60 | 13,964 | 0.42 | 0.68 | 338 of 880 | 24517 (-87), 22938 (-85), 24522 (-79) | 23009 (+80), 24127 (+74), 24132 (+72) |
-| Heart / cardiology | 60 | 8,365 | 0.28 | 0.69 | 375 of 880 | 22938 (-53), 22731 (-47), 24174 (-47) | 23009 (+88), 22952 (+82), 22580 (+77) |
-| Skin / dermatology | 60 | 2,922 | 0.10 | 0.77 | 313 of 880 | 22972 (-79), 22731 (-70), 22738 (-64) | 22746 (+85), 24314 (+75), 22737 (+72) |
-| Allergy & immunology | 60 | 1,230 | 0.03 | 0.77 | 319 of 880 | 22938 (-100), 22972 (-100), 22731 (-88) | 23846 (+100), 24318 (+93), 24127 (+91) |
-| Lung, breathing & sleep | 60 | 3,954 | 0.14 | 0.76 | 306 of 880 | 24244 (-53), 23141 (-40), 24174 (-37) | 24127 (+98), 22952 (+84), 24216 (+76) |
-| Digestive / gastroenterology | 60 | 3,854 | 0.13 | 0.74 | 318 of 880 | 24174 (-55), 24258 (-48), 23663 (-46) | 24127 (+99), 24657 (+79), 22952 (+75) |
-| Kidney / nephrology | 60 | 3,556 | 0.12 | 0.65 | 395 of 880 | 24607 (-59), 23169 (-55), 23092 (-52) | 23891 (+87), 23009 (+78), 22952 (+76) |
-| Diabetes & hormones | 60 | 2,033 | 0.07 | 0.76 | 295 of 880 | 22938 (-100), 22940 (-82), 24590 (-80) | 23009 (+83), 23427 (+80), 24127 (+78) |
-| Cancer care / oncology | 90 | 5,085 | 0.18 | 0.57 | 472 of 880 | 23415 (-56), 23416 (-56), 23442 (-56) | 22637 (+82), 22646 (+77), 22620 (+75) |
-| Arthritis / rheumatology | 60 | 1,267 | 0.04 | 0.78 | 300 of 880 | 22938 (-69), 22973 (-57), 22937 (-55) | 23846 (+100), 24127 (+98), 24412 (+88) |
-| Brain & nerves / neurology | 60 | 6,215 | 0.24 | 0.76 | 214 of 880 | 24174 (-54), 24122 (-39), 24090 (-37) | 24127 (+88), 22952 (+78), 22920 (+75) |
-| Ear, nose & throat | 60 | 2,158 | 0.08 | 0.69 | 395 of 880 | 22938 (-74), 24441 (-64), 22969 (-56) | 24318 (+91), 24657 (+90), 24127 (+85) |
-| Urology | 60 | 2,644 | 0.08 | 0.68 | 482 of 880 | 22938 (-70), 23414 (-62), 23401 (-57) | 24657 (+84), 24270 (+79), 24127 (+76) |
-| Foot & ankle / podiatry | 60 | 4,780 | 0.16 | 0.69 | 350 of 880 | 23415 (-46), 23414 (-45), 23442 (-44) | 23427 (+100), 24127 (+99), 23426 (+97) |
-| Pain management | 60 | 2,529 | 0.09 | 0.73 | 284 of 880 | 24426 (-100), 24457 (-100), 24474 (-100) | 24127 (+99), 22952 (+83), 22637 (+69) |
-| Plastic & reconstructive surgery | 90 | 1,811 | 0.07 | 0.74 | 428 of 880 | 23065 (-56), 23102 (-52), 23084 (-50) | 24127 (+75), 24065 (+64), 24521 (+64) |
-| Speech & language therapy | 30 | 27,459 | 0.87 | 0.66 | 386 of 880 | 23085 (-74), 24651 (-51), 23301 (-50) | 23461 (+80), 23002 (+69), 24413 (+66) |
-| Nutrition & dietitian | 30 | 10,027 | 0.32 | 0.71 | 309 of 880 | 22820 (-90), 22811 (-78), 22976 (-74) | 24065 (+100), 22952 (+99), 24127 (+97) |
-| Acupuncture, massage & naturopathy | 30 | 9,571 | 0.50 | 0.77 | 150 of 880 | 20117 (-76), 24448 (-44), 22967 (-42) | 24458 (+87), 22736 (+79), 24413 (+76) |
-| Urgent care & emergency | 30 | 13,463 | 0.50 | 0.62 | 350 of 880 | 22482 (-71), 24171 (-58), 22560 (-56) | 22746 (+100), 24065 (+100), 24127 (+100) |
-| Imaging & lab | 60 | 14,528 | 0.55 | 0.72 | 273 of 880 | 24605 (-39), 22546 (-36), 24607 (-35) | 22637 (+65), 24127 (+65), 22580 (+62) |
-| Pharmacy | 30 | 52,320 | 1.68 | 0.51 | 395 of 880 | 23123 (-67), 22482 (-66), 22949 (-65) | 24225 (+98), 24602 (+86), 24270 (+80) |
-| Home health & in-home care | 30 | 112,101 | 1.49 | 0.69 | 210 of 880 | 22150 (-50), 24228 (-45), 22601 (-37) | 24150 (+100), 24413 (+100), 24458 (+100) |
-| Nursing & assisted living | 60 | 12,970 | 0.37 | 0.50 | 292 of 880 | 24529 (-72), 23927 (-64), 24541 (-51) | 24484 (+72), 23874 (+62), 23307 (+58) |
-| Medical equipment & supplies | 60 | 9,949 | 0.34 | 0.68 | 307 of 880 | 24244 (-38), 23141 (-36), 23821 (-35) | 24216 (+78), 22952 (+73), 24245 (+66) |
-| Hearing & audiology | 60 | 5,963 | 0.20 | 0.71 | 355 of 880 | 23169 (-56), 22938 (-54), 24472 (-51) | 24127 (+93), 24657 (+88), 22952 (+74) |
-| Behavior therapy (ABA) | 30 | 65,533 | 2.58 | 0.77 | 152 of 880 | 22003 (-53), 22046 (-50), 22213 (-49) | 23461 (+98), 22580 (+72), 23457 (+70) |
-| Care coordination & community health | 30 | 69,686 | 1.55 | 0.66 | 76 of 880 | 23604 (-89), 23092 (-50), 22624 (-47) | 22811 (+88), 24366 (+78), 22503 (+72) |
-| General surgery | 60 | 11,161 | 0.39 | 0.67 | 372 of 880 | 24090 (-47), 24174 (-46), 24066 (-45) | 24127 (+98), 22952 (+78), 22920 (+70) |
-| Infectious disease | 90 | 1,613 | 0.06 | 0.72 | 381 of 880 | 22938 (-75), 23084 (-65), 22969 (-64) | 23899 (+78), 24127 (+76), 23881 (+68) |
-| Genetics & genetic counseling | 90 | 1,033 | 0.03 | 0.65 | 417 of 880 | 22938 (-78), 23084 (-73), 22937 (-69) | 23356 (+91), 23415 (+91), 23416 (+91) |
-| Hospice & palliative care | 60 | 1,669 | 0.09 | 0.62 | 356 of 880 | 24343 (-68), 23486 (-67), 23416 (-63) | 24225 (+83), 24484 (+83), 23430 (+81) |
+| Primary care / family doctor | 30 | 151,315.999 | 4.30 | 0.64 | 301 of 889 | 24314 (-61), 24366 (-40), 23461 (-36) | 24101 (+82), 24216 (+78), 24095 (+75) |
+| Pediatrics (children) | 30 | 42,046 | 1.11 | 0.74 | 259 of 889 | 23882 (-61), 23830 (-53), 23884 (-50) | 22940 (+87), 22946 (+85), 22066 (+65) |
+| Women's health / OB-GYN | 60 | 18,222 | 0.53 | 0.77 | 319 of 889 | 22546 (-51), 23836 (-50), 23102 (-46) | 23430 (+67), 23009 (+65), 20158 (+59) |
+| Mental health & counseling | 30 | 255,384.6 | 7.20 | 0.74 | 192 of 889 | 23221 (-29), 23230 (-29), 22102 (-26) | 22946 (+56), 22940 (+52), 24574 (+50) |
+| Dental | 30 | 51,738.6 | 1.65 | 0.73 | 286 of 889 | 22958 (-54), 22427 (-38), 22514 (-35) | 22935 (+72), 22940 (+64), 24067 (+63) |
+| Eye care | 30 | 20,144.2 | 0.62 | 0.68 | 327 of 889 | 23970 (-52), 22734 (-41), 23410 (-41) | 22637 (+79), 22940 (+77), 22935 (+71) |
+| Chiropractic | 30 | 15,981 | 0.63 | 0.68 | 189 of 889 | 23310 (-41), 23316 (-40), 23307 (-37) | 24067 (+62), 22935 (+57), 24127 (+55) |
+| Physical & occupational therapy | 30 | 96,757.2 | 2.70 | 0.68 | 301 of 889 | 23221 (-33), 23230 (-33), 23927 (-31) | 23106 (+90), 23009 (+86), 22940 (+79) |
+| Orthopedics & sports injury | 60 | 14,520.4 | 0.39 | 0.67 | 366 of 889 | 22931 (-94), 24517 (-86), 24441 (-82) | 24216 (+68), 23009 (+67), 20197 (+66) |
+| Heart / cardiology | 60 | 8,759.4 | 0.24 | 0.69 | 411 of 889 | 24083 (-55), 22931 (-52), 24630 (-52) | 23009 (+75), 24622 (+68), 22637 (+67) |
+| Skin / dermatology | 60 | 3,106.4 | 0.09 | 0.76 | 341 of 889 | 22931 (-66), 22972 (-65), 22723 (-62) | 20106 (+81), 24606 (+70), 24131 (+68) |
+| Allergy & immunology | 60 | 1,298.2 | 0.03 | 0.74 | 333 of 889 | 22931 (-100), 22943 (-100), 22973 (-100) | 23846 (+100), 23899 (+100), 23883 (+95) |
+| Lung, breathing & sleep | 60 | 4,273 | 0.13 | 0.76 | 325 of 889 | 24279 (-71), 23141 (-46), 24083 (-46) | 24127 (+86), 23899 (+79), 23881 (+76) |
+| Digestive / gastroenterology | 60 | 4,082.8 | 0.11 | 0.74 | 374 of 889 | 23141 (-58), 24083 (-57), 23836 (-52) | 24127 (+75), 22637 (+74), 23009 (+72) |
+| Kidney / nephrology | 60 | 3,874.4 | 0.11 | 0.66 | 401 of 889 | 24607 (-54), 23092 (-48), 23922 (-45) | 23891 (+91), 23882 (+68), 23009 (+65) |
+| Diabetes & hormones | 60 | 2,187.4 | 0.06 | 0.76 | 318 of 889 | 22931 (-100), 22973 (-95), 22938 (-93) | 23427 (+93), 23440 (+84), 23009 (+68) |
+| Cancer care / oncology | 90 | 5,454.6 | 0.15 | 0.53 | 513 of 889 | 23129 (-56), 23102 (-52), 23140 (-52) | 22637 (+82), 23950 (+79), 23440 (+78) |
+| Arthritis / rheumatology | 60 | 1,380.8 | 0.04 | 0.78 | 328 of 889 | 22931 (-76), 22973 (-67), 22938 (-56) | 24412 (+95), 23846 (+94), 24127 (+84) |
+| Brain & nerves / neurology | 60 | 6,678.8 | 0.22 | 0.75 | 254 of 889 | 24083 (-54), 23141 (-50), 23102 (-49) | 24127 (+67), 23009 (+60), 24595 (+58) |
+| Ear, nose & throat | 60 | 2,255.2 | 0.07 | 0.69 | 468 of 889 | 24630 (-73), 24441 (-71), 22973 (-67) | 24412 (+92), 23952 (+86), 24318 (+82) |
+| Urology | 60 | 2,699 | 0.07 | 0.67 | 482 of 889 | 24630 (-88), 24651 (-80), 23422 (-67) | 24131 (+100), 24316 (+87), 24091 (+76) |
+| Foot & ankle / podiatry | 60 | 5,460.6 | 0.15 | 0.67 | 361 of 889 | 24630 (-57), 24651 (-51), 22973 (-45) | 23427 (+98), 23891 (+91), 23440 (+84) |
+| Pain management | 60 | 2,719.4 | 0.09 | 0.72 | 307 of 889 | 24426 (-100), 24457 (-100), 24474 (-85) | 24127 (+73), 22637 (+65), 22935 (+58) |
+| Plastic & reconstructive surgery | 90 | 1,989.8 | 0.07 | 0.73 | 433 of 889 | 23102 (-65), 23065 (-64), 23192 (-60) | 24127 (+67), 22968 (+66), 22923 (+65) |
+| Speech & language therapy | 30 | 30,224.2 | 0.90 | 0.71 | 280 of 889 | 23085 (-61), 23161 (-46), 23023 (-36) | 23461 (+77), 22940 (+71), 24070 (+70) |
+| Nutrition & dietitian | 30 | 11,231.8 | 0.33 | 0.77 | 214 of 889 | 22811 (-91), 22820 (-85), 24465 (-57) | 24127 (+91), 22940 (+87), 22946 (+84) |
+| Acupuncture, massage & naturopathy | 30 | 10,487.4 | 0.52 | 0.82 | 103 of 889 | 24520 (-44), 24093 (-39), 24147 (-32) | 24433 (+74), 22580 (+61), 24131 (+60) |
+| Urgent care & emergency | 30 | 14,554.4 | 0.47 | 0.68 | 299 of 889 | 23426 (-60), 24165 (-53), 23970 (-52) | 23009 (+100), 24131 (+100), 24095 (+95) |
+| Imaging & lab | 60 | 15,578.8 | 0.49 | 0.72 | 275 of 889 | 23102 (-48), 22546 (-44), 23831 (-44) | 24131 (+74), 24127 (+63), 24184 (+62) |
+| Pharmacy | 30 | 59,604.8 | 1.72 | 0.54 | 320 of 889 | 23123 (-51), 23337 (-36), 23092 (-29) | 24131 (+72), 24258 (+70), 24622 (+70) |
+| Home health & in-home care | 30 | 116,461 | 1.61 | 0.74 | 164 of 889 | 22637 (-62), 22641 (-62), 22150 (-54) | 24458 (+100), 24465 (+100), 24622 (+100) |
+| Nursing & assisted living | 60 | 14,156 | 0.39 | 0.46 | 278 of 889 | 24093 (-45), 23410 (-44), 24363 (-40) | 23307 (+62), 24484 (+55), 23488 (+52) |
+| Medical equipment & supplies | 60 | 11,477 | 0.36 | 0.69 | 310 of 889 | 24441 (-38), 22931 (-36), 22211 (-34) | 20106 (+59), 23952 (+58), 24245 (+51) |
+| Hearing & audiology | 60 | 6,357.8 | 0.19 | 0.70 | 390 of 889 | 22931 (-58), 22973 (-58), 24440 (-55) | 24127 (+74), 24323 (+74), 24622 (+73) |
+| Behavior therapy (ABA) | 30 | 69,527.6 | 2.88 | 0.81 | 120 of 889 | 22003 (-57), 22151 (-55), 22213 (-54) | 23461 (+100), 23430 (+49), 22580 (+48) |
+| Care coordination & community health | 30 | 72,228.2 | 1.63 | 0.70 | 77 of 889 | 24093 (-78), 24604 (-66), 24147 (-58) | 24315 (+100), 22503 (+49), 24265 (+49) |
+| General surgery | 60 | 11,674.4 | 0.35 | 0.69 | 382 of 889 | 24083 (-64), 24064 (-52), 24175 (-52) | 24412 (+87), 24127 (+85), 22637 (+66) |
+| Infectious disease | 90 | 1,822 | 0.05 | 0.73 | 439 of 889 | 23129 (-74), 23084 (-70), 23102 (-69) | 24412 (+77), 24127 (+66), 24184 (+62) |
+| Genetics & genetic counseling | 90 | 1,283.8 | 0.03 | 0.67 | 454 of 889 | 22931 (-65), 23084 (-65), 23065 (-64) | 23356 (+92), 23488 (+92), 22637 (+88) |
+| Hospice & palliative care | 60 | 1,814.6 | 0.09 | 0.63 | 387 of 889 | 22437 (-77), 23306 (-66), 22504 (-65) | 23430 (+73), 24272 (+71), 22942 (+70) |
 
 In the last two columns a negative change means E2SFCA finds **better** access than the crude ratio (a lower access factor), a positive one **worse**.
+
+## People without a car
+
+The stored figure (`e2sfca` above) splits each ZIP's adults by the share of households with no vehicle (ACS B25044) and routes that group on foot (OSRM foot profile on OpenStreetMap paths), with the same catchment edge in minutes as by car; both groups compete for the same clinicians (Mao & Nekorchuk 2013, multi-mode E2SFCA). Walking inside a ZIP is half the walk to its nearest neighbour, 5 to 20 minutes. Households are applied to adults (no ACS table gives vehicles per adult at ZIP level).
+
+- Adults in Virginia in households with no vehicle: about 396,974 of 6,745,229 (5.9%)
+- Focus ZIPs with no Census vehicle figure (scored as if every household has a car): 21
+- Sensitivity check: the same split with the no-car group at 2.5x the drive time instead of walking (a stand-in for transit, rides and waiting; an assumption, not a published figure). It is not stored.
+
+| Specialty | Rank agreement with car-only | ZIPs moved 15+ vs car-only | Most worsened by the no-car split | Rank agreement, walking vs slowdown |
+|---|---|---|---|---|
+| Primary care / family doctor | 1.00 | 3 of 889 | 23416 (+26), 23523 (+18), 22904 (+13) | 1.00 |
+| Pediatrics (children) | 1.00 | 3 of 889 | 23523 (+21), 23416 (+16), 23504 (+15) | 1.00 |
+| Women's health / OB-GYN | 0.99 | 5 of 889 | 23416 (+24), 23440 (+22), 22209 (+16) | 1.00 |
+| Mental health & counseling | 1.00 | 4 of 889 | 23219 (+17), 22904 (+16), 23523 (+15) | 1.00 |
+| Dental | 1.00 | 4 of 889 | 23416 (+27), 22904 (+17), 23523 (+17) | 1.00 |
+| Eye care | 1.00 | 3 of 889 | 22904 (+18), 23416 (+17), 23523 (+15) | 1.00 |
+| Chiropractic | 1.00 | 1 of 889 | 23416 (+18), 22904 (+14), 23523 (+10) | 1.00 |
+| Physical & occupational therapy | 1.00 | 4 of 889 | 23416 (+19), 22904 (+18), 23219 (+17) | 1.00 |
+| Orthopedics & sports injury | 0.99 | 2 of 889 | 24476 (+27), 23523 (+15), 22943 (+13) | 1.00 |
+| Heart / cardiology | 1.00 | 1 of 889 | 23523 (+15), 22209 (+13), 23440 (+13) | 1.00 |
+| Skin / dermatology | 1.00 | 3 of 889 | 22904 (+28), 22209 (+17), 24606 (+15) | 1.00 |
+| Allergy & immunology | 1.00 | 1 of 889 | 23219 (+15), 23607 (+12), 23284 (+11) | 1.00 |
+| Lung, breathing & sleep | 1.00 | 2 of 889 | 23523 (+17), 23607 (+16), 23651 (+13) | 1.00 |
+| Digestive / gastroenterology | 1.00 | 0 of 889 | 22209 (+14), 23523 (+13), 23607 (+13) | 1.00 |
+| Kidney / nephrology | 0.99 | 3 of 889 | 23416 (+16), 23440 (+16), 23523 (+15) | 1.00 |
+| Diabetes & hormones | 1.00 | 2 of 889 | 22209 (+17), 23523 (+15), 23607 (+14) | 1.00 |
+| Cancer care / oncology | 0.99 | 2 of 889 | 23416 (+31), 23440 (+15), 22209 (+12) | 1.00 |
+| Arthritis / rheumatology | 1.00 | 3 of 889 | 22209 (+17), 22943 (+15), 24476 (+15) | 1.00 |
+| Brain & nerves / neurology | 1.00 | 0 of 889 | 22209 (+12), 23523 (+11), 22203 (+10) | 1.00 |
+| Ear, nose & throat | 1.00 | 3 of 889 | 24606 (+20), 24476 (+16), 22943 (+15) | 1.00 |
+| Urology | 0.99 | 4 of 889 | 23440 (+28), 23416 (+18), 23523 (+16) | 1.00 |
+| Foot & ankle / podiatry | 0.99 | 3 of 889 | 23416 (+26), 23440 (+21), 23523 (+15) | 1.00 |
+| Pain management | 1.00 | 1 of 889 | 22904 (+16), 22209 (+14), 22943 (+12) | 1.00 |
+| Plastic & reconstructive surgery | 1.00 | 0 of 889 | 23523 (+14), 22209 (+12), 23607 (+11) | 1.00 |
+| Speech & language therapy | 1.00 | 2 of 889 | 23523 (+16), 22904 (+15), 23219 (+12) | 1.00 |
+| Nutrition & dietitian | 1.00 | 2 of 889 | 22904 (+17), 23219 (+11), 23284 (+11) | 1.00 |
+| Acupuncture, massage & naturopathy | 1.00 | 0 of 889 | 22904 (+11), 23523 (+11), 22209 (+10) | 1.00 |
+| Urgent care & emergency | 1.00 | 3 of 889 | 23416 (+17), 23523 (+16), 23440 (+13) | 1.00 |
+| Imaging & lab | 1.00 | 1 of 889 | 24606 (+16), 23523 (+13), 22209 (+11) | 1.00 |
+| Pharmacy | 1.00 | 2 of 889 | 23416 (+29), 23523 (+15), 23219 (+14) | 1.00 |
+| Home health & in-home care | 1.00 | 4 of 889 | 23523 (+22), 23504 (+16), 23704 (+16) | 1.00 |
+| Nursing & assisted living | 0.99 | 2 of 889 | 23416 (+25), 24606 (+16), 24476 (+13) | 1.00 |
+| Medical equipment & supplies | 0.99 | 3 of 889 | 23416 (+17), 24476 (+16), 23523 (+15) | 1.00 |
+| Hearing & audiology | 0.99 | 3 of 889 | 24606 (+17), 22904 (+16), 24476 (+16) | 1.00 |
+| Behavior therapy (ABA) | 1.00 | 1 of 889 | 23523 (+19), 22209 (+13), 23504 (+12) | 1.00 |
+| Care coordination & community health | 1.00 | 3 of 889 | 24604 (+17), 22504 (+10), 23416 (+10) | 1.00 |
+| General surgery | 0.99 | 1 of 889 | 23523 (+17), 23440 (+14), 23607 (+14) | 1.00 |
+| Infectious disease | 1.00 | 2 of 889 | 24476 (+19), 22209 (+17), 22202 (+14) | 1.00 |
+| Genetics & genetic counseling | 1.00 | 1 of 889 | 24476 (+15), 22209 (+14), 22203 (+12) | 1.00 |
+| Hospice & palliative care | 0.99 | 3 of 889 | 23416 (+41), 23440 (+39), 22904 (+15) | 1.00 |
+
+A positive change is worse access once people without a car are counted. Rank agreement near 1 between walking and the slowdown means the conclusion does not hinge on which no-car assumption is used.
 
 ## Sample ZIPs
 
 | ZIP | Specialty | Crude per 1k | E2SFCA per 1k | Crude access | E2SFCA access |
 |---|---|---|---|---|---|
-| 23219 | Primary care / family doctor | 4.580 | 6.352 | 52 | 34 |
-| 23219 | Mental health & counseling | 11.606 | 15.059 | 19 | 0 |
-| 23219 | Heart / cardiology | 0.291 | 0.300 | 48 | 47 |
-| 23219 | Cancer care / oncology | 0.196 | 0.136 | 45 | 62 |
-| 23219 | Urgent care & emergency | 0.435 | 0.607 | 56 | 39 |
-| 22030 | Primary care / family doctor | 5.499 | 4.186 | 42 | 56 |
-| 22030 | Mental health & counseling | 7.171 | 6.903 | 50 | 52 |
-| 22030 | Heart / cardiology | 0.376 | 0.300 | 33 | 47 |
-| 22030 | Cancer care / oncology | 0.228 | 0.186 | 36 | 48 |
-| 22030 | Urgent care & emergency | 0.375 | 0.237 | 62 | 76 |
-| 23510 | Primary care / family doctor | 6.622 | 8.481 | 31 | 11 |
-| 23510 | Mental health & counseling | 7.534 | 9.924 | 47 | 30 |
-| 23510 | Heart / cardiology | 0.363 | 0.379 | 35 | 33 |
-| 23510 | Cancer care / oncology | 0.176 | 0.157 | 51 | 56 |
-| 23510 | Urgent care & emergency | 0.717 | 0.869 | 28 | 13 |
-| 24016 | Primary care / family doctor | 8.387 | 12.961 | 12 | 0 |
-| 24016 | Mental health & counseling | 8.387 | 12.240 | 41 | 14 |
-| 24016 | Heart / cardiology | 0.477 | 0.459 | 15 | 18 |
-| 24016 | Cancer care / oncology | 0.214 | 0.150 | 40 | 58 |
-| 24016 | Urgent care & emergency | 0.949 | 1.556 | 5 | 0 |
-| 22903 | Primary care / family doctor | 5.692 | 7.574 | 40 | 21 |
-| 22903 | Mental health & counseling | 10.305 | 12.251 | 28 | 14 |
-| 22903 | Heart / cardiology | 0.564 | 0.508 | 0 | 10 |
-| 22903 | Cancer care / oncology | 0.079 | 0.120 | 78 | 66 |
-| 22903 | Urgent care & emergency | 0.208 | 0.242 | 79 | 76 |
-| 22488 | Primary care / family doctor | 0.908 | 0.316 | 90 | 97 |
-| 22488 | Mental health & counseling | 0.568 | 0.829 | 96 | 94 |
-| 22488 | Heart / cardiology | 0.000 | 0.006 | 100 | 99 |
-| 22488 | Cancer care / oncology | 0.000 | 0.040 | 100 | 89 |
-| 22488 | Urgent care & emergency | 0.000 | 0.000 | 100 | 100 |
+
+## Travel burden against CMS Medicare Advantage limits
+
+Drive minutes from each ZIP centre to the nearest practice location (the middle of each ZIP's pinned listings in the specialty, the 8 nearest by straight line routed on roads), against the maximum minutes CMS sets for Medicare Advantage networks (2026 HSD Reference File) in the ZIP's main county. The CMS limit applies to a plan's network; here it is read against every listing, so a ZIP over the limit has no clinician of that kind within the limit at all. Specialty pairs are in `supabase/reference/network-adequacy/specialty-map.csv` (reviewable). Not scored.
+
+- Counties not matched by name to the HSD file: 0
+
+| Specialty | CMS code | ZIPs over the limit | Adults in them | Large Metro | Metro | Micro | Rural | CEAC |
+|---|---|---|---|---|---|---|---|---|
+| Primary care / family doctor | S03 | 22 of 888 | 85,276 (1.3%) | 0/59 | 16/284 | 5/305 | 1/230 | 0/10 |
+| Women's health / OB-GYN | 016 | 2 of 888 | 588 (0.0%) | 0/59 | 2/284 | 0/305 | 0/230 | 0/10 |
+| Mental health & counseling: Psychiatry | 029 | 3 of 888 | 2,947 (0.0%) | 0/59 | 3/284 | 0/305 | 0/230 | 0/10 |
+| Mental health & counseling: Clinical Psychology | 036 | 0 of 888 | 0 (0.0%) | 0/59 | 0/284 | 0/305 | 0/230 | 0/10 |
+| Mental health & counseling: Clinical Social Work | 037 | 6 of 888 | 6,083 (0.1%) | 0/59 | 6/284 | 0/305 | 0/230 | 0/10 |
+| Eye care | 023 | 8 of 888 | 26,199 (0.4%) | 0/59 | 8/284 | 0/305 | 0/230 | 0/10 |
+| Chiropractic | 010 | 2 of 888 | 588 (0.0%) | 0/59 | 2/284 | 0/305 | 0/230 | 0/10 |
+| Physical & occupational therapy | F049 | 0 of 888 | 0 (0.0%) | 0/59 | 0/284 | 0/305 | 0/230 | 0/10 |
+| Orthopedics & sports injury | 025 | 5 of 888 | 5,336 (0.1%) | 0/59 | 4/284 | 1/305 | 0/230 | 0/10 |
+| Heart / cardiology | 008 | 33 of 888 | 70,919 (1.1%) | 0/59 | 23/284 | 9/305 | 0/230 | 1/10 |
+| Skin / dermatology | 011 | 40 of 888 | 41,786 (0.6%) | 0/59 | 4/284 | 33/305 | 3/230 | 0/10 |
+| Allergy & immunology | 007 | 32 of 888 | 38,802 (0.6%) | 0/59 | 9/284 | 13/305 | 10/230 | 0/10 |
+| Lung, breathing & sleep | 030 | 3 of 888 | 2,947 (0.0%) | 0/59 | 3/284 | 0/305 | 0/230 | 0/10 |
+| Digestive / gastroenterology | 014 | 4 of 888 | 5,159 (0.1%) | 0/59 | 4/284 | 0/305 | 0/230 | 0/10 |
+| Kidney / nephrology | 018 | 2 of 888 | 588 (0.0%) | 0/59 | 2/284 | 0/305 | 0/230 | 0/10 |
+| Diabetes & hormones | 012 | 1 of 888 | 67 (0.0%) | 0/59 | 0/284 | 1/305 | 0/230 | 0/10 |
+| Cancer care / oncology | 021 | 8 of 888 | 22,015 (0.3%) | 0/59 | 2/284 | 6/305 | 0/230 | 0/10 |
+| Arthritis / rheumatology | 031 | 13 of 888 | 13,691 (0.2%) | 0/59 | 2/284 | 10/305 | 1/230 | 0/10 |
+| Brain & nerves / neurology | 019 | 18 of 888 | 12,354 (0.2%) | 0/59 | 3/284 | 15/305 | 0/230 | 0/10 |
+| Ear, nose & throat | 013 | 11 of 888 | 11,333 (0.2%) | 0/59 | 5/284 | 5/305 | 1/230 | 0/10 |
+| Urology | 033 | 9 of 888 | 14,832 (0.2%) | 0/59 | 4/284 | 5/305 | 0/230 | 0/10 |
+| Foot & ankle / podiatry | 028 | 4 of 888 | 3,825 (0.1%) | 0/59 | 3/284 | 0/305 | 1/230 | 0/10 |
+| Plastic & reconstructive surgery | 027 | 6 of 888 | 12,620 (0.2%) | 0/59 | 1/284 | 5/305 | 0/230 | 0/10 |
+| Speech & language therapy | F051 | 0 of 888 | 0 (0.0%) | 0/59 | 0/284 | 0/305 | 0/230 | 0/10 |
+| Imaging & lab | F047 | 2 of 888 | 588 (0.0%) | 0/59 | 2/284 | 0/305 | 0/230 | 0/10 |
+| Nursing & assisted living | F046 | 0 of 888 | 0 (0.0%) | 0/59 | 0/284 | 0/305 | 0/230 | 0/10 |
+| General surgery | 015 | 15 of 888 | 26,023 (0.4%) | 0/59 | 13/284 | 2/305 | 0/230 | 0/10 |
+| Infectious disease | 017 | 7 of 888 | 10,642 (0.2%) | 0/59 | 1/284 | 6/305 | 0/230 | 0/10 |
+
+Designation cells are ZIPs over the limit out of ZIPs of that county type.
 
 ## Reading this
 
@@ -206,6 +186,6 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
 
-## Applied 2026-11-19
+## Applied 2026-11-23
 
-- 35240 rows (ZIP x specialty) stored in access_e2sfca for VA; market-score now uses drive-time access for these ZIPs.
+- 35560 rows (ZIP x specialty) stored in access_e2sfca for VA; market-score now uses drive-time access for these ZIPs.
