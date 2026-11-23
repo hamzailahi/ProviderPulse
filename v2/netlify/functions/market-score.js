@@ -532,7 +532,14 @@ exports.handler = async (event) => {
       const geoView = Array.isArray(home) && home.length > 0;
       if (!geoView) home = await get(
         `cdc_places?zip=eq.${zip}&measureid=eq.${GEO_MEASURE}&select=zip,lat,lon,pop_18plus&limit=1`, 5000);
-      const origin = home[0];
+      // Population-weighted centres (migration 059, 2026-11-23): where each
+      // ZIP's residents live. The shape's middle can sit hundreds of miles off
+      // (Anchorage 99503's PLACES centre was in western Alaska), so distances
+      // use these where present and the old centre otherwise. A failed or
+      // missing table leaves the old centres (get() returns []).
+      const popHome = await get(`zip_pop_centres?zip=eq.${zip}&select=zip,lat,lon&limit=1`, 5000);
+      const popCentres = Array.isArray(popHome) && popHome.length > 0;
+      const origin = home[0] && popCentres ? { ...home[0], lat: popHome[0].lat, lon: popHome[0].lon } : home[0];
       const noPlaces = !!(origin && origin.source && origin.source !== 'cdc_places');
 
       if (!origin || origin.lat === null || origin.lon === null) {
@@ -552,8 +559,28 @@ exports.handler = async (event) => {
           `&lat=gte.${(oLat - dLat).toFixed(4)}&lat=lte.${(oLat + dLat).toFixed(4)}` +
           `&lon=gte.${(oLon - dLon).toFixed(4)}&lon=lte.${(oLon + dLon).toFixed(4)}` +
           `&select=zip,lat,lon,pop_18plus`, 'zip', { cap: 4000, ms: 7000 });
+        let geoRows = boxPage.rows;
+        if (popCentres) {
+          const boxQ = `&lat=gte.${(oLat - dLat).toFixed(4)}&lat=lte.${(oLat + dLat).toFixed(4)}` +
+            `&lon=gte.${(oLon - dLon).toFixed(4)}&lon=lte.${(oLon + dLon).toFixed(4)}`;
+          const popBox = await pagedGet(`zip_pop_centres?select=zip,lat,lon${boxQ}`, 'zip', { cap: 4000, ms: 7000 });
+          if (!popBox.failed) {
+            const pop = new Map(boxPage.rows.map(r => [r.zip, r.pop_18plus]));
+            const miss = popBox.rows.map(r => r.zip).filter(z => !pop.has(z));
+            for (let i = 0; i < miss.length; i += 100) {
+              const g = await get(`${geoView ? 'zip_geo?source=neq.none' : `cdc_places?measureid=eq.${GEO_MEASURE}`}&zip=in.(${miss.slice(i, i + 100).join(',')})&select=zip,pop_18plus`, 5000);
+              (Array.isArray(g) ? g : []).forEach(r => pop.set(r.zip, r.pop_18plus));
+            }
+            // Every zip_geo ZIP has a population centre (the 2026-11-23 load
+            // found none without), so the population box replaces the old one;
+            // a ZIP whose residents sit outside it is not really that close.
+            // ZIPs with no adults figure are left out, as before.
+            geoRows = popBox.rows.filter(r => pop.has(r.zip))
+              .map(r => ({ zip: r.zip, lat: r.lat, lon: r.lon, pop_18plus: pop.get(r.zip) }));
+          }
+        }
 
-        const inRange = boxPage.rows
+        const inRange = geoRows
           .map(r => ({
             zip: r.zip,
             pop: Number(r.pop_18plus) || 0,
@@ -663,7 +690,7 @@ exports.handler = async (event) => {
           clinic_rows: clinicPage.rows.length,
           individual_rows: individualPage.rows.length,
           truncated: clinicPage.truncated || individualPage.truncated || placesPage.truncated || boxPage.truncated,
-          basis: 'ZCTA centroid distance; approximates adjacency, not drive time'
+          basis: popCentres ? 'distance between population-weighted ZIP centres; approximates adjacency, not drive time' : 'ZCTA centroid distance; approximates adjacency, not drive time'
         };
 
         // ---- per-specialty opportunity model (assets/market-model.js) ------

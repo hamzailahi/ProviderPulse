@@ -18,11 +18,13 @@ const home = { zip: '38017', lat: 35.04, lon: -89.66, pop_18plus: 30000 };
 const dem = { zip: '38017', state: 'TN', 'Total Population': 40000, 'Insured Population': 37000 };
 // A ZIP `miles` north of home (69 miles per degree of latitude).
 const zipAt = (i, miles) => ({ zip: String(38100 + i), lat: home.lat + miles / 69, lon: home.lon, pop_18plus: 1000 });
-let box = [], listingFails = 0, listingCalls = [];
+let box = [], listingFails = 0, listingCalls = [], popRows = null;
 globalThis.fetch = async (url) => {
   const u = decodeURIComponent(String(url));
   const J = rows => ({ ok: true, status: 200, json: async () => rows });
   if (/[?&](npi|zip|fips|id)=gt\./.test(u)) return J([]);
+  if (u.includes('zip_pop_centres?zip=eq.')) return J(popRows ? popRows.filter(r => r.zip === '38017') : []);
+  if (u.includes('zip_pop_centres?select=zip,lat,lon&lat=gte')) return J(popRows || []);
   if (u.includes('cdc_places?zip=eq.')) return J([home]);
   if (u.includes('cdc_places?measureid=eq.DENTAL&lat=gte')) return J([home].concat(box));
   if (u.includes('cdc_places?zip=in.(')) return J([{ zip: '38017', measureid: 'CHD', value: 8.5, pop_18plus: 30000, data_year: 2023 }]);
@@ -78,6 +80,26 @@ listingFails = 50;
 d = await run();
 check('a load that keeps failing refuses to score, with a reason', d.model && d.model.available === false && /did not answer/.test(d.model.reason) && d.catchment.listings_failed === true);
 listingFails = 0;
+
+console.log('\n5. Population-weighted centres decide distance (migration 059)');
+// 38150's shape middle is 200 miles off, but its residents live 2 miles away;
+// 38151's middle is 1 mile away, but its residents are 40 miles off.
+box = [zipAt(51, 1)].concat(Array.from({ length: 12 }, (_, i) => zipAt(i, 3 + i * 0.4)));
+popRows = [{ zip: '38017', lat: home.lat, lon: home.lon }, { zip: '38150', lat: home.lat + 2 / 69, lon: home.lon }, { zip: '38151', lat: home.lat + 40 / 69, lon: home.lon }]
+  .concat(Array.from({ length: 12 }, (_, i) => ({ zip: String(38100 + i), lat: home.lat + (3 + i * 0.4) / 69, lon: home.lon })));
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url) => {
+  const u = decodeURIComponent(String(url));
+  if (u.includes('zip=in.(') && u.includes('select=zip,pop_18plus')) return { ok: true, status: 200, json: async () => [{ zip: '38150', pop_18plus: 5000 }, { zip: '38151', pop_18plus: 5000 }] };
+  return realFetch(url);
+};
+d = await run();
+check('a ZIP whose residents are near is in, though its shape middle is far', d.catchment.zips.includes('38150'));
+check('a ZIP whose residents are far is out, though its shape middle is near', !d.catchment.zips.includes('38151'));
+check('the response says distances are between population centres', /population-weighted/.test(d.catchment.basis));
+globalThis.fetch = realFetch; popRows = null;
+d = await run();
+check('without the table, the old centres are used', /ZCTA centroid/.test(d.catchment.basis));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
