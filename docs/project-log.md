@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 433 changes over 70 working days, 2026-05-13 to 2026-11-23.
-- 2026-08-19 onward: from the README changelog (259 entries, written for a reader).
+- 434 changes over 70 working days, 2026-05-13 to 2026-11-23.
+- 2026-08-19 onward: from the README changelog (260 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 98 |
+| November 2026 | 99 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -18,6 +18,7 @@ Every change to the product, newest first, with the date it shipped. Generated f
 
 ## 2026-11-23
 
+- New read-only Market score check job: scores chosen ZIPs against the live data and shows which neighbouring ZIPs each catchment used and how distances were measured.
 - The market score now picks a ZIP's neighbours by where people live, not by the middle of each ZIP's shape. Some shape middles were badly off (Anchorage 99503's sat about 280 miles away in rural Alaska), so those areas were scored against the wrong neighbours.
 - Drive-time start points now sit where each ZIP's people live (2020 Census blocks weighted by population) for all 33,774 ZIPs. The typical start point moved under a mile; big rural ZIPs moved much more.
 - Drive times will start from each ZIP's population-weighted centre (where its residents live, from 2020 Census blocks) instead of the middle of the ZIP's shape. A new job builds these points; the drive-time job uses them once loaded.

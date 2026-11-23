@@ -1,0 +1,36 @@
+name: Market score check
+
+# Manual, read only. Runs market-score.js from this commit against the live
+# database through the publishable key for chosen ZIPs, and prints timing,
+# the catchment (ZIPs, reach, distance basis) and one specialty's score.
+# The function code comes from the repo, so it checks a change before or
+# after Netlify deploys it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: Space-separated ZIPs
+        default: "99503 99701 38017"
+      specialty:
+        description: Scored specialty label
+        default: Primary care / family doctor
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci --prefix v2
+      - name: Score
+        env:
+          ZIPS: ${{ inputs.zips }}
+          SPEC: ${{ inputs.specialty }}
+        run: node scripts/live/market-score-check.mjs "$SPEC" $ZIPS
