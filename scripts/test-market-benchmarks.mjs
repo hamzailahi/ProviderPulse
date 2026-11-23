@@ -13,7 +13,7 @@ const check = (l, c, d) => { if (c) { pass++; console.log(`  PASS  ${l}`); } els
 
 const L = (npi, code, state = 'TN', name = 'Cardiovascular Disease Physician') => ({ npi, taxonomy_code: code, primary_taxonomy: name, state });
 const individuals = [
-  { ...L('1000000001', '207RC0000X'), w: 0.6 }, L('1100000002', '207RC0000X'), L('1200000003', '207RC0000X'),
+  L('1000000001', '207RC0000X'), L('1100000002', '207RC0000X'), L('1200000003', '207RC0000X'),
   // the name says cardiology; the code says dermatology, and the code counts
   L('1300000004', '207N00000X'), L('1400000005', '207N00000X', 'AR'),
   L('1500000006', null),                                   // no code: state density only
@@ -31,6 +31,7 @@ globalThis.fetch = async url => {
   const u = decodeURIComponent(String(url));
   if (u.includes('cdc_places')) return J(u.includes('measureid=eq.DENTAL') && !u.includes('zip=gt.')
     ? [{ zip: '38017', value: 60, pop_18plus: 100000000 }, { zip: '72201', value: 60, pop_18plus: 100000000 }] : []);
+  if (u.includes('clinician_weight')) return J(u.includes('npi=gt.') ? [] : [{ npi: '1000000001', w: 0.6 }]);
   if (u.includes('demographics_raw')) return J(u.includes('zip=gt.') ? [] : [
     { zip: '38017', state: 'TN', 'Total Population': 200000000 }, { zip: '72201', state: 'AR', 'Total Population': 100000000 }]);
   const table = u.includes('provider_individuals') ? IND : u.includes('clinics') ? ORG : null;
@@ -55,7 +56,7 @@ check('dermatology counts the listings whose code says dermatology', listings('S
 check('primary care counts the family NP, the primary care clinic and the FQHC by code', listings('Primary care / family doctor') === 3);
 check('nursing and physician assistant are searchable but not scored', listings('Nursing (RN, LPN)') === null && listings('Physician assistant') === null);
 check('a category that is searchable but not scored gets no benchmark', listings('Other health services') === null && listings('Hospital-based clinicians') === null);
-check('the uncoded listing is reported', /provider_individuals_weighted: 7 rows, 4 distinct taxonomy codes, 1 without one/.test(out), out.match(/provider_individuals:.*/) && out.match(/provider_individuals:.*/)[0]);
+check('the uncoded listing is reported', /provider_individuals: 7 rows, 4 distinct taxonomy codes, 1 without one/.test(out), out.match(/provider_individuals:.*/) && out.match(/provider_individuals:.*/)[0]);
 // Places patients go (2026-10-25): organizations per care type, clinicians never.
 const sites = type => { const m = out.match(new RegExp('  ' + type.replace(/[/()&]/g, '\\$&') + ': (\\d+) sites')); return m ? Number(m[1]) : null; };
 check('a retail pharmacy counts as a pharmacy site', sites('Pharmacies') === 1, String(sites('Pharmacies')));

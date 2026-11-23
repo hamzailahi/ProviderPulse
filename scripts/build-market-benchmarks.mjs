@@ -101,13 +101,12 @@ async function tallySlice(table, prefix, tally, stateTally, wtally) {
   let last = null, n = 0;
   for (;;) {
     const seek = last ? `npi=gt.${last}` : `npi=gte.${prefix}`;
-    const weighted = table === 'provider_individuals_weighted';
-    const res = await rest(`${table}?select=npi,taxonomy_code,state${weighted ? ',w' : ''}&${seek}&npi=lt.${upper}&order=npi&limit=1000`);
+    const res = await rest(`${table}?select=npi,taxonomy_code,state&${seek}&npi=lt.${upper}&order=npi&limit=1000`);
     const rows = await res.json();
     for (const r of rows) {
       const t = r.taxonomy_code || ''; tally.set(t, (tally.get(t) || 0) + 1);
       // Site weight (migration 052): 1 unless the clinician splits time across offices.
-      const w = r.w != null && Number.isFinite(Number(r.w)) ? Number(r.w) : 1;
+      const w = table === 'provider_individuals' && WEIGHTS.has(String(r.npi)) ? WEIGHTS.get(String(r.npi)) : 1;
       wtally.set(t, (wtally.get(t) || 0) + w);
       const st = String(r.state || '').trim().toUpperCase();
       if (st) stateTally.set(st, (stateTally.get(st) || 0) + 1);
@@ -116,6 +115,19 @@ async function tallySlice(table, prefix, tally, stateTally, wtally) {
     if (rows.length < 1000) return n;
     last = rows[rows.length - 1].npi;
   }
+}
+
+const WEIGHTS = new Map();
+async function loadWeights() {
+  let last = '';
+  for (;;) {
+    const res = await rest(`clinician_weight?select=npi,w${last ? `&npi=gt.${last}` : ''}&order=npi&limit=1000`);
+    const rows = await res.json();
+    for (const r of rows) { const w = Number(r.w); if (Number.isFinite(w)) WEIGHTS.set(String(r.npi), w); }
+    if (rows.length < 1000) break;
+    last = rows[rows.length - 1].npi;
+  }
+  console.log(`  site weights below 1: ${WEIGHTS.size.toLocaleString()} clinicians`);
 }
 
 async function tallyTable(table) {
@@ -172,9 +184,11 @@ async function main() {
 
   console.log('\nReading every listing\'s taxonomy (this takes a few minutes)');
   const clinics = await tallyTable('clinics');
-  // Clinicians through the site-weight view (2026-11-23, step 10): row counts
-  // are unchanged, and the weighted rate is stored beside the plain one.
-  const individuals = await tallyTable('provider_individuals_weighted');
+  // Site weights (2026-11-23, step 10): clinician_weight holds only NPIs whose
+  // weight is below 1 (migration 052); everyone else counts 1. Row counts are
+  // unchanged, and the weighted rate is stored beside the plain one.
+  await loadWeights();
+  const individuals = await tallyTable('provider_individuals');
   // MIN_LISTINGS exists only so a test can run this against a small fake database.
   const minListings = Number(process.env.MIN_LISTINGS) || 5e6;
   if (clinics.total + individuals.total < minListings) throw new Error(`fewer than ${minListings.toLocaleString()} listings read; NPPES load incomplete?`);
