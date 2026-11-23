@@ -56,6 +56,15 @@ jobs:
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y -q -o Acquire::Retries=8 postgresql-client-17
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      # Texas's region (with parts of eight states) ran out of memory building
+      # the walking graph while the car server was up (exit 137, 2026-11-23).
+      # 16 GB of swap on the runner's spare disk lets the big regions finish.
+      - name: Add swap
+        run: |
+          d=/mnt; [ -w /mnt ] || d=$HOME
+          sudo fallocate -l 16G "$d/swapfile" && sudo chmod 600 "$d/swapfile"
+          sudo mkswap "$d/swapfile" >/dev/null && sudo swapon "$d/swapfile"
+          free -g
       - name: Dry run
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}

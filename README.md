@@ -653,6 +653,7 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-23
 
+- The drive-time job now adds swap space on its runner, so very large regions such as Texas no longer run out of memory building the walking-route graph.
 - New read-only Market score check job: scores chosen ZIPs against the live data and shows which neighbouring ZIPs each catchment used and how distances were measured.
 - The market score now picks a ZIP's neighbours by where people live, not by the middle of each ZIP's shape. Some shape middles were badly off (Anchorage 99503's sat about 280 miles away in rural Alaska), so those areas were scored against the wrong neighbours.
 - Drive-time start points now sit where each ZIP's people live (2020 Census blocks weighted by population) for all 33,774 ZIPs. The typical start point moved under a mile; big rural ZIPs moved much more.
