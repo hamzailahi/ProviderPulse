@@ -177,6 +177,27 @@ ALTER SEQUENCE public.access_codes_id_seq OWNED BY public.access_codes.id;
 
 
 --
+-- Name: access_e2sfca; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.access_e2sfca (
+    zip text NOT NULL,
+    specialty text NOT NULL,
+    per_1k numeric NOT NULL,
+    catchment_minutes integer NOT NULL,
+    state text NOT NULL,
+    computed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE access_e2sfca; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.access_e2sfca IS 'Drive-time E2SFCA access per ZIP and scored specialty; written only by access-dry-run.yml apply';
+
+
+--
 -- Name: access_requests; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -371,6 +392,48 @@ CREATE TABLE public.clinic_secondary_locations (
 
 
 --
+-- Name: clinician_medicare_sites; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.clinician_medicare_sites (
+    npi text NOT NULL,
+    address text NOT NULL,
+    city text,
+    state text,
+    zip text NOT NULL,
+    facility text,
+    release_date date
+);
+
+
+--
+-- Name: clinician_status; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.clinician_status (
+    npi text NOT NULL,
+    ind_pac_id text,
+    grad_year smallint,
+    telehealth boolean DEFAULT false NOT NULL,
+    sites smallint NOT NULL,
+    org_pac_ids text[] DEFAULT '{}'::text[] NOT NULL,
+    cms_specialty text,
+    release_date date NOT NULL
+);
+
+
+--
+-- Name: clinician_weight; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.clinician_weight (
+    npi text NOT NULL,
+    w real NOT NULL,
+    CONSTRAINT clinician_weight_w_check CHECK (((w > (0)::double precision) AND (w <= (1)::double precision)))
+);
+
+
+--
 -- Name: clinics; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -388,7 +451,11 @@ CREATE TABLE public.clinics (
     created_at timestamp without time zone DEFAULT now(),
     taxonomy_code text,
     taxonomy_code_source text,
-    phone text
+    phone text,
+    fax text,
+    org_fax text,
+    org_fax_npi text,
+    org_fax_name text
 );
 
 
@@ -397,6 +464,20 @@ CREATE TABLE public.clinics (
 --
 
 COMMENT ON COLUMN public.clinics.phone IS 'Practice phone from NPPES (10 digits), filled by org-phone-backfill';
+
+
+--
+-- Name: COLUMN clinics.fax; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.clinics.fax IS 'Practice fax from NPPES (10 digits), filled by fax-backfill';
+
+
+--
+-- Name: COLUMN clinics.org_fax; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.clinics.org_fax IS 'Always null: present so one select list serves both directory tables (048)';
 
 
 --
@@ -606,6 +687,20 @@ CREATE SEQUENCE public.cms_zip_procedures_id_seq
 --
 
 ALTER SEQUENCE public.cms_zip_procedures_id_seq OWNED BY public.cms_zip_procedures.id;
+
+
+--
+-- Name: county_preventable_stays; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.county_preventable_stays (
+    fips text NOT NULL,
+    rate numeric NOT NULL,
+    release_year integer NOT NULL,
+    data_years text,
+    loaded_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT county_preventable_stays_fips_check CHECK ((fips ~ '^\d{5}$'::text))
+);
 
 
 --
@@ -839,6 +934,26 @@ ALTER TABLE public.leie_exclusions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENT
 
 
 --
+-- Name: listing_counts_zip; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.listing_counts_zip (
+    k text NOT NULL,
+    zip text NOT NULL,
+    taxonomy_code text DEFAULT ''::text NOT NULL,
+    src character(1) NOT NULL,
+    n integer NOT NULL,
+    w real NOT NULL,
+    sites integer NOT NULL,
+    pinned integer NOT NULL,
+    lat double precision,
+    lng double precision,
+    built_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT listing_counts_zip_src_check CHECK ((src = ANY (ARRAY['c'::bpchar, 'i'::bpchar])))
+);
+
+
+--
 -- Name: listing_reports; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -885,6 +1000,23 @@ CREATE TABLE public.market_benchmarks (
     data jsonb NOT NULL,
     refreshed_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT market_benchmarks_kind_check CHECK ((kind = ANY (ARRAY['measure'::text, 'specialty'::text, 'state_density'::text, 'demand_model'::text, 'care_type'::text])))
+);
+
+
+--
+-- Name: market_concentration; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.market_concentration (
+    zip3 text NOT NULL,
+    specialty text NOT NULL,
+    clinicians integer NOT NULL,
+    groups integer NOT NULL,
+    hhi integer NOT NULL,
+    top_group text,
+    top_share numeric,
+    release_date date,
+    CONSTRAINT market_concentration_zip3_check CHECK ((zip3 ~ '^\d{3}$'::text))
 );
 
 
@@ -1053,8 +1185,65 @@ CREATE TABLE public.provider_individuals (
     refreshed_at timestamp with time zone DEFAULT now() NOT NULL,
     affiliated_clinic_npi text,
     taxonomy_code text,
-    taxonomy_code_source text
+    taxonomy_code_source text,
+    fax text,
+    org_fax text,
+    org_fax_npi text,
+    org_fax_name text,
+    address_source text,
+    address_checked date,
+    nppes_address text,
+    nppes_city text,
+    nppes_state text,
+    nppes_zip text,
+    nppes_latitude numeric,
+    nppes_longitude numeric,
+    CONSTRAINT provider_individuals_address_source_check CHECK ((address_source = 'medicare'::text))
 );
+
+
+--
+-- Name: COLUMN provider_individuals.fax; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.provider_individuals.fax IS 'Practice fax from NPPES (10 digits), filled by fax-backfill';
+
+
+--
+-- Name: COLUMN provider_individuals.org_fax; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.provider_individuals.org_fax IS 'Fax of the organization this clinician bills through in Medicare, at the same address; only when fax is null (fax-via-org)';
+
+
+--
+-- Name: COLUMN provider_individuals.org_fax_npi; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.provider_individuals.org_fax_npi IS 'NPI of the organization org_fax belongs to';
+
+
+--
+-- Name: COLUMN provider_individuals.org_fax_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.provider_individuals.org_fax_name IS 'Name of the organization org_fax belongs to, shown as "via <name>"';
+
+
+--
+-- Name: provider_individuals_weighted; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.provider_individuals_weighted WITH (security_invoker='true') AS
+ SELECT p.npi,
+    p.zip,
+    p.primary_taxonomy,
+    p.taxonomy_code,
+    p.latitude,
+    p.longitude,
+    COALESCE(cw.w, (1)::real) AS w
+   FROM (public.provider_individuals p
+     LEFT JOIN public.clinician_weight cw ON ((cw.npi = p.npi)));
 
 
 --
@@ -1248,6 +1437,21 @@ CREATE TABLE public.taxonomy_map (
 
 
 --
+-- Name: zip_centres; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.zip_centres (
+    zip text NOT NULL,
+    lat numeric NOT NULL,
+    lon numeric NOT NULL,
+    pop_18plus integer NOT NULL,
+    source text DEFAULT 'census_gazetteer'::text NOT NULL,
+    gazetteer_year integer,
+    loaded_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: zip_county_crosswalk; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1289,6 +1493,41 @@ CREATE TABLE public.zip_enrichment_queue (
     attempts integer DEFAULT 0 NOT NULL,
     last_error text,
     CONSTRAINT zip_enrichment_queue_status_chk CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'done'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: zip_geo; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.zip_geo WITH (security_invoker='true') AS
+ SELECT cdc_places.zip,
+    cdc_places.lat,
+    cdc_places.lon,
+    cdc_places.pop_18plus,
+    'cdc_places'::text AS source
+   FROM public.cdc_places
+  WHERE (cdc_places.measureid = 'DENTAL'::text)
+UNION ALL
+ SELECT zip_centres.zip,
+    zip_centres.lat,
+    zip_centres.lon,
+    zip_centres.pop_18plus,
+    zip_centres.source
+   FROM public.zip_centres;
+
+
+--
+-- Name: zip_pop_centres; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.zip_pop_centres (
+    zip text NOT NULL,
+    lat double precision NOT NULL,
+    lon double precision NOT NULL,
+    pop integer NOT NULL,
+    blocks integer NOT NULL,
+    source text DEFAULT 'census_2020_blocks'::text NOT NULL
 );
 
 
@@ -1354,6 +1593,14 @@ ALTER TABLE ONLY public.hpsa_designations ALTER COLUMN id SET DEFAULT nextval('p
 
 ALTER TABLE ONLY public.access_codes
     ADD CONSTRAINT access_codes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: access_e2sfca access_e2sfca_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.access_e2sfca
+    ADD CONSTRAINT access_e2sfca_pkey PRIMARY KEY (zip, specialty);
 
 
 --
@@ -1437,6 +1684,30 @@ ALTER TABLE ONLY public.clinic_secondary_locations
 
 
 --
+-- Name: clinician_medicare_sites clinician_medicare_sites_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.clinician_medicare_sites
+    ADD CONSTRAINT clinician_medicare_sites_pkey PRIMARY KEY (npi, address, zip);
+
+
+--
+-- Name: clinician_status clinician_status_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.clinician_status
+    ADD CONSTRAINT clinician_status_pkey PRIMARY KEY (npi);
+
+
+--
+-- Name: clinician_weight clinician_weight_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.clinician_weight
+    ADD CONSTRAINT clinician_weight_pkey PRIMARY KEY (npi);
+
+
+--
 -- Name: clinics clinics_npi_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1482,6 +1753,14 @@ ALTER TABLE ONLY public.cms_provider_cache
 
 ALTER TABLE ONLY public.cms_zip_procedures
     ADD CONSTRAINT cms_zip_procedures_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: county_preventable_stays county_preventable_stays_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.county_preventable_stays
+    ADD CONSTRAINT county_preventable_stays_pkey PRIMARY KEY (fips);
 
 
 --
@@ -1541,6 +1820,14 @@ ALTER TABLE ONLY public.leie_exclusions
 
 
 --
+-- Name: listing_counts_zip listing_counts_zip_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.listing_counts_zip
+    ADD CONSTRAINT listing_counts_zip_pkey PRIMARY KEY (k);
+
+
+--
 -- Name: listing_reports listing_reports_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1554,6 +1841,14 @@ ALTER TABLE ONLY public.listing_reports
 
 ALTER TABLE ONLY public.market_benchmarks
     ADD CONSTRAINT market_benchmarks_pkey PRIMARY KEY (kind, key);
+
+
+--
+-- Name: market_concentration market_concentration_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.market_concentration
+    ADD CONSTRAINT market_concentration_pkey PRIMARY KEY (zip3, specialty);
 
 
 --
@@ -1717,6 +2012,14 @@ ALTER TABLE ONLY public.taxonomy_map
 
 
 --
+-- Name: zip_centres zip_centres_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zip_centres
+    ADD CONSTRAINT zip_centres_pkey PRIMARY KEY (zip);
+
+
+--
 -- Name: zip_county_crosswalk zip_county_crosswalk_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1738,6 +2041,14 @@ ALTER TABLE ONLY public.zip_county_crosswalk
 
 ALTER TABLE ONLY public.zip_enrichment_queue
     ADD CONSTRAINT zip_enrichment_queue_pkey PRIMARY KEY (zip);
+
+
+--
+-- Name: zip_pop_centres zip_pop_centres_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.zip_pop_centres
+    ADD CONSTRAINT zip_pop_centres_pkey PRIMARY KEY (zip);
 
 
 --
@@ -1843,6 +2154,13 @@ CREATE INDEX clinic_secondary_locations_zip_idx ON public.clinic_secondary_locat
 --
 
 CREATE INDEX clinics_geo_idx ON public.clinics USING btree (latitude, longitude) WHERE ((latitude IS NOT NULL) AND (longitude IS NOT NULL));
+
+
+--
+-- Name: clinics_name_trgm_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX clinics_name_trgm_idx ON public.clinics USING gin (name extensions.gin_trgm_ops);
 
 
 --
@@ -1979,6 +2297,13 @@ CREATE INDEX leie_npi_idx ON public.leie_exclusions USING btree (npi) WHERE (npi
 
 
 --
+-- Name: listing_counts_zip_zip_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX listing_counts_zip_zip_idx ON public.listing_counts_zip USING btree (zip, k);
+
+
+--
 -- Name: listing_reports_npi_created_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1997,13 +2322,6 @@ CREATE INDEX medicare_county_enrollment_state_idx ON public.medicare_county_enro
 --
 
 CREATE INDEX medicare_hospital_procedures_zip_idx ON public.medicare_hospital_procedures USING btree (zip, setting);
-
-
---
--- Name: npi_activity_refreshed_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX npi_activity_refreshed_idx ON public.npi_activity USING btree (refreshed_at);
 
 
 --
@@ -2035,6 +2353,13 @@ CREATE INDEX provider_individuals_geo_idx ON public.provider_individuals USING b
 
 
 --
+-- Name: provider_individuals_name_trgm_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX provider_individuals_name_trgm_idx ON public.provider_individuals USING gin (name extensions.gin_trgm_ops);
+
+
+--
 -- Name: provider_individuals_state_city_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2046,13 +2371,6 @@ CREATE INDEX provider_individuals_state_city_idx ON public.provider_individuals 
 --
 
 CREATE INDEX provider_individuals_taxonomy_code_idx ON public.provider_individuals USING btree (taxonomy_code);
-
-
---
--- Name: provider_individuals_taxonomy_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX provider_individuals_taxonomy_idx ON public.provider_individuals USING btree (primary_taxonomy);
 
 
 --
@@ -2325,6 +2643,19 @@ CREATE POLICY "Public read demographics" ON public.demographics_raw FOR SELECT U
 ALTER TABLE public.access_codes ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: access_e2sfca; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.access_e2sfca ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: access_e2sfca access_e2sfca_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY access_e2sfca_read ON public.access_e2sfca FOR SELECT USING (true);
+
+
+--
 -- Name: access_requests; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2424,6 +2755,45 @@ CREATE POLICY clinic_secondary_locations_public_read ON public.clinic_secondary_
 
 
 --
+-- Name: clinician_medicare_sites; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.clinician_medicare_sites ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: clinician_medicare_sites clinician_medicare_sites_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY clinician_medicare_sites_read ON public.clinician_medicare_sites FOR SELECT USING (true);
+
+
+--
+-- Name: clinician_status; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.clinician_status ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: clinician_status clinician_status_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY clinician_status_read ON public.clinician_status FOR SELECT USING (true);
+
+
+--
+-- Name: clinician_weight; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.clinician_weight ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: clinician_weight clinician_weight_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY clinician_weight_read ON public.clinician_weight FOR SELECT USING (true);
+
+
+--
 -- Name: clinics; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2459,6 +2829,19 @@ CREATE POLICY cms_provider_cache_public_read ON public.cms_provider_cache FOR SE
 --
 
 ALTER TABLE public.cms_zip_procedures ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: county_preventable_stays; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.county_preventable_stays ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: county_preventable_stays county_preventable_stays_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY county_preventable_stays_read ON public.county_preventable_stays FOR SELECT USING (true);
+
 
 --
 -- Name: demand_log; Type: ROW SECURITY; Schema: public; Owner: -
@@ -2511,6 +2894,19 @@ CREATE POLICY insurance_self_insert ON public.provider_insurance FOR INSERT WITH
 ALTER TABLE public.leie_exclusions ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: listing_counts_zip; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.listing_counts_zip ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: listing_counts_zip listing_counts_zip_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY listing_counts_zip_read ON public.listing_counts_zip FOR SELECT USING (true);
+
+
+--
 -- Name: listing_reports; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2527,6 +2923,19 @@ ALTER TABLE public.market_benchmarks ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY "market_benchmarks public read" ON public.market_benchmarks FOR SELECT USING (true);
+
+
+--
+-- Name: market_concentration; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.market_concentration ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: market_concentration market_concentration_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY market_concentration_read ON public.market_concentration FOR SELECT USING (true);
 
 
 --
@@ -2782,6 +3191,19 @@ CREATE POLICY "zip county crosswalk is public" ON public.zip_county_crosswalk FO
 
 
 --
+-- Name: zip_centres; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.zip_centres ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: zip_centres zip_centres_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY zip_centres_read ON public.zip_centres FOR SELECT USING (true);
+
+
+--
 -- Name: zip_county_crosswalk; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2792,6 +3214,19 @@ ALTER TABLE public.zip_county_crosswalk ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.zip_enrichment_queue ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: zip_pop_centres; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.zip_pop_centres ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: zip_pop_centres zip_pop_centres_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY zip_pop_centres_read ON public.zip_pop_centres FOR SELECT USING (true);
+
 
 --
 -- Name: SCHEMA public; Type: ACL; Schema: -; Owner: -
@@ -2863,6 +3298,15 @@ GRANT ALL ON TABLE public.access_codes TO service_role;
 GRANT ALL ON SEQUENCE public.access_codes_id_seq TO anon;
 GRANT ALL ON SEQUENCE public.access_codes_id_seq TO authenticated;
 GRANT ALL ON SEQUENCE public.access_codes_id_seq TO service_role;
+
+
+--
+-- Name: TABLE access_e2sfca; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.access_e2sfca TO service_role;
+GRANT SELECT ON TABLE public.access_e2sfca TO anon;
+GRANT SELECT ON TABLE public.access_e2sfca TO authenticated;
 
 
 --
@@ -3003,6 +3447,33 @@ GRANT ALL ON TABLE public.clinic_secondary_locations TO service_role;
 
 
 --
+-- Name: TABLE clinician_medicare_sites; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.clinician_medicare_sites TO anon;
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.clinician_medicare_sites TO authenticated;
+GRANT ALL ON TABLE public.clinician_medicare_sites TO service_role;
+
+
+--
+-- Name: TABLE clinician_status; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.clinician_status TO service_role;
+GRANT SELECT ON TABLE public.clinician_status TO anon;
+GRANT SELECT ON TABLE public.clinician_status TO authenticated;
+
+
+--
+-- Name: TABLE clinician_weight; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.clinician_weight TO service_role;
+GRANT SELECT ON TABLE public.clinician_weight TO anon;
+GRANT SELECT ON TABLE public.clinician_weight TO authenticated;
+
+
+--
 -- Name: TABLE clinics; Type: ACL; Schema: public; Owner: -
 --
 
@@ -3081,6 +3552,15 @@ GRANT ALL ON TABLE public.cms_zip_procedures TO service_role;
 GRANT ALL ON SEQUENCE public.cms_zip_procedures_id_seq TO anon;
 GRANT ALL ON SEQUENCE public.cms_zip_procedures_id_seq TO authenticated;
 GRANT ALL ON SEQUENCE public.cms_zip_procedures_id_seq TO service_role;
+
+
+--
+-- Name: TABLE county_preventable_stays; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.county_preventable_stays TO anon;
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.county_preventable_stays TO authenticated;
+GRANT ALL ON TABLE public.county_preventable_stays TO service_role;
 
 
 --
@@ -3174,6 +3654,15 @@ GRANT ALL ON SEQUENCE public.leie_exclusions_id_seq TO service_role;
 
 
 --
+-- Name: TABLE listing_counts_zip; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.listing_counts_zip TO anon;
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.listing_counts_zip TO authenticated;
+GRANT ALL ON TABLE public.listing_counts_zip TO service_role;
+
+
+--
 -- Name: TABLE listing_reports; Type: ACL; Schema: public; Owner: -
 --
 
@@ -3196,6 +3685,15 @@ GRANT ALL ON SEQUENCE public.listing_reports_id_seq TO service_role;
 GRANT ALL ON TABLE public.market_benchmarks TO anon;
 GRANT ALL ON TABLE public.market_benchmarks TO authenticated;
 GRANT ALL ON TABLE public.market_benchmarks TO service_role;
+
+
+--
+-- Name: TABLE market_concentration; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.market_concentration TO anon;
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.market_concentration TO authenticated;
+GRANT ALL ON TABLE public.market_concentration TO service_role;
 
 
 --
@@ -3277,6 +3775,15 @@ GRANT ALL ON TABLE public.procedure_codes TO service_role;
 GRANT ALL ON TABLE public.provider_individuals TO anon;
 GRANT ALL ON TABLE public.provider_individuals TO authenticated;
 GRANT ALL ON TABLE public.provider_individuals TO service_role;
+
+
+--
+-- Name: TABLE provider_individuals_weighted; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.provider_individuals_weighted TO anon;
+GRANT ALL ON TABLE public.provider_individuals_weighted TO authenticated;
+GRANT ALL ON TABLE public.provider_individuals_weighted TO service_role;
 
 
 --
@@ -3576,6 +4083,15 @@ GRANT ALL ON TABLE public.taxonomy_map TO service_role;
 
 
 --
+-- Name: TABLE zip_centres; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.zip_centres TO anon;
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.zip_centres TO authenticated;
+GRANT ALL ON TABLE public.zip_centres TO service_role;
+
+
+--
 -- Name: TABLE zip_county_crosswalk; Type: ACL; Schema: public; Owner: -
 --
 
@@ -3600,6 +4116,24 @@ GRANT ALL ON SEQUENCE public.zip_county_crosswalk_id_seq TO service_role;
 GRANT ALL ON TABLE public.zip_enrichment_queue TO anon;
 GRANT ALL ON TABLE public.zip_enrichment_queue TO authenticated;
 GRANT ALL ON TABLE public.zip_enrichment_queue TO service_role;
+
+
+--
+-- Name: TABLE zip_geo; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.zip_geo TO anon;
+GRANT ALL ON TABLE public.zip_geo TO authenticated;
+GRANT ALL ON TABLE public.zip_geo TO service_role;
+
+
+--
+-- Name: TABLE zip_pop_centres; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.zip_pop_centres TO anon;
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.zip_pop_centres TO authenticated;
+GRANT ALL ON TABLE public.zip_pop_centres TO service_role;
 
 
 --
