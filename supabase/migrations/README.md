@@ -96,6 +96,7 @@ Status as of 2026-10-06, checked against the first schema snapshot.
 | 056 | `056_clinician_medicare_address.sql` | Medicare address columns on `provider_individuals` (`address_source`, `address_checked`, `nppes_*`) and `clinician_medicare_sites`, public read; written only by `address-check.yml` apply | applied 2026-11-20 by `address-check.yml` apply: 138,150 clinicians shown at their Medicare address (115,647 with a pin), 1,002,333 other Medicare offices |
 | 057 | `057_market_concentration.sql` | `market_concentration`: HHI by Medicare billing group per ZIP3 and specialty, public read; written only by `hhi-build.yml` | applied 2026-11-20 by `hhi-build.yml` apply: 16,938 cells |
 | 058 | `058_drop_unused_indexes.sql` | Drops `provider_individuals_taxonomy_idx` and `npi_activity_refreshed_idx` (never used, about 140 MB) | applied 2026-11-22 by `apply-migration.yml` |
+| 059 | Population-weighted ZIP centres from 2020 Census blocks (`zip_pop_centres`, public read); applied and loaded by `zip-pop-centres.yml` apply | pending |
 
 Only 014 depends on another file (013). Everything else is creation order.
 

@@ -19,11 +19,22 @@ if [ "${WEIGHTED:-1}" = 1 ]; then
 else
   IND_TABLE=provider_individuals; IND_COUNT='count(*)'; BENCH_FIELD="data->>'rate_per_1k'"
 fi
+# Start points (step 10, 2026-11-23): each ZIP's population-weighted centre
+# (zip_pop_centres, migration 059) when it exists, else the middle of its shape.
+BOXQ="lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON and zip ~ '^[0-9]{5}\$'"
+GBOXQ="g.lat between $MINLAT and $MAXLAT and g.lon between $MINLON and $MAXLON and g.zip ~ '^[0-9]{5}\$'"
+if [ "$(psql "$SUPABASE_DB_URL" -At -X -c "select to_regclass('public.zip_pop_centres') is not null")" = t ]; then
+  ZIPQ="select g.zip, coalesce(p.lat, avg(g.lat)) lat, coalesce(p.lon, avg(g.lon)) lon, max(g.pop_18plus) adults from public.zip_geo g left join public.zip_pop_centres p on p.zip = g.zip where $GBOXQ group by g.zip, p.lat, p.lon order by g.zip"
+  echo "   start points: population-weighted ZIP centres"
+else
+  ZIPQ="select zip, avg(lat) lat, avg(lon) lon, max(pop_18plus) adults from public.zip_geo where $BOXQ group by zip order by zip"
+  echo "   start points: ZIP shape centres (zip_pop_centres not loaded)"
+fi
 echo "== Export (read only)"
 psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -X <<SQL
 begin transaction read only;
 set local statement_timeout = '30min';
-\\copy (select zip, avg(lat) lat, avg(lon) lon, max(pop_18plus) adults from public.zip_geo where true and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON and zip ~ '^[0-9]{5}\$' group by zip order by zip) to '$WORK/zips.csv' with (format csv, header true)
+\\copy ($ZIPQ) to '$WORK/zips.csv' with (format csv, header true)
 \\copy (select key, $BENCH_FIELD from public.market_benchmarks where kind = 'specialty') to '$WORK/bench.csv' with (format csv, header true)
 \\copy (select z, taxonomy_code, sum(n) from (select left(zip, 5) z, taxonomy_code, count(*) n from public.clinics where taxonomy_code is not null and left(zip, 5) in (select zip from public.zip_geo where true and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON) group by 1, 2 union all select left(zip, 5), taxonomy_code, $IND_COUNT from public.$IND_TABLE where taxonomy_code is not null and left(zip, 5) in (select zip from public.zip_geo where true and lat between $MINLAT and $MAXLAT and lon between $MINLON and $MAXLON) group by 1, 2) x group by 1, 2) to '$WORK/supply.csv' with (format csv, header true)
 \\copy (select zip, (signals->'no_vehicle'->>'n')::numeric / nullif((signals->'no_vehicle'->>'of')::numeric, 0) as share from public.census_acs_zcta where signals ? 'no_vehicle' and (signals->'no_vehicle'->>'of')::numeric > 0) to '$WORK/nocar.csv' with (format csv, header true)

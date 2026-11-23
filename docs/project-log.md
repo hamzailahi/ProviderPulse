@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 430 changes over 70 working days, 2026-05-13 to 2026-11-23.
-- 2026-08-19 onward: from the README changelog (256 entries, written for a reader).
+- 431 changes over 70 working days, 2026-05-13 to 2026-11-23.
+- 2026-08-19 onward: from the README changelog (257 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 95 |
+| November 2026 | 96 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -18,6 +18,7 @@ Every change to the product, newest first, with the date it shipped. Generated f
 
 ## 2026-11-23
 
+- Drive times will start from each ZIP's population-weighted centre (where its residents live, from 2020 Census blocks) instead of the middle of the ZIP's shape. A new job builds these points; the drive-time job uses them once loaded.
 - Market benchmarks now also store a site-weighted national rate per specialty (clinicians who split time across offices count 0.6 at their main address). The live score still reads the plain rate until every state's drive-time figures are rerun with the same weighting.
 - The drive-time job now counts clinicians by site weight and measures travel burden to the practices' own locations rather than ZIP centres.
 - Each specialty's opportunity score now weights patient need and ability to pay by how well each tracked real outcomes in the back-test, as access already was. Oncology, imaging and urgent care now rest on ability to pay; rheumatology and home health on need. The weights shown on Insights follow.
