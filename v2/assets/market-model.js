@@ -116,10 +116,33 @@
     return { commercial_pct: r(c), medicare_pct: r(a.medicare), medicaid_pct: r(a.medicaid), uninsured_pct: Math.round((1 - a.insured) * 100) };
   }
 
+  // Learned need and pay weights (2026-11-23, step 9, the user's go-ahead):
+  // the same rule as ACCESS_SHARE (rho 0.15+ full, 0.05 to 0.15 half, under
+  // 0.05 none). NEED_SHARE from need alone against county preventable
+  // hospital stays (back-test section 1), PAY_SHARE from payer yield against
+  // clinician entry 2021 to 2025 (section 2). Missing from a table keeps 1.
+  // Rerun the back-test after the full rerun and update all three tables.
+  var NEED_SHARE = {
+    'Allergy & immunology': 0.5, 'Ear, nose & throat': 0.5,
+    'Cancer care / oncology': 0, 'Urgent care & emergency': 0, 'Imaging & lab': 0, 'Hearing & audiology': 0
+  };
+  var PAY_SHARE = {
+    'Primary care / family doctor': 0.5, 'Eye care': 0.5, 'Heart / cardiology': 0.5, 'Allergy & immunology': 0.5,
+    'Lung, breathing & sleep': 0.5, 'Digestive / gastroenterology': 0.5, 'Kidney / nephrology': 0.5,
+    'Diabetes & hormones': 0.5, 'Cancer care / oncology': 0.5, 'Ear, nose & throat': 0.5, 'Urology': 0.5,
+    'Foot & ankle / podiatry': 0.5, 'Pain management': 0.5, 'Plastic & reconstructive surgery': 0.5,
+    'Urgent care & emergency': 0.5, 'Imaging & lab': 0.5, 'Pharmacy': 0.5, 'Nursing & assisted living': 0.5,
+    'Medical equipment & supplies': 0.5, 'Care coordination & community health': 0.5,
+    'Infectious disease': 0.5, 'Genetics & genetic counseling': 0.5, 'Hospice & palliative care': 0.5,
+    'Arthritis / rheumatology': 0, 'Home health & in-home care': 0
+  };
+  function share(t, label) { return t.hasOwnProperty(label) ? t[label] : 1; }
   function weightsFor(label) {
-    var a = ACCESS_SHARE.hasOwnProperty(label) ? ACCESS_SHARE[label] : 1;
-    var w = { need: WEIGHTS.need, access: WEIGHTS.access * a, pay: WEIGHTS.pay }, t = w.need + w.access + w.pay;
-    return { need: w.need / t, access: w.access / t, pay: w.pay / t, access_share: a };
+    var a = share(ACCESS_SHARE, label), n = share(NEED_SHARE, label), p = share(PAY_SHARE, label);
+    var w = { need: WEIGHTS.need * n, access: WEIGHTS.access * a, pay: WEIGHTS.pay * p }, t = w.need + w.access + w.pay;
+    // Nothing validated at all: fall back to the plain weights rather than divide by zero.
+    if (!(t > 0)) { w = { need: WEIGHTS.need, access: WEIGHTS.access, pay: WEIGHTS.pay }; t = w.need + w.access + w.pay; }
+    return { need: w.need / t, access: w.access / t, pay: w.pay / t, access_share: a, need_share: n, pay_share: p };
   }
 
   // Per-specialty need drivers. m: [PLACES measureid, weight, invert?],
@@ -427,7 +450,9 @@
       var arche = classify(f, clin, confidence);
             var scores = {
         patient_need: (function () {
-          var nw = f.need != null ? 1 : 0, aw = f.access != null ? W.access_share : 0;
+          var nw = f.need != null ? W.need_share : 0, aw = f.access != null ? W.access_share : 0;
+          // Neither validated (oncology, imaging, urgent care): a plain mean, never null for data we hold.
+          if (!(nw + aw)) { nw = f.need != null ? 1 : 0; aw = f.access != null ? 1 : 0; }
           return nw + aw ? Math.round(((f.need || 0) * nw + (f.access || 0) * aw) / (nw + aw)) : null;
         })(),
         viability: f.pay != null ? Math.round(f.pay) : null
@@ -595,7 +620,7 @@
   }
 
   var API = {
-    VERSION: VERSION, WEIGHTS: WEIGHTS, YIELD: YIELD, payerYield: payerYield, payerMix: payerMix, ACCESS_SHARE: ACCESS_SHARE, UNVALIDATED: UNVALIDATED, weightsFor: weightsFor, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
+    VERSION: VERSION, WEIGHTS: WEIGHTS, YIELD: YIELD, payerYield: payerYield, payerMix: payerMix, ACCESS_SHARE: ACCESS_SHARE, NEED_SHARE: NEED_SHARE, PAY_SHARE: PAY_SHARE, UNVALIDATED: UNVALIDATED, weightsFor: weightsFor, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
     score: score, classify: classify, pct: pct, rankIn: rankIn, measureIds: measureIds, MEASURE_NAME: MEASURE_NAME,
     FACILITY_TYPES: FACILITY_TYPES, facilities: facilities, facilityCodes: facilityCodes
   };

@@ -180,10 +180,15 @@ console.log('Learned access weight (2026-11-20)');
 {
   const w = M.weightsFor('Dental'), z = M.weightsFor('Heart / cardiology'), h = M.weightsFor('Orthopedics & sports injury'), u = M.weightsFor('Pediatrics (children)');
   check('full share keeps the thirds', Math.abs(w.access - 0.333) < 1e-9 && Math.abs(w.need + w.access + w.pay - 1) < 1e-9);
-  check('no share drops access and renormalises', z.access === 0 && Math.abs(z.need + z.pay - 1) < 1e-9 && Math.abs(z.need - 0.333 / 0.667) < 1e-9);
+  check('no share drops access and renormalises', z.access === 0 && Math.abs(z.need + z.pay - 1) < 1e-9 && Math.abs(z.need - 0.333 / (0.333 + 0.334 * 0.5)) < 1e-9);
   check('half share is between', h.access > 0 && h.access < w.access);
   check('a specialty with no outcome test keeps full weight', u.access_share === 1);
-  check('every table entry is a scored specialty', Object.keys(M.ACCESS_SHARE).concat(Object.keys(M.UNVALIDATED)).every(l => SPECIALTIES.some(s => s[0] === l)));
+  check('every table entry is a scored specialty', Object.keys(M.ACCESS_SHARE).concat(Object.keys(M.UNVALIDATED), Object.keys(M.NEED_SHARE), Object.keys(M.PAY_SHARE)).every(l => SPECIALTIES.some(s => s[0] === l)));
+  const onc = M.weightsFor('Cancer care / oncology'), rh = M.weightsFor('Arthritis / rheumatology');
+  check('learned need: none drops need (oncology rests on pay)', onc.need === 0 && onc.access === 0 && Math.abs(onc.pay - 1) < 1e-9);
+  check('learned pay: none drops pay (rheumatology rests on need)', rh.pay === 0 && Math.abs(rh.need - 1) < 1e-9);
+  check('learned shares are reported', onc.need_share === 0 && onc.pay_share === 0.5 && w.need_share === 1 && w.pay_share === 1);
+  check('no specialty loses every weight', SPECIALTIES.every(s => { const x = M.weightsFor(s[0]); return Math.abs(x.need + x.access + x.pay - 1) < 1e-9; }));
   const r = one(base({ rows: cardRows(5, 6) }));
   check('per-specialty weights are returned', r.weights && r.weights.access === 0);
   check('the score ignores access when its share is 0', Math.abs(r.score - (r.factors.need * z.need + r.factors.pay * z.pay) / (z.need + z.pay)) <= 1, JSON.stringify([r.score, r.factors]));

@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-22. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-23. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -650,6 +650,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-23
+
+- Each specialty's opportunity score now weights patient need and ability to pay by how well each tracked real outcomes in the back-test, as access already was. Oncology, imaging and urgent care now rest on ability to pay; rheumatology and home health on need. The weights shown on Insights follow.
 
 ### 2026-11-22
 
