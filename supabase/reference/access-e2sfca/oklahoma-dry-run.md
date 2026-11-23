@@ -1,27 +1,22 @@
 # E2SFCA access dry run: Oklahoma
 
-Run 2026-11-18 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-23 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
 ## Inputs
 
-- ZIP areas in the region (focus plus a border strip of about 60 miles): 1,716; in Oklahoma: 643
-- Drive times: OSRM on OpenStreetMap roads (car profile), 1,716 x 1,716 ZIP centre pairs; travel inside a ZIP is half the drive to its nearest neighbour, 2 to 10 minutes
+- ZIP areas in the region (focus plus a border strip of about 60 miles): 1,769; in Oklahoma: 660
+- Drive times: OSRM on OpenStreetMap roads (car profile), 1,769 x 1,769 ZIP centre pairs; travel inside a ZIP is half the drive to its nearest neighbour, 2 to 10 minutes
 - Focus ZIPs with no road link to any other ZIP (islands, unrouted centres): 0
-- Listings read: 352,289; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
+- Listings read: 336,348.404; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
 - Catchment edges: 30 minutes for everyday care, 60 for most specialties, 90 for oncology, genetics, infectious disease and plastic surgery (reviewable assumptions, listed per row below)
 
 ## Routing sanity check
 
-Regional median: 2.66 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (6.65), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
+Regional median: 2.36 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (5.89), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
 
-- Flagged: 2; re-anchored: 1; still implausible (left out of the rank comparison, marked in the CSV): 0
-
-| ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
-|---|---|---|---|---|---|---|
-| 71061 | no | 6.72 | 100% | 6.46 | 100% | no |
-| 71082 | no | 7.59 | 100% | 4.35 | 100% | yes (3.37) |
+- Flagged: 0; re-anchored: 0; still implausible (left out of the rank comparison, still stored, marked in the CSV): 0
 
 ## By specialty
 
@@ -29,83 +24,140 @@ Rank agreement is Spearman's rho between the two access factors across the state
 
 | Specialty | Catchment (min) | Listings in region | US rate per 1k | Rank agreement | ZIPs moved 15+ | Most improved access (new minus old) | Most worsened |
 |---|---|---|---|---|---|---|---|
-| Primary care / family doctor | 30 | 49,114 | 4.78 | 0.37 | 371 of 643 | 73565 (-72), 73858 (-69), 73932 (-65) | 74558 (+94), 74871 (+90), 74549 (+87) |
-| Pediatrics (children) | 30 | 9,440 | 1.13 | 0.69 | 171 of 643 | 73722 (-81), 74571 (-58), 73669 (-53) | 73084 (+72), 73130 (+58), 73097 (+54) |
-| Women's health / OB-GYN | 60 | 5,456 | 0.55 | 0.69 | 238 of 643 | 73835 (-82), 73855 (-47), 74572 (-46) | 74558 (+90), 74549 (+87), 74640 (+62) |
-| Mental health & counseling | 30 | 70,253 | 7.13 | 0.58 | 368 of 643 | 74745 (-57), 74955 (-55), 73860 (-52) | 74369 (+100), 74442 (+100), 74530 (+100) |
-| Dental | 30 | 18,136 | 1.64 | 0.52 | 374 of 643 | 73663 (-81), 74650 (-73), 73554 (-69) | 73006 (+92), 73552 (+80), 73527 (+69) |
-| Eye care | 30 | 7,040 | 0.65 | 0.49 | 379 of 643 | 73932 (-70), 74571 (-63), 73737 (-62) | 74352 (+98), 73719 (+90), 74359 (+85) |
-| Chiropractic | 30 | 8,161 | 0.64 | 0.53 | 351 of 643 | 73573 (-70), 73033 (-68), 74536 (-60) | 73007 (+74), 73842 (+69), 73860 (+64) |
-| Physical & occupational therapy | 30 | 27,656 | 2.73 | 0.56 | 311 of 643 | 73673 (-71), 73646 (-59), 73446 (-54) | 74442 (+67), 74565 (+67), 73447 (+64) |
-| Orthopedics & sports injury | 60 | 4,174 | 0.42 | 0.76 | 269 of 643 | 74832 (-50), 73150 (-45), 74467 (-45) | 73949 (+100), 73947 (+74), 73058 (+60) |
-| Heart / cardiology | 60 | 2,350 | 0.28 | 0.78 | 206 of 643 | 73099 (-53), 73049 (-46), 73064 (-46) | 74422 (+67), 74468 (+67), 74640 (+64) |
-| Skin / dermatology | 60 | 932 | 0.10 | 0.80 | 213 of 643 | 73150 (-48), 74063 (-42), 74055 (-40) | 73528 (+65), 74932 (+62), 74468 (+61) |
-| Allergy & immunology | 60 | 305 | 0.03 | 0.74 | 194 of 643 | 73720 (-58), 74130 (-55), 73768 (-54) | 74083 (+74), 73084 (+64), 74833 (+63) |
-| Lung, breathing & sleep | 60 | 1,341 | 0.14 | 0.79 | 216 of 643 | 74536 (-100), 74935 (-100), 74578 (-77) | 74558 (+100), 74423 (+74), 73439 (+71) |
-| Digestive / gastroenterology | 60 | 1,046 | 0.13 | 0.77 | 193 of 643 | 73170 (-46), 74066 (-45), 73065 (-44) | 74426 (+71), 74640 (+69), 74363 (+65) |
-| Kidney / nephrology | 60 | 1,190 | 0.12 | 0.77 | 266 of 643 | 73566 (-47), 73065 (-46), 73559 (-44) | 73439 (+91), 73433 (+71), 73722 (+71) |
-| Diabetes & hormones | 60 | 523 | 0.07 | 0.70 | 274 of 643 | 74935 (-95), 74536 (-72), 74830 (-70) | 73722 (+100), 74558 (+100), 74549 (+81) |
-| Cancer care / oncology | 90 | 1,316 | 0.18 | 0.60 | 310 of 643 | 73049 (-54), 73028 (-51), 74834 (-51) | 74426 (+75), 74468 (+74), 74428 (+72) |
-| Arthritis / rheumatology | 60 | 389 | 0.04 | 0.74 | 163 of 643 | 73150 (-75), 73066 (-70), 73531 (-69) | 73442 (+79), 73434 (+76), 74422 (+64) |
-| Brain & nerves / neurology | 60 | 3,017 | 0.24 | 0.77 | 160 of 643 | 74055 (-85), 74015 (-82), 74063 (-78) | 73528 (+48), 74902 (+45), 74640 (+39) |
-| Ear, nose & throat | 60 | 630 | 0.08 | 0.77 | 263 of 643 | 74467 (-61), 73099 (-56), 73150 (-56) | 73528 (+62), 74422 (+62), 74468 (+62) |
-| Urology | 60 | 674 | 0.08 | 0.74 | 250 of 643 | 73170 (-65), 73065 (-62), 73099 (-62) | 74640 (+72), 73628 (+70), 73641 (+63) |
-| Foot & ankle / podiatry | 60 | 1,210 | 0.16 | 0.73 | 218 of 643 | 73859 (-48), 74935 (-44), 74467 (-41) | 74558 (+100), 74549 (+92), 73625 (+78) |
-| Pain management | 60 | 1,330 | 0.09 | 0.78 | 254 of 643 | 73446 (-77), 74055 (-70), 74467 (-66) | 74640 (+68), 73641 (+66), 73628 (+64) |
-| Plastic & reconstructive surgery | 90 | 734 | 0.07 | 0.68 | 287 of 643 | 74834 (-65), 73150 (-61), 74026 (-60) | 74932 (+73), 74363 (+70), 74902 (+66) |
-| Speech & language therapy | 30 | 12,462 | 0.87 | 0.60 | 352 of 643 | 74831 (-84), 73722 (-81), 73669 (-74) | 73659 (+88), 73002 (+85), 73011 (+82) |
-| Nutrition & dietitian | 30 | 3,570 | 0.32 | 0.65 | 321 of 643 | 73664 (-84), 73645 (-83), 74643 (-79) | 74423 (+100), 74549 (+100), 74558 (+100) |
-| Acupuncture, massage & naturopathy | 30 | 1,939 | 0.50 | 0.64 | 71 of 643 | 73729 (-83), 73663 (-80), 73048 (-56) | 74871 (+28), 74442 (+27), 74565 (+27) |
-| Urgent care & emergency | 30 | 5,486 | 0.50 | 0.43 | 391 of 643 | 74650 (-76), 74637 (-70), 73043 (-63) | 73642 (+100), 73658 (+100), 73667 (+100) |
-| Imaging & lab | 60 | 5,754 | 0.55 | 0.77 | 214 of 643 | 73150 (-51), 74055 (-47), 73049 (-46) | 74738 (+58), 74640 (+53), 73733 (+51) |
-| Pharmacy | 30 | 17,203 | 1.68 | 0.31 | 392 of 643 | 74536 (-70), 74567 (-65), 74650 (-60) | 74549 (+100), 74558 (+100), 74574 (+100) |
-| Home health & in-home care | 30 | 9,504 | 1.49 | 0.54 | 169 of 643 | 73554 (-65), 74352 (-56), 73018 (-52) | 74557 (+100), 74569 (+96), 74931 (+82) |
-| Nursing & assisted living | 60 | 4,045 | 0.37 | 0.51 | 291 of 643 | 74350 (-54), 73559 (-51), 73937 (-49) | 73949 (+100), 73625 (+94), 73734 (+86) |
-| Medical equipment & supplies | 60 | 4,908 | 0.34 | 0.64 | 319 of 643 | 74951 (-66), 73559 (-61), 74932 (-60) | 73844 (+100), 73625 (+94), 74558 (+77) |
-| Hearing & audiology | 60 | 2,113 | 0.20 | 0.75 | 295 of 643 | 73768 (-76), 74630 (-67), 73720 (-59) | 73716 (+85), 73726 (+84), 73724 (+80) |
-| Behavior therapy (ABA) | 30 | 20,348 | 2.58 | 0.65 | 185 of 643 | 73569 (-95), 73501 (-53), 73096 (-45) | 73447 (+100), 73458 (+100), 73463 (+100) |
-| Care coordination & community health | 30 | 23,812 | 1.55 | 0.44 | 321 of 643 | 73844 (-87), 73642 (-75), 73759 (-68) | 73024 (+100), 73048 (+100), 73092 (+100) |
-| General surgery | 60 | 4,229 | 0.39 | 0.71 | 241 of 643 | 74055 (-53), 74066 (-49), 74015 (-42) | 73084 (+50), 73130 (+47), 74640 (+47) |
-| Infectious disease | 90 | 411 | 0.06 | 0.67 | 249 of 643 | 73018 (-44), 73099 (-44), 73064 (-43) | 74127 (+61), 74131 (+60), 74106 (+59) |
-| Genetics & genetic counseling | 90 | 211 | 0.03 | 0.59 | 163 of 643 | 74347 (-80), 74359 (-67), 74364 (-62) | 74964 (+58), 73084 (+44), 73097 (+43) |
-| Hospice & palliative care | 60 | 1,391 | 0.09 | 0.68 | 344 of 643 | 74761 (-81), 74066 (-66), 74553 (-65) | 73844 (+100), 73092 (+92), 73625 (+91) |
+| Primary care / family doctor | 30 | 44,313 | 4.30 | 0.49 | 311 of 660 | 74058 (-66), 73770 (-53), 74536 (-42) | 74558 (+96), 74549 (+95), 74867 (+80) |
+| Pediatrics (children) | 30 | 9,010.4 | 1.11 | 0.73 | 146 of 660 | 74571 (-52), 73669 (-50), 74058 (-44) | 73084 (+71), 73130 (+60), 73141 (+55) |
+| Women's health / OB-GYN | 60 | 5,080.8 | 0.53 | 0.72 | 217 of 660 | 74935 (-46), 73566 (-42), 74966 (-42) | 74558 (+100), 74549 (+83), 73733 (+67) |
+| Mental health & counseling | 30 | 67,814.8 | 7.20 | 0.64 | 325 of 660 | 74761 (-60), 74955 (-56), 73860 (-47) | 74442 (+100), 74528 (+100), 74530 (+100) |
+| Dental | 30 | 17,789.8 | 1.65 | 0.59 | 282 of 660 | 74058 (-61), 74571 (-41), 74637 (-39) | 73552 (+96), 73541 (+94), 73006 (+83) |
+| Eye care | 30 | 6,588.4 | 0.62 | 0.60 | 315 of 660 | 74058 (-69), 73737 (-58), 73932 (-52) | 74427 (+95), 73641 (+85), 73719 (+84) |
+| Chiropractic | 30 | 7,992 | 0.63 | 0.62 | 287 of 660 | 74536 (-60), 73021 (-59), 74462 (-43) | 73016 (+80), 73007 (+74), 73860 (+67) |
+| Physical & occupational therapy | 30 | 26,567 | 2.70 | 0.66 | 245 of 660 | 73669 (-51), 73646 (-50), 73639 (-45) | 74570 (+70), 74528 (+67), 74442 (+66) |
+| Orthopedics & sports injury | 60 | 3,832.4 | 0.39 | 0.75 | 283 of 660 | 74832 (-57), 73566 (-56), 73150 (-48) | 73058 (+66), 73528 (+61), 73021 (+57) |
+| Heart / cardiology | 60 | 2,020.6 | 0.24 | 0.75 | 220 of 660 | 73064 (-51), 73054 (-47), 73531 (-45) | 74640 (+75), 74459 (+72), 73733 (+67) |
+| Skin / dermatology | 60 | 838.6 | 0.09 | 0.77 | 248 of 660 | 73531 (-55), 73562 (-51), 74073 (-49) | 74459 (+80), 73528 (+75), 73552 (+59) |
+| Allergy & immunology | 60 | 281.8 | 0.03 | 0.70 | 202 of 660 | 73768 (-62), 73738 (-58), 73742 (-58) | 74046 (+83), 74833 (+70), 73049 (+66) |
+| Lung, breathing & sleep | 60 | 1,215.6 | 0.13 | 0.77 | 240 of 660 | 74536 (-100), 74939 (-100), 74943 (-83) | 74558 (+100), 74423 (+72), 74459 (+69) |
+| Digestive / gastroenterology | 60 | 905.2 | 0.11 | 0.75 | 206 of 660 | 73065 (-52), 73064 (-45), 73173 (-43) | 74459 (+81), 74640 (+71), 73051 (+62) |
+| Kidney / nephrology | 60 | 1,075.8 | 0.11 | 0.73 | 289 of 660 | 73566 (-68), 73567 (-58), 73531 (-54) | 73433 (+81), 73439 (+69), 73719 (+68) |
+| Diabetes & hormones | 60 | 467 | 0.06 | 0.69 | 298 of 660 | 74536 (-100), 74939 (-96), 74943 (-75) | 74558 (+100), 73528 (+70), 74735 (+70) |
+| Cancer care / oncology | 90 | 1,114 | 0.15 | 0.59 | 337 of 660 | 73028 (-55), 73054 (-53), 73064 (-51) | 74459 (+79), 74463 (+65), 74468 (+65) |
+| Arthritis / rheumatology | 60 | 339.6 | 0.04 | 0.72 | 187 of 660 | 73531 (-98), 73562 (-91), 73150 (-76) | 73548 (+79), 73528 (+74), 74459 (+74) |
+| Brain & nerves / neurology | 60 | 2,820.6 | 0.22 | 0.74 | 177 of 660 | 74015 (-90), 74055 (-88), 74073 (-82) | 73528 (+71), 74902 (+51), 74640 (+48) |
+| Ear, nose & throat | 60 | 574 | 0.07 | 0.75 | 308 of 660 | 73531 (-62), 74354 (-62), 74360 (-59) | 74459 (+85), 73528 (+76), 73552 (+60) |
+| Urology | 60 | 582.4 | 0.07 | 0.73 | 287 of 660 | 73173 (-67), 73065 (-60), 73064 (-57) | 74640 (+79), 74459 (+78), 73528 (+76) |
+| Foot & ankle / podiatry | 60 | 1,121.6 | 0.15 | 0.71 | 227 of 660 | 73663 (-49), 73858 (-49), 74939 (-48) | 74558 (+100), 74549 (+75), 73625 (+61) |
+| Pain management | 60 | 1,241 | 0.09 | 0.75 | 297 of 660 | 73446 (-74), 74055 (-67), 73030 (-66) | 74528 (+72), 74650 (+72), 74045 (+70) |
+| Plastic & reconstructive surgery | 90 | 690 | 0.07 | 0.67 | 307 of 660 | 74834 (-65), 73054 (-62), 74881 (-62) | 74902 (+71), 74106 (+58), 74103 (+57) |
+| Speech & language therapy | 30 | 12,145.6 | 0.90 | 0.66 | 290 of 660 | 73639 (-72), 73669 (-71), 74750 (-60) | 73659 (+87), 73002 (+85), 73073 (+82) |
+| Nutrition & dietitian | 30 | 3,477 | 0.33 | 0.70 | 271 of 660 | 73744 (-74), 74644 (-73), 74651 (-70) | 73946 (+100), 74549 (+100), 74558 (+100) |
+| Acupuncture, massage & naturopathy | 30 | 1,918.2 | 0.52 | 0.73 | 41 of 660 | 73663 (-30), 74427 (-29), 73838 (-27) | 74570 (+31), 74528 (+27), 74530 (+27) |
+| Urgent care & emergency | 30 | 5,145.8 | 0.47 | 0.47 | 349 of 660 | 74637 (-73), 73842 (-59), 74015 (-56) | 73461 (+100), 73835 (+100), 74060 (+100) |
+| Imaging & lab | 60 | 5,284.6 | 0.49 | 0.71 | 246 of 660 | 73150 (-50), 74055 (-45), 73566 (-44) | 74459 (+61), 74640 (+61), 73733 (+55) |
+| Pharmacy | 30 | 17,047.6 | 1.72 | 0.49 | 324 of 660 | 74536 (-73), 74058 (-53), 73770 (-44) | 74549 (+100), 74574 (+100), 74942 (+100) |
+| Home health & in-home care | 30 | 9,492.6 | 1.61 | 0.64 | 107 of 660 | 73554 (-67), 74954 (-43), 74637 (-40) | 73571 (+79), 74931 (+76), 73544 (+72) |
+| Nursing & assisted living | 60 | 4,043 | 0.39 | 0.57 | 289 of 660 | 74531 (-65), 74761 (-57), 73559 (-44) | 73842 (+82), 74931 (+78), 73756 (+76) |
+| Medical equipment & supplies | 60 | 4,901.2 | 0.36 | 0.64 | 302 of 660 | 73559 (-57), 73531 (-55), 74761 (-54) | 74549 (+69), 74558 (+63), 73625 (+61) |
+| Hearing & audiology | 60 | 2,009.2 | 0.19 | 0.76 | 336 of 660 | 73531 (-59), 74630 (-56), 73742 (-55) | 73628 (+69), 74738 (+60), 73641 (+59) |
+| Behavior therapy (ABA) | 30 | 19,995.4 | 2.88 | 0.75 | 151 of 660 | 74523 (-51), 73569 (-40), 73096 (-28) | 74944 (+100), 73032 (+97), 73016 (+96) |
+| Care coordination & community health | 30 | 23,542 | 1.63 | 0.58 | 285 of 660 | 73844 (-80), 73435 (-71), 73437 (-67) | 73453 (+100), 73628 (+100), 73842 (+100) |
+| General surgery | 60 | 3,816.8 | 0.35 | 0.71 | 241 of 660 | 74055 (-50), 74015 (-45), 74014 (-44) | 74558 (+65), 73528 (+62), 74549 (+62) |
+| Infectious disease | 90 | 363.8 | 0.05 | 0.65 | 257 of 660 | 73064 (-48), 73065 (-45), 74834 (-45) | 74106 (+66), 73528 (+64), 74131 (+59) |
+| Genetics & genetic counseling | 90 | 204.2 | 0.03 | 0.58 | 167 of 660 | 74359 (-59), 74368 (-59), 74364 (-53) | 73569 (+92), 73565 (+91), 73084 (+55) |
+| Hospice & palliative care | 60 | 1,361 | 0.09 | 0.65 | 393 of 660 | 74761 (-100), 74764 (-84), 74576 (-74) | 73844 (+97), 73011 (+92), 73002 (+89) |
 
 In the last two columns a negative change means E2SFCA finds **better** access than the crude ratio (a lower access factor), a positive one **worse**.
 
-## Sample ZIPs
+## People without a car
 
-| ZIP | Specialty | Crude per 1k | E2SFCA per 1k | Crude access | E2SFCA access |
-|---|---|---|---|---|---|
-| 73102 | Primary care / family doctor | 7.882 | 9.956 | 18 | 0 |
-| 73102 | Mental health & counseling | 18.273 | 22.668 | 0 | 0 |
-| 73102 | Heart / cardiology | 0.657 | 0.431 | 0 | 23 |
-| 73102 | Cancer care / oncology | 0.379 | 0.228 | 0 | 36 |
-| 73102 | Urgent care & emergency | 0.793 | 0.962 | 20 | 3 |
-| 74103 | Primary care / family doctor | 7.381 | 6.665 | 23 | 30 |
-| 74103 | Mental health & counseling | 19.481 | 16.085 | 0 | 0 |
-| 74103 | Heart / cardiology | 0.539 | 0.281 | 4 | 50 |
-| 74103 | Cancer care / oncology | 0.334 | 0.164 | 6 | 54 |
-| 74103 | Urgent care & emergency | 1.221 | 1.131 | 0 | 0 |
-| 73505 | Primary care / family doctor | 5.100 | 7.841 | 47 | 18 |
-| 73505 | Mental health & counseling | 10.908 | 12.944 | 24 | 9 |
-| 73505 | Heart / cardiology | 0.160 | 0.173 | 72 | 69 |
-| 73505 | Cancer care / oncology | 0.137 | 0.096 | 61 | 73 |
-| 73505 | Urgent care & emergency | 1.155 | 1.653 | 0 | 0 |
-| 74801 | Primary care / family doctor | 2.871 | 3.397 | 70 | 64 |
-| 74801 | Mental health & counseling | 7.340 | 12.047 | 49 | 16 |
-| 74801 | Heart / cardiology | 0.048 | 0.089 | 91 | 84 |
-| 74801 | Cancer care / oncology | 0.048 | 0.131 | 86 | 63 |
-| 74801 | Urgent care & emergency | 0.242 | 0.351 | 76 | 65 |
-| 73701 | Primary care / family doctor | 4.424 | 5.336 | 54 | 44 |
-| 73701 | Mental health & counseling | 10.450 | 12.416 | 27 | 13 |
-| 73701 | Heart / cardiology | 0.316 | 0.296 | 44 | 47 |
-| 73701 | Cancer care / oncology | 0.158 | 0.099 | 56 | 72 |
-| 73701 | Urgent care & emergency | 0.361 | 0.463 | 64 | 53 |
-| 74501 | Primary care / family doctor | 4.962 | 6.265 | 48 | 34 |
-| 74501 | Mental health & counseling | 20.567 | 24.435 | 0 | 0 |
-| 74501 | Heart / cardiology | 0.068 | 0.073 | 88 | 87 |
-| 74501 | Cancer care / oncology | 0.103 | 0.056 | 71 | 84 |
-| 74501 | Urgent care & emergency | 0.411 | 0.529 | 59 | 47 |
+The stored figure (`e2sfca` above) splits each ZIP's adults by the share of households with no vehicle (ACS B25044) and routes that group on foot (OSRM foot profile on OpenStreetMap paths), with the same catchment edge in minutes as by car; both groups compete for the same clinicians (Mao & Nekorchuk 2013, multi-mode E2SFCA). Walking inside a ZIP is half the walk to its nearest neighbour, 5 to 20 minutes. Households are applied to adults (no ACS table gives vehicles per adult at ZIP level).
+
+- Adults in Oklahoma in households with no vehicle: about 166,795 of 3,010,476 (5.5%)
+- Focus ZIPs with no Census vehicle figure (scored as if every household has a car): 6
+- Sensitivity check: the same split with the no-car group at 2.5x the drive time instead of walking (a stand-in for transit, rides and waiting; an assumption, not a published figure). It is not stored.
+
+| Specialty | Rank agreement with car-only | ZIPs moved 15+ vs car-only | Most worsened by the no-car split | Rank agreement, walking vs slowdown |
+|---|---|---|---|---|
+| Primary care / family doctor | 1.00 | 1 of 660 | 73117 (+15), 74103 (+13), 73102 (+12) | 1.00 |
+| Pediatrics (children) | 1.00 | 0 of 660 | 73117 (+12), 74103 (+11), 73102 (+10) | 1.00 |
+| Women's health / OB-GYN | 1.00 | 0 of 660 | 74103 (+11), 74106 (+11), 73117 (+10) | 1.00 |
+| Mental health & counseling | 1.00 | 2 of 660 | 74103 (+19), 74106 (+15), 74116 (+8) | 1.00 |
+| Dental | 1.00 | 1 of 660 | 73102 (+15), 73117 (+13), 74103 (+11) | 1.00 |
+| Eye care | 1.00 | 0 of 660 | 73102 (+14), 73117 (+14), 74103 (+12) | 1.00 |
+| Chiropractic | 1.00 | 1 of 660 | 74103 (+15), 73102 (+13), 73117 (+12) | 1.00 |
+| Physical & occupational therapy | 1.00 | 0 of 660 | 73102 (+12), 73117 (+12), 74103 (+12) | 1.00 |
+| Orthopedics & sports injury | 1.00 | 0 of 660 | 74103 (+14), 74106 (+12), 73102 (+11) | 1.00 |
+| Heart / cardiology | 1.00 | 0 of 660 | 73117 (+10), 74103 (+10), 73102 (+8) | 1.00 |
+| Skin / dermatology | 1.00 | 0 of 660 | 74103 (+11), 74106 (+11), 73102 (+10) | 1.00 |
+| Allergy & immunology | 1.00 | 0 of 660 | 74103 (+12), 74106 (+11), 73117 (+6) | 1.00 |
+| Lung, breathing & sleep | 1.00 | 0 of 660 | 73117 (+12), 74103 (+11), 73102 (+9) | 1.00 |
+| Digestive / gastroenterology | 1.00 | 0 of 660 | 74103 (+11), 73117 (+9), 74106 (+9) | 1.00 |
+| Kidney / nephrology | 1.00 | 0 of 660 | 74103 (+12), 73117 (+11), 74106 (+10) | 1.00 |
+| Diabetes & hormones | 1.00 | 0 of 660 | 74103 (+11), 74106 (+10), 73117 (+9) | 1.00 |
+| Cancer care / oncology | 1.00 | 0 of 660 | 74103 (+9), 74106 (+9), 74046 (+8) | 1.00 |
+| Arthritis / rheumatology | 1.00 | 0 of 660 | 73117 (+11), 73122 (+10), 73127 (+9) | 1.00 |
+| Brain & nerves / neurology | 1.00 | 1 of 660 | 74106 (+15), 73117 (+11), 73122 (+10) | 1.00 |
+| Ear, nose & throat | 1.00 | 0 of 660 | 74103 (+14), 74106 (+12), 73117 (+11) | 1.00 |
+| Urology | 1.00 | 0 of 660 | 73117 (+11), 73122 (+10), 74103 (+10) | 1.00 |
+| Foot & ankle / podiatry | 1.00 | 0 of 660 | 74942 (+10), 73102 (+9), 73117 (+9) | 1.00 |
+| Pain management | 1.00 | 2 of 660 | 74103 (+20), 74106 (+17), 73117 (+13) | 1.00 |
+| Plastic & reconstructive surgery | 1.00 | 0 of 660 | 74046 (+11), 74106 (+11), 74103 (+10) | 1.00 |
+| Speech & language therapy | 1.00 | 3 of 660 | 73102 (+15), 73117 (+15), 74103 (+15) | 1.00 |
+| Nutrition & dietitian | 1.00 | 2 of 660 | 74103 (+16), 74106 (+15), 73122 (+11) | 1.00 |
+| Acupuncture, massage & naturopathy | 1.00 | 0 of 660 | 73102 (+4), 74103 (+4), 73117 (+3) | 1.00 |
+| Urgent care & emergency | 1.00 | 2 of 660 | 74103 (+18), 73668 (+17), 74106 (+14) | 1.00 |
+| Imaging & lab | 1.00 | 0 of 660 | 74103 (+13), 73117 (+10), 74106 (+10) | 1.00 |
+| Pharmacy | 1.00 | 0 of 660 | 73117 (+13), 73102 (+12), 73668 (+12) | 1.00 |
+| Home health & in-home care | 1.00 | 0 of 660 | 73102 (+4), 73117 (+4), 74103 (+4) | 1.00 |
+| Nursing & assisted living | 0.99 | 1 of 660 | 73668 (+20), 73559 (+10), 74103 (+10) | 1.00 |
+| Medical equipment & supplies | 1.00 | 0 of 660 | 74103 (+14), 74106 (+13), 73102 (+12) | 1.00 |
+| Hearing & audiology | 1.00 | 0 of 660 | 73102 (+13), 73117 (+13), 74103 (+13) | 1.00 |
+| Behavior therapy (ABA) | 1.00 | 0 of 660 | 73122 (+11), 74103 (+11), 73127 (+10) | 1.00 |
+| Care coordination & community health | 1.00 | 0 of 660 | 74368 (+11), 74046 (+8), 74459 (+7) | 1.00 |
+| General surgery | 1.00 | 0 of 660 | 74103 (+14), 74106 (+13), 73117 (+9) | 1.00 |
+| Infectious disease | 1.00 | 0 of 660 | 74106 (+8), 74046 (+7), 73127 (+6) | 1.00 |
+| Genetics & genetic counseling | 1.00 | 0 of 660 | 74368 (+10), 73122 (+6), 73127 (+6) | 1.00 |
+| Hospice & palliative care | 1.00 | 1 of 660 | 74103 (+16), 74106 (+14), 73117 (+13) | 1.00 |
+
+A positive change is worse access once people without a car are counted. Rank agreement near 1 between walking and the slowdown means the conclusion does not hinge on which no-car assumption is used.
+
+## Travel burden against CMS Medicare Advantage limits
+
+Drive minutes from each ZIP centre to the nearest practice location (the middle of each ZIP's pinned listings in the specialty, the 8 nearest by straight line routed on roads), against the maximum minutes CMS sets for Medicare Advantage networks (2026 HSD Reference File) in the ZIP's main county. The CMS limit applies to a plan's network; here it is read against every listing, so a ZIP over the limit has no clinician of that kind within the limit at all. Specialty pairs are in `supabase/reference/network-adequacy/specialty-map.csv` (reviewable). Not scored.
+
+- Counties not matched by name to the HSD file: 0
+
+| Specialty | CMS code | ZIPs over the limit | Adults in them | Large Metro | Metro | Micro | Rural | CEAC |
+|---|---|---|---|---|---|---|---|---|
+| Primary care / family doctor | S03 | 16 of 659 | 42,515 (1.4%) |  | 9/152 | 4/158 | 3/244 | 0/105 |
+| Women's health / OB-GYN | 016 | 0 of 659 | 0 (0.0%) |  | 0/152 | 0/158 | 0/244 | 0/105 |
+| Mental health & counseling: Psychiatry | 029 | 1 of 659 | 1,154 (0.0%) |  | 0/152 | 0/158 | 1/244 | 0/105 |
+| Mental health & counseling: Clinical Psychology | 036 | 1 of 659 | 281 (0.0%) |  | 0/152 | 1/158 | 0/244 | 0/105 |
+| Mental health & counseling: Clinical Social Work | 037 | 2 of 659 | 3,038 (0.1%) |  | 2/152 | 0/158 | 0/244 | 0/105 |
+| Eye care | 023 | 2 of 659 | 3,540 (0.1%) |  | 2/152 | 0/158 | 0/244 | 0/105 |
+| Chiropractic | 010 | 0 of 659 | 0 (0.0%) |  | 0/152 | 0/158 | 0/244 | 0/105 |
+| Physical & occupational therapy | F049 | 0 of 659 | 0 (0.0%) |  | 0/152 | 0/158 | 0/244 | 0/105 |
+| Orthopedics & sports injury | 025 | 11 of 659 | 21,735 (0.7%) |  | 4/152 | 3/158 | 2/244 | 2/105 |
+| Heart / cardiology | 008 | 56 of 659 | 83,248 (2.8%) |  | 6/152 | 15/158 | 19/244 | 16/105 |
+| Skin / dermatology | 011 | 65 of 659 | 112,889 (3.8%) |  | 0/152 | 22/158 | 33/244 | 10/105 |
+| Allergy & immunology | 007 | 52 of 659 | 82,240 (2.7%) |  | 8/152 | 1/158 | 23/244 | 20/105 |
+| Lung, breathing & sleep | 030 | 26 of 659 | 24,171 (0.8%) |  | 0/152 | 3/158 | 15/244 | 8/105 |
+| Digestive / gastroenterology | 014 | 35 of 659 | 41,992 (1.4%) |  | 0/152 | 13/158 | 18/244 | 4/105 |
+| Kidney / nephrology | 018 | 2 of 659 | 1,166 (0.0%) |  | 0/152 | 0/158 | 1/244 | 1/105 |
+| Diabetes & hormones | 012 | 3 of 659 | 2,139 (0.1%) |  | 2/152 | 0/158 | 0/244 | 1/105 |
+| Cancer care / oncology | 021 | 18 of 659 | 25,449 (0.8%) |  | 0/152 | 0/158 | 14/244 | 4/105 |
+| Arthritis / rheumatology | 031 | 38 of 659 | 27,466 (0.9%) |  | 3/152 | 2/158 | 9/244 | 24/105 |
+| Brain & nerves / neurology | 019 | 15 of 659 | 13,211 (0.4%) |  | 0/152 | 4/158 | 7/244 | 4/105 |
+| Ear, nose & throat | 013 | 22 of 659 | 34,786 (1.2%) |  | 0/152 | 0/158 | 20/244 | 2/105 |
+| Urology | 033 | 23 of 659 | 34,394 (1.1%) |  | 2/152 | 5/158 | 15/244 | 1/105 |
+| Foot & ankle / podiatry | 028 | 17 of 659 | 32,681 (1.1%) |  | 0/152 | 0/158 | 15/244 | 2/105 |
+| Plastic & reconstructive surgery | 027 | 38 of 659 | 21,448 (0.7%) |  | 0/152 | 3/158 | 17/244 | 18/105 |
+| Speech & language therapy | F051 | 0 of 659 | 0 (0.0%) |  | 0/152 | 0/158 | 0/244 | 0/105 |
+| Imaging & lab | F047 | 1 of 659 | 97 (0.0%) |  | 0/152 | 0/158 | 1/244 | 0/105 |
+| Nursing & assisted living | F046 | 0 of 659 | 0 (0.0%) |  | 0/152 | 0/158 | 0/244 | 0/105 |
+| General surgery | 015 | 7 of 659 | 20,345 (0.7%) |  | 5/152 | 2/158 | 0/244 | 0/105 |
+| Infectious disease | 017 | 39 of 659 | 23,750 (0.8%) |  | 1/152 | 4/158 | 11/244 | 23/105 |
+
+Designation cells are ZIPs over the limit out of ZIPs of that county type.
 
 ## Reading this
 
@@ -113,6 +165,6 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
 
-## Applied 2026-11-18
+## Applied 2026-11-23
 
-- 25720 rows (ZIP x specialty) stored in access_e2sfca for OK; market-score now uses drive-time access for these ZIPs.
+- 26400 rows (ZIP x specialty) stored in access_e2sfca for OK; market-score now uses drive-time access for these ZIPs.
