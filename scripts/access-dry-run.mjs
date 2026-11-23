@@ -238,10 +238,57 @@ if (arg('td') && arg('specmap') && arg('zipcounty')) {
   // A row may narrow the label to NUCC classifications (mental health is split
   // into CMS's psychiatry, clinical psychology and clinical social work).
   const smap = qcsv(arg('specmap')).map(([label, code, cms, , cls]) => [label, code, cms, (cls || '').split(';').filter(Boolean)]);
-  burden = { rows: [], unmatched: new Set(), out: [] };
-  for (const [label0, code, cms, cls] of smap) {
-    const label = cls.length ? `${label0}: ${cms}` : label0;
+  burden = { rows: [], unmatched: new Set(), out: [], basis: 'zip_centres' };
+  // Practice locations (step 10, 2026-11-23): the middle of each ZIP's pinned
+  // listings per code (listing_counts_zip), so the drive ends where the
+  // practices are, not at a ZIP centre. Each focus ZIP is routed to the
+  // PIN_K nearest such points per specialty by straight line, in one request.
+  const PIN_K = 8;
+  const pinsByCode = new Map();
+  if (arg('pins')) for (const [z, code, n, lat, lng] of csv(arg('pins'))) {
+    if (!(+n > 0) || !Number.isFinite(+lat) || !Number.isFinite(+lng)) continue;
+    if (!pinsByCode.has(code)) pinsByCode.set(code, []);
+    pinsByCode.get(code).push({ z, n: +n, lat: +lat, lon: +lng });
+  }
+  const labelPoints = (codes) => {
+    const m = new Map();
+    for (const c of codes) for (const p of pinsByCode.get(c) || []) {
+      const a = m.get(p.z) || { z: p.z, n: 0, la: 0, lo: 0 };
+      a.n += p.n; a.la += p.lat * p.n; a.lo += p.lon * p.n; m.set(p.z, a);
+    }
+    return [...m.values()].map(a => ({ z: a.z, lat: a.la / a.n, lon: a.lo / a.n }));
+  };
+  const plans = smap.map(([label0, code, cms, cls]) => {
     const codes = TaxonomyMap.codesFor(label0).filter(c => !cls.length || cls.includes((TaxonomyMap.get(c) || {}).classification));
+    return { label0, code, cms, cls, codes, points: labelPoints(codes) };
+  });
+  const pinMin = new Map();   // zip|plan index -> minutes to the nearest practice point
+  if (pinsByCode.size) {
+    burden.basis = 'practice_locations';
+    let reqFailed = 0;
+    for (const z of focus) {
+      const want = new Map();   // "lon,lat" -> [plan indexes]
+      plans.forEach((pl, k) => {
+        if (!pl.points.length) return;
+        pl.points.map(p => [milesBetween(z, p), p]).sort((a, b) => a[0] - b[0]).slice(0, PIN_K).forEach(([, p]) => {
+          const key = `${p.lon.toFixed(5)},${p.lat.toFixed(5)}`;
+          if (!want.has(key)) want.set(key, []);
+          want.get(key).push(k);
+        });
+      });
+      if (!want.size) continue;
+      const keys = [...want.keys()];
+      const b = await getJson(`${osrm}/table/v1/driving/${z.lon.toFixed(5)},${z.lat.toFixed(5)};${keys.join(';')}?sources=0&destinations=${keys.map((_, q) => q + 1).join(';')}&annotations=duration`);
+      if (!b) { reqFailed++; continue; }
+      b.durations[0].forEach((sec, q) => {
+        if (sec == null) return;
+        for (const k of want.get(keys[q])) { const id = z.zip + '|' + k, v = sec / 60; if (!(pinMin.get(id) <= v)) pinMin.set(id, v); }
+      });
+    }
+    if (reqFailed) throw new Error(`${reqFailed} practice-location routing requests failed; not reporting a partial check`);
+  }
+  for (const [k, { label0, code, cms, cls, codes }] of plans.entries()) {
+    const label = cls.length ? `${label0}: ${cms}` : label0;
     const supply = new Map();
     for (const c of codes) for (const [z, n] of byCode.get(c) || []) supply.set(z, (supply.get(z) || 0) + n);
     const has = [...supply.keys()].filter(z => idx.has(z)).map(z => idx.get(z));
@@ -250,7 +297,9 @@ if (arg('td') && arg('specmap') && arg('zipcounty')) {
       const c = zc.get(z.zip); const lim = c && td.get(`${c.st}|${normCounty(c.county)}|${code}`);
       if (!lim) { if (c) burden.unmatched.add(`${c.st} ${c.county}`); continue; }
       const i = idx.get(z.zip); let m = Infinity;
-      for (const j of has) { const v = T[i * N + j]; if (Number.isFinite(v) && v < m) m = v; }
+      // Practice locations when routed; else ZIP centre to ZIP centre.
+      if (pinMin.has(z.zip + '|' + k)) m = pinMin.get(z.zip + '|' + k);
+      else for (const j of has) { const v = T[i * N + j]; if (Number.isFinite(v) && v < m) m = v; }
       const a = agg[lim.des] || (agg[lim.des] = { n: 0, over: 0, ad: 0, adOver: 0 });
       a.n++; a.ad += z.adults;
       if (!Number.isFinite(m)) none++;
@@ -306,7 +355,7 @@ if (SAMPLE.length) {
 if (burden) {
   const pct = (a, b) => (b ? (100 * a / b).toFixed(1) + '%' : 'n/a');
   lines.push('## Travel burden against CMS Medicare Advantage limits', '',
-    'Drive minutes from each ZIP centre to the nearest ZIP with a listing in the specialty, against the maximum minutes CMS sets for Medicare Advantage networks (2026 HSD Reference File) in the ZIP\'s main county. The CMS limit applies to a plan\'s network; here it is read against every listing, so a ZIP over the limit has no clinician of that kind within the limit at all. Specialty pairs are in `supabase/reference/network-adequacy/specialty-map.csv` (reviewable). Not scored.', '',
+    (burden.basis === 'practice_locations' ? 'Drive minutes from each ZIP centre to the nearest practice location (the middle of each ZIP\'s pinned listings in the specialty, the 8 nearest by straight line routed on roads),' : 'Drive minutes from each ZIP centre to the nearest ZIP with a listing in the specialty,') + ' against the maximum minutes CMS sets for Medicare Advantage networks (2026 HSD Reference File) in the ZIP\'s main county. The CMS limit applies to a plan\'s network; here it is read against every listing, so a ZIP over the limit has no clinician of that kind within the limit at all. Specialty pairs are in `supabase/reference/network-adequacy/specialty-map.csv` (reviewable). Not scored.', '',
     `- Counties not matched by name to the HSD file: ${burden.unmatched.size}${burden.unmatched.size ? ' (' + [...burden.unmatched].slice(0, 20).join(', ') + ')' : ''}`, '',
     '| Specialty | CMS code | ZIPs over the limit | Adults in them | Large Metro | Metro | Micro | Rural | CEAC |', '|---|---|---|---|---|---|---|---|---|',
     ...burden.rows.map(r => `| ${r.label} | ${r.code} | ${r.over} of ${r.n} | ${Math.round(r.adOver).toLocaleString()} (${pct(r.adOver, r.ad)}) | ${['Large Metro', 'Metro', 'Micro', 'Rural', 'CEAC'].map(d => r.agg[d] ? `${r.agg[d].over}/${r.agg[d].n}` : '').join(' | ')} |`), '',

@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-23
 
+- Market benchmarks now also store a site-weighted national rate per specialty (clinicians who split time across offices count 0.6 at their main address). The live score still reads the plain rate until every state's drive-time figures are rerun with the same weighting.
+- The drive-time job now counts clinicians by site weight and measures travel burden to the practices' own locations rather than ZIP centres.
 - Each specialty's opportunity score now weights patient need and ability to pay by how well each tracked real outcomes in the back-test, as access already was. Oncology, imaging and urgent care now rest on ability to pay; rheumatology and home health on need. The weights shown on Insights follow.
 
 ### 2026-11-22

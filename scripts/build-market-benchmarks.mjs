@@ -28,7 +28,7 @@
 //                    clinics), per 10,000 US adults. Needs migration 042.
 //
 //   kind 'specialty' key = specialty label from assets/specialties.js
-//                    data = { rate_per_1k, clinicians, adults }
+//                    data = { rate_per_1k, clinicians, adults, rate_per_1k_weighted, clinicians_weighted }
 //                    Listings nationally whose NUCC taxonomy_code the reviewed
 //                    table puts in the specialty (TaxonomyMap.codesFor), per
 //                    1,000 US adults: the same membership market-score.js
@@ -96,15 +96,19 @@ function quantile(sorted, q) {
 // NPIs are 10 digits beginning 1 or 2: slices "10".."29" cover every row.
 const SLICES = Array.from({ length: 20 }, (_, i) => String(10 + i));
 
-async function tallySlice(table, prefix, tally, stateTally) {
+async function tallySlice(table, prefix, tally, stateTally, wtally) {
   const upper = String(Number(prefix) + 1);
   let last = null, n = 0;
   for (;;) {
     const seek = last ? `npi=gt.${last}` : `npi=gte.${prefix}`;
-    const res = await rest(`${table}?select=npi,taxonomy_code,state&${seek}&npi=lt.${upper}&order=npi&limit=1000`);
+    const weighted = table === 'provider_individuals_weighted';
+    const res = await rest(`${table}?select=npi,taxonomy_code,state${weighted ? ',w' : ''}&${seek}&npi=lt.${upper}&order=npi&limit=1000`);
     const rows = await res.json();
     for (const r of rows) {
       const t = r.taxonomy_code || ''; tally.set(t, (tally.get(t) || 0) + 1);
+      // Site weight (migration 052): 1 unless the clinician splits time across offices.
+      const w = r.w != null && Number.isFinite(Number(r.w)) ? Number(r.w) : 1;
+      wtally.set(t, (wtally.get(t) || 0) + w);
       const st = String(r.state || '').trim().toUpperCase();
       if (st) stateTally.set(st, (stateTally.get(st) || 0) + 1);
     }
@@ -115,16 +119,16 @@ async function tallySlice(table, prefix, tally, stateTally) {
 }
 
 async function tallyTable(table) {
-  const tally = new Map(), stateTally = new Map();
+  const tally = new Map(), stateTally = new Map(), wtally = new Map();
   let total = 0, next = 0;
   const worker = async () => {
     // Not `total += await ...`: that reads `total` before awaiting, so
     // parallel workers overwrite each other (the first run logged 1.8M of ~9M).
-    while (next < SLICES.length) { const n = await tallySlice(table, SLICES[next++], tally, stateTally); total += n; }
+    while (next < SLICES.length) { const n = await tallySlice(table, SLICES[next++], tally, stateTally, wtally); total += n; }
   };
   await Promise.all(Array.from({ length: 6 }, worker));
   console.log(`  ${table}: ${total.toLocaleString()} rows, ${tally.size} distinct taxonomy codes, ${(tally.get('') || 0).toLocaleString()} without one`);
-  return { tally, stateTally, total };
+  return { tally, stateTally, wtally, total };
 }
 
 // Census population and ZIP count by state. zip is unique in demographics_raw,
@@ -168,12 +172,16 @@ async function main() {
 
   console.log('\nReading every listing\'s taxonomy (this takes a few minutes)');
   const clinics = await tallyTable('clinics');
-  const individuals = await tallyTable('provider_individuals');
+  // Clinicians through the site-weight view (2026-11-23, step 10): row counts
+  // are unchanged, and the weighted rate is stored beside the plain one.
+  const individuals = await tallyTable('provider_individuals_weighted');
   // MIN_LISTINGS exists only so a test can run this against a small fake database.
   const minListings = Number(process.env.MIN_LISTINGS) || 5e6;
   if (clinics.total + individuals.total < minListings) throw new Error(`fewer than ${minListings.toLocaleString()} listings read; NPPES load incomplete?`);
   const merged = new Map(clinics.tally);
   for (const [t, n] of individuals.tally) merged.set(t, (merged.get(t) || 0) + n);
+  const mergedW = new Map(clinics.tally);
+  for (const [t, n] of individuals.wtally) mergedW.set(t, (mergedW.get(t) || 0) + n);
 
   // Like-for-like density per state: every listing over Census population.
   const { pop, zips: zipCount } = await statePopulation();
@@ -193,10 +201,11 @@ async function main() {
   console.log(`  all states: ${(allListings / totalPop * 1000).toFixed(2)} listings per 1,000 residents`);
 
   for (const [label] of SPECIALTIES) {
-    let clinicians = 0;
-    for (const code of TaxonomyMap.codesFor(label)) clinicians += merged.get(code) || 0;
-    const data = { rate_per_1k: Number(((clinicians / adults) * 1000).toFixed(4)), clinicians, adults };
-    console.log(`  ${label}: ${clinicians.toLocaleString()} listings, ${data.rate_per_1k}/1k`);
+    let clinicians = 0, weighted = 0;
+    for (const code of TaxonomyMap.codesFor(label)) { clinicians += merged.get(code) || 0; weighted += mergedW.get(code) || 0; }
+    const data = { rate_per_1k: Number(((clinicians / adults) * 1000).toFixed(4)), clinicians, adults,
+      rate_per_1k_weighted: Number(((weighted / adults) * 1000).toFixed(4)), clinicians_weighted: Math.round(weighted) };
+    console.log(`  ${label}: ${clinicians.toLocaleString()} listings, ${data.rate_per_1k}/1k (site-weighted ${weighted.toFixed(1)})`);
     if (clinicians > 0) rows.push({ kind: 'specialty', key: label, data });
   }
 
