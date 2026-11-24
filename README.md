@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- "Shade ZIPs by" on the dashboard map now colours every ZIP in view and updates as you pan or zoom. Before, it coloured only the few ZIPs a search had loaded (3 shapes for Collierville), so it looked like it did nothing. Listing density still covers only the searched ZIPs.
+
 - The dashboard's Filters panel now starts closed from the first moment the page draws (it used to show open until the page's scripts finished). The live audit gained a check for "Shade ZIPs by", reported as not working.
 
 - The dashboard's map key is shorter: each section lists its five largest provider groups first with a "Show more" link for the rest, and the symbol explanations fold away under "What the symbols mean".

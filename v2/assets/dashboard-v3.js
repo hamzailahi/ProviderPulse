@@ -1848,12 +1848,21 @@ if (isProviderAcct) {
     while (i < cuts.length && v > cuts[i]) i++;
     return { fillColor: PAL[i], fillOpacity: 0.55 };
   };
+  // Every ZIP outline in the map's current view (2026-11-24: shading only the
+  // searched ZIPs left a city search with 3 or 4 coloured shapes among
+  // hundreds of blank ones, which read as broken). Repainted after a pan or zoom.
   function areaZips() {
-    var set = {};
+    var set = {}, b = null;
+    try { b = map.getBounds(); } catch (e) {}
+    try {
+      zipGeoJSONLayer.eachLayer(function (l) {
+        var z = String(l.feature.properties.ZCTA5CE10 || '').padStart(5, '0');
+        if (!b || (l.getBounds && b.intersects(l.getBounds()))) set[z] = 1;
+      });
+    } catch (e) {}
     try { zipsWithClinics.forEach(function (z) { set[String(z).padStart(5, '0')] = 1; }); } catch (e) {}
-    try { if (neighborZipSet) neighborZipSet.forEach(function (z) { set[String(z).padStart(5, '0')] = 1; }); } catch (e) {}
     try { if (strayAreaZips) strayAreaZips.forEach(function (z) { delete set[z]; }); } catch (e) {}
-    return Object.keys(set).filter(function (z) { return /^\d{5}$/.test(z) && z !== '00000'; }).slice(0, 600);
+    return Object.keys(set).filter(function (z) { return /^\d{5}$/.test(z) && z !== '00000'; }).slice(0, 800);
   }
   function rows(zips) {
     var need = zips.filter(function (z) { return !acsRowCache.has(z); }), groups = [];
@@ -1888,7 +1897,9 @@ if (isProviderAcct) {
       zips.forEach(function (z) {
         var r = acsRowCache.get(z);
         if (!r) return;
-        var v = mode === 'density' ? (N(r.pop_total) >= 200 ? (perZip[z] || 0) / N(r.pop_total) * 10000 : null) : M.of(r);
+        // Listings are loaded only for the searched ZIPs, so density is shown only there.
+        var loaded = false; try { loaded = zipsWithClinics.has(z) || zipsWithClinics.has(String(Number(z))); } catch (e) {}
+        var v = mode === 'density' ? (loaded && N(r.pop_total) >= 200 ? (perZip[z] || 0) / N(r.pop_total) * 10000 : null) : M.of(r);
         if (v != null && isFinite(v)) values[z] = v;
       });
       var vals = Object.keys(values).map(function (z) { return values[z]; }).sort(function (a, b) { return a - b; });
@@ -1897,7 +1908,8 @@ if (isProviderAcct) {
       if (vals.length < 2) { note.textContent = failed ? 'Census figures did not load. Pick it again to retry.' : 'Not enough ZIPs with this figure to shade.'; values = {}; restyle(); return; }
       var top = vals[vals.length - 1];
       if (top === vals[0]) { note.textContent = 'Every ZIP here has the same figure (' + M.fmt(top) + '), so there is nothing to shade.'; values = {}; restyle(); return; }
-      for (var i = 1; i < 5; i++) { var c = vals[Math.min(vals.length - 1, Math.floor(vals.length * i / 5))]; if (c < top && (!cuts.length || c > cuts[cuts.length - 1])) cuts.push(c); }
+      for (var i = 1; i < 5; i++) { var c = vals[Math.min(vals.length - 1, Math.floor(vals.length * i / 5))]; if (c > vals[0] && c < top && (!cuts.length || c > cuts[cuts.length - 1])) cuts.push(c); }
+      if (!cuts.length) cuts.push(vals[0]);
       var lo = vals[0];
       cuts.concat([top]).forEach(function (hi, i) {
         var sw = el('i', { class: 'lg-sw' }); sw.style.background = PAL[i];
@@ -1921,6 +1933,8 @@ if (isProviderAcct) {
     } catch (e) {}
   }
   sel.addEventListener('change', function () { mode = sel.value; paint(); });
+  var moveT = null;
+  try { map.on('moveend', function () { if (!mode) return; clearTimeout(moveT); moveT = setTimeout(paint, 600); }); } catch (e) {}
   // Repaint after each search and when the specialty filter changes the map.
   var prevProcess = window.processData;
   if (typeof prevProcess === 'function') window.processData = function () { var r = prevProcess.apply(this, arguments); if (mode) setTimeout(paint, 1500); return r; };
