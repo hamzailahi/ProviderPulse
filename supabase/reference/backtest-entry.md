@@ -104,6 +104,53 @@ Payer yield (dry run, 2026-11-20): coverage weighted by what it pays relative to
 | Genetics & genetic counseling | 20,588 | -0.35 | 0.14 | 0.14 | n/a | n/a | -0.74 | 0.25 |
 | Hospice & palliative care | 20,588 | -0.26 | 0.07 | 0.07 | 1.10x | 1.10x | -0.40 | 0.23 |
 
+### 2b. Payer yield by the specialty's patients' ages (dry run, 2026-11-24)
+
+The same yield, built from Census coverage in three age bands (signals.cov_age) weighted toward the ages each specialty sees (PROFILES age measures: 1 + 4 x the weight, or that band alone at weight 1). Compared on the same ZIPs with the one-figure yield.
+
+| Specialty | ZIPs | One yield (same ZIPs) | Yield by age | By age: top vs bottom fifth |
+|---|---|---|---|---|
+| Primary care / family doctor | 20,587 | 0.12 | 0.11 | 1.16x |
+| Pediatrics (children) | 20,563 | 0.15 | 0.14 | n/a |
+| Women's health / OB-GYN | 20,586 | 0.17 | 0.17 | n/a |
+| Mental health & counseling | 20,587 | 0.18 | 0.18 | 1.29x |
+| Dental | 20,587 | 0.16 | 0.16 | 1.26x |
+| Eye care | 20,587 | 0.14 | 0.13 | 1.25x |
+| Chiropractic | 20,587 | 0.27 | 0.27 | 2.00x |
+| Physical & occupational therapy | 20,587 | 0.30 | 0.29 | 1.55x |
+| Orthopedics & sports injury | 20,587 | 0.18 | 0.18 | 1.44x |
+| Heart / cardiology | 20,587 | 0.09 | 0.08 | 1.24x |
+| Skin / dermatology | 20,587 | 0.16 | 0.15 | n/a |
+| Allergy & immunology | 20,587 | 0.05 | 0.05 | 1.73x |
+| Lung, breathing & sleep | 20,587 | 0.11 | 0.11 | 0.86x |
+| Digestive / gastroenterology | 20,587 | 0.07 | 0.06 | 1.34x |
+| Kidney / nephrology | 20,587 | 0.05 | 0.05 | 1.04x |
+| Diabetes & hormones | 20,587 | 0.09 | 0.09 | 1.14x |
+| Cancer care / oncology | 20,587 | 0.10 | 0.09 | 1.24x |
+| Arthritis / rheumatology | 20,587 | 0.04 | 0.04 | 1.41x |
+| Brain & nerves / neurology | 20,587 | 0.18 | 0.17 | 1.93x |
+| Ear, nose & throat | 20,587 | 0.06 | 0.06 | 1.52x |
+| Urology | 20,587 | 0.06 | 0.04 | 1.25x |
+| Foot & ankle / podiatry | 20,587 | 0.14 | 0.13 | 1.28x |
+| Pain management | 20,587 | 0.11 | 0.11 | 1.84x |
+| Plastic & reconstructive surgery | 20,587 | 0.07 | 0.07 | n/a |
+| Speech & language therapy | 20,587 | 0.25 | 0.24 | 1.57x |
+| Nutrition & dietitian | 20,587 | 0.27 | 0.27 | 1.75x |
+| Acupuncture, massage & naturopathy | 20,587 | 0.22 | 0.22 | 1.70x |
+| Urgent care & emergency | 20,587 | 0.08 | 0.08 | 0.87x |
+| Imaging & lab | 20,587 | 0.12 | 0.10 | 1.16x |
+| Pharmacy | 20,587 | 0.12 | 0.12 | 1.15x |
+| Home health & in-home care | 20,587 | 0.04 | 0.02 | 0.84x |
+| Nursing & assisted living | 20,433 | 0.07 | 0.00 | 0.80x |
+| Medical equipment & supplies | 20,587 | 0.13 | 0.11 | 1.17x |
+| Hearing & audiology | 20,587 | 0.22 | 0.21 | 1.56x |
+| Behavior therapy (ABA) | 20,563 | 0.22 | 0.20 | n/a |
+| Care coordination & community health | 20,587 | 0.05 | 0.05 | 0.93x |
+| General surgery | 20,587 | 0.17 | 0.15 | 1.39x |
+| Infectious disease | 20,587 | 0.05 | 0.05 | n/a |
+| Genetics & genetic counseling | 20,587 | 0.14 | 0.14 | n/a |
+| Hospice & palliative care | 20,433 | 0.06 | -0.05 | 0.88x |
+
 ## 3. For reference: patients need care here vs entry (the first run's finding)
 
 Negative means new clinicians went where supply was already dense, not where the need score pointed.
