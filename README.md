@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- The dashboard's map key is shorter: each section lists its five largest provider groups first with a "Show more" link for the rest, and the symbol explanations fold away under "What the symbols mean".
+
 - The travel-time check against Medicare Advantage limits now matches every county: Doña Ana, Kusilvak, Oglala Lakota and Connecticut's nine planning regions were unmatched before.
 - The yearly Census import now keeps insurance coverage split by age (under 19, 19 to 64, 65 and over), the first step toward a payer score that follows each specialty's patients.
 

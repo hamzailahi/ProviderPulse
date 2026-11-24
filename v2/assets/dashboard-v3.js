@@ -233,10 +233,13 @@ function applySpecialty(label, quiet) {
   var body = el('div', { class: 'lg-body' },
     groups,
     el('div', { class: 'lg-sep' }),
-    el('div', { class: 'lg-row' }, el('i', { class: 'lg-cluster' }, '12'), 'Cluster: number of providers, zoom in to split'),
-    el('div', { class: 'lg-row' }, el('i', { class: 'lg-dot ring' }), 'Verified on ProviderPulse'),
-    el('div', { class: 'lg-row' }, el('i', { class: 'lg-line zip' }), 'ZIP boundary'),
-    el('div', { class: 'lg-row' }, el('i', { class: 'lg-line county' }), 'County line'));
+    // The symbol legend folds away (2026-11-24, the user's ask: a shorter key).
+    el('details', { class: 'lg-symbols' },
+      el('summary', null, 'What the symbols mean'),
+      el('div', { class: 'lg-row' }, el('i', { class: 'lg-cluster' }, '12'), 'Cluster: number of providers, zoom in to split'),
+      el('div', { class: 'lg-row' }, el('i', { class: 'lg-dot ring' }), 'Verified on ProviderPulse'),
+      el('div', { class: 'lg-row' }, el('i', { class: 'lg-line zip' }), 'ZIP boundary'),
+      el('div', { class: 'lg-row' }, el('i', { class: 'lg-line county' }), 'County line')));
   var box = el('div', { id: 'map-legend', class: 'open' },
     el('button', { type: 'button', class: 'lg-head', 'aria-expanded': 'true', onclick: function () {
       var open = box.classList.toggle('open');
@@ -245,12 +248,22 @@ function applySpecialty(label, quiet) {
     body);
   mapBox.appendChild(box);
 
+  // Each section lists its largest groupings first and shows the top LG_TOP;
+  // the rest sit behind "Show N more" (remembered per section while the page
+  // is open). An unchecked grouping always shows, so it can be checked again.
+  var LG_TOP = 5, expanded = {}, last = null;
   function section(title, list, counts, hidden) {
-    var shown = list.filter(function (g) { return counts[g.key] || hidden.has(g.key); });
+    var shown = list.filter(function (g) { return counts[g.key] || hidden.has(g.key); })
+      .sort(function (a, b) { return (counts[b.key] || 0) - (counts[a.key] || 0); });
     if (!shown.length) return null;
+    var extra = shown.length - LG_TOP, open = expanded[title];
+    var visible = open || extra <= 1 ? shown : shown.filter(function (g, i) { return i < LG_TOP || hidden.has(g.key); });
+    var more = extra > 1 ? el('button', { type: 'button', class: 'lg-more', 'aria-expanded': open ? 'true' : 'false', onclick: function () {
+      expanded[title] = !open; if (last) window.onGroupingCounts.apply(null, last);
+    } }, open ? 'Show fewer' : 'Show ' + (shown.length - visible.length) + ' more') : null;
     return el('div', { class: 'lg-sec' },
       el('div', { class: 'lg-sub' }, title),
-      shown.map(function (g) {
+      visible.map(function (g) {
         var id = 'lg-g-' + GROUPING_IDS(g.key);
         return el('label', { class: 'lg-row lg-check', for: id },
           el('input', { type: 'checkbox', id: id, checked: !hidden.has(g.key), onchange: function () {
@@ -259,12 +272,13 @@ function applySpecialty(label, quiet) {
           el('i', { class: 'lg-dot' + (g.individual ? '' : ' org'), style: 'background:' + g.color }),
           el('span', { class: 'lg-name', title: g.grouping }, g.grouping),
           el('span', { class: 'lg-count' }, (counts[g.key] || 0).toLocaleString()));
-      }));
+      }), more);
   }
   var ids = {}, nextId = 0;
   function GROUPING_IDS(key) { if (!(key in ids)) ids[key] = String(nextId++); return ids[key]; }
 
   window.onGroupingCounts = function (counts, unknown, hidden) {
+    last = [counts, unknown, hidden];
     var all = window.MAP_GROUPINGS || [];
     while (groups.firstChild) groups.removeChild(groups.firstChild);
     var ind = section('Individuals', all.filter(function (g) { return g.individual; }), counts, hidden);

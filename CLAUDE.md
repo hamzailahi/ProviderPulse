@@ -587,7 +587,7 @@ keyword matching and no default bucket**. Three phases, each gated:
    `TaxonomyMap.groupings`, so a new NUCC release needs no code change. The
    map key (`dashboard-v3.js`, fed by `window.onGroupingCounts` after each
    `renderMap`) lists groupings present with a checkbox and a count of what
-   passes every other filter; unchecking calls `setGroupingVisible`. Popups
+   passes every other filter, largest first, the top 5 per section with "Show N more" for the rest (an unchecked grouping always shows; the symbol legend folds under "What the symbols mean"; 2026-11-24, the user's ask for a shorter key); unchecking calls `setGroupingVisible`. Popups
    and single-pin tooltips show Grouping › Classification › Specialization
    plus the code. `show_on_map=false` codes are left off silently. A missing
    or unknown code is **hidden and reported**: `console.error` once per code

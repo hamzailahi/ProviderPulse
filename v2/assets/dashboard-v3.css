@@ -85,6 +85,10 @@ body { background: #F5F8F8; }
 .lg-line.zip { border-top: 2px solid #3b82f6; }
 .lg-line.county { border-top: 2px dashed #f97316; }
 .lg-sep { height: 1px; background: #eef2f7; margin: 3px 0; }
+.lg-more { background: none; border: 0; padding: 2px 0 0 22px; font: 600 12px var(--sans); color: var(--pp-teal-700, #0f766e); cursor: pointer; text-align: left; }
+.lg-more:hover { text-decoration: underline; }
+.lg-symbols summary { cursor: pointer; font: 600 12px var(--sans); color: #4D5D64; padding: 2px 0; }
+.lg-symbols[open] summary { margin-bottom: 2px; }
 .lg-groups { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow-y: auto; margin-right: -6px; padding-right: 6px; }
 .lg-sec { display: flex; flex-direction: column; gap: 4px; }
 .lg-sub { font: 700 10.5px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: #4D5D64; }
