@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 450 changes over 71 working days, 2026-05-13 to 2026-11-24.
-- 2026-08-19 onward: from the README changelog (276 entries, written for a reader).
+- 451 changes over 71 working days, 2026-05-13 to 2026-11-24.
+- 2026-08-19 onward: from the README changelog (277 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 115 |
+| November 2026 | 116 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-24
+
+- The check for pins outside their ZIP now keeps a pin when the address is right but the listing's ZIP was mistyped, instead of removing it. The first trial run would have taken almost every flagged listing off the map.
 
 - "Shade ZIPs by: listings shown per 10,000 residents" now covers ZIPs added with + Add neighbors, and the shading refreshes after each ring loads. Before, only the first searched ZIPs were shaded.
 

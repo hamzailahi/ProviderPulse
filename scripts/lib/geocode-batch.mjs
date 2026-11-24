@@ -150,6 +150,9 @@ export async function geocodeAll(items, opt = {}) {
     census_no_match: 0, census_non_exact: 0, census_other_zip: 0, census_tie: 0 };
   const examples = [];
   const left = [];
+  // Census matches that were not accepted (another ZIP, or a fuzzy match), so
+  // a caller can tell a wrong ZIP on a right address from a wrong address.
+  const misses = new Map();
 
   // 1. Census, in batches, a few at a time.
   const batches = [];
@@ -182,6 +185,8 @@ export async function geocodeAll(items, opt = {}) {
           coords.set(it.id, { lat: hit.lat, lng: hit.lng, how: 'census_near' }); stats.census_near++;
         }
         else {
+          if (hit && hit.match === 'Match' && Number.isFinite(hit.lat) && Number.isFinite(hit.lng))
+            misses.set(it.id, { exact: !!hit.exact, near: !hit.exact && censusNearExact(it.address, hit.matched, String(it.state || '').toUpperCase()), zip: hit.zip, lat: hit.lat, lng: hit.lng });
           if (hit) {
             const why = hit.match === 'Tie' ? 'tie' : hit.match !== 'Match' ? 'no_match' : !hit.exact ? 'non_exact' : 'other_zip';
             stats['census_' + why]++;
@@ -222,5 +227,5 @@ export async function geocodeAll(items, opt = {}) {
   };
   await Promise.all(Array.from({ length: opt.googleConcurrency || 8 }, google));
   stats.service_failed = stats.census_service_failed + stats.google_service_failed;
-  return { coords, failed, stats, examples };
+  return { coords, failed, stats, examples, misses };
 }

@@ -23,7 +23,7 @@ let items = rows.map((r, i) => ({ id: String(i), tbl: r[col.tbl], key: r[col.key
 const sample = Number(arg('sample', 0)) || 0;
 if (sample) items = items.slice(0, sample);
 
-const { coords, failed, stats, examples } = await geocodeAll(items, { googleKey: process.env.GOOGLE_GEOCODING_KEY || null, log: m => console.error(m) });
+const { coords, failed, stats, examples, misses } = await geocodeAll(items, { googleKey: process.env.GOOGLE_GEOCODING_KEY || null, log: m => console.error(m) });
 const out = ['tbl,key,lat,lng'];
 const per = {};
 for (const it of items) {
@@ -34,6 +34,11 @@ for (const it of items) {
   else if (failed.has(it.id)) t.failed++;
 }
 writeFileSync(arg('out'), out.join('\n') + '\n');
+if (arg('misses')) {
+  const ms = ['tbl,key,exact,near,mzip,lat,lng'];
+  for (const it of items) { const m = misses.get(it.id); if (m && !coords.has(it.id)) ms.push([it.tbl, it.key, m.exact ? 1 : 0, m.near ? 1 : 0, m.zip || '', m.lat.toFixed(7), m.lng.toFixed(7)].join(',')); }
+  writeFileSync(arg('misses'), ms.join('\n') + '\n');
+}
 const lines = [`## Geocoding${sample ? ` (a sample of ${fmt(sample)})` : ''}`, '',
   '| Table | Tried | Placed | Left unplaced | Geocoder failed |', '|---|---|---|---|---|',
   ...Object.entries(per).map(([t, v]) => `| ${t} | ${fmt(v.asked)} | ${fmt(v.placed)} | ${fmt(v.asked - v.placed - v.failed)} | ${fmt(v.failed)} |`), '',
