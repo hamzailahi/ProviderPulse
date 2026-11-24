@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- New check for map pins that sit outside their own ZIP: it finds listings drawn more than half a mile outside their ZIP's Census boundary, geocodes their address again, and keeps a new pin only if it lands inside the ZIP; otherwise the pin is removed. A dry run comes first.
+
 - Income shading on the dashboard map is more detailed: median household income now uses seven fixed dollar bands (under $50k up to $250k or more), so a wealthy ZIP looks wealthy in any city, and a new option shades by the share of households earning $200,000 or more.
 
 - "Shade ZIPs by" on the dashboard map now colours every ZIP in view and updates as you pan or zoom. Before, it coloured only the few ZIPs a search had loaded (3 shapes for Collierville), so it looked like it did nothing. Listing density still covers only the searched ZIPs.

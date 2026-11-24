@@ -1,0 +1,76 @@
+name: Pins outside their ZIP
+
+# Finds listings whose map pin lies more than half a mile outside their own
+# Census ZIP area, geocodes them again and keeps a new point only if it lands
+# inside the ZIP, else removes the pin (the user's rules, 2026-11-24).
+# scripts/pin-zip-check.sh has the flow. A manual run defaults to a dry run.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry_run (flag all, re-geocode a sample of 300, write nothing) or apply'
+        type: choice
+        options: [dry_run, apply]
+        default: dry_run
+      max_rows:
+        description: 'Most flagged rows to re-geocode in an apply run'
+        default: '60000'
+      example_zip:
+        description: 'ZIP whose flagged listings the report lists'
+        default: '38017'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pin-zip-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.repository_owner == 'hamzailahi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Check the secret is set
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "::error::Add the repository secret SUPABASE_DB_URL."; exit 1; fi
+      - name: Install psql 17 and Python packages
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          pip install -q pyshp shapely
+      - name: Check
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          MODE: ${{ inputs.mode }}
+          MAX_ROWS: ${{ inputs.max_rows }}
+          EXAMPLE_ZIP: ${{ inputs.example_zip }}
+          ARTIFACT_DIR: ${{ runner.temp }}/out
+        run: mkdir -p "$ARTIFACT_DIR" && bash scripts/pin-zip-check.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pin-zip-check
+          path: ${{ runner.temp }}/out
+          retention-days: 7
+      - name: Commit the report
+        if: always()
+        run: |
+          git add supabase/reference/pin-zip-check.md 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Nothing to commit."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Pins outside their ZIP $(date -u +%F) [skip netlify]"
+          for i in 1 2 3 4 5; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep $((RANDOM % 20 + 5)); done
