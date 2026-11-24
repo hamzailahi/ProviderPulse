@@ -47,5 +47,15 @@ check('CSV reader keeps commas inside quotes', parseCsv('a,b\n"x, y",{"k":1}\n')
   check('payer yield: commercial pays more than Medicaid, uninsured scales it down', all === 1.43 && mcd === 0.72 && half === 0.715, JSON.stringify([all, mcd, half]));
   check('payer yield: missing coverage counts give no figure', payerYield({ insured: 1, employer: null, medicare: 1, medicaid: 1 }) === null);
 }
+{
+  const PC = 'Primary care / family doctor';
+  const z0 = pc[0].zip, e2 = new Map([[z0, { [PC]: { per_1k: 0.001, catchment_minutes: 30 } }]]);
+  const a = run({ counts, zips, places: [], bench, hpsa, zipcounty }, { supply: 'all', e2sfca: e2 }).filter(r => r.specialty === PC);
+  const hit = a.find(r => r.zip === z0), rest = a.filter(r => r.zip !== z0);
+  check('today\'s access reads the stored drive-time figure where one exists', hit.accessBasis === 'e2sfca' && hit.access > 99, JSON.stringify([hit.accessBasis, hit.access]));
+  check('ZIPs without a drive-time row keep the 10-mile count', rest.every(r => r.accessBasis !== 'e2sfca'));
+  const b = run({ counts, zips, places: [], bench, hpsa, zipcounty }, { e2sfca: e2 }).filter(r => r.specialty === PC);
+  check('the 2020 run never reads today\'s drive-time figures', b.every(r => r.accessBasis !== 'e2sfca'));
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

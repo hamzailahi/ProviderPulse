@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- The back-test now checks the access score the live site actually uses: where a drive-time access figure is stored for a ZIP and specialty, it is tested against county preventable hospital stays instead of the older 10-mile count.
+
 - The back-test was rerun after the drive-time rebuild. Results moved by at most 0.01, so no specialty's need, access or pay weight changed.
 - Every state, DC and Puerto Rico now has drive-time access rebuilt the new way: clinicians who split time across offices count 0.6 at their main one, drives start where people live and end at the practices themselves. California and Illinois have drive-time figures for the first time, and Puerto Rico is covered.
 - The market score now counts clinicians with that site weighting by default, against the matching weighted national rate.

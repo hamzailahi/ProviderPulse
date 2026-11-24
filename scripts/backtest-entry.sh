@@ -17,6 +17,7 @@ set local statement_timeout = '30min';
 \\copy (select distinct on (x.zip) x.zip, x.fips, m.county, m.state from public.zip_county_crosswalk x join (select distinct on (fips) fips, county, state from public.medicare_county_enrollment order by fips, data_year desc) m on m.fips = x.fips order by x.zip, x.res_ratio desc) to '$WORK/zipcounty.csv' with (format csv, header true)
 \\copy (select zip, state, ins_universe, ins_uninsured, median_hh_income, ins_medicare, ins_medicaid, signals->'employer'->>'n', signals->'direct'->>'n', signals->'tricare'->>'n' from public.census_acs_zcta) to '$WORK/acs.csv' with (format csv, header true)
 \\copy (select u.fips, u.er_visits_per_1000, u.readmission_rate, p.rate from (select fips, (array_agg(er_visits_per_1000 order by year desc) filter (where er_visits_per_1000 is not null))[1] as er_visits_per_1000, (array_agg(readmission_rate order by year desc) filter (where readmission_rate is not null))[1] as readmission_rate from public.cms_county_utilization where fips is not null group by fips) u full join public.county_preventable_stays p on p.fips = u.fips) to '$WORK/util.csv' with (format csv, header true)
+\\copy (select zip, specialty, per_1k, catchment_minutes from public.access_e2sfca) to '$WORK/e2sfca.csv' with (format csv, header true)
 commit;
 SQL
 wc -l "$WORK"/*.csv
@@ -30,6 +31,6 @@ rm -f "$WORK/nppes.zip"
 export NPPES_STATS="$(tail -1 "$WORK/nppes.log")"; echo "   $NPPES_STATS"
 echo "== Score and compare"
 node --max-old-space-size=6144 scripts/backtest-entry.mjs --counts "$WORK/counts.csv" --zips "$WORK/zips.csv" --places "$WORK/places.csv" \
-  --bench "$WORK/bench.csv" --hpsa "$WORK/hpsa.csv" --zipcounty "$WORK/zipcounty.csv" --acs "$WORK/acs.csv" --util "$WORK/util.csv" \
+  --bench "$WORK/bench.csv" --hpsa "$WORK/hpsa.csv" --zipcounty "$WORK/zipcounty.csv" --acs "$WORK/acs.csv" --util "$WORK/util.csv" --e2sfca "$WORK/e2sfca.csv" \
   --report supabase/reference/backtest-entry.md --csv "$WORK/backtest-entry.csv"
 gzip -kf "$WORK/backtest-entry.csv"

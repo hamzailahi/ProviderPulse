@@ -88,6 +88,11 @@ export function run(input, opts = {}) {
   for (const r of places) { const m = P.get(r.zip) || {}; m[r.measureid] = r.value; P.set(r.zip, m); }
   const benchmarks = { measures: {}, specialties: {} };
   for (const r of bench) { if (r.kind === 'measure') benchmarks.measures[r.key] = r.data; if (r.kind === 'specialty') benchmarks.specialties[r.key] = r.data; }
+  // Stored drive-time access (access_e2sfca, site-weighted), the figure the live
+  // score reads: used for today's supply only, against the weighted national
+  // rate so local and national stay like for like (2026-11-24).
+  const E2 = supplyAll && opts.e2sfca ? opts.e2sfca : null;
+  if (E2) for (const k in benchmarks.specialties) { const d = benchmarks.specialties[k]; if (d && d.rate_per_1k_weighted) benchmarks.specialties[k] = { ...d, rate_per_1k: d.rate_per_1k_weighted }; }
   const hp = new Map();   // state|countyKey -> {primary, dental, mental}
   for (const h of hpsa) {
     const k = h.state + '|' + countyKey(h.county), d = /mental/i.test(h.discipline) ? 'mental' : /dental/i.test(h.discipline) ? 'dental' : /primary/i.test(h.discipline) ? 'primary' : null;
@@ -121,7 +126,7 @@ export function run(input, opts = {}) {
       for (const [code, n] of entered.get(x.y.zip) || []) for (const l of codeSpec.get(code) || []) ent[l] = (ent[l] || 0) + n;
     }
     const s = MarketModel.score({ specialties: SCORED, rows, codesFor: l => TaxonomyMap.codesFor(l), center: { lat: z.lat, lng: z.lon },
-      adults, places: pl, benchmarks, pay: payOf.get(z.zip), milesBetween: (a, b, c, d) => milesBetween({ lat: a, lon: b }, { lat: c, lon: d }) });
+      adults, places: pl, benchmarks, pay: payOf.get(z.zip), accessE2sfca: E2 ? E2.get(z.zip) : undefined, milesBetween: (a, b, c, d) => milesBetween({ lat: a, lon: b }, { lat: c, lon: d }) });
     const ck = zc.get(z.zip);
     for (const sp of s.specialties) {
       const f = sp.factors, need = f.need ?? null, access = f.access ?? null;
@@ -129,7 +134,8 @@ export function run(input, opts = {}) {
       const hpsaScore = ck == null ? null : hpCounties.has(ck) ? (hp.get(ck)[disc] || 0) : 0;
       const pay = f.pay ?? null, comp = f.competition ?? null, po = payOf.get(z.zip);
       const payYield = po && po.yieldPct != null ? Math.round(0.7 * po.yieldPct + 0.3 * (po.incomePct ?? po.yieldPct)) : null;
-      out.push({ zip: z.zip, fips: fipsOf.get(z.zip) || null, specialty: sp.specialty, need, access, needScore: need != null && access != null ? (need + access) / 2 : null,
+      const basis = sp.evidence && sp.evidence.access ? sp.evidence.access.basis : null;
+      out.push({ accessBasis: basis, zip: z.zip, fips: fipsOf.get(z.zip) || null, specialty: sp.specialty, need, access, needScore: need != null && access != null ? (need + access) / 2 : null,
         pay, payYield, competition: comp, viability: pay != null && comp != null ? (pay + comp) / 2 : null,
         hpsa: hpsaScore, hpsaMatched: ck != null, entryPer1k: (ent[sp.specialty] || 0) / adults * 1000, adults });
     }
@@ -207,14 +213,18 @@ if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
   const util = read('util').map(c => ({ fips: c[0], er: num(c[1]), readm: num(c[2]), pqi: num(c[3]) }));
   console.log('util counties', util.length, 'with preventable stays', util.filter(u => u.pqi != null).length);
   const rows = run(input), sum = summarize(rows);
-  const now = run(input, { supply: 'all' }), out = outcomes(now, util);
+  let e2sfca = null;
+  if (arg('e2sfca')) { e2sfca = new Map(); for (const [zip, spec, per1k, mins] of read('e2sfca')) { const m = e2sfca.get(zip) || {}; m[spec] = { per_1k: num(per1k), catchment_minutes: num(mins) }; e2sfca.set(zip, m); } }
+  const now = run(input, { supply: 'all', e2sfca }), out = outcomes(now, util);
+  const e2n = now.filter(r => r.accessBasis === 'e2sfca').length, accN = now.filter(r => r.access != null).length;
+  console.log('access from drive time', e2n, 'of', accN);
   writeFileSync(arg('csv'), 'zip,specialty,need,access,need_score,pay,competition,viability,hpsa,entry_per_1k\n' + rows.map(r => [r.zip, '"' + r.specialty + '"', r.need ?? '', r.access ?? '', r.needScore ?? '', r.pay ?? '', r.competition ?? '', r.viability ?? '', r.hpsa ?? '', r.entryPer1k.toFixed(4)].join(',')).join('\n') + '\n');
   const f = v => (v == null ? 'n/a' : v.toFixed(2)), x = v => (v == null ? 'n/a' : v.toFixed(2) + 'x');
   const meta = JSON.parse(process.env.NPPES_STATS || '{}');
   const lines = ['# Back-test: need against health outcomes, viability against entry', '',
     `Run ${new Date().toISOString().slice(0, 10)} by scripts/backtest-entry.mjs. Read only.`, '',
     'Two scores, each against the outcome it claims to predict (2026-11-19, the user\'s choice after the first run showed new clinicians going to already-supplied areas):', '',
-    '- **Patients need care here** = the mean of the need factor (CDC PLACES against national percentiles; age mix left out here) and the access factor (listings per adult in the 10-mile catchment against the national rate). Tested with today\'s supply against county outcomes that thin access is known to raise: preventable hospital stays (County Health Rankings: stays for conditions good outpatient care usually prevents, per 100,000 Medicare enrollees; CMS publishes its own county rates as NA), ER visits per 1,000 and readmission rate (Medicare fee-for-service, newest year). County score = adult-weighted mean of its ZIPs (HUD main county). Higher correlation is better: a need score should rise with preventable stays.',
+    '- **Patients need care here** = the mean of the need factor (CDC PLACES against national percentiles; age mix left out here) and the access factor (where `access_e2sfca` holds the ZIP and specialty, the stored drive-time E2SFCA figure the live score reads, against the site-weighted national rate; else listings per adult in the 10-mile catchment against the national rate' + (e2n ? `; drive time covered ${e2n.toLocaleString()} of ${accN.toLocaleString()} ZIP x specialty rows with an access figure` : '') + '). Tested with today\'s supply against county outcomes that thin access is known to raise: preventable hospital stays (County Health Rankings: stays for conditions good outpatient care usually prevents, per 100,000 Medicare enrollees; CMS publishes its own county rates as NA), ER visits per 1,000 and readmission rate (Medicare fee-for-service, newest year). County score = adult-weighted mean of its ZIPs (HUD main county). Higher correlation is better: a need score should rise with preventable stays.',
     '- **A practice can make it here** = the mean of ability to pay (insured rate 70% and median income 30%, percentiles in the state, ACS) and room from competitors (nearest same-specialty listing). Tested as of the end of 2020 against clinicians (NPI-1) enumerated in 2021 to 2025 per 1,000 adults in the catchment.',
     '- HPSA (the county\'s score for the specialty\'s discipline, 0 when a matched county has none) gets the same tests on the same counties and ZIPs.', '',
     '## Limits', '',
