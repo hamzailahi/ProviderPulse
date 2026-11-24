@@ -6,7 +6,7 @@ A pin counts as away when it lies more than 0.5 miles outside the listing's own 
 - Inside or within 0.5 mi of their ZIP: 10,473,593
 - ZIP has no Census area (not judged): 96,747
 - **Away from their ZIP: 56,936**
-- This run, 2,000 sampled: keep (wrong ZIP, right pin) 612, move 7, unpin 1,381
+- This run, 2,000 sampled: keep (wrong ZIP, right pin) 612, move 7, unpin 133
 
 | How far outside | Listings |
 |---|---|
@@ -23,7 +23,7 @@ A pin counts as away when it lies more than 0.5 miles outside the listing's own 
 
 States with the most: MN 10,386, CA 6,004, TX 3,789, FL 3,340, NY 3,058, PR 2,274, CO 1,830, OH 1,665, GA 1,636, AZ 1,630, PA 1,578, NJ 1,554
 
-Decisions in this run by state (top 12 by unpins): MN move 0 / unpin 366, CA move 0 / unpin 114, PR move 0 / unpin 94, TX move 0 / unpin 82, NY move 1 / unpin 80, FL move 0 / unpin 66, OH move 0 / unpin 47, CO move 0 / unpin 45, AZ move 4 / unpin 39, MI move 0 / unpin 34, PA move 1 / unpin 34, MA move 0 / unpin 27
+Decisions in this run by state (top 12 by unpins): MA move 0 / unpin 14, CA move 0 / unpin 12, TX move 0 / unpin 11, AZ move 4 / unpin 10, AK move 0 / unpin 8, PR move 0 / unpin 7, OK move 0 / unpin 7, NY move 1 / unpin 6, FL move 0 / unpin 6, GA move 0 / unpin 5, NM move 0 / unpin 4, PA move 1 / unpin 3
 
 ## Listed in 38017: 2 away
 
@@ -32,13 +32,13 @@ Decisions in this run by state (top 12 by unpins): MN move 0 / unpin 366, CA mov
 | provider_individuals | 6025 WALNUT GROVE | MEMPHIS | 7.49 |
 | provider_individuals | 577 N. GERMANTOWN RD. | CORDOVA | 4.39 |
 
-## Why the unpins
+## Why the unpins (and what is left alone)
 
 | Reason | Listings |
 |---|---|
-| no Census match | 1,071 |
-| Census matched a different street | 307 |
-| address found in another ZIP, pin 0.25-1 mi from it | 3 |
+| left alone (under the unpin distance, or Minnesota) | 1,248 |
+| no Census match | 90 |
+| Census matched a different street | 43 |
 
 ## Geocoding
 
@@ -56,16 +56,16 @@ Examples (public listing addresses):
 
 | Why | Listed | Census matched |
 |---|---|---|
-| non_exact | 11 PARK CREEK DR, GREENVILLE, SC 29605 | 11 CREEK DR, GREENVILLE, SC, 29607 |
-| non_exact | 5121 OOLTEWAH RINGGOLD ROAD, COLLEGEDALE, TN 37315 | 5121 OOLTEWAH RINGGOLD RD, COLLEGE DALE, TN, 37363 |
-| non_exact | 11 CALLE CARAZO, GUAYNABO, PR 00969 | 11 CALLE E, GUAYNABO, PR, 00969 |
-| non_exact | 820 E GILBERT ST, SAN BERNARDINO, CA 92415 | 820 E GILBERT ST, SAN BERNARDINO, CA, 92404 |
-| non_exact | 2385 NW CABRILLO CT, ROSEBURG, OR 97470 | 2385 NW CABRILLO CT, ROSEBURG, OR, 97471 |
-| non_exact | 1985 ZONAL AVE, LOS ANGELES, CA 90089 | 1985 ZONAL AVE, LOS ANGELES, CA, 90033 |
-| non_exact | 1786 MOON LAKE BLVD, HOFFMAN ESTATES, IL 60194 | 1786 MOON LAKE BLVD, HOFFMAN ESTATES, IL, 60169 |
-| non_exact | 57 POST ST, SAN FRANCISCO, CA 94112 | 57 POST ST, SAN FRANCISCO, CA, 94104 |
-| non_exact | 8811 TEEL PKWY, FRISCO, TX 75035 | 8811 TEEL PKWY, FRISCO, TX, 75036 |
-| non_exact | 6890 Chestnut St, Gilroy, CA 95030 | 6890 CHESTNUT ST, GILROY, CA, 95020 |
-| non_exact | 4900 S Monaco St Ste 210, Denver, CO 80237 | 4900 MONACO ST, DENVER, CO, 80022 |
-| non_exact | 3291 LOMA VISTA RD, VENTURA, CA 93001 | 3291 LOMA VISTA RD, VENTURA, CA, 93003 |
+| non_exact | 470 NORTH CLAYTON STREET, LAWRENCEVILLE, GA 30045 | 470 N CLAYTON ST, LAWRENCEVILLE, GA, 30046 |
+| non_exact | 2808-II E MADISON STREET, SEATTLE, WA 98117 | 2808 E MADISON ST, SEATTLE, WA, 98112 |
+| non_exact | 159 E. 125TH ST., NEW YORK, NY 10549 | 159 E 125TH ST, NEW YORK, NY, 10035 |
+| non_exact | 1954 EAST HOUSTON STREET SUITE 208, SAN ANTONIO, TX 78204 | 1954 E HOUSTON ST, SAN ANTONIO, TX, 78202 |
+| non_exact | 7 BLANCHARD CIR, WHEATON, IL 60187 | 7 BLANCHARD CIR, WHEATON, IL, 60189 |
+| non_exact | 405 Butterfly Gardens Dr, Columbus, OH 43215 | 405 GARDEN DR, COLUMBUS, OH, 43085 |
+| non_exact | 608 MIFFLIN ST, HUNTINGDON, PA 16657 | 608 MIFFLIN ST, HUNTINGDON, PA, 16652 |
+| non_exact | 316 HADDON AVENUE, COLLINGSWOOD, NJ 80108 | 316 HADDON AVE, COLLINGSWOOD, NJ, 08108 |
+| non_exact | 1760 E KEN PRATT BLVD STE 405, LONGMONT, CO 80504 | 1760 KEN PRATT BLVD, LONGMONT, CO, 80501 |
+| non_exact | 2454 ABBEY WAY SE, SALEM, OR 97301 | 2454 ABBEY LN SE, SALEM, OR, 97317 |
+| non_exact | 141 ELMWOOD AVENUE, CRANSTON, RI 02920 | 141 ELMWOOD AVE, CRANSTON, RI, 02907 |
+| non_exact | 111 COLCHESTER AVE., BURLINGTON, VT 05041 | 111 COLCHESTER AVE, BURLINGTON, VT, 05401 |
 
