@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- The dashboard's Filters panel now starts closed from the first moment the page draws (it used to show open until the page's scripts finished). The live audit gained a check for "Shade ZIPs by", reported as not working.
+
 - The dashboard's map key is shorter: each section lists its five largest provider groups first with a "Show more" link for the rest, and the symbol explanations fold away under "What the symbols mean".
 
 - The travel-time check against Medicare Advantage limits now matches every county: Doña Ana, Kusilvak, Oglala Lakota and Connecticut's nine planning regions were unmatched before.

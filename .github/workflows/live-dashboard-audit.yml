@@ -13,7 +13,7 @@ on:
         description: Site to audit
         default: https://providerpulse-v2.netlify.app
       only:
-        description: "Run one scenario only (report-context), or leave blank for all"
+        description: "Run one scenario only (report-context or zip-shade), or leave blank for all"
         default: ""
 
 permissions:

@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 444 changes over 71 working days, 2026-05-13 to 2026-11-24.
-- 2026-08-19 onward: from the README changelog (270 entries, written for a reader).
+- 445 changes over 71 working days, 2026-05-13 to 2026-11-24.
+- 2026-08-19 onward: from the README changelog (271 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 109 |
+| November 2026 | 110 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-24
+
+- The dashboard's Filters panel now starts closed from the first moment the page draws (it used to show open until the page's scripts finished). The live audit gained a check for "Shade ZIPs by", reported as not working.
 
 - The dashboard's map key is shorter: each section lists its five largest provider groups first with a "Show more" link for the rest, and the symbol explanations fold away under "What the symbols mean".
 

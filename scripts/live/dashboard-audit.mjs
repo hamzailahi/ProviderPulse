@@ -298,6 +298,39 @@ if (!ONLY || ONLY === 'report-context') {
   results.push(r);
   await ctx.close();
 }
+// "Shade ZIPs by" (2026-11-24, the user's report that it does not work):
+// search, pick each mode, record the key's note and scale and how many ZIP
+// outlines carry one of the shade colours.
+if (!ONLY || ONLY === 'zip-shade') {
+  const { ctx, page, log } = await fresh();
+  const r = { name: 'Shade ZIPs by (Collierville, TN)', q: 'Collierville, TN', steps: [] };
+  const shade = () => page.evaluate(() => {
+    const PAL = ['#E3F3F1', '#B8DDD7', '#8FCFC6', '#4FA89D', '#115E59'].map(c => c.toLowerCase());
+    let paths = 0, shaded = 0, layers = 0, shadedLayers = 0, sample = null;
+    document.querySelectorAll('path.leaflet-interactive').forEach(p => { paths++; if (PAL.includes(String(p.getAttribute('fill') || '').toLowerCase())) shaded++; });
+    try { zipGeoJSONLayer.eachLayer(l => { layers++; const f = l.options && l.options.fillColor; if (PAL.includes(String(f || '').toLowerCase())) shadedLayers++; if (!sample) sample = { props: Object.keys(l.feature.properties).join(','), z: l.feature.properties.ZCTA5CE10, fill: f, op: l.options && l.options.fillOpacity }; }); } catch (e) { sample = 'err ' + e.message; }
+    let fn = typeof window.ppZipShade, wcs = null; try { wcs = [...zipsWithClinics].slice(0, 5).join(','); } catch (e) { wcs = 'err ' + e.message; }
+    return { note: (document.querySelector('.lg-note') || {}).textContent || '', scale: (document.querySelector('.lg-scale') || {}).innerText || '',
+      paths, shaded, layers, shadedLayers, sample: JSON.stringify(sample), fn, wcs, zip38017: window.ppZipShade ? JSON.stringify(window.ppZipShade('38017')) : 'none' };
+  }).catch(e => ({ error: String(e) }));
+  try {
+    await page.goto(BASE + '/dashboard', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForFunction(() => document.getElementById('addressInput'), null, { timeout: 30000 });
+    await page.fill('#addressInput', r.q); await page.press('#addressInput', 'Enter');
+    r.ms = await settle(page);
+    r.after = await snapshot(page);
+    for (const m of ['p65', 'unins', 'income', 'density']) {
+      let err = null;
+      try { await page.selectOption('#zip-shade', m); await page.waitForTimeout(9000); } catch (e) { err = String(e.message || e).slice(0, 200); }
+      const sn = await shade();
+      r.steps.push({ label: 'shade ' + m + ' ' + JSON.stringify(sn), err, snap: await snapshot(page), newRequests: [] });
+      await page.screenshot({ path: join(OUT, 'shade_' + m + '.png') });
+    }
+  } catch (e) { r.error = String(e.message || e).slice(0, 300); }
+  r.requests = log.requests; r.console = log.console; r.pageErrors = log.pageErrors;
+  results.push(r);
+  await ctx.close();
+}
 await browser.close();
 
 // ---- report ----
