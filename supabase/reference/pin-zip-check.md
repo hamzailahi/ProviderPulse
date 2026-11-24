@@ -1,4 +1,4 @@
-# Pins outside their own ZIP, 2026-11-24 (dry run: nothing written)
+# Pins outside their own ZIP, 2026-11-24
 
 A pin counts as away when it lies more than 0.5 miles outside the listing's own 2020 Census ZIP area (ZCTA). A flagged listing is geocoded again. If the Census finds the same address in another ZIP and the current pin sits within a quarter mile of it, the ZIP on the listing is the mistake and the pin is kept. Otherwise a new point in the listing's own ZIP replaces it, or, failing that, the listing loses its pin and stays listed without one. A ZIP with no Census area cannot be judged and is left alone.
 
@@ -6,7 +6,7 @@ A pin counts as away when it lies more than 0.5 miles outside the listing's own 
 - Inside or within 0.5 mi of their ZIP: 10,473,593
 - ZIP has no Census area (not judged): 96,747
 - **Away from their ZIP: 56,936**
-- This run, 2,000 sampled: keep (wrong ZIP, right pin) 612, move 7, unpin 133
+- This run, 56,936 tried: keep (wrong ZIP, right pin) 17,204, move 270, unpin 3,737; written: clinics unpin=817 clinics move=34 provider_individuals unpin=2445 provider_individuals move=224 clinic_secondary_locations unpin=475 clinic_secondary_locations move=12 
 
 | How far outside | Listings |
 |---|---|
@@ -23,7 +23,7 @@ A pin counts as away when it lies more than 0.5 miles outside the listing's own 
 
 States with the most: MN 10,386, CA 6,004, TX 3,789, FL 3,340, NY 3,058, PR 2,274, CO 1,830, OH 1,665, GA 1,636, AZ 1,630, PA 1,578, NJ 1,554
 
-Decisions in this run by state (top 12 by unpins): MA move 0 / unpin 14, CA move 0 / unpin 12, TX move 0 / unpin 11, AZ move 4 / unpin 10, AK move 0 / unpin 8, PR move 0 / unpin 7, OK move 0 / unpin 7, NY move 1 / unpin 6, FL move 0 / unpin 6, GA move 0 / unpin 5, NM move 0 / unpin 4, PA move 1 / unpin 3
+Decisions in this run by state (top 12 by unpins): TX move 3 / unpin 443, MA move 2 / unpin 379, CA move 6 / unpin 286, FL move 50 / unpin 204, NY move 14 / unpin 185, AZ move 159 / unpin 182, AK move 0 / unpin 162, PR move 0 / unpin 151, GA move 0 / unpin 127, NC move 1 / unpin 114, NM move 0 / unpin 99, OK move 2 / unpin 97
 
 ## Listed in 38017: 2 away
 
@@ -36,36 +36,37 @@ Decisions in this run by state (top 12 by unpins): MA move 0 / unpin 14, CA move
 
 | Reason | Listings |
 |---|---|
-| left alone (under the unpin distance, or Minnesota) | 1,248 |
-| no Census match | 90 |
-| Census matched a different street | 43 |
+| left alone (under the unpin distance, or Minnesota) | 35,725 |
+| no Census match | 2,126 |
+| Census matched a different street | 1,610 |
+| address found in another ZIP, pin 0.25-1 mi from it | 1 |
 
 ## Geocoding
 
 | Table | Tried | Placed | Left unplaced | Geocoder failed |
 |---|---|---|---|---|
-| clinics | 302 | 23 | 279 | 0 |
-| provider_individuals | 1,471 | 140 | 1,331 | 0 |
-| clinic_secondary_locations | 227 | 27 | 200 | 0 |
+| clinics | 8,381 | 803 | 7,578 | 0 |
+| provider_individuals | 41,856 | 4,569 | 37,287 | 0 |
+| clinic_secondary_locations | 6,699 | 612 | 6,087 | 0 |
 
-Census exact 180, Census same address written another way 10 (one direction word, an ordinal, a state route's spelling or a space; same house number and ZIP), Google 0 (off unless a key is passed); anything else keeps no coordinates.
+Census exact 5,623, Census same address written another way 361 (one direction word, an ordinal, a state route's spelling or a space; same house number and ZIP), Google 0 (off unless a key is passed); anything else keeps no coordinates.
 
-Why the rest were not placed: no match 869, a fuzzy (non-exact) match 922, matched in another ZIP 0, several equal matches 19.
+Why the rest were not placed: no match 24,053, a fuzzy (non-exact) match 26,282, matched in another ZIP 0, several equal matches 617.
 
 Examples (public listing addresses):
 
 | Why | Listed | Census matched |
 |---|---|---|
-| non_exact | 470 NORTH CLAYTON STREET, LAWRENCEVILLE, GA 30045 | 470 N CLAYTON ST, LAWRENCEVILLE, GA, 30046 |
-| non_exact | 2808-II E MADISON STREET, SEATTLE, WA 98117 | 2808 E MADISON ST, SEATTLE, WA, 98112 |
-| non_exact | 159 E. 125TH ST., NEW YORK, NY 10549 | 159 E 125TH ST, NEW YORK, NY, 10035 |
-| non_exact | 1954 EAST HOUSTON STREET SUITE 208, SAN ANTONIO, TX 78204 | 1954 E HOUSTON ST, SAN ANTONIO, TX, 78202 |
-| non_exact | 7 BLANCHARD CIR, WHEATON, IL 60187 | 7 BLANCHARD CIR, WHEATON, IL, 60189 |
-| non_exact | 405 Butterfly Gardens Dr, Columbus, OH 43215 | 405 GARDEN DR, COLUMBUS, OH, 43085 |
-| non_exact | 608 MIFFLIN ST, HUNTINGDON, PA 16657 | 608 MIFFLIN ST, HUNTINGDON, PA, 16652 |
-| non_exact | 316 HADDON AVENUE, COLLINGSWOOD, NJ 80108 | 316 HADDON AVE, COLLINGSWOOD, NJ, 08108 |
-| non_exact | 1760 E KEN PRATT BLVD STE 405, LONGMONT, CO 80504 | 1760 KEN PRATT BLVD, LONGMONT, CO, 80501 |
-| non_exact | 2454 ABBEY WAY SE, SALEM, OR 97301 | 2454 ABBEY LN SE, SALEM, OR, 97317 |
-| non_exact | 141 ELMWOOD AVENUE, CRANSTON, RI 02920 | 141 ELMWOOD AVE, CRANSTON, RI, 02907 |
-| non_exact | 111 COLCHESTER AVE., BURLINGTON, VT 05041 | 111 COLCHESTER AVE, BURLINGTON, VT, 05401 |
+| non_exact | 11 PARK CREEK DR, GREENVILLE, SC 29605 | 11 CREEK DR, GREENVILLE, SC, 29607 |
+| non_exact | 5121 OOLTEWAH RINGGOLD ROAD, COLLEGEDALE, TN 37315 | 5121 OOLTEWAH RINGGOLD RD, COLLEGE DALE, TN, 37363 |
+| non_exact | 11 CALLE CARAZO, GUAYNABO, PR 00969 | 11 CALLE E, GUAYNABO, PR, 00969 |
+| non_exact | 820 E GILBERT ST, SAN BERNARDINO, CA 92415 | 820 E GILBERT ST, SAN BERNARDINO, CA, 92404 |
+| non_exact | 2385 NW CABRILLO CT, ROSEBURG, OR 97470 | 2385 NW CABRILLO CT, ROSEBURG, OR, 97471 |
+| non_exact | 1985 ZONAL AVE, LOS ANGELES, CA 90089 | 1985 ZONAL AVE, LOS ANGELES, CA, 90033 |
+| non_exact | 1786 MOON LAKE BLVD, HOFFMAN ESTATES, IL 60194 | 1786 MOON LAKE BLVD, HOFFMAN ESTATES, IL, 60169 |
+| non_exact | 57 POST ST, SAN FRANCISCO, CA 94112 | 57 POST ST, SAN FRANCISCO, CA, 94104 |
+| non_exact | 8811 TEEL PKWY, FRISCO, TX 75035 | 8811 TEEL PKWY, FRISCO, TX, 75036 |
+| non_exact | 6890 Chestnut St, Gilroy, CA 95030 | 6890 CHESTNUT ST, GILROY, CA, 95020 |
+| non_exact | 4900 S Monaco St Ste 210, Denver, CO 80237 | 4900 MONACO ST, DENVER, CO, 80022 |
+| non_exact | 3291 LOMA VISTA RD, VENTURA, CA 93001 | 3291 LOMA VISTA RD, VENTURA, CA, 93003 |
 
