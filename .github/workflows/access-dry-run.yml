@@ -93,5 +93,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -q -m "E2SFCA access dry run $(date -u +%F) [skip netlify]"
-          git pull -q --rebase origin main
-          git push origin HEAD:main
+          # Several state runs finish together; retry if another push wins.
+          for i in 1 2 3 4 5; do
+            git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0
+            sleep $((RANDOM % 20 + 10))
+          done
+          exit 1

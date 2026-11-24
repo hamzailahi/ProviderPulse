@@ -2,19 +2,23 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 435 changes over 70 working days, 2026-05-13 to 2026-11-23.
-- 2026-08-19 onward: from the README changelog (261 entries, written for a reader).
+- 436 changes over 71 working days, 2026-05-13 to 2026-11-24.
+- 2026-08-19 onward: from the README changelog (262 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 100 |
+| November 2026 | 101 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
 | July 2026 | 37 |
 | June 2026 | 22 |
 | May 2026 | 31 |
+
+## 2026-11-24
+
+- The drive-time job retries saving its report when another state's run saves at the same moment (Oregon's figures were stored but its report was lost to that race).
 
 ## 2026-11-23
 

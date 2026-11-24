@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-23. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-24. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -650,6 +650,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-24
+
+- The drive-time job retries saving its report when another state's run saves at the same moment (Oregon's figures were stored but its report was lost to that race).
 
 ### 2026-11-23
 
