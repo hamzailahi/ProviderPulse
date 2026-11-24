@@ -1,4 +1,4 @@
-# Pins outside their own ZIP, 2026-11-24 (dry run: nothing written)
+# Pins outside their own ZIP, 2026-11-24
 
 A pin counts as away when it lies more than 0.5 miles outside the listing's own 2020 Census ZIP area (ZCTA). A flagged listing is geocoded again. If the Census finds the same address in another ZIP and the current pin sits within a quarter mile of it, the ZIP on the listing is the mistake and the pin is kept. Otherwise a new point in the listing's own ZIP replaces it, or, failing that, the listing loses its pin and stays listed without one. A ZIP with no Census area cannot be judged and is left alone.
 
@@ -6,7 +6,7 @@ A pin counts as away when it lies more than 0.5 miles outside the listing's own 
 - Inside or within 0.5 mi of their ZIP: 10,473,863
 - ZIP has no Census area (not judged): 96,747
 - **Away from their ZIP: 52,929**
-- This run, 2,000 sampled: keep (wrong ZIP, right pin) 714, move 754, unpin 4
+- This run, 1,400 tried: keep (wrong ZIP, right pin) 507, move 514, unpin 4; written: clinics unpin=1 clinics move=33 provider_individuals unpin=3 provider_individuals move=406 clinic_secondary_locations move=75 
 
 | How far outside | Listings |
 |---|---|
@@ -23,7 +23,7 @@ A pin counts as away when it lies more than 0.5 miles outside the listing's own 
 
 States with the most: MN 10,386, CA 5,712, TX 3,343, FL 3,086, NY 2,859, PR 2,123, CO 1,807, OH 1,608, GA 1,509, PA 1,475, NJ 1,472, MI 1,378
 
-Decisions in this run by state (top 12 by unpins): NJ move 8 / unpin 1, MS move 10 / unpin 1, DE move 2 / unpin 1, VA move 1 / unpin 1, MN move 389 / unpin 0, OH move 37 / unpin 0, NE move 7 / unpin 0, TX move 43 / unpin 0, FL move 18 / unpin 0, MA move 10 / unpin 0, IL move 3 / unpin 0, AR move 5 / unpin 0
+Decisions in this run by state (top 12 by unpins): NJ move 8 / unpin 1, MS move 7 / unpin 1, DE move 2 / unpin 1, VA move 1 / unpin 1, MN move 261 / unpin 0, OH move 26 / unpin 0, NE move 6 / unpin 0, TX move 24 / unpin 0, FL move 13 / unpin 0, MA move 9 / unpin 0, IL move 3 / unpin 0, AR move 4 / unpin 0
 
 ## Listed in 38017: 2 away
 
@@ -36,8 +36,8 @@ Decisions in this run by state (top 12 by unpins): NJ move 8 / unpin 1, MS move 
 
 | Reason | Listings |
 |---|---|
-| moved to the Azure building | 754 |
-| left alone (under the unpin distance, or Minnesota) | 528 |
+| moved to the Azure building | 514 |
+| left alone (under the unpin distance, or Minnesota) | 375 |
 | address found in another ZIP, pin 0.25-1 mi from it | 2 |
 | address found in another ZIP, pin 1-5 mi from it | 1 |
 | address found in another ZIP, pin 5+ mi from it | 1 |
@@ -46,13 +46,13 @@ Decisions in this run by state (top 12 by unpins): NJ move 8 / unpin 1, MS move 
 
 | Table | Tried | Placed | Left unplaced | Geocoder failed |
 |---|---|---|---|---|
-| clinics | 287 | 25 | 262 | 0 |
-| provider_individuals | 1,487 | 134 | 1,353 | 0 |
-| clinic_secondary_locations | 226 | 25 | 201 | 0 |
+| clinics | 209 | 18 | 191 | 0 |
+| provider_individuals | 1,036 | 102 | 934 | 0 |
+| clinic_secondary_locations | 155 | 19 | 136 | 0 |
 
-Census exact 175, Census same address written another way 9 (one direction word, an ordinal, a state route's spelling or a space; same house number and ZIP), Google 0 (off unless a key is passed); anything else keeps no coordinates.
+Census exact 132, Census same address written another way 7 (one direction word, an ordinal, a state route's spelling or a space; same house number and ZIP), Google 0 (off unless a key is passed); anything else keeps no coordinates.
 
-Why the rest were not placed: no match 852, a fuzzy (non-exact) match 946, matched in another ZIP 0, several equal matches 18.
+Why the rest were not placed: no match 568, a fuzzy (non-exact) match 681, matched in another ZIP 0, several equal matches 12.
 
 Examples (public listing addresses):
 
@@ -71,4 +71,4 @@ Examples (public listing addresses):
 | non_exact | 1820 S MASON RD STE 305, KATY, TX 77450 | 1820 MASON RD, KATY, TX, 77449 |
 | non_exact | 29 BLACK COAL DRIVE, FORT WASHAKIE, WY 82516 | 29 BLACK COAL DR, FORT WASHAKIE, WY, 82514 |
 
-Azure Maps: {"asked":1816,"placed":921,"failed":0,"not_sent":0,"miss_other_zip":471,"miss_low_confidence":298,"miss_not_an_address":11,"miss_other_house_number":19,"miss_not_rooftop":96}
+Azure Maps: {"asked":1261,"placed":630,"failed":0,"not_sent":0,"miss_other_zip":336,"miss_low_confidence":207,"miss_not_an_address":8,"miss_other_house_number":13,"miss_not_rooftop":67}
