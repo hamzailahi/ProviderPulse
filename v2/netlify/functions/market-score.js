@@ -209,7 +209,10 @@ exports.handler = async (event) => {
 
   const env = process.env;
   const zip = String((event.queryStringParameters || {}).zip || '').trim();
-  const weighted = String((event.queryStringParameters || {}).weighted || '') === '1';
+  // Site-weighted clinicians are the default since 2026-11-23 (step 10, the
+  // user's go-ahead), once every state's drive-time figures and the national
+  // benchmarks were rebuilt weighted; ?weighted=0 reproduces the plain counts.
+  const weighted = String((event.queryStringParameters || {}).weighted || '') !== '0';
   if (!/^\d{5}$/.test(zip)) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'A 5-digit zip is required' }) };
 
   const anon = { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` };
@@ -608,9 +611,9 @@ exports.handler = async (event) => {
           for (let i = 0; i < memberZips.length; i += CATCHMENT_ZIP_GROUP) groups.push(memberZips.slice(i, i + CATCHMENT_ZIP_GROUP));
           const out = { rows: [], truncated: false, failed: false };
           for (let i = 0; i < groups.length; i += CATCHMENT_PARALLEL) {
-            // ?weighted=1 (test switch until the user approves the switch-over,
-            // 2026-11-19): clinicians come from the view carrying each one's
-            // site weight (migration 052).
+            // Weighted (the default since 2026-11-23; ?weighted=0 turns it off):
+            // clinicians come from the view carrying each one's site weight
+            // (migration 052).
             const src = table === 'provider_individuals' && weighted ? 'provider_individuals_weighted' : table;
             const one = g => pagedGet(`${src}?zip=in.(${variantsOf(g).join(',')})&select=npi,primary_taxonomy,taxonomy_code,latitude,longitude${src !== table ? ',w' : ''}`,
               'npi', { cap: CATCHMENT_MAX_CLINIC_ROWS, ms: 8000, strict: true });
@@ -782,7 +785,10 @@ exports.handler = async (event) => {
           const benchmarks = { measures: {}, specialties: {} }, demandModels = {}, careRates = {};
           (Array.isArray(bmRows) ? bmRows : []).forEach(r => {
             if (r.kind === 'measure') benchmarks.measures[r.key] = r.data;
-            if (r.kind === 'specialty') benchmarks.specialties[r.key] = r.data;
+            // Like for like: weighted local counts against the weighted national
+            // rate (stored beside the plain one by the benchmark job).
+            if (r.kind === 'specialty') benchmarks.specialties[r.key] = weighted && r.data && r.data.rate_per_1k_weighted != null
+              ? Object.assign({}, r.data, { rate_per_1k: r.data.rate_per_1k_weighted }) : r.data;
             if (r.kind === 'care_type' && r.data && r.data.rate_per_10k != null) careRates[r.key] = r.data.rate_per_10k;
             if (r.kind === 'demand_model') demandModels[r.key] = r.data;
           });

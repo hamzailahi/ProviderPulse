@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- Every state, DC and Puerto Rico now has drive-time access rebuilt the new way: clinicians who split time across offices count 0.6 at their main one, drives start where people live and end at the practices themselves. California and Illinois have drive-time figures for the first time, and Puerto Rico is covered.
+- The market score now counts clinicians with that site weighting by default, against the matching weighted national rate.
 - The drive-time job retries saving its report when another state's run saves at the same moment (Oregon's figures were stored but its report was lost to that race).
 
 ### 2026-11-23

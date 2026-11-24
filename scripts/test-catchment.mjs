@@ -29,7 +29,7 @@ globalThis.fetch = async (url) => {
   if (u.includes('cdc_places?measureid=eq.DENTAL&lat=gte')) return J([home].concat(box));
   if (u.includes('cdc_places?zip=in.(')) return J([{ zip: '38017', measureid: 'CHD', value: 8.5, pop_18plus: 30000, data_year: 2023 }]);
   if (u.includes('demographics_raw?zip=eq') || u.includes('demographics_raw?state')) return J([dem]);
-  if (/(clinics|provider_individuals)\?zip=in\.\(/.test(u)) {
+  if (/(clinics|provider_individuals(_weighted)?)\?zip=in\.\(/.test(u)) {
     listingCalls.push(u);
     if (u.includes('provider_individuals') && listingFails > 0) { listingFails--; return { ok: false, status: 500, json: async () => ({ code: '57014' }) }; }
     return J([]);
