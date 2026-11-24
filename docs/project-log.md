@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 438 changes over 71 working days, 2026-05-13 to 2026-11-24.
-- 2026-08-19 onward: from the README changelog (264 entries, written for a reader).
+- 439 changes over 71 working days, 2026-05-13 to 2026-11-24.
+- 2026-08-19 onward: from the README changelog (265 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 103 |
+| November 2026 | 104 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -18,6 +18,7 @@ Every change to the product, newest first, with the date it shipped. Generated f
 
 ## 2026-11-24
 
+- The back-test was rerun after the drive-time rebuild. Results moved by at most 0.01, so no specialty's need, access or pay weight changed.
 - Every state, DC and Puerto Rico now has drive-time access rebuilt the new way: clinicians who split time across offices count 0.6 at their main one, drives start where people live and end at the practices themselves. California and Illinois have drive-time figures for the first time, and Puerto Rico is covered.
 - The market score now counts clinicians with that site weighting by default, against the matching weighted national rate.
 - The drive-time job retries saving its report when another state's run saves at the same moment (Oregon's figures were stored but its report was lost to that race).
