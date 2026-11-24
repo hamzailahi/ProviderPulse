@@ -15,6 +15,13 @@ on:
       max_rows:
         description: 'Most flagged rows to re-geocode in an apply run'
         default: '60000'
+      use_azure:
+        description: 'Also ask Azure Maps for what the Census cannot place (needs the AZURE_MAPS_KEY secret; billed)'
+        type: boolean
+        default: false
+      azure_max:
+        description: 'Most Azure lookups to send (5,000 a month are free, then $4.50 per 1,000)'
+        default: '2000'
       example_zip:
         description: 'ZIP whose flagged listings the report lists'
         default: '38017'
@@ -57,6 +64,9 @@ jobs:
           MODE: ${{ inputs.mode }}
           MAX_ROWS: ${{ inputs.max_rows }}
           EXAMPLE_ZIP: ${{ inputs.example_zip }}
+          USE_AZURE: ${{ inputs.use_azure && '1' || '0' }}
+          AZURE_MAX: ${{ inputs.azure_max }}
+          AZURE_MAPS_KEY: ${{ secrets.AZURE_MAPS_KEY }}
           ARTIFACT_DIR: ${{ runner.temp }}/out
         run: mkdir -p "$ARTIFACT_DIR" && bash scripts/pin-zip-check.sh
       - uses: actions/upload-artifact@v4

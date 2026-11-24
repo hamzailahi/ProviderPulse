@@ -71,6 +71,35 @@ for p in csv.DictReader(open(sys.argv[2], newline='')):
     t = todo.get((p['tbl'], p['key']))
     if t: w.writerow({'tbl': p['tbl'], 'key': p['key'], 'zip': t['zip'], 'lat': p['lat'], 'lng': p['lng']})
 PY
+# Azure Maps for what the Census did not place (2026-11-24, the user's choice;
+# USE_AZURE=1 and AZURE_MAPS_KEY). Its building points join the same ZIP
+# test; a building it finds in another ZIP feeds the keep rule like a Census
+# match. AZURE_MAX caps the lookups sent (each one is billed).
+if [ "${USE_AZURE:-0}" = 1 ]; then
+  python3 - "$WORK/todo.csv" "$WORK/new.csv" "$WORK/azure-todo.csv" <<'PY'
+import csv, sys
+done = {(r['tbl'], r['key']) for r in csv.DictReader(open(sys.argv[2], newline=''))}
+rows = [r for r in csv.DictReader(open(sys.argv[1], newline='')) if (r['tbl'], r['key']) not in done]
+w = csv.DictWriter(open(sys.argv[3], 'w', newline=''), fieldnames=['tbl', 'key', 'address', 'city', 'state', 'zip'], extrasaction='ignore', lineterminator='\n')
+w.writeheader(); w.writerows(rows)
+PY
+  arc=0
+  node scripts/azure-geocode.mjs --in "$WORK/azure-todo.csv" --out "$WORK/azure-placed.csv" --misses "$WORK/azure-misses.csv" --max "${AZURE_MAX:-2000}" | tee "$WORK/azure-stats.txt" || arc=$?
+  [ "$arc" -eq 0 ] || { echo "::warning::Azure failures over 5%; rows it did not answer are left alone"; rc=1; }
+  python3 - "$WORK/todo.csv" "$WORK/azure-placed.csv" "$WORK/new.csv" "$WORK/azure-misses.csv" "$WORK/misses.csv" <<'PY'
+import csv, sys
+todo = {(r['tbl'], r['key']): r for r in csv.DictReader(open(sys.argv[1], newline=''))}
+with open(sys.argv[3], 'a', newline='') as g:
+    w = csv.writer(g, lineterminator='\n')
+    for p in csv.DictReader(open(sys.argv[2], newline='')):
+        t = todo.get((p['tbl'], p['key']))
+        if t: w.writerow([p['tbl'], p['key'], t['zip'], p['lat'], p['lng']])
+with open(sys.argv[5], 'a', newline='') as g:
+    w = csv.writer(g, lineterminator='\n')
+    for m in csv.DictReader(open(sys.argv[4], newline='')):
+        if m['building'] == '1': w.writerow([m['tbl'], m['key'], 1, 0, m['mzip'], m['lat'], m['lng']])
+PY
+fi
 python3 scripts/pin-zip-check.py check "$WORK/new.csv" "$SHP" "$WORK/moved.csv" "$MARGIN_MI"
 
 # Decisions (the user's rules, reworked 2026-11-24 after the first dry run
@@ -194,6 +223,9 @@ try:
     print()
 except Exception: pass
 print(open(geo).read())
+import os
+az = os.path.join(os.path.dirname(geo), 'azure-stats.txt')
+if os.path.exists(az): print('Azure Maps: ' + open(az).read().strip().replace('Azure: ', ''))
 PY
 cat "$OUT"; [ -n "${GITHUB_STEP_SUMMARY:-}" ] && cat "$OUT" >> "$GITHUB_STEP_SUMMARY" || true
 cp "$WORK/flagged.csv" "$WORK/decide.csv" "$WORK/keep.csv" "${ARTIFACT_DIR:-$WORK}/" 2>/dev/null || true
