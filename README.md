@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- "Shade ZIPs by: listings shown per 10,000 residents" now covers ZIPs added with + Add neighbors, and the shading refreshes after each ring loads. Before, only the first searched ZIPs were shaded.
+
 - Tested a payer score tuned to each specialty's patient ages against where clinicians actually opened practices. It did no better than the current single score for any specialty (and worse for senior-focused ones), so the score stays as it is.
 
 - New check for map pins that sit outside their own ZIP: it finds listings drawn more than half a mile outside their ZIP's Census boundary, geocodes their address again, and keeps a new pin only if it lands inside the ZIP; otherwise the pin is removed. A dry run comes first.

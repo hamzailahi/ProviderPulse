@@ -1866,6 +1866,8 @@ if (isProviderAcct) {
   function areaZips() {
     var set = {}, b = null;
     try { b = map.getBounds(); } catch (e) {}
+    try { zipsWithClinics.forEach(function (z) { set[String(z).padStart(5, '0')] = 1; }); } catch (e) {}
+    try { if (typeof neighborZipSet !== 'undefined') neighborZipSet.forEach(function (z) { set[String(z).padStart(5, '0')] = 1; }); } catch (e) {}
     try {
       zipGeoJSONLayer.eachLayer(function (l) {
         var z = String(l.feature.properties.ZCTA5CE10 || '').padStart(5, '0');
@@ -1910,7 +1912,7 @@ if (isProviderAcct) {
         var r = acsRowCache.get(z);
         if (!r) return;
         // Listings are loaded only for the searched ZIPs, so density is shown only there.
-        var loaded = false; try { loaded = zipsWithClinics.has(z) || zipsWithClinics.has(String(Number(z))); } catch (e) {}
+        var loaded = false; try { loaded = zipsWithClinics.has(z) || zipsWithClinics.has(String(Number(z))) || (typeof neighborZipSet !== 'undefined' && neighborZipSet.has(z)) || (typeof neighborSeedZip !== 'undefined' && neighborSeedZip && String(neighborSeedZip).padStart(5, '0') === z); } catch (e) {}
         var v = mode === 'density' ? (loaded && N(r.pop_total) >= 200 ? (perZip[z] || 0) / N(r.pop_total) * 10000 : null) : M.of(r);
         if (v != null && isFinite(v)) values[z] = v;
       });
@@ -1967,6 +1969,9 @@ if (isProviderAcct) {
   if (typeof prevProcess === 'function') window.processData = function () { var r = prevProcess.apply(this, arguments); if (mode) setTimeout(paint, 1500); return r; };
   var specSel = $('specialty-select');
   if (specSel) specSel.addEventListener('change', function () { if (mode === 'density') setTimeout(paint, 300); });
+  // Neighbor rings bypass processData; repaint once a ring has loaded.
+  var prevRing = window.loadNeighboringZips;
+  if (typeof prevRing === 'function') window.loadNeighboringZips = function () { var r = prevRing.apply(this, arguments); Promise.resolve(r).then(function () { if (mode) setTimeout(paint, 500); }); return r; };
 })();
 
 /* ---- Rings after a city search (2026-11-04) -------------------------------

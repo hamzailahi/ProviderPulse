@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 449 changes over 71 working days, 2026-05-13 to 2026-11-24.
-- 2026-08-19 onward: from the README changelog (275 entries, written for a reader).
+- 450 changes over 71 working days, 2026-05-13 to 2026-11-24.
+- 2026-08-19 onward: from the README changelog (276 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 114 |
+| November 2026 | 115 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-24
+
+- "Shade ZIPs by: listings shown per 10,000 residents" now covers ZIPs added with + Add neighbors, and the shading refreshes after each ring loads. Before, only the first searched ZIPs were shaded.
 
 - Tested a payer score tuned to each specialty's patient ages against where clinicians actually opened practices. It did no better than the current single score for any specialty (and worse for senior-focused ones), so the score stays as it is.
 
