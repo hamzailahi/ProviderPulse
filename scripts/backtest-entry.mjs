@@ -74,6 +74,13 @@ export function run(input, opts = {}) {
       const yp = a.yield == null || yl.length < 30 ? null : MarketModel.rankIn(yl, a.yield);
       if (ip != null) payOf.set(a.zip, { insuredPct: ip, incomePct: cp, yieldPct: yp });
     }
+    // Per-specialty yield by patients' ages (signals.cov_age), ranked in the state per label.
+    for (const [label] of SCORED) {
+      const v = rs.map(a => [a, a.covAge ? MarketModel.payerYieldAge(a.covAge, label) : null]).filter(x => x[1] != null);
+      if (v.length < 30) continue;
+      const vals = v.map(x => x[1]);
+      for (const [a, y] of v) { const po = payOf.get(a.zip); if (po) (po.yieldAge = po.yieldAge || {})[label] = MarketModel.rankIn(vals, y); }
+    }
   }
   const Z = zips.filter(z => Number.isFinite(z.lat) && Number.isFinite(z.lon));
   const zipIdx = new Map(Z.map(z => [z.zip, z]));
@@ -134,9 +141,11 @@ export function run(input, opts = {}) {
       const hpsaScore = ck == null ? null : hpCounties.has(ck) ? (hp.get(ck)[disc] || 0) : 0;
       const pay = f.pay ?? null, comp = f.competition ?? null, po = payOf.get(z.zip);
       const payYield = po && po.yieldPct != null ? Math.round(0.7 * po.yieldPct + 0.3 * (po.incomePct ?? po.yieldPct)) : null;
+      const ya = po && po.yieldAge && po.yieldAge[sp.specialty];
+      const payYieldAge = ya != null ? Math.round(0.7 * ya + 0.3 * (po.incomePct ?? ya)) : null;
       const basis = sp.evidence && sp.evidence.access ? sp.evidence.access.basis : null;
       out.push({ accessBasis: basis, zip: z.zip, fips: fipsOf.get(z.zip) || null, specialty: sp.specialty, need, access, needScore: need != null && access != null ? (need + access) / 2 : null,
-        pay, payYield, competition: comp, viability: pay != null && comp != null ? (pay + comp) / 2 : null,
+        pay, payYield, payYieldAge, competition: comp, viability: pay != null && comp != null ? (pay + comp) / 2 : null,
         hpsa: hpsaScore, hpsaMatched: ck != null, entryPer1k: (ent[sp.specialty] || 0) / adults * 1000, adults });
     }
   }
@@ -162,7 +171,10 @@ export function summarize(rows) {
       nViab: rs.filter(r => r.viability != null).length,
       rhoPay: spearman(rs.filter(r => r.pay != null).map(r => r.pay), rs.filter(r => r.pay != null).map(r => r.entryPer1k)),
       rhoYield: spearman(rs.filter(r => r.payYield != null).map(r => r.payYield), rs.filter(r => r.payYield != null).map(r => r.entryPer1k)),
-      liftPay: quint('pay'), liftYield: quint('payYield'),
+      liftPay: quint('pay'), liftYield: quint('payYield'), liftYieldAge: quint('payYieldAge'),
+      rhoYieldAge: spearman(rs.filter(r => r.payYieldAge != null).map(r => r.payYieldAge), rs.filter(r => r.payYieldAge != null).map(r => r.entryPer1k)),
+      rhoYieldSame: spearman(rs.filter(r => r.payYieldAge != null && r.payYield != null).map(r => r.payYield), rs.filter(r => r.payYieldAge != null && r.payYield != null).map(r => r.entryPer1k)),
+      nYieldAge: rs.filter(r => r.payYieldAge != null).length,
       rhoComp: spearman(rs.filter(r => r.competition != null).map(r => r.competition), rs.filter(r => r.competition != null).map(r => r.entryPer1k)),
       nHpsa: hm.length, rhoHpsa: spearman(hm.map(r => r.hpsa), hm.map(r => r.entryPer1k)),
       rhoScoreSame: spearman(hm.filter(r => r.needScore != null).map(r => r.needScore), hm.filter(r => r.needScore != null).map(r => r.entryPer1k)) });
@@ -206,8 +218,8 @@ if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
     bench: read('bench').map(([kind, key, data]) => ({ kind, key, data: JSON.parse(data) })),
     hpsa: read('hpsa').map(([state, county, discipline, score]) => ({ state, county, discipline, score: num(score) || 0 })),
     zipcounty: read('zipcounty').map(([zip, fips, county, state]) => ({ zip, fips, county, state })),
-    acs: read('acs').map(([zip, state, uni, unins, inc, mcr, mcd, emp, dir, tri]) => ({ zip, state, insured: num(uni) > 0 && num(unins) != null ? 1 - num(unins) / num(uni) : null, income: num(inc),
-      medicare: num(mcr), medicaid: num(mcd), employer: num(emp), direct: num(dir), tricare: num(tri) }))
+    acs: read('acs').map(([zip, state, uni, unins, inc, mcr, mcd, emp, dir, tri, cov]) => ({ zip, state, insured: num(uni) > 0 && num(unins) != null ? 1 - num(unins) / num(uni) : null, income: num(inc),
+      medicare: num(mcr), medicaid: num(mcd), employer: num(emp), direct: num(dir), tricare: num(tri), covAge: cov ? JSON.parse(cov) : null }))
   };
   // util: fips, er_per_1000, readmission_rate, then the 7 PQI columns for ages 65 to 74
   const util = read('util').map(c => ({ fips: c[0], er: num(c[1]), readm: num(c[2]), pqi: num(c[3]) }));
@@ -241,6 +253,10 @@ if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
     'Payer yield (dry run, 2026-11-20): coverage weighted by what it pays relative to Medicare (commercial 1.43, Medicare 1.0, Medicaid 0.72, uninsured 0; published national averages), then 70% yield and 30% income as percentiles in the state, beside the live pay factor (insured rate and income).', '',
     '| Specialty | ZIPs | Viability score | Pay alone (live) | Payer yield (dry run) | Pay: top vs bottom fifth | Yield: top vs bottom fifth | Competition alone | HPSA (same ZIPs) |', '|---|---|---|---|---|---|---|---|---|',
     ...sum.map(s2 => `| ${s2.label} | ${s2.nViab.toLocaleString()} | ${f(s2.rhoViab)} | ${f(s2.rhoPay)} | ${f(s2.rhoYield)} | ${x(s2.liftPay)} | ${x(s2.liftYield)} | ${f(s2.rhoComp)} | ${f(s2.rhoHpsa)} |`), '',
+    '### 2b. Payer yield by the specialty\'s patients\' ages (dry run, 2026-11-24)', '',
+    'The same yield, built from Census coverage in three age bands (signals.cov_age) weighted toward the ages each specialty sees (PROFILES age measures: 1 + 4 x the weight, or that band alone at weight 1). Compared on the same ZIPs with the one-figure yield.', '',
+    '| Specialty | ZIPs | One yield (same ZIPs) | Yield by age | By age: top vs bottom fifth |', '|---|---|---|---|---|',
+    ...sum.map(s2 => `| ${s2.label} | ${(s2.nYieldAge || 0).toLocaleString()} | ${f(s2.rhoYieldSame)} | ${f(s2.rhoYieldAge)} | ${x(s2.liftYieldAge)} |`), '',
     '## 3. For reference: patients need care here vs entry (the first run\'s finding)', '',
     'Negative means new clinicians went where supply was already dense, not where the need score pointed.', '',
     '| Specialty | ZIPs | Need score | Need alone | Access alone | Top vs bottom fifth |', '|---|---|---|---|---|---|',

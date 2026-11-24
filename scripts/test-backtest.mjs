@@ -57,5 +57,13 @@ check('CSV reader keeps commas inside quotes', parseCsv('a,b\n"x, y",{"k":1}\n')
   const b = run({ counts, zips, places: [], bench, hpsa, zipcounty }, { e2sfca: e2 }).filter(r => r.specialty === PC);
   check('the 2020 run never reads today\'s drive-time figures', b.every(r => r.accessBasis !== 'e2sfca'));
 }
+{
+  const MM = (await import('node:module')).createRequire(import.meta.url)('../v2/assets/market-model.js');
+  const ca = { u19: { pop: 100, uninsured: 5, employer: 50, direct: 5, tricare: 1, medicare: 0, medicaid: 45 }, a19_64: { pop: 300, uninsured: 30, employer: 200, direct: 20, tricare: 5, medicare: 10, medicaid: 40 }, a65: { pop: 80, uninsured: 1, employer: 20, direct: 20, tricare: 2, medicare: 78, medicaid: 8 } };
+  const kid = MM.payerYieldAge(ca, 'Pediatrics (children)'), all = MM.payerYieldAge(ca, 'Skin / dermatology');
+  check('yield by age: pediatrics reads only the under-19 band', JSON.stringify(MM.ageTilt('Pediatrics (children)')) === '{"u19":1,"a19_64":0,"a65":0}' && kid != null && kid !== all);
+  check('yield by age: a 65+ measure tilts toward 65+', MM.ageTilt('Urology').a65 > MM.ageTilt('Urology').a19_64);
+  check('yield by age: a band with no uninsured count gives no figure', MM.payerYieldAge({ ...ca, a65: { pop: 80 } }, 'Urology') === null && MM.payerYieldAge(null, 'Urology') === null);
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -107,6 +107,30 @@
     if (!(n > 0)) return null;
     return a.insured * (c * YIELD.commercial + a.medicare * YIELD.medicare + a.medicaid * YIELD.medicaid) / n;
   }
+  // Payer yield by the specialty's patients' ages (2026-11-24, a dry run in the
+  // back-test before any live use). covAge is census_acs_zcta.signals.cov_age:
+  // three bands with people and coverage counts. Each band counts in
+  // proportion to its people, tilted by the specialty's age measures in
+  // PROFILES (over65 to 65+, under18 to under 19): weight 1 + 4 x the measure's
+  // weight, or that band alone when the weight is 1 (pediatrics, ABA, nursing
+  // homes, hospice). A band with a missing count makes the whole figure unknown.
+  var AGE_DEMO = { over65: 'a65', under18: 'u19', age19to44: 'a19_64' };
+  function ageTilt(label) {
+    var t = { u19: 1, a19_64: 1, a65: 1 }, d = (PROFILES[label] && PROFILES[label].d) || [];
+    d.forEach(function (p) { var b = AGE_DEMO[p[0]]; if (!b) return; if (p[1] >= 1) { t = { u19: 0, a19_64: 0, a65: 0 }; t[b] = 1; } else t[b] = 1 + 4 * p[1]; });
+    return t;
+  }
+  function payerYieldAge(covAge, label) {
+    if (!covAge) return null;
+    var t = ageTilt(label), agg = { pop: 0, uninsured: 0, employer: 0, direct: 0, tricare: 0, medicare: 0, medicaid: 0 };
+    for (var b in t) {
+      if (!t[b]) continue;
+      var c = covAge[b]; if (!c || c.pop == null || c.uninsured == null) return null;
+      for (var k in agg) { if (c[k] == null && (k === 'pop' || k === 'uninsured')) return null; agg[k] += t[b] * (c[k] || 0); }
+    }
+    if (!(agg.pop > 0)) return null;
+    return payerYield({ insured: 1 - agg.uninsured / agg.pop, employer: agg.employer, direct: agg.direct, tricare: agg.tricare, medicare: agg.medicare, medicaid: agg.medicaid });
+  }
   function payerMix(a) {
     if (!a || a.medicare == null || a.medicaid == null || a.employer == null) return null;
     var c = (a.employer || 0) + (a.direct || 0) + (a.tricare || 0), n = c + a.medicare + a.medicaid;
@@ -619,7 +643,7 @@
   }
 
   var API = {
-    VERSION: VERSION, WEIGHTS: WEIGHTS, YIELD: YIELD, payerYield: payerYield, payerMix: payerMix, ACCESS_SHARE: ACCESS_SHARE, NEED_SHARE: NEED_SHARE, PAY_SHARE: PAY_SHARE, UNVALIDATED: UNVALIDATED, weightsFor: weightsFor, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
+    VERSION: VERSION, WEIGHTS: WEIGHTS, YIELD: YIELD, payerYield: payerYield, payerYieldAge: payerYieldAge, ageTilt: ageTilt, payerMix: payerMix, ACCESS_SHARE: ACCESS_SHARE, NEED_SHARE: NEED_SHARE, PAY_SHARE: PAY_SHARE, UNVALIDATED: UNVALIDATED, weightsFor: weightsFor, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
     score: score, classify: classify, pct: pct, rankIn: rankIn, measureIds: measureIds, MEASURE_NAME: MEASURE_NAME,
     FACILITY_TYPES: FACILITY_TYPES, facilities: facilities, facilityCodes: facilityCodes
   };
