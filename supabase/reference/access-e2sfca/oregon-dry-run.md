@@ -1,29 +1,28 @@
 # E2SFCA access dry run: Oregon
 
-Run 2026-11-19 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-24 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
 ## Inputs
 
-- ZIP areas in the region (focus plus a border strip of about 60 miles): 782; in Oregon: 414
-- Drive times: OSRM on OpenStreetMap roads (car profile), 782 x 782 ZIP centre pairs; travel inside a ZIP is half the drive to its nearest neighbour, 2 to 10 minutes
+- ZIP areas in the region (focus plus a border strip of about 60 miles): 798; in Oregon: 422
+- Drive times: OSRM on OpenStreetMap roads (car profile), 798 x 798 ZIP centre pairs; travel inside a ZIP is half the drive to its nearest neighbour, 2 to 10 minutes
 - Focus ZIPs with no road link to any other ZIP (islands, unrouted centres): 0
-- Listings read: 241,855; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
+- Listings read: 230,065; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
 - Catchment edges: 30 minutes for everyday care, 60 for most specialties, 90 for oncology, genetics, infectious disease and plastic surgery (reviewable assumptions, listed per row below)
 
 ## Routing sanity check
 
-Regional median: 3.26 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (8.16), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
+Regional median: 2.64 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (6.59), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
 
-- Flagged: 4; re-anchored: 3; still implausible (left out of the rank comparison, still stored, marked in the CSV): 1 (97842)
+- Flagged: 3; re-anchored: 1; still implausible (left out of the rank comparison, still stored, marked in the CSV): 2 (97842, 98303)
 
 | ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
 |---|---|---|---|---|---|---|
-| 97842 | yes | 9.86 | 100% | 9.86 | 100% | no |
-| 98303 | no | 8.28 | 100% | 2.69 | 100% | yes (2.51) |
-| 98533 | no | 8.19 | 100% | 3.90 | 100% | yes (3.10) |
-| 98603 | no | 9.97 | 100% | 2.90 | 100% | yes (4.10) |
+| 97842 | yes | 6.71 | 100% | 6.71 | 100% | no |
+| 98303 | no | 7.02 | 100% | 7.02 | 100% | no |
+| 98556 | no | 6.83 | 100% | 3.37 | 100% | yes (1.37) |
 
 ## By specialty
 
@@ -31,48 +30,140 @@ Rank agreement is Spearman's rho between the two access factors across the state
 
 | Specialty | Catchment (min) | Listings in region | US rate per 1k | Rank agreement | ZIPs moved 15+ | Most improved access (new minus old) | Most worsened |
 |---|---|---|---|---|---|---|---|
-| Primary care / family doctor | 30 | 26,520 | 4.78 | 0.50 | 239 of 413 | 97039 (-71), 97417 (-46), 97731 (-42) | 97626 (+100), 97001 (+77), 97446 (+66) |
-| Pediatrics (children) | 30 | 5,282 | 1.13 | 0.67 | 177 of 413 | 97492 (-69), 97731 (-55), 97438 (-46) | 97753 (+66), 97217 (+57), 97007 (+55) |
-| Women's health / OB-GYN | 60 | 4,613 | 0.55 | 0.79 | 176 of 413 | 97634 (-76), 97020 (-73), 97348 (-69) | 97624 (+100), 97065 (+92), 97877 (+88) |
-| Mental health & counseling | 30 | 73,067 | 7.13 | 0.58 | 233 of 413 | 97051 (-51), 97818 (-48), 97741 (-38) | 97029 (+100), 97326 (+100), 97357 (+100) |
-| Dental | 30 | 12,301 | 1.64 | 0.61 | 265 of 413 | 97761 (-52), 97830 (-50), 97526 (-49) | 97041 (+89), 97446 (+79), 97040 (+78) |
-| Eye care | 30 | 3,826 | 0.65 | 0.57 | 261 of 413 | 97526 (-45), 97470 (-41), 97845 (-40) | 97144 (+100), 97125 (+99), 97109 (+98) |
-| Chiropractic | 30 | 5,429 | 0.64 | 0.66 | 243 of 413 | 97417 (-57), 97828 (-48), 97470 (-47) | 97627 (+100), 97753 (+100), 97041 (+87) |
-| Physical & occupational therapy | 30 | 15,935 | 2.73 | 0.66 | 213 of 413 | 97365 (-37), 97031 (-35), 97209 (-32) | 97753 (+81), 97342 (+78), 97841 (+70) |
-| Orthopedics & sports injury | 60 | 2,258 | 0.42 | 0.75 | 135 of 413 | 97444 (-69), 97448 (-52), 97327 (-43) | 97627 (+93), 97370 (+80), 97624 (+70) |
-| Heart / cardiology | 60 | 1,059 | 0.28 | 0.77 | 106 of 413 | 97634 (-43), 97020 (-38), 97070 (-37) | 97624 (+87), 97503 (+70), 97520 (+67) |
-| Skin / dermatology | 60 | 503 | 0.10 | 0.80 | 139 of 413 | 97020 (-54), 97348 (-51), 97448 (-42) | 97753 (+91), 97918 (+74), 97029 (+70) |
-| Allergy & immunology | 60 | 123 | 0.03 | 0.78 | 107 of 413 | 97634 (-63), 97701 (-47), 97448 (-46) | 97624 (+100), 97487 (+70), 97446 (+65) |
-| Lung, breathing & sleep | 60 | 673 | 0.14 | 0.78 | 143 of 413 | 97020 (-55), 97467 (-50), 97070 (-49) | 97004 (+76), 97503 (+74), 97022 (+71) |
-| Digestive / gastroenterology | 60 | 623 | 0.13 | 0.89 | 100 of 413 | 97020 (-60), 97032 (-40), 97348 (-37) | 97438 (+85), 97489 (+82), 97004 (+76) |
-| Kidney / nephrology | 60 | 467 | 0.12 | 0.79 | 123 of 413 | 97020 (-38), 97352 (-28), 97032 (-27) | 97357 (+66), 97438 (+62), 97839 (+62) |
-| Diabetes & hormones | 60 | 300 | 0.07 | 0.79 | 151 of 413 | 97761 (-54), 97020 (-47), 97348 (-47) | 97037 (+100), 97343 (+77), 97368 (+77) |
-| Cancer care / oncology | 90 | 829 | 0.18 | 0.73 | 195 of 413 | 97444 (-71), 97020 (-57), 97106 (-52) | 97029 (+51), 97370 (+50), 97624 (+50) |
-| Arthritis / rheumatology | 60 | 194 | 0.04 | 0.82 | 130 of 413 | 97348 (-61), 97020 (-53), 97448 (-50) | 97627 (+100), 97370 (+87), 97753 (+75) |
-| Brain & nerves / neurology | 60 | 1,089 | 0.24 | 0.85 | 120 of 413 | 97020 (-61), 97070 (-47), 97032 (-41) | 97438 (+73), 97489 (+64), 97446 (+58) |
-| Ear, nose & throat | 60 | 416 | 0.08 | 0.77 | 174 of 413 | 97020 (-70), 97002 (-66), 97502 (-50) | 97029 (+100), 97824 (+100), 97050 (+87) |
-| Urology | 60 | 404 | 0.08 | 0.76 | 152 of 413 | 97348 (-67), 97020 (-46), 97365 (-39) | 97029 (+100), 97370 (+99), 97429 (+90) |
-| Foot & ankle / podiatry | 60 | 692 | 0.16 | 0.69 | 141 of 413 | 97761 (-61), 97411 (-55), 97634 (-48) | 97624 (+98), 97883 (+78), 97824 (+72) |
-| Pain management | 60 | 417 | 0.09 | 0.84 | 88 of 413 | 97444 (-72), 97448 (-54), 97327 (-41) | 97627 (+100), 97503 (+81), 97040 (+79) |
-| Plastic & reconstructive surgery | 90 | 301 | 0.07 | 0.78 | 146 of 413 | 97739 (-67), 97020 (-56), 97032 (-50) | 97627 (+61), 97753 (+58), 97370 (+52) |
-| Speech & language therapy | 30 | 4,417 | 0.87 | 0.66 | 172 of 413 | 97390 (-80), 97039 (-77), 97453 (-57) | 97473 (+66), 97461 (+64), 97734 (+64) |
-| Nutrition & dietitian | 30 | 2,142 | 0.32 | 0.60 | 233 of 413 | 97885 (-80), 97914 (-63), 97465 (-61) | 97446 (+88), 97626 (+87), 97370 (+79) |
-| Acupuncture, massage & naturopathy | 30 | 15,860 | 0.50 | 0.57 | 189 of 413 | 97417 (-55), 97810 (-43), 97412 (-40) | 97017 (+100), 97029 (+100), 97041 (+100) |
-| Urgent care & emergency | 30 | 2,600 | 0.50 | 0.38 | 256 of 413 | 97536 (-93), 97625 (-81), 97381 (-72) | 97624 (+100), 97626 (+100), 97864 (+100) |
-| Imaging & lab | 60 | 2,412 | 0.55 | 0.79 | 138 of 413 | 97020 (-41), 97348 (-35), 97377 (-34) | 97624 (+69), 97753 (+65), 97029 (+53) |
-| Pharmacy | 30 | 10,600 | 1.68 | 0.49 | 258 of 413 | 97001 (-86), 97823 (-68), 97480 (-62) | 97037 (+93), 97626 (+88), 97522 (+79) |
-| Home health & in-home care | 30 | 4,285 | 1.49 | 0.55 | 101 of 413 | 97621 (-89), 97825 (-85), 97534 (-68) | 97751 (+100), 97874 (+64), 97001 (+46) |
-| Nursing & assisted living | 60 | 2,183 | 0.37 | 0.58 | 191 of 413 | 97885 (-48), 97147 (-43), 97838 (-42) | 97817 (+100), 97343 (+90), 97884 (+81) |
-| Medical equipment & supplies | 60 | 1,625 | 0.34 | 0.69 | 143 of 413 | 97846 (-43), 97348 (-39), 97838 (-34) | 97001 (+100), 97874 (+100), 97824 (+81) |
-| Hearing & audiology | 60 | 1,387 | 0.20 | 0.74 | 183 of 413 | 97020 (-67), 97348 (-61), 97002 (-55) | 97029 (+100), 97824 (+100), 97624 (+92) |
-| Behavior therapy (ABA) | 30 | 9,494 | 2.58 | 0.74 | 80 of 413 | 97350 (-91), 97357 (-62), 97462 (-44) | 97053 (+60), 97231 (+41), 97217 (+40) |
-| Care coordination & community health | 30 | 16,858 | 1.55 | 0.49 | 234 of 413 | 97039 (-75), 97430 (-63), 97838 (-53) | 97029 (+100), 97040 (+100), 97048 (+100) |
-| General surgery | 60 | 2,276 | 0.39 | 0.71 | 194 of 413 | 97634 (-71), 97348 (-63), 97020 (-60) | 97624 (+100), 97848 (+100), 97370 (+93) |
-| Infectious disease | 90 | 209 | 0.06 | 0.75 | 167 of 413 | 97070 (-56), 97002 (-54), 97020 (-53) | 97029 (+79), 97438 (+66), 97489 (+61) |
-| Genetics & genetic counseling | 90 | 159 | 0.03 | 0.68 | 136 of 413 | 97002 (-64), 97123 (-61), 97020 (-60) | 97438 (+63), 97489 (+59), 97886 (+47) |
-| Hospice & palliative care | 60 | 414 | 0.09 | 0.68 | 145 of 413 | 97907 (-70), 97467 (-68), 97839 (-63) | 97122 (+100), 97406 (+100), 97620 (+100) |
+| Primary care / family doctor | 30 | 22,770 | 4.30 | 0.54 | 191 of 421 | 97037 (-52), 97761 (-49), 97731 (-47) | 97001 (+100), 97732 (+82), 97539 (+71) |
+| Pediatrics (children) | 30 | 5,008.4 | 1.11 | 0.74 | 138 of 421 | 97731 (-54), 97037 (-45), 97031 (-31) | 97759 (+66), 97231 (+62), 97707 (+59) |
+| Women's health / OB-GYN | 60 | 4,256.8 | 0.53 | 0.82 | 146 of 421 | 97348 (-74), 97032 (-64), 97020 (-60) | 97406 (+100), 97624 (+100), 97522 (+86) |
+| Mental health & counseling | 30 | 70,327 | 7.20 | 0.61 | 205 of 421 | 97844 (-63), 97051 (-59), 97818 (-54) | 97625 (+100), 97632 (+100), 97639 (+100) |
+| Dental | 30 | 12,040.4 | 1.65 | 0.68 | 233 of 421 | 97761 (-52), 97634 (-42), 97830 (-33) | 97817 (+84), 97840 (+81), 97023 (+73) |
+| Eye care | 30 | 3,540 | 0.62 | 0.58 | 202 of 421 | 97761 (-33), 97365 (-31), 97141 (-27) | 97144 (+97), 97819 (+95), 97837 (+94) |
+| Chiropractic | 30 | 5,316.2 | 0.63 | 0.71 | 197 of 421 | 97342 (-85), 97350 (-74), 97063 (-49) | 97707 (+100), 97732 (+100), 97760 (+78) |
+| Physical & occupational therapy | 30 | 15,205.6 | 2.70 | 0.73 | 166 of 421 | 97031 (-33), 97219 (-30), 97239 (-25) | 97827 (+68), 97876 (+66), 97867 (+65) |
+| Orthopedics & sports injury | 60 | 2,089.8 | 0.39 | 0.75 | 112 of 421 | 97446 (-53), 97327 (-39), 97352 (-37) | 97326 (+76), 97406 (+75), 97624 (+75) |
+| Heart / cardiology | 60 | 857.6 | 0.24 | 0.79 | 101 of 421 | 97348 (-37), 97070 (-31), 97071 (-31) | 97624 (+83), 97522 (+68), 97539 (+62) |
+| Skin / dermatology | 60 | 452.2 | 0.09 | 0.84 | 142 of 421 | 97348 (-57), 97020 (-55), 97032 (-47) | 97624 (+87), 97522 (+77), 97539 (+65) |
+| Allergy & immunology | 60 | 111.2 | 0.03 | 0.80 | 118 of 421 | 97020 (-44), 97032 (-41), 97348 (-40) | 97624 (+100), 97451 (+61), 97454 (+60) |
+| Lung, breathing & sleep | 60 | 580.6 | 0.13 | 0.83 | 112 of 421 | 97020 (-51), 97070 (-45), 97032 (-41) | 97023 (+78), 97022 (+70), 97466 (+70) |
+| Digestive / gastroenterology | 60 | 509 | 0.11 | 0.87 | 107 of 421 | 97020 (-47), 97032 (-47), 97348 (-42) | 97023 (+84), 97431 (+71), 97452 (+67) |
+| Kidney / nephrology | 60 | 418.2 | 0.11 | 0.83 | 89 of 421 | 97032 (-37), 97020 (-33), 97071 (-30) | 97357 (+45), 97818 (+45), 97711 (+44) |
+| Diabetes & hormones | 60 | 278.6 | 0.06 | 0.84 | 143 of 421 | 97348 (-49), 97032 (-48), 97020 (-47) | 97326 (+64), 97733 (+64), 97522 (+63) |
+| Cancer care / oncology | 90 | 675.4 | 0.15 | 0.71 | 217 of 421 | 97026 (-48), 97032 (-47), 97020 (-46) | 97406 (+83), 97039 (+59), 97454 (+56) |
+| Arthritis / rheumatology | 60 | 167.6 | 0.04 | 0.83 | 141 of 421 | 97348 (-62), 97446 (-55), 97456 (-47) | 97326 (+72), 97707 (+65), 97522 (+64) |
+| Brain & nerves / neurology | 60 | 944 | 0.22 | 0.87 | 115 of 421 | 97032 (-51), 97020 (-43), 97071 (-43) | 97522 (+56), 97454 (+52), 97204 (+49) |
+| Ear, nose & throat | 60 | 364.4 | 0.07 | 0.82 | 156 of 421 | 97417 (-73), 97469 (-71), 97833 (-66) | 97039 (+84), 97023 (+81), 97624 (+68) |
+| Urology | 60 | 332.4 | 0.07 | 0.78 | 154 of 421 | 97348 (-65), 97446 (-46), 97020 (-44) | 97429 (+91), 97039 (+87), 97023 (+83) |
+| Foot & ankle / podiatry | 60 | 619.6 | 0.15 | 0.75 | 113 of 421 | 97071 (-32), 97348 (-32), 97032 (-28) | 97624 (+100), 97837 (+100), 97877 (+89) |
+| Pain management | 60 | 385 | 0.09 | 0.87 | 83 of 421 | 97446 (-57), 97537 (-50), 97020 (-40) | 97406 (+100), 97522 (+90), 97326 (+86) |
+| Plastic & reconstructive surgery | 90 | 273.8 | 0.07 | 0.74 | 162 of 421 | 97739 (-69), 97754 (-62), 97734 (-61) | 97326 (+58), 97007 (+51), 97267 (+49) |
+| Speech & language therapy | 30 | 4,294.6 | 0.90 | 0.71 | 135 of 421 | 97830 (-62), 97390 (-56), 97031 (-28) | 97490 (+71), 97001 (+65), 97754 (+53) |
+| Nutrition & dietitian | 30 | 2,046.2 | 0.33 | 0.65 | 198 of 421 | 97885 (-84), 97857 (-59), 97761 (-50) | 97057 (+100), 97326 (+100), 97707 (+100) |
+| Acupuncture, massage & naturopathy | 30 | 15,575.4 | 0.52 | 0.68 | 171 of 421 | 97063 (-38), 97834 (-33), 97641 (-32) | 97033 (+100), 97039 (+100), 97050 (+100) |
+| Urgent care & emergency | 30 | 2,492.6 | 0.47 | 0.44 | 216 of 421 | 97536 (-94), 97733 (-83), 97029 (-76) | 97406 (+100), 97624 (+100), 97750 (+100) |
+| Imaging & lab | 60 | 2,148.8 | 0.49 | 0.83 | 114 of 421 | 97020 (-37), 97348 (-36), 97026 (-31) | 97624 (+62), 97406 (+55), 97522 (+54) |
+| Pharmacy | 30 | 10,399.6 | 1.72 | 0.55 | 210 of 421 | 97057 (-70), 97001 (-66), 97761 (-47) | 97145 (+79), 97819 (+77), 97837 (+77) |
+| Home health & in-home care | 30 | 4,268.6 | 1.61 | 0.59 | 74 of 421 | 97825 (-76), 97324 (-53), 97830 (-49) | 97001 (+100), 97823 (+62), 97874 (+59) |
+| Nursing & assisted living | 60 | 2,178.2 | 0.39 | 0.58 | 139 of 421 | 97367 (-43), 97882 (-29), 97838 (-26) | 97856 (+100), 97057 (+93), 97390 (+85) |
+| Medical equipment & supplies | 60 | 1,623.4 | 0.36 | 0.75 | 97 of 421 | 97348 (-44), 97498 (-31), 97833 (-31) | 97874 (+100), 97637 (+69), 97390 (+60) |
+| Hearing & audiology | 60 | 1,308.4 | 0.19 | 0.79 | 156 of 421 | 97348 (-65), 97032 (-58), 97020 (-56) | 97624 (+89), 97039 (+86), 97856 (+70) |
+| Behavior therapy (ABA) | 30 | 9,324.6 | 2.88 | 0.79 | 53 of 421 | 97350 (-42), 97907 (-34), 97342 (-31) | 97231 (+60), 97056 (+56), 97053 (+47) |
+| Care coordination & community health | 30 | 16,584.2 | 1.63 | 0.60 | 212 of 421 | 97430 (-60), 97324 (-47), 97882 (-47) | 97001 (+100), 97110 (+100), 97390 (+100) |
+| General surgery | 60 | 1,924 | 0.35 | 0.73 | 163 of 421 | 97348 (-68), 97446 (-52), 97032 (-47) | 97624 (+100), 97848 (+100), 97817 (+88) |
+| Infectious disease | 90 | 167.4 | 0.05 | 0.72 | 170 of 421 | 97070 (-50), 97020 (-49), 97014 (-48) | 97039 (+75), 97357 (+71), 97380 (+60) |
+| Genetics & genetic counseling | 90 | 152.8 | 0.03 | 0.67 | 142 of 421 | 97020 (-56), 97002 (-55), 97032 (-55) | 97204 (+53), 97205 (+48), 97452 (+48) |
+| Hospice & palliative care | 60 | 380 | 0.09 | 0.79 | 116 of 421 | 97365 (-44), 97347 (-39), 97476 (-31) | 97406 (+100), 97837 (+100), 97733 (+89) |
 
 In the last two columns a negative change means E2SFCA finds **better** access than the crude ratio (a lower access factor), a positive one **worse**.
+
+## People without a car
+
+The stored figure (`e2sfca` above) splits each ZIP's adults by the share of households with no vehicle (ACS B25044) and routes that group on foot (OSRM foot profile on OpenStreetMap paths), with the same catchment edge in minutes as by car; both groups compete for the same clinicians (Mao & Nekorchuk 2013, multi-mode E2SFCA). Walking inside a ZIP is half the walk to its nearest neighbour, 5 to 20 minutes. Households are applied to adults (no ACS table gives vehicles per adult at ZIP level).
+
+- Adults in Oregon in households with no vehicle: about 231,696 of 3,370,470 (6.9%)
+- Focus ZIPs with no Census vehicle figure (scored as if every household has a car): 4
+- Sensitivity check: the same split with the no-car group at 2.5x the drive time instead of walking (a stand-in for transit, rides and waiting; an assumption, not a published figure). It is not stored.
+
+| Specialty | Rank agreement with car-only | ZIPs moved 15+ vs car-only | Most worsened by the no-car split | Rank agreement, walking vs slowdown |
+|---|---|---|---|---|
+| Primary care / family doctor | 1.00 | 5 of 421 | 97204 (+64), 97205 (+37), 97201 (+23) | 1.00 |
+| Pediatrics (children) | 1.00 | 3 of 421 | 97204 (+65), 97205 (+36), 97201 (+16) | 1.00 |
+| Women's health / OB-GYN | 0.99 | 3 of 421 | 97204 (+59), 97205 (+35), 97201 (+15) | 1.00 |
+| Mental health & counseling | 1.00 | 1 of 421 | 97204 (+29), 97233 (+8), 97018 (+3) | 1.00 |
+| Dental | 1.00 | 3 of 421 | 97204 (+60), 97205 (+33), 97227 (+15) | 1.00 |
+| Eye care | 1.00 | 5 of 421 | 97204 (+70), 97205 (+40), 97201 (+26) | 1.00 |
+| Chiropractic | 1.00 | 1 of 421 | 97204 (+47), 97205 (+8), 97233 (+8) | 1.00 |
+| Physical & occupational therapy | 1.00 | 5 of 421 | 97204 (+68), 97205 (+45), 97201 (+27) | 1.00 |
+| Orthopedics & sports injury | 0.99 | 3 of 421 | 97204 (+37), 97205 (+24), 97201 (+15) | 1.00 |
+| Heart / cardiology | 0.99 | 2 of 421 | 97204 (+29), 97205 (+19), 97201 (+10) | 1.00 |
+| Skin / dermatology | 0.99 | 3 of 421 | 97204 (+39), 97205 (+26), 97201 (+15) | 1.00 |
+| Allergy & immunology | 1.00 | 2 of 421 | 97204 (+32), 97205 (+21), 97201 (+12) | 1.00 |
+| Lung, breathing & sleep | 1.00 | 5 of 421 | 97204 (+46), 97205 (+30), 97201 (+17) | 1.00 |
+| Digestive / gastroenterology | 1.00 | 4 of 421 | 97204 (+46), 97205 (+31), 97201 (+17) | 1.00 |
+| Kidney / nephrology | 0.99 | 2 of 421 | 97204 (+36), 97205 (+24), 97201 (+13) | 1.00 |
+| Diabetes & hormones | 1.00 | 4 of 421 | 97204 (+43), 97205 (+31), 97201 (+16) | 1.00 |
+| Cancer care / oncology | 0.99 | 2 of 421 | 97204 (+28), 97205 (+20), 97201 (+11) | 1.00 |
+| Arthritis / rheumatology | 1.00 | 4 of 421 | 97204 (+42), 97205 (+30), 97201 (+15) | 1.00 |
+| Brain & nerves / neurology | 1.00 | 4 of 421 | 97204 (+42), 97205 (+30), 97209 (+16) | 1.00 |
+| Ear, nose & throat | 0.99 | 4 of 421 | 97204 (+44), 97205 (+29), 97201 (+16) | 1.00 |
+| Urology | 0.99 | 2 of 421 | 97204 (+36), 97205 (+23), 97201 (+13) | 1.00 |
+| Foot & ankle / podiatry | 0.99 | 2 of 421 | 97204 (+31), 97205 (+20), 97201 (+12) | 1.00 |
+| Pain management | 1.00 | 2 of 421 | 97204 (+33), 97205 (+22), 97201 (+13) | 1.00 |
+| Plastic & reconstructive surgery | 0.99 | 2 of 421 | 97204 (+30), 97205 (+20), 97201 (+12) | 1.00 |
+| Speech & language therapy | 1.00 | 5 of 421 | 97204 (+72), 97205 (+42), 97201 (+26) | 1.00 |
+| Nutrition & dietitian | 1.00 | 2 of 421 | 97204 (+59), 97205 (+26), 97216 (+9) | 1.00 |
+| Acupuncture, massage & naturopathy | 1.00 | 0 of 421 | 97450 (+6), 97122 (+5), 97414 (+4) | 1.00 |
+| Urgent care & emergency | 1.00 | 4 of 421 | 97204 (+64), 97205 (+35), 97201 (+22) | 1.00 |
+| Imaging & lab | 0.99 | 2 of 421 | 97204 (+36), 97205 (+24), 97201 (+13) | 1.00 |
+| Pharmacy | 1.00 | 6 of 421 | 97204 (+69), 97205 (+42), 97201 (+26) | 1.00 |
+| Home health & in-home care | 1.00 | 4 of 421 | 97204 (+53), 97205 (+28), 97201 (+18) | 1.00 |
+| Nursing & assisted living | 0.99 | 3 of 421 | 97204 (+38), 97205 (+24), 97201 (+15) | 1.00 |
+| Medical equipment & supplies | 0.99 | 2 of 421 | 97204 (+29), 97205 (+19), 97201 (+11) | 1.00 |
+| Hearing & audiology | 0.99 | 5 of 421 | 97204 (+55), 97205 (+37), 97201 (+21) | 1.00 |
+| Behavior therapy (ABA) | 1.00 | 4 of 421 | 97204 (+53), 97205 (+33), 97201 (+20) | 1.00 |
+| Care coordination & community health | 1.00 | 1 of 421 | 97204 (+37), 97722 (+5), 97839 (+4) | 1.00 |
+| General surgery | 0.99 | 4 of 421 | 97204 (+42), 97205 (+28), 97201 (+15) | 1.00 |
+| Infectious disease | 0.99 | 2 of 421 | 97204 (+23), 97205 (+16), 97227 (+10) | 1.00 |
+| Genetics & genetic counseling | 1.00 | 2 of 421 | 97204 (+22), 97205 (+16), 97227 (+10) | 1.00 |
+| Hospice & palliative care | 0.99 | 2 of 421 | 97204 (+29), 97205 (+19), 97201 (+11) | 1.00 |
+
+A positive change is worse access once people without a car are counted. Rank agreement near 1 between walking and the slowdown means the conclusion does not hinge on which no-car assumption is used.
+
+## Travel burden against CMS Medicare Advantage limits
+
+Drive minutes from each ZIP centre to the nearest practice location (the middle of each ZIP's pinned listings in the specialty, the 8 nearest by straight line routed on roads), against the maximum minutes CMS sets for Medicare Advantage networks (2026 HSD Reference File) in the ZIP's main county. The CMS limit applies to a plan's network; here it is read against every listing, so a ZIP over the limit has no clinician of that kind within the limit at all. Specialty pairs are in `supabase/reference/network-adequacy/specialty-map.csv` (reviewable). Not scored.
+
+- Counties not matched by name to the HSD file: 0
+
+| Specialty | CMS code | ZIPs over the limit | Adults in them | Large Metro | Metro | Micro | Rural | CEAC |
+|---|---|---|---|---|---|---|---|---|
+| Primary care / family doctor | S03 | 51 of 422 | 32,416 (1.0%) | 1/32 | 20/153 | 15/113 | 4/49 | 11/75 |
+| Women's health / OB-GYN | 016 | 7 of 422 | 1,143 (0.0%) | 0/32 | 4/153 | 1/113 | 0/49 | 2/75 |
+| Mental health & counseling: Psychiatry | 029 | 41 of 422 | 27,062 (0.8%) | 2/32 | 10/153 | 2/113 | 1/49 | 26/75 |
+| Mental health & counseling: Clinical Psychology | 036 | 18 of 422 | 9,485 (0.3%) | 1/32 | 4/153 | 7/113 | 0/49 | 6/75 |
+| Mental health & counseling: Clinical Social Work | 037 | 20 of 422 | 8,980 (0.3%) | 0/32 | 9/153 | 9/113 | 0/49 | 2/75 |
+| Eye care | 023 | 31 of 422 | 19,818 (0.6%) | 1/32 | 14/153 | 8/113 | 0/49 | 8/75 |
+| Chiropractic | 010 | 6 of 422 | 1,842 (0.1%) | 0/32 | 4/153 | 0/113 | 0/49 | 2/75 |
+| Physical & occupational therapy | F049 | 8 of 422 | 2,038 (0.1%) | 0/32 | 5/153 | 0/113 | 0/49 | 3/75 |
+| Orthopedics & sports injury | 025 | 54 of 422 | 61,001 (1.8%) | 1/32 | 16/153 | 14/113 | 0/49 | 23/75 |
+| Heart / cardiology | 008 | 96 of 422 | 103,882 (3.1%) | 2/32 | 35/153 | 9/113 | 4/49 | 46/75 |
+| Skin / dermatology | 011 | 95 of 422 | 124,642 (3.7%) | 2/32 | 21/153 | 22/113 | 11/49 | 39/75 |
+| Allergy & immunology | 007 | 93 of 422 | 155,300 (4.6%) | 0/32 | 19/153 | 21/113 | 12/49 | 41/75 |
+| Lung, breathing & sleep | 030 | 40 of 422 | 35,250 (1.0%) | 2/32 | 11/153 | 2/113 | 1/49 | 24/75 |
+| Digestive / gastroenterology | 014 | 102 of 422 | 180,558 (5.4%) | 1/32 | 20/153 | 16/113 | 27/49 | 38/75 |
+| Kidney / nephrology | 018 | 33 of 422 | 16,039 (0.5%) | 0/32 | 9/153 | 3/113 | 1/49 | 20/75 |
+| Diabetes & hormones | 012 | 29 of 422 | 24,185 (0.7%) | 0/32 | 11/153 | 0/113 | 0/49 | 18/75 |
+| Cancer care / oncology | 021 | 55 of 422 | 43,862 (1.3%) | 0/32 | 20/153 | 1/113 | 4/49 | 30/75 |
+| Arthritis / rheumatology | 031 | 46 of 422 | 89,255 (2.6%) | 1/32 | 13/153 | 5/113 | 6/49 | 21/75 |
+| Brain & nerves / neurology | 019 | 56 of 422 | 59,358 (1.8%) | 1/32 | 11/153 | 17/113 | 5/49 | 22/75 |
+| Ear, nose & throat | 013 | 57 of 422 | 63,216 (1.9%) | 0/32 | 21/153 | 4/113 | 7/49 | 25/75 |
+| Urology | 033 | 71 of 422 | 104,597 (3.1%) | 1/32 | 27/153 | 4/113 | 3/49 | 36/75 |
+| Foot & ankle / podiatry | 028 | 51 of 422 | 35,834 (1.1%) | 2/32 | 10/153 | 10/113 | 2/49 | 27/75 |
+| Plastic & reconstructive surgery | 027 | 57 of 422 | 69,266 (2.1%) | 1/32 | 11/153 | 12/113 | 7/49 | 26/75 |
+| Speech & language therapy | F051 | 17 of 422 | 8,601 (0.3%) | 0/32 | 6/153 | 1/113 | 0/49 | 10/75 |
+| Imaging & lab | F047 | 44 of 422 | 36,101 (1.1%) | 2/32 | 14/153 | 0/113 | 0/49 | 28/75 |
+| Nursing & assisted living | F046 | 22 of 422 | 10,009 (0.3%) | 0/32 | 9/153 | 1/113 | 1/49 | 11/75 |
+| General surgery | 015 | 61 of 422 | 45,391 (1.3%) | 2/32 | 23/153 | 12/113 | 3/49 | 21/75 |
+| Infectious disease | 017 | 45 of 422 | 41,299 (1.2%) | 0/32 | 10/153 | 8/113 | 1/49 | 26/75 |
+
+Designation cells are ZIPs over the limit out of ZIPs of that county type.
 
 ## Reading this
 
@@ -80,6 +171,6 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
 
-## Applied 2026-11-19
+## Applied 2026-11-24
 
-- 16560 rows (ZIP x specialty) stored in access_e2sfca for OR; market-score now uses drive-time access for these ZIPs.
+- 16880 rows (ZIP x specialty) stored in access_e2sfca for OR; market-score now uses drive-time access for these ZIPs.
