@@ -88,6 +88,7 @@ moved = {(r['tbl'], r['key']): r for r in csv.DictReader(open(sys.argv[2], newli
 outage = sys.argv[4] != '0'
 miss = {(r['tbl'], r['key']): r for r in csv.DictReader(open(sys.argv[5], newline=''))}
 keep_mi = float(sys.argv[7])
+reasons = {}
 def mi(a1, o1, a2, o2):
     a1, o1, a2, o2 = map(math.radians, (a1, o1, a2, o2))
     d = math.sin((a2 - a1) / 2) ** 2 + math.cos(a1) * math.cos(a2) * math.sin((o2 - o1) / 2) ** 2
@@ -103,7 +104,16 @@ for r in todo:
         d = mi(float(r['lat']), float(r['lng']), float(x['lat']), float(x['lng']))
         if d <= keep_mi:
             k.writerow({'tbl': r['tbl'], 'key': r['key'], 'state': r['state'], 'zip': r['zip'][:5], 'census_zip': x['mzip'], 'miles_from_match': f'{d:.2f}'}); continue
-    if not outage: w.writerow({'tbl': r['tbl'], 'key': r['key'], 'old_lat': r['lat'], 'old_lng': r['lng'], 'new_lat': '', 'new_lng': '', 'action': 'unpin'})
+    if not outage:
+        w.writerow({'tbl': r['tbl'], 'key': r['key'], 'old_lat': r['lat'], 'old_lng': r['lng'], 'new_lat': '', 'new_lng': '', 'action': 'unpin'})
+        if not x: why = 'no Census match'
+        elif x['exact'] != '1' and x['near'] != '1': why = 'Census matched a different street'
+        elif x['mzip'] == r['zip'][:5]: why = 'same ZIP match, but outside the ZIP area'
+        else:
+            d = mi(float(r['lat']), float(r['lng']), float(x['lat']), float(x['lng']))
+            why = 'address found in another ZIP, pin ' + ('0.25-1 mi' if d < 1 else '1-5 mi' if d < 5 else '5+ mi') + ' from it'
+        reasons[why] = reasons.get(why, 0) + 1
+import json; json.dump(reasons, open(sys.argv[3] + '.why.json', 'w'))
 PY
 moves=$(grep -c ',move$' "$WORK/decide.csv" || true); unpins=$(grep -c ',unpin$' "$WORK/decide.csv" || true)
 keeps=$(($(wc -l < "$WORK/keep.csv") - 1))
@@ -139,7 +149,7 @@ s = json.load(open(st)); c = s['counts']
 n = lambda v: f'{int(v):,}'
 print(f'# Pins outside their own ZIP, {datetime.date.today()}' + (' (dry run: nothing written)' if mode == 'dry_run' else ''))
 print()
-print(f'A pin counts as away when it lies more than {margin} miles outside the listing\'s own 2020 Census ZIP area (ZCTA). A flagged listing is geocoded again. If the Census finds the same address in another ZIP and the current pin sits within a quarter mile of it, the ZIP on the listing is the mistake and the pin is kept. Otherwise a new point in the listing's own ZIP replaces it, or, failing that, the listing loses its pin and stays listed without one. A ZIP with no Census area cannot be judged and is left alone.')
+print(f'A pin counts as away when it lies more than {margin} miles outside the listing\'s own 2020 Census ZIP area (ZCTA). A flagged listing is geocoded again. If the Census finds the same address in another ZIP and the current pin sits within a quarter mile of it, the ZIP on the listing is the mistake and the pin is kept. Otherwise a new point in the listing\'s own ZIP replaces it, or, failing that, the listing loses its pin and stays listed without one. A ZIP with no Census area cannot be judged and is left alone.')
 print()
 print(f"- Pinned listings checked: {n(c.get('rows', 0))}")
 print(f"- Inside or within {margin} mi of their ZIP: {n(c.get('ok', 0))}")
@@ -169,6 +179,12 @@ if rows:
     for r in sorted(rows, key=lambda r: -float(r['miles']))[:25]:
         print(f"| {r['tbl']} | {r['address'].replace('|', '/')} | {r['city']} | {r['miles']} |")
 print()
+try:
+    why = json.load(open(dec + '.why.json'))
+    print('## Why the unpins'); print(); print('| Reason | Listings |'); print('|---|---|')
+    for k, v in sorted(why.items(), key=lambda kv: -kv[1]): print(f'| {k} | {n(v)} |')
+    print()
+except Exception: pass
 print(open(geo).read())
 PY
 cat "$OUT"; [ -n "${GITHUB_STEP_SUMMARY:-}" ] && cat "$OUT" >> "$GITHUB_STEP_SUMMARY" || true
