@@ -6,7 +6,7 @@ A pin counts as away when it lies more than 0.5 miles outside the listing's own 
 - Inside or within 0.5 mi of their ZIP: 10,473,863
 - ZIP has no Census area (not judged): 96,747
 - **Away from their ZIP: 52,929**
-- This run, 2,000 sampled: keep (wrong ZIP, right pin) 579, move 354, unpin 4
+- This run, 2,000 sampled: keep (wrong ZIP, right pin) 714, move 754, unpin 4
 
 | How far outside | Listings |
 |---|---|
@@ -23,7 +23,7 @@ A pin counts as away when it lies more than 0.5 miles outside the listing's own 
 
 States with the most: MN 10,386, CA 5,712, TX 3,343, FL 3,086, NY 2,859, PR 2,123, CO 1,807, OH 1,608, GA 1,509, PA 1,475, NJ 1,472, MI 1,378
 
-Decisions in this run by state (top 12 by unpins): NJ move 33 / unpin 1, MS move 16 / unpin 1, DE move 3 / unpin 1, VA move 2 / unpin 1, OH move 35 / unpin 0, CO move 10 / unpin 0, FL move 25 / unpin 0, MA move 10 / unpin 0, IA move 5 / unpin 0, AR move 4 / unpin 0, CA move 34 / unpin 0, OK move 22 / unpin 0
+Decisions in this run by state (top 12 by unpins): NJ move 8 / unpin 1, MS move 10 / unpin 1, DE move 2 / unpin 1, VA move 1 / unpin 1, MN move 389 / unpin 0, OH move 37 / unpin 0, NE move 7 / unpin 0, TX move 43 / unpin 0, FL move 18 / unpin 0, MA move 10 / unpin 0, IL move 3 / unpin 0, AR move 5 / unpin 0
 
 ## Listed in 38017: 2 away
 
@@ -36,7 +36,8 @@ Decisions in this run by state (top 12 by unpins): NJ move 33 / unpin 1, MS move
 
 | Reason | Listings |
 |---|---|
-| left alone (under the unpin distance, or Minnesota) | 1,063 |
+| moved to the Azure building | 754 |
+| left alone (under the unpin distance, or Minnesota) | 528 |
 | address found in another ZIP, pin 0.25-1 mi from it | 2 |
 | address found in another ZIP, pin 1-5 mi from it | 1 |
 | address found in another ZIP, pin 5+ mi from it | 1 |
@@ -70,4 +71,4 @@ Examples (public listing addresses):
 | non_exact | 1820 S MASON RD STE 305, KATY, TX 77450 | 1820 MASON RD, KATY, TX, 77449 |
 | non_exact | 29 BLACK COAL DRIVE, FORT WASHAKIE, WY 82516 | 29 BLACK COAL DR, FORT WASHAKIE, WY, 82514 |
 
-Azure Maps: {"asked":1816,"placed":921,"failed":0,"not_sent":0,"miss_other_zip":468,"miss_low_confidence":298,"miss_not_an_address":12,"miss_other_house_number":21,"miss_not_rooftop":96}
+Azure Maps: {"asked":1816,"placed":921,"failed":0,"not_sent":0,"miss_other_zip":471,"miss_low_confidence":298,"miss_not_an_address":11,"miss_other_house_number":19,"miss_not_rooftop":96}
