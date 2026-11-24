@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- Pins Azure Maps places on the actual building now move there even when the listing's ZIP was mistyped, as long as the building is within 10 miles of that ZIP.
+
 - The pin check can now ask Azure Maps to place addresses the free Census geocoder cannot, pinning only exact building matches. It is off unless switched on per run, with a cap on paid lookups.
 
 - Pins outside their ZIP: only pins 10 or more miles off that can't be confirmed will be removed. Nearer ones stay until there is evidence they are wrong, and Minnesota is held back for a separate look.

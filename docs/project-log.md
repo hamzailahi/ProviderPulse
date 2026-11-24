@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 453 changes over 71 working days, 2026-05-13 to 2026-11-24.
-- 2026-08-19 onward: from the README changelog (279 entries, written for a reader).
+- 454 changes over 71 working days, 2026-05-13 to 2026-11-24.
+- 2026-08-19 onward: from the README changelog (280 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 118 |
+| November 2026 | 119 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-24
+
+- Pins Azure Maps places on the actual building now move there even when the listing's ZIP was mistyped, as long as the building is within 10 miles of that ZIP.
 
 - The pin check can now ask Azure Maps to place addresses the free Census geocoder cannot, pinning only exact building matches. It is off unless switched on per run, with a cap on paid lookups.
 

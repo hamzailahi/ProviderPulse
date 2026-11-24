@@ -89,17 +89,27 @@ PY
   python3 - "$WORK/todo.csv" "$WORK/azure-placed.csv" "$WORK/new.csv" "$WORK/azure-misses.csv" "$WORK/misses.csv" <<'PY'
 import csv, sys
 todo = {(r['tbl'], r['key']): r for r in csv.DictReader(open(sys.argv[1], newline=''))}
-with open(sys.argv[3], 'a', newline='') as g:
-    w = csv.writer(g, lineterminator='\n')
+# Azure buildings become move candidates (the user's rule, 2026-11-24): one in
+# the listing's own ZIP, or in another ZIP, moves the pin there when it lies
+# within AZURE_NEAR_MI of the listing's own ZIP area (a same-named street in
+# another town cannot pull a pin across the state). Buildings in another ZIP
+# also feed the keep rule, which runs first.
+with open(sys.argv[3].replace('new.csv', 'azure-cand.csv'), 'w', newline='') as g:
+    w = csv.writer(g, lineterminator='\n'); w.writerow(['tbl', 'key', 'zip', 'lat', 'lng'])
     for p in csv.DictReader(open(sys.argv[2], newline='')):
         t = todo.get((p['tbl'], p['key']))
         if t: w.writerow([p['tbl'], p['key'], t['zip'], p['lat'], p['lng']])
+    for m in csv.DictReader(open(sys.argv[4], newline='')):
+        t = todo.get((m['tbl'], m['key']))
+        if t and m['building'] == '1': w.writerow([m['tbl'], m['key'], t['zip'], m['lat'], m['lng']])
 with open(sys.argv[5], 'a', newline='') as g:
     w = csv.writer(g, lineterminator='\n')
     for m in csv.DictReader(open(sys.argv[4], newline='')):
         if m['building'] == '1': w.writerow([m['tbl'], m['key'], 1, 0, m['mzip'], m['lat'], m['lng']])
 PY
+  python3 scripts/pin-zip-check.py check "$WORK/azure-cand.csv" "$SHP" "$WORK/azure-moved.csv" "${AZURE_NEAR_MI:-10}"
 fi
+[ -f "$WORK/azure-moved.csv" ] || echo 'tbl,key,lat,lng,miles' > "$WORK/azure-moved.csv"
 python3 scripts/pin-zip-check.py check "$WORK/new.csv" "$SHP" "$WORK/moved.csv" "$MARGIN_MI"
 
 # Decisions (the user's rules, reworked 2026-11-24 after the first dry run
@@ -110,13 +120,14 @@ python3 scripts/pin-zip-check.py check "$WORK/new.csv" "$SHP" "$WORK/moved.csv" 
 #   move  - a new point inside the listing's own ZIP;
 #   unpin - anything else, except rows the geocoder never answered (an outage
 #           is not "no match"). decide.csv holds only move and unpin.
-python3 - "$WORK/todo.csv" "$WORK/moved.csv" "$WORK/decide.csv" "$rc" "$WORK/misses.csv" "$WORK/keep.csv" "${KEEP_MI:-0.25}" <<'PY'
+python3 - "$WORK/todo.csv" "$WORK/moved.csv" "$WORK/decide.csv" "$rc" "$WORK/misses.csv" "$WORK/keep.csv" "${KEEP_MI:-0.25}" "$WORK/azure-moved.csv" <<'PY'
 import csv, sys, math
 todo = list(csv.DictReader(open(sys.argv[1], newline='')))
 moved = {(r['tbl'], r['key']): r for r in csv.DictReader(open(sys.argv[2], newline=''))}
 outage = sys.argv[4] != '0'
 miss = {(r['tbl'], r['key']): r for r in csv.DictReader(open(sys.argv[5], newline=''))}
 keep_mi = float(sys.argv[7])
+azmoved = {(r['tbl'], r['key']): r for r in csv.DictReader(open(sys.argv[8], newline=''))}
 reasons = {}
 leave = 0
 import os
@@ -136,6 +147,10 @@ for r in todo:
         d = mi(float(r['lat']), float(r['lng']), float(x['lat']), float(x['lng']))
         if d <= keep_mi:
             k.writerow({'tbl': r['tbl'], 'key': r['key'], 'state': r['state'], 'zip': r['zip'][:5], 'census_zip': x['mzip'], 'miles_from_match': f'{d:.2f}'}); continue
+    a = azmoved.get(key)
+    if a:
+        w.writerow({'tbl': r['tbl'], 'key': r['key'], 'old_lat': r['lat'], 'old_lng': r['lng'], 'new_lat': a['lat'], 'new_lng': a['lng'], 'action': 'move'})
+        reasons['moved to the Azure building'] = reasons.get('moved to the Azure building', 0) + 1; continue
     # The user's rule (2026-11-24): unpin only a pin 10+ miles outside its ZIP
     # that the Census cannot confirm; nearer ones and Minnesota (a suspected
     # source problem, looked at separately) are left alone.
