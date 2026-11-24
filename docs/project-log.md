@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 451 changes over 71 working days, 2026-05-13 to 2026-11-24.
-- 2026-08-19 onward: from the README changelog (277 entries, written for a reader).
+- 452 changes over 71 working days, 2026-05-13 to 2026-11-24.
+- 2026-08-19 onward: from the README changelog (278 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 116 |
+| November 2026 | 117 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-24
+
+- Pins outside their ZIP: only pins 10 or more miles off that can't be confirmed will be removed. Nearer ones stay until there is evidence they are wrong, and Minnesota is held back for a separate look.
 
 - The check for pins outside their ZIP now keeps a pin when the address is right but the listing's ZIP was mistyped, instead of removing it. The first trial run would have taken almost every flagged listing off the map.
 

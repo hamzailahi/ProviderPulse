@@ -89,6 +89,9 @@ outage = sys.argv[4] != '0'
 miss = {(r['tbl'], r['key']): r for r in csv.DictReader(open(sys.argv[5], newline=''))}
 keep_mi = float(sys.argv[7])
 reasons = {}
+leave = 0
+import os
+UNPIN_MI = os.environ.get('UNPIN_MI', '10')
 def mi(a1, o1, a2, o2):
     a1, o1, a2, o2 = map(math.radians, (a1, o1, a2, o2))
     d = math.sin((a2 - a1) / 2) ** 2 + math.cos(a1) * math.cos(a2) * math.sin((o2 - o1) / 2) ** 2
@@ -104,6 +107,11 @@ for r in todo:
         d = mi(float(r['lat']), float(r['lng']), float(x['lat']), float(x['lng']))
         if d <= keep_mi:
             k.writerow({'tbl': r['tbl'], 'key': r['key'], 'state': r['state'], 'zip': r['zip'][:5], 'census_zip': x['mzip'], 'miles_from_match': f'{d:.2f}'}); continue
+    # The user's rule (2026-11-24): unpin only a pin 10+ miles outside its ZIP
+    # that the Census cannot confirm; nearer ones and Minnesota (a suspected
+    # source problem, looked at separately) are left alone.
+    if float(r['miles']) < float(UNPIN_MI) or r['state'] == 'MN':
+        leave += 1; continue
     if not outage:
         w.writerow({'tbl': r['tbl'], 'key': r['key'], 'old_lat': r['lat'], 'old_lng': r['lng'], 'new_lat': '', 'new_lng': '', 'action': 'unpin'})
         if not x: why = 'no Census match'
@@ -113,7 +121,7 @@ for r in todo:
             d = mi(float(r['lat']), float(r['lng']), float(x['lat']), float(x['lng']))
             why = 'address found in another ZIP, pin ' + ('0.25-1 mi' if d < 1 else '1-5 mi' if d < 5 else '5+ mi') + ' from it'
         reasons[why] = reasons.get(why, 0) + 1
-import json; json.dump(reasons, open(sys.argv[3] + '.why.json', 'w'))
+import json; reasons['left alone (under the unpin distance, or Minnesota)'] = leave; json.dump(reasons, open(sys.argv[3] + '.why.json', 'w'))
 PY
 moves=$(grep -c ',move$' "$WORK/decide.csv" || true); unpins=$(grep -c ',unpin$' "$WORK/decide.csv" || true)
 keeps=$(($(wc -l < "$WORK/keep.csv") - 1))
@@ -181,7 +189,7 @@ if rows:
 print()
 try:
     why = json.load(open(dec + '.why.json'))
-    print('## Why the unpins'); print(); print('| Reason | Listings |'); print('|---|---|')
+    print('## Why the unpins (and what is left alone)'); print(); print('| Reason | Listings |'); print('|---|---|')
     for k, v in sorted(why.items(), key=lambda kv: -kv[1]): print(f'| {k} | {n(v)} |')
     print()
 except Exception: pass
