@@ -1829,11 +1829,23 @@ if (isProviderAcct) {
       return tot ? t.slice(13).reduce(function (a, b) { return a + b; }, 0) / tot * 100 : null; } },
     unins: { label: 'Uninsured', fmt: function (v) { return v.toFixed(1) + '%'; }, of: function (r) {
       return r.ins_universe != null && r.ins_uninsured != null && N(r.ins_universe) > 0 ? N(r.ins_uninsured) / N(r.ins_universe) * 100 : null; } },
-    income: { label: 'Median household income', fmt: function (v) { return v >= 250000 ? '$250k+' : '$' + Math.round(v / 1000) + 'k'; }, of: function (r) {
-      return r.median_hh_income != null ? Math.min(N(r.median_hh_income), 250001) : null; } },
+    // Fixed dollar bands (2026-11-24, the user's choice): the same colour means
+    // the same income in every city, so a rich ZIP always reads as rich.
+    income: { label: 'Median household income', fmt: function (v) { return v >= 250000 ? '$250k+' : '$' + Math.round(v / 1000) + 'k'; },
+      breaks: [50000, 75000, 100000, 150000, 200000, 250000],
+      bandLabels: ['Under $50k', '$50k to $75k', '$75k to $100k', '$100k to $150k', '$150k to $200k', '$200k to $250k', '$250k or more'],
+      of: function (r) { return r.median_hh_income != null ? Math.min(N(r.median_hh_income), 250001) : null; } },
+    // The Census's top income band is $200,000 or more (income_bands[15]).
+    rich: { label: 'Households earning $200k or more', fmt: function (v) { return v.toFixed(1) + '%'; },
+      breaks: [5, 10, 20, 30, 40],
+      bandLabels: ['Under 5%', '5% to 10%', '10% to 20%', '20% to 30%', '30% to 40%', '40% or more'],
+      of: function (r) { var b = r.income_bands || []; if (b.length !== 16) return null;
+        var tot = b.reduce(function (a, x) { return a + N(x); }, 0); return tot ? N(b[15]) / tot * 100 : null; } },
     density: { label: 'Listings shown per 10,000 residents', fmt: function (v) { return v.toFixed(v < 10 ? 1 : 0); }, of: null }
   };
+  var PAL7 = ['#F1F8F7', '#D3ECE8', '#A9DAD2', '#73BFB4', '#3E9C91', '#17766D', '#0B4C47'];
   var mode = '', values = {}, cuts = [], seq = 0;
+  function palFor(n) { return n + 1 > PAL.length ? PAL7.slice(PAL7.length - (n + 1)) : PAL.slice(PAL.length - (n + 1)); }
   var sel = el('select', { id: 'zip-shade', class: 'lg-select' },
     el('option', { value: '' }, 'None'),
     Object.keys(MODES).map(function (k) { return el('option', { value: k }, MODES[k].label); }));
@@ -1846,7 +1858,7 @@ if (isProviderAcct) {
     if (!mode || values[z] == null || !cuts.length) return null;
     var v = values[z], i = 0;
     while (i < cuts.length && v > cuts[i]) i++;
-    return { fillColor: PAL[i], fillOpacity: 0.55 };
+    return { fillColor: palFor(cuts.length)[i], fillOpacity: 0.55 };
   };
   // Every ZIP outline in the map's current view (2026-11-24: shading only the
   // searched ZIPs left a city search with 3 or 4 coloured shapes among
@@ -1906,13 +1918,28 @@ if (isProviderAcct) {
       var none = zips.length - vals.length;
       note.textContent = '';
       if (vals.length < 2) { note.textContent = failed ? 'Census figures did not load. Pick it again to retry.' : 'Not enough ZIPs with this figure to shade.'; values = {}; restyle(); return; }
+      if (M.breaks) {
+        cuts = M.breaks.slice();
+        var pal = palFor(cuts.length), counts = cuts.map(function () { return 0; }).concat([0]);
+        vals.forEach(function (v) { var k = 0; while (k < cuts.length && v >= cuts[k]) k++; counts[k]++; });
+        // ppZipShade puts v > cut into the next band; fixed bands start at the break, so nudge.
+        cuts = cuts.map(function (c) { return c - 1e-9; });
+        M.bandLabels.forEach(function (lab, i) {
+          var sw = el('i', { class: 'lg-sw' }); sw.style.background = pal[i];
+          scale.appendChild(el('div', { class: 'lg-row' }, sw, lab + ' (' + counts[i] + ')'));
+        });
+        note.textContent = 'Census ACS 5-year. Fixed bands, the same in every area; ZIPs per band in brackets.' +
+          (mode === 'income' ? ' The Census caps a ZIP median at $250,000.' : '') +
+          (none ? ' ' + none + ' ZIP' + (none === 1 ? ' has' : 's have') + ' no figure and ' + (none === 1 ? 'is' : 'are') + ' left unshaded' + (failed ? ' (some did not load)' : '') + '.' : '');
+        restyle(); return;
+      }
       var top = vals[vals.length - 1];
       if (top === vals[0]) { note.textContent = 'Every ZIP here has the same figure (' + M.fmt(top) + '), so there is nothing to shade.'; values = {}; restyle(); return; }
       for (var i = 1; i < 5; i++) { var c = vals[Math.min(vals.length - 1, Math.floor(vals.length * i / 5))]; if (c > vals[0] && c < top && (!cuts.length || c > cuts[cuts.length - 1])) cuts.push(c); }
       if (!cuts.length) cuts.push(vals[0]);
       var lo = vals[0];
       cuts.concat([top]).forEach(function (hi, i) {
-        var sw = el('i', { class: 'lg-sw' }); sw.style.background = PAL[i];
+        var sw = el('i', { class: 'lg-sw' }); sw.style.background = palFor(cuts.length)[i];
         scale.appendChild(el('div', { class: 'lg-row' }, sw, M.fmt(lo) + ' to ' + M.fmt(hi)));
         lo = hi;
       });

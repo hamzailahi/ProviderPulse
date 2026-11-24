@@ -305,7 +305,7 @@ if (!ONLY || ONLY === 'zip-shade') {
   const { ctx, page, log } = await fresh();
   const r = { name: 'Shade ZIPs by (Collierville, TN)', q: 'Collierville, TN', steps: [] };
   const shade = () => page.evaluate(() => {
-    const PAL = ['#E3F3F1', '#B8DDD7', '#8FCFC6', '#4FA89D', '#115E59'].map(c => c.toLowerCase());
+    const PAL = ['#E3F3F1', '#B8DDD7', '#8FCFC6', '#4FA89D', '#115E59', '#F1F8F7', '#D3ECE8', '#A9DAD2', '#73BFB4', '#3E9C91', '#17766D', '#0B4C47'].map(c => c.toLowerCase());
     let paths = 0, shaded = 0, layers = 0, shadedLayers = 0, sample = null;
     document.querySelectorAll('path.leaflet-interactive').forEach(p => { paths++; if (PAL.includes(String(p.getAttribute('fill') || '').toLowerCase())) shaded++; });
     try { zipGeoJSONLayer.eachLayer(l => { layers++; const f = l.options && l.options.fillColor; if (PAL.includes(String(f || '').toLowerCase())) shadedLayers++; if (!sample) sample = { props: Object.keys(l.feature.properties).join(','), z: l.feature.properties.ZCTA5CE10, fill: f, op: l.options && l.options.fillOpacity }; }); } catch (e) { sample = 'err ' + e.message; }
@@ -319,7 +319,7 @@ if (!ONLY || ONLY === 'zip-shade') {
     await page.fill('#addressInput', r.q); await page.press('#addressInput', 'Enter');
     r.ms = await settle(page);
     r.after = await snapshot(page);
-    for (const m of ['p65', 'unins', 'income', 'density']) {
+    for (const m of ['p65', 'unins', 'income', 'rich', 'density']) {
       let err = null;
       try { await page.selectOption('#zip-shade', m); await page.waitForTimeout(9000); } catch (e) { err = String(e.message || e).slice(0, 200); }
       const sn = await shade();

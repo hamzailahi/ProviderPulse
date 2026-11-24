@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- Income shading on the dashboard map is more detailed: median household income now uses seven fixed dollar bands (under $50k up to $250k or more), so a wealthy ZIP looks wealthy in any city, and a new option shades by the share of households earning $200,000 or more.
+
 - "Shade ZIPs by" on the dashboard map now colours every ZIP in view and updates as you pan or zoom. Before, it coloured only the few ZIPs a search had loaded (3 shapes for Collierville), so it looked like it did nothing. Listing density still covers only the searched ZIPs.
 
 - The dashboard's Filters panel now starts closed from the first moment the page draws (it used to show open until the page's scripts finished). The live audit gained a check for "Shade ZIPs by", reported as not working.

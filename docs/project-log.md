@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 446 changes over 71 working days, 2026-05-13 to 2026-11-24.
-- 2026-08-19 onward: from the README changelog (272 entries, written for a reader).
+- 447 changes over 71 working days, 2026-05-13 to 2026-11-24.
+- 2026-08-19 onward: from the README changelog (273 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 111 |
+| November 2026 | 112 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-24
+
+- Income shading on the dashboard map is more detailed: median household income now uses seven fixed dollar bands (under $50k up to $250k or more), so a wealthy ZIP looks wealthy in any city, and a new option shades by the share of households earning $200,000 or more.
 
 - "Shade ZIPs by" on the dashboard map now colours every ZIP in view and updates as you pan or zoom. Before, it coloured only the few ZIPs a search had loaded (3 shapes for Collierville), so it looked like it did nothing. Listing density still covers only the searched ZIPs.
 
