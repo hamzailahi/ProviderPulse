@@ -1,38 +1,38 @@
 # E2SFCA access dry run: New Hampshire
 
-Run 2026-11-19 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-24 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
 ## Inputs
 
-- ZIP areas in the region (focus plus a border strip of about 60 miles): 1,359; in New Hampshire: 244
-- Drive times: OSRM on OpenStreetMap roads (car profile), 1,359 x 1,359 ZIP centre pairs; travel inside a ZIP is half the drive to its nearest neighbour, 2 to 10 minutes
+- ZIP areas in the region (focus plus a border strip of about 60 miles): 1,378; in New Hampshire: 246
+- Drive times: OSRM on OpenStreetMap roads (car profile), 1,378 x 1,378 ZIP centre pairs; travel inside a ZIP is half the drive to its nearest neighbour, 2 to 10 minutes
 - Focus ZIPs with no road link to any other ZIP (islands, unrouted centres): 0
-- Listings read: 360,886; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
+- Listings read: 340,376.201; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
 - Catchment edges: 30 minutes for everyday care, 60 for most specialties, 90 for oncology, genetics, infectious disease and plastic surgery (reviewable assumptions, listed per row below)
 
 ## Routing sanity check
 
-Regional median: 3.32 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (8.29), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
+Regional median: 2.96 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (7.41), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
 
-- Flagged: 13; re-anchored: 7; still implausible (left out of the rank comparison, still stored, marked in the CSV): 8 (02642, 02652, 02657, 02663, 02666, 02667, 04017, 04019)
+- Flagged: 13; re-anchored: 5; still implausible (left out of the rank comparison, still stored, marked in the CSV): 9 (02642, 02652, 02657, 02663, 02666, 02667, 04017, 04019, 04548)
 
 | ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
 |---|---|---|---|---|---|---|
-| 01085 | no | 9.58 | 100% | 2.73 | 100% | yes (1.72) |
-| 02199 | no | 9.23 | 100% | 5.36 | 100% | yes (1.02) |
-| 02642 | no | 2.52 | 42% | 2.52 | 42% | no |
-| 02652 | no | 1.97 | 42% | 1.97 | 42% | no |
-| 02657 | no | 2.36 | 42% | 2.36 | 42% | no |
-| 02663 | no | 2.67 | 42% | 2.67 | 42% | no |
-| 02666 | no | 2.67 | 42% | 2.67 | 42% | no |
-| 02667 | no | 2.69 | 42% | 2.69 | 42% | no |
-| 04017 | no | 19.44 | 100% | 9.82 | 100% | yes (2.36) |
-| 04019 | no | 15.96 | 100% | 13.49 | 100% | yes (1.64) |
-| 04050 | no | 10.89 | 100% | 5.94 | 100% | yes (2.04) |
-| 04568 | no | 10.76 | 100% | 3.85 | 100% | yes (1.87) |
-| 04925 | no | 8.95 | 100% | 6.02 | 100% | yes (2.30) |
+| 02109 | no | 9.20 | 100% | 4.27 | 100% | yes (0.51) |
+| 02642 | no | 2.19 | 42% | 2.19 | 42% | no |
+| 02652 | no | 2.29 | 42% | 2.29 | 42% | no |
+| 02657 | no | 2.26 | 42% | 2.26 | 42% | no |
+| 02663 | no | 2.44 | 42% | 2.44 | 42% | no |
+| 02666 | no | 2.31 | 42% | 2.31 | 42% | no |
+| 02667 | no | 2.31 | 42% | 2.31 | 42% | no |
+| 04017 | no | 19.97 | 100% | 7.45 | 100% | yes (1.69) |
+| 04019 | no | 14.31 | 100% | 18.01 | 100% | no |
+| 04050 | no | 11.17 | 100% | 5.69 | 100% | yes (1.98) |
+| 04109 | no | 7.53 | 100% | 3.66 | 100% | yes (1.70) |
+| 04548 | no | 9.05 | 100% | 9.05 | 100% | no |
+| 04568 | no | 10.71 | 100% | 3.75 | 100% | yes (1.34) |
 
 ## By specialty
 
@@ -40,48 +40,140 @@ Rank agreement is Spearman's rho between the two access factors across the state
 
 | Specialty | Catchment (min) | Listings in region | US rate per 1k | Rank agreement | ZIPs moved 15+ | Most improved access (new minus old) | Most worsened |
 |---|---|---|---|---|---|---|---|
-| Primary care / family doctor | 30 | 46,459 | 4.78 | 0.53 | 115 of 244 | 03465 (-52), 03576 (-49), 03264 (-38) | 03307 (+96), 03215 (+94), 03771 (+82) |
-| Pediatrics (children) | 30 | 17,969 | 1.13 | 0.54 | 97 of 244 | 03264 (-53), 03818 (-48), 03581 (-42) | 03307 (+73), 03771 (+56), 03215 (+52) |
-| Women's health / OB-GYN | 60 | 6,115 | 0.55 | 0.65 | 119 of 244 | 03849 (-54), 03465 (-45), 03875 (-45) | 03057 (+68), 03307 (+67), 03215 (+65) |
-| Mental health & counseling | 30 | 103,797 | 7.13 | 0.50 | 118 of 244 | 03465 (-57), 03576 (-50), 03570 (-42) | 03307 (+92), 03771 (+86), 03215 (+83) |
-| Dental | 30 | 18,808 | 1.64 | 0.63 | 120 of 244 | 03465 (-58), 03581 (-58), 03249 (-48) | 03215 (+86), 03307 (+86), 03457 (+79) |
-| Eye care | 30 | 6,072 | 0.65 | 0.55 | 112 of 244 | 03576 (-63), 03249 (-61), 03465 (-47) | 03771 (+94), 03307 (+92), 03595 (+86) |
-| Chiropractic | 30 | 4,352 | 0.64 | 0.65 | 108 of 244 | 03581 (-54), 03580 (-44), 03609 (-42) | 03215 (+74), 03082 (+63), 03307 (+58) |
-| Physical & occupational therapy | 30 | 34,115 | 2.73 | 0.59 | 137 of 244 | 03465 (-38), 03581 (-37), 03894 (-36) | 03215 (+100), 03307 (+82), 03575 (+77) |
-| Orthopedics & sports injury | 60 | 4,243 | 0.42 | 0.49 | 152 of 244 | 03276 (-87), 03235 (-74), 03282 (-73) | 03215 (+62), 03850 (+62), 03307 (+57) |
-| Heart / cardiology | 60 | 2,715 | 0.28 | 0.64 | 85 of 244 | 03276 (-42), 03077 (-40), 03234 (-40) | 03303 (+64), 03046 (+63), 03224 (+61) |
-| Skin / dermatology | 60 | 1,232 | 0.10 | 0.54 | 128 of 244 | 03257 (-100), 03284 (-100), 03751 (-100) | 03854 (+70), 03870 (+69), 03871 (+66) |
-| Allergy & immunology | 60 | 349 | 0.03 | 0.66 | 89 of 244 | 03223 (-56), 03279 (-42), 03465 (-41) | 03215 (+100), 03574 (+70), 03457 (+66) |
-| Lung, breathing & sleep | 60 | 1,207 | 0.14 | 0.59 | 103 of 244 | 03276 (-56), 03293 (-47), 03235 (-46) | 03853 (+76), 03307 (+50), 03595 (+49) |
-| Digestive / gastroenterology | 60 | 1,299 | 0.13 | 0.70 | 100 of 244 | 03077 (-42), 03465 (-36), 03609 (-35) | 03307 (+74), 03258 (+64), 03303 (+62) |
-| Kidney / nephrology | 60 | 816 | 0.12 | 0.57 | 59 of 244 | 03470 (-25), 03465 (-24), 03466 (-23) | 03854 (+52), 03457 (+49), 03445 (+47) |
-| Diabetes & hormones | 60 | 926 | 0.07 | 0.55 | 161 of 244 | 03849 (-61), 03077 (-56), 03875 (-55) | 03579 (+93), 03597 (+77), 03215 (+68) |
-| Cancer care / oncology | 90 | 2,069 | 0.18 | 0.55 | 85 of 244 | 03079 (-60), 03087 (-48), 03060 (-43) | 03457 (+86), 03445 (+85), 03448 (+83) |
-| Arthritis / rheumatology | 60 | 488 | 0.04 | 0.62 | 144 of 244 | 03465 (-65), 03464 (-58), 03470 (-52) | 03853 (+67), 03278 (+65), 03221 (+63) |
-| Brain & nerves / neurology | 60 | 2,586 | 0.24 | 0.61 | 100 of 244 | 03079 (-34), 03087 (-32), 03745 (-31) | 03753 (+59), 03755 (+58), 03770 (+57) |
-| Ear, nose & throat | 60 | 686 | 0.08 | 0.61 | 126 of 244 | 03276 (-62), 03237 (-59), 03609 (-59) | 03853 (+96), 03229 (+69), 03275 (+67) |
-| Urology | 60 | 800 | 0.08 | 0.60 | 141 of 244 | 03609 (-81), 03465 (-66), 03602 (-59) | 03229 (+68), 03275 (+64), 03303 (+63) |
-| Foot & ankle / podiatry | 60 | 1,144 | 0.16 | 0.52 | 120 of 244 | 03583 (-41), 03849 (-40), 03817 (-38) | 03854 (+70), 03870 (+67), 03588 (+58) |
-| Pain management | 60 | 545 | 0.09 | 0.59 | 127 of 244 | 03251 (-68), 03293 (-62), 03262 (-53) | 03886 (+78), 03871 (+62), 03259 (+56) |
-| Plastic & reconstructive surgery | 90 | 534 | 0.07 | 0.67 | 71 of 244 | 03079 (-43), 03087 (-39), 03060 (-37) | 03307 (+88), 03258 (+83), 03303 (+77) |
-| Speech & language therapy | 30 | 7,774 | 0.87 | 0.67 | 117 of 244 | 03593 (-59), 03574 (-36), 03103 (-35) | 03810 (+83), 03307 (+73), 03450 (+72) |
-| Nutrition & dietitian | 30 | 4,242 | 0.32 | 0.52 | 125 of 244 | 03278 (-57), 03264 (-56), 03465 (-56) | 03579 (+100), 03592 (+100), 03590 (+96) |
-| Acupuncture, massage & naturopathy | 30 | 4,801 | 0.50 | 0.61 | 113 of 244 | 03241 (-68), 03576 (-43), 03101 (-33) | 03215 (+100), 03443 (+100), 03451 (+98) |
-| Urgent care & emergency | 30 | 4,511 | 0.50 | 0.53 | 118 of 244 | 03465 (-76), 03849 (-48), 03264 (-47) | 03590 (+100), 03592 (+100), 03597 (+100) |
-| Imaging & lab | 60 | 5,126 | 0.55 | 0.60 | 83 of 244 | 03609 (-32), 03291 (-27), 03077 (-25) | 03307 (+49), 03597 (+48), 03057 (+45) |
-| Pharmacy | 30 | 13,366 | 1.68 | 0.50 | 117 of 244 | 03576 (-58), 03785 (-48), 03293 (-47) | 03307 (+79), 03771 (+77), 03595 (+68) |
-| Home health & in-home care | 30 | 5,868 | 1.49 | 0.61 | 21 of 244 | 03576 (-28), 03766 (-13), 03784 (-13) | 03597 (+27), 03593 (+24), 03582 (+23) |
-| Nursing & assisted living | 60 | 2,686 | 0.37 | 0.44 | 108 of 244 | 03597 (-43), 03456 (-40), 03609 (-40) | 03450 (+66), 03084 (+63), 03780 (+60) |
-| Medical equipment & supplies | 60 | 1,917 | 0.34 | 0.60 | 114 of 244 | 03836 (-44), 03890 (-38), 03293 (-37) | 03275 (+57), 03215 (+51), 03307 (+49) |
-| Hearing & audiology | 60 | 1,751 | 0.20 | 0.54 | 155 of 244 | 03276 (-85), 03235 (-69), 03609 (-59) | 03853 (+86), 03846 (+64), 03266 (+59) |
-| Behavior therapy (ABA) | 30 | 19,273 | 2.58 | 0.81 | 44 of 244 | 03466 (-35), 03217 (-31), 03860 (-25) | 03441 (+44), 03052 (+39), 03854 (+37) |
-| Care coordination & community health | 30 | 13,946 | 1.55 | 0.55 | 83 of 244 | 03465 (-75), 03234 (-46), 03766 (-42) | 03215 (+100), 03259 (+100), 03581 (+100) |
-| General surgery | 60 | 3,404 | 0.39 | 0.53 | 117 of 244 | 03077 (-46), 03836 (-44), 03890 (-44) | 03307 (+69), 03854 (+66), 03857 (+61) |
-| Infectious disease | 90 | 676 | 0.06 | 0.55 | 88 of 244 | 03087 (-65), 03038 (-58), 03079 (-56) | 03445 (+86), 03457 (+86), 03448 (+85) |
-| Genetics & genetic counseling | 90 | 457 | 0.03 | 0.55 | 101 of 244 | 03079 (-100), 03874 (-96), 03865 (-89) | 03812 (+87), 03838 (+84), 03846 (+78) |
-| Hospice & palliative care | 60 | 486 | 0.09 | 0.61 | 137 of 244 | 03237 (-45), 03077 (-42), 03293 (-42) | 03597 (+88), 03590 (+77), 03254 (+72) |
+| Primary care / family doctor | 30 | 40,088.601 | 4.30 | 0.65 | 92 of 246 | 03576 (-36), 03860 (-35), 03801 (-30) | 03812 (+68), 03224 (+58), 03234 (+58) |
+| Pediatrics (children) | 30 | 17,139.4 | 1.11 | 0.69 | 70 of 246 | 03264 (-29), 03801 (-26), 03820 (-25) | 03224 (+45), 03285 (+43), 03234 (+41) |
+| Women's health / OB-GYN | 60 | 5,573.2 | 0.53 | 0.67 | 108 of 246 | 03077 (-41), 03771 (-41), 03740 (-34) | 03057 (+70), 03854 (+53), 03070 (+51) |
+| Mental health & counseling | 30 | 99,672.2 | 7.20 | 0.70 | 106 of 246 | 03820 (-42), 03462 (-32), 03576 (-32) | 03595 (+71), 03812 (+70), 03579 (+67) |
+| Dental | 30 | 18,427.8 | 1.65 | 0.71 | 101 of 246 | 03820 (-36), 03753 (-33), 03462 (-28) | 03781 (+78), 03812 (+70), 03846 (+65) |
+| Eye care | 30 | 5,587 | 0.62 | 0.66 | 96 of 246 | 03576 (-44), 03561 (-36), 03820 (-36) | 03781 (+79), 03812 (+66), 03595 (+64) |
+| Chiropractic | 30 | 4,254.8 | 0.63 | 0.67 | 90 of 246 | 03894 (-37), 03820 (-34), 03753 (-32) | 03781 (+79), 03812 (+60), 03082 (+57) |
+| Physical & occupational therapy | 30 | 32,821.6 | 2.70 | 0.61 | 128 of 246 | 03785 (-35), 03774 (-32), 03740 (-28) | 03812 (+85), 03601 (+66), 03575 (+65) |
+| Orthopedics & sports injury | 60 | 3,899.8 | 0.39 | 0.43 | 150 of 246 | 03293 (-89), 03282 (-80), 03215 (-73) | 03853 (+66), 03816 (+65), 03850 (+61) |
+| Heart / cardiology | 60 | 2,243.4 | 0.24 | 0.70 | 74 of 246 | 03077 (-42), 03079 (-38), 03291 (-34) | 03046 (+73), 03234 (+66), 03258 (+64) |
+| Skin / dermatology | 60 | 1,052.8 | 0.09 | 0.50 | 117 of 246 | 03284 (-100), 03751 (-100), 03753 (-100) | 03854 (+73), 03870 (+59), 03431 (+57) |
+| Allergy & immunology | 60 | 311.2 | 0.03 | 0.66 | 91 of 246 | 03223 (-63), 03264 (-42), 03279 (-41) | 03457 (+74), 03448 (+71), 03215 (+65) |
+| Lung, breathing & sleep | 60 | 1,027 | 0.13 | 0.56 | 92 of 246 | 03771 (-57), 03262 (-40), 03293 (-37) | 03595 (+62), 03226 (+59), 03253 (+52) |
+| Digestive / gastroenterology | 60 | 1,102.8 | 0.11 | 0.70 | 108 of 246 | 03077 (-47), 03079 (-42), 03771 (-39) | 03234 (+68), 03275 (+65), 03450 (+63) |
+| Kidney / nephrology | 60 | 705 | 0.11 | 0.62 | 53 of 246 | 03077 (-24), 03574 (-21), 03561 (-19) | 03854 (+49), 03448 (+37), 03457 (+37) |
+| Diabetes & hormones | 60 | 791.2 | 0.06 | 0.61 | 153 of 246 | 03582 (-60), 03077 (-59), 03079 (-57) | 03867 (+64), 03869 (+61), 03825 (+60) |
+| Cancer care / oncology | 90 | 1,686.8 | 0.15 | 0.50 | 77 of 246 | 03079 (-60), 03076 (-55), 03865 (-53) | 03448 (+86), 03457 (+83), 03445 (+75) |
+| Arthritis / rheumatology | 60 | 417.8 | 0.04 | 0.63 | 152 of 246 | 03447 (-64), 03440 (-62), 03464 (-62) | 03595 (+73), 03221 (+65), 03585 (+65) |
+| Brain & nerves / neurology | 60 | 2,243.8 | 0.22 | 0.60 | 95 of 246 | 03865 (-38), 03079 (-36), 03087 (-33) | 03854 (+63), 03781 (+54), 03770 (+48) |
+| Ear, nose & throat | 60 | 595.8 | 0.07 | 0.67 | 124 of 246 | 03771 (-69), 03740 (-58), 03584 (-46) | 03234 (+66), 03457 (+65), 03229 (+63) |
+| Urology | 60 | 686.2 | 0.07 | 0.61 | 122 of 246 | 03771 (-63), 03609 (-60), 03608 (-54) | 03601 (+73), 03450 (+69), 03595 (+68) |
+| Foot & ankle / podiatry | 60 | 1,044.2 | 0.15 | 0.60 | 110 of 246 | 03580 (-46), 03586 (-40), 03077 (-35) | 03870 (+67), 03854 (+65), 03285 (+58) |
+| Pain management | 60 | 485 | 0.09 | 0.55 | 133 of 246 | 03042 (-45), 03077 (-45), 03276 (-38) | 03285 (+74), 03266 (+71), 03817 (+70) |
+| Plastic & reconstructive surgery | 90 | 478.8 | 0.07 | 0.65 | 70 of 246 | 03087 (-37), 03865 (-37), 03051 (-34) | 03870 (+67), 03854 (+65), 03871 (+60) |
+| Speech & language therapy | 30 | 7,572.6 | 0.90 | 0.77 | 86 of 246 | 03458 (-34), 03820 (-33), 03801 (-28) | 03812 (+61), 03235 (+57), 03810 (+52) |
+| Nutrition & dietitian | 30 | 4,093.4 | 0.33 | 0.69 | 113 of 246 | 03278 (-61), 03781 (-38), 03264 (-36) | 03592 (+100), 03590 (+96), 03238 (+82) |
+| Acupuncture, massage & naturopathy | 30 | 4,715.8 | 0.52 | 0.71 | 90 of 246 | 03462 (-49), 03820 (-49), 03814 (-39) | 03082 (+94), 03812 (+86), 03781 (+70) |
+| Urgent care & emergency | 30 | 4,020 | 0.47 | 0.66 | 103 of 246 | 03771 (-44), 03814 (-40), 03801 (-38) | 03238 (+100), 03812 (+100), 03590 (+89) |
+| Imaging & lab | 60 | 4,260.8 | 0.49 | 0.66 | 75 of 246 | 03771 (-29), 03609 (-28), 03077 (-27) | 03234 (+40), 03812 (+40), 03854 (+39) |
+| Pharmacy | 30 | 13,239.8 | 1.72 | 0.62 | 93 of 246 | 03576 (-35), 03785 (-33), 03561 (-30) | 03812 (+62), 03595 (+57), 03781 (+56) |
+| Home health & in-home care | 30 | 5,853.2 | 1.61 | 0.73 | 8 of 246 | 03576 (-17), 03820 (-11), 03864 (-11) | 03579 (+22), 03590 (+20), 03850 (+19) |
+| Nursing & assisted living | 60 | 2,687 | 0.39 | 0.43 | 101 of 246 | 03771 (-53), 03753 (-47), 03740 (-35) | 03450 (+63), 03458 (+60), 03444 (+59) |
+| Medical equipment & supplies | 60 | 1,914.6 | 0.36 | 0.61 | 109 of 246 | 03890 (-35), 03771 (-34), 03740 (-31) | 03812 (+49), 03258 (+45), 03846 (+44) |
+| Hearing & audiology | 60 | 1,658.8 | 0.19 | 0.56 | 142 of 246 | 03771 (-58), 03584 (-52), 03293 (-51) | 03853 (+71), 03266 (+70), 03229 (+64) |
+| Behavior therapy (ABA) | 30 | 18,965.4 | 2.88 | 0.86 | 21 of 246 | 03820 (-29), 03874 (-18), 03801 (-15) | 03470 (+29), 03055 (+24), 03441 (+24) |
+| Care coordination & community health | 30 | 13,719.6 | 1.63 | 0.74 | 76 of 246 | 03609 (-70), 03276 (-68), 03106 (-58) | 03812 (+100), 03601 (+99), 03846 (+96) |
+| General surgery | 60 | 2,863 | 0.35 | 0.52 | 112 of 246 | 03077 (-45), 03771 (-45), 03890 (-40) | 03854 (+66), 03234 (+56), 03857 (+53) |
+| Infectious disease | 90 | 575.6 | 0.05 | 0.59 | 76 of 246 | 03079 (-62), 03038 (-60), 03826 (-60) | 03057 (+77), 03448 (+76), 03457 (+72) |
+| Genetics & genetic counseling | 90 | 442 | 0.03 | 0.49 | 107 of 246 | 03079 (-100), 03865 (-100), 03874 (-100) | 03812 (+89), 03818 (+81), 03832 (+79) |
+| Hospice & palliative care | 60 | 449.8 | 0.09 | 0.59 | 145 of 246 | 03575 (-61), 03077 (-44), 03890 (-43) | 03590 (+70), 03254 (+67), 03216 (+65) |
 
 In the last two columns a negative change means E2SFCA finds **better** access than the crude ratio (a lower access factor), a positive one **worse**.
+
+## People without a car
+
+The stored figure (`e2sfca` above) splits each ZIP's adults by the share of households with no vehicle (ACS B25044) and routes that group on foot (OSRM foot profile on OpenStreetMap paths), with the same catchment edge in minutes as by car; both groups compete for the same clinicians (Mao & Nekorchuk 2013, multi-mode E2SFCA). Walking inside a ZIP is half the walk to its nearest neighbour, 5 to 20 minutes. Households are applied to adults (no ACS table gives vehicles per adult at ZIP level).
+
+- Adults in New Hampshire in households with no vehicle: about 51,489 of 1,120,742 (4.6%)
+- Focus ZIPs with no Census vehicle figure (scored as if every household has a car): 1
+- Sensitivity check: the same split with the no-car group at 2.5x the drive time instead of walking (a stand-in for transit, rides and waiting; an assumption, not a published figure). It is not stored.
+
+| Specialty | Rank agreement with car-only | ZIPs moved 15+ vs car-only | Most worsened by the no-car split | Rank agreement, walking vs slowdown |
+|---|---|---|---|---|
+| Primary care / family doctor | 1.00 | 1 of 246 | 03101 (+18), 03238 (+8), 03774 (+6) | 1.00 |
+| Pediatrics (children) | 1.00 | 1 of 246 | 03101 (+15), 03217 (+4), 03774 (+4) | 1.00 |
+| Women's health / OB-GYN | 0.99 | 0 of 246 | 03101 (+10), 03583 (+5), 03817 (+5) | 1.00 |
+| Mental health & counseling | 1.00 | 1 of 246 | 03101 (+18), 03817 (+7), 03238 (+4) | 1.00 |
+| Dental | 1.00 | 1 of 246 | 03101 (+20), 03818 (+5), 03869 (+5) | 1.00 |
+| Eye care | 1.00 | 1 of 246 | 03101 (+16), 03583 (+4), 03755 (+4) | 1.00 |
+| Chiropractic | 1.00 | 0 of 246 | 03101 (+14), 03755 (+4), 03817 (+4) | 1.00 |
+| Physical & occupational therapy | 1.00 | 0 of 246 | 03101 (+13), 03817 (+7), 03583 (+6) | 1.00 |
+| Orthopedics & sports injury | 0.99 | 1 of 246 | 03238 (+26), 03101 (+10), 03817 (+8) | 1.00 |
+| Heart / cardiology | 1.00 | 0 of 246 | 03101 (+6), 03869 (+2), 03060 (+1) | 1.00 |
+| Skin / dermatology | 1.00 | 0 of 246 | 03101 (+6), 03601 (+3), 03743 (+2) | 1.00 |
+| Allergy & immunology | 1.00 | 1 of 246 | 03238 (+16), 03264 (+4), 03101 (+3) | 1.00 |
+| Lung, breathing & sleep | 1.00 | 0 of 246 | 03238 (+8), 03101 (+6), 03785 (+5) | 1.00 |
+| Digestive / gastroenterology | 1.00 | 0 of 246 | 03101 (+8), 03238 (+5), 03774 (+3) | 1.00 |
+| Kidney / nephrology | 0.99 | 0 of 246 | 03101 (+4), 03583 (+2), 03817 (+2) | 1.00 |
+| Diabetes & hormones | 1.00 | 0 of 246 | 03101 (+9), 03817 (+7), 03818 (+5) | 1.00 |
+| Cancer care / oncology | 0.99 | 0 of 246 | 03101 (+8), 03238 (+4), 03060 (+2) | 1.00 |
+| Arthritis / rheumatology | 1.00 | 0 of 246 | 03101 (+9), 03602 (+3), 03217 (+2) | 1.00 |
+| Brain & nerves / neurology | 1.00 | 0 of 246 | 03101 (+5), 03583 (+3), 03755 (+2) | 1.00 |
+| Ear, nose & throat | 1.00 | 0 of 246 | 03101 (+6), 03583 (+4), 03774 (+4) | 1.00 |
+| Urology | 0.99 | 0 of 246 | 03238 (+7), 03101 (+6), 03774 (+6) | 1.00 |
+| Foot & ankle / podiatry | 0.99 | 0 of 246 | 03583 (+7), 03101 (+6), 03238 (+5) | 1.00 |
+| Pain management | 1.00 | 0 of 246 | 03238 (+6), 03817 (+6), 03101 (+5) | 1.00 |
+| Plastic & reconstructive surgery | 0.99 | 0 of 246 | 03101 (+5), 03238 (+3), 03869 (+2) | 1.00 |
+| Speech & language therapy | 1.00 | 1 of 246 | 03101 (+19), 03817 (+7), 03869 (+6) | 1.00 |
+| Nutrition & dietitian | 1.00 | 0 of 246 | 03869 (+6), 03784 (+5), 03583 (+4) | 1.00 |
+| Acupuncture, massage & naturopathy | 1.00 | 1 of 246 | 03101 (+15), 03817 (+7), 03601 (+5) | 1.00 |
+| Urgent care & emergency | 1.00 | 1 of 246 | 03101 (+15), 03583 (+7), 03598 (+4) | 1.00 |
+| Imaging & lab | 1.00 | 0 of 246 | 03101 (+6), 03238 (+5), 03583 (+5) | 1.00 |
+| Pharmacy | 1.00 | 1 of 246 | 03101 (+16), 03238 (+7), 03774 (+7) | 1.00 |
+| Home health & in-home care | 1.00 | 0 of 246 | 03101 (+6), 03060 (+1), 03084 (+1) | 1.00 |
+| Nursing & assisted living | 0.99 | 0 of 246 | 03238 (+9), 03101 (+7), 03817 (+6) | 1.00 |
+| Medical equipment & supplies | 0.99 | 0 of 246 | 03101 (+9), 03817 (+7), 03886 (+4) | 1.00 |
+| Hearing & audiology | 0.99 | 0 of 246 | 03101 (+9), 03238 (+7), 03817 (+6) | 1.00 |
+| Behavior therapy (ABA) | 1.00 | 0 of 246 | 03101 (+9), 03060 (+3), 03818 (+2) | 1.00 |
+| Care coordination & community health | 1.00 | 1 of 246 | 03101 (+16), 03817 (+14), 03597 (+4) | 1.00 |
+| General surgery | 0.99 | 0 of 246 | 03238 (+8), 03101 (+7), 03817 (+6) | 1.00 |
+| Infectious disease | 1.00 | 0 of 246 | 03101 (+8), 03060 (+2), 03869 (+2) | 1.00 |
+| Genetics & genetic counseling | 1.00 | 0 of 246 | 03101 (+10), 03238 (+4), 03060 (+2) | 1.00 |
+| Hospice & palliative care | 1.00 | 0 of 246 | 03583 (+8), 03101 (+7), 03817 (+6) | 1.00 |
+
+A positive change is worse access once people without a car are counted. Rank agreement near 1 between walking and the slowdown means the conclusion does not hinge on which no-car assumption is used.
+
+## Travel burden against CMS Medicare Advantage limits
+
+Drive minutes from each ZIP centre to the nearest practice location (the middle of each ZIP's pinned listings in the specialty, the 8 nearest by straight line routed on roads), against the maximum minutes CMS sets for Medicare Advantage networks (2026 HSD Reference File) in the ZIP's main county. The CMS limit applies to a plan's network; here it is read against every listing, so a ZIP over the limit has no clinician of that kind within the limit at all. Specialty pairs are in `supabase/reference/network-adequacy/specialty-map.csv` (reviewable). Not scored.
+
+- Counties not matched by name to the HSD file: 0
+
+| Specialty | CMS code | ZIPs over the limit | Adults in them | Large Metro | Metro | Micro | Rural | CEAC |
+|---|---|---|---|---|---|---|---|---|
+| Primary care / family doctor | S03 | 18 of 245 | 26,453 (2.4%) |  | 17/151 | 0/79 | 1/15 |  |
+| Women's health / OB-GYN | 016 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| Mental health & counseling: Psychiatry | 029 | 3 of 245 | 3,802 (0.3%) |  | 0/151 | 0/79 | 3/15 |  |
+| Mental health & counseling: Clinical Psychology | 036 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| Mental health & counseling: Clinical Social Work | 037 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| Eye care | 023 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| Chiropractic | 010 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| Physical & occupational therapy | F049 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| Orthopedics & sports injury | 025 | 1 of 245 | 3,004 (0.3%) |  | 1/151 | 0/79 | 0/15 |  |
+| Heart / cardiology | 008 | 39 of 245 | 73,242 (6.5%) |  | 24/151 | 10/79 | 5/15 |  |
+| Skin / dermatology | 011 | 11 of 245 | 10,219 (0.9%) |  | 3/151 | 4/79 | 4/15 |  |
+| Allergy & immunology | 007 | 12 of 245 | 15,342 (1.4%) |  | 9/151 | 2/79 | 1/15 |  |
+| Lung, breathing & sleep | 030 | 7 of 245 | 9,040 (0.8%) |  | 4/151 | 0/79 | 3/15 |  |
+| Digestive / gastroenterology | 014 | 10 of 245 | 15,230 (1.4%) |  | 5/151 | 0/79 | 5/15 |  |
+| Kidney / nephrology | 018 | 3 of 245 | 3,358 (0.3%) |  | 3/151 | 0/79 | 0/15 |  |
+| Diabetes & hormones | 012 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| Cancer care / oncology | 021 | 6 of 245 | 5,242 (0.5%) |  | 5/151 | 0/79 | 1/15 |  |
+| Arthritis / rheumatology | 031 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| Brain & nerves / neurology | 019 | 5 of 245 | 5,631 (0.5%) |  | 0/151 | 2/79 | 3/15 |  |
+| Ear, nose & throat | 013 | 10 of 245 | 13,769 (1.2%) |  | 9/151 | 0/79 | 1/15 |  |
+| Urology | 033 | 16 of 245 | 15,605 (1.4%) |  | 3/151 | 8/79 | 5/15 |  |
+| Foot & ankle / podiatry | 028 | 1 of 245 | 994 (0.1%) |  | 0/151 | 0/79 | 1/15 |  |
+| Plastic & reconstructive surgery | 027 | 2 of 245 | 1,960 (0.2%) |  | 1/151 | 0/79 | 1/15 |  |
+| Speech & language therapy | F051 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| Imaging & lab | F047 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| Nursing & assisted living | F046 | 0 of 245 | 0 (0.0%) |  | 0/151 | 0/79 | 0/15 |  |
+| General surgery | 015 | 11 of 245 | 36,725 (3.3%) |  | 10/151 | 0/79 | 1/15 |  |
+| Infectious disease | 017 | 10 of 245 | 11,320 (1.0%) |  | 1/151 | 5/79 | 4/15 |  |
+
+Designation cells are ZIPs over the limit out of ZIPs of that county type.
 
 ## Reading this
 
@@ -89,6 +181,6 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
 
-## Applied 2026-11-19
+## Applied 2026-11-24
 
-- 9760 rows (ZIP x specialty) stored in access_e2sfca for NH; market-score now uses drive-time access for these ZIPs.
+- 9840 rows (ZIP x specialty) stored in access_e2sfca for NH; market-score now uses drive-time access for these ZIPs.
