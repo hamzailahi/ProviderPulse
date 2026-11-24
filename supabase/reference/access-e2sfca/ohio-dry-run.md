@@ -1,49 +1,32 @@
 # E2SFCA access dry run: Ohio
 
-Run 2026-11-19 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-24 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
 ## Inputs
 
-- ZIP areas in the region (focus plus a border strip of about 60 miles): 3,307; in Ohio: 1,204
-- Drive times: OSRM on OpenStreetMap roads (car profile), 3,307 x 3,307 ZIP centre pairs; travel inside a ZIP is half the drive to its nearest neighbour, 2 to 10 minutes
+- ZIP areas in the region (focus plus a border strip of about 60 miles): 3,353; in Ohio: 1,221
+- Drive times: OSRM on OpenStreetMap roads (car profile), 3,353 x 3,353 ZIP centre pairs; travel inside a ZIP is half the drive to its nearest neighbour, 2 to 10 minutes
 - Focus ZIPs with no road link to any other ZIP (islands, unrouted centres): 0
-- Listings read: 939,631; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
+- Listings read: 890,100.001; outside the region's ZIP list (no centre, or a mistyped ZIP): 0
 - Catchment edges: 30 minutes for everyday care, 60 for most specialties, 90 for oncology, genetics, infectious disease and plastic surgery (reviewable assumptions, listed per row below)
 
 ## Routing sanity check
 
-Regional median: 3.13 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (7.83), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
+Regional median: 2.90 drive minutes per straight-line mile to a ZIP's 12 nearest ZIPs. A ZIP is flagged above 2.5x that (7.26), or when fewer than half of its neighbours are reachable, then re-anchored to the best-connected road point within about 2.5 km and routed again.
 
-- Flagged: 24; re-anchored: 18; still implausible (left out of the rank comparison, still stored, marked in the CSV): 5 (25008, 25047, 25149, 25173, 25204)
+- Flagged: 7; re-anchored: 7; still implausible (left out of the rank comparison, still stored, marked in the CSV): 0
 
 | ZIP | In focus state | Minutes per mile before | Reachable before | After | Reachable after | Re-anchored (miles moved) |
 |---|---|---|---|---|---|---|
-| 15325 | no | 8.02 | 100% | 4.29 | 100% | yes (1.70) |
-| 15450 | no | 9.55 | 100% | 4.03 | 100% | yes (0.80) |
-| 15466 | no | 10.02 | 100% | 3.64 | 100% | yes (0.82) |
-| 24823 | no | 9.96 | 100% | 5.79 | 100% | yes (2.29) |
-| 24870 | no | 7.98 | 100% | 5.09 | 100% | yes (1.65) |
-| 25008 | no | 8.06 | 100% | 8.06 | 100% | no |
-| 25021 | no | 8.27 | 100% | 5.76 | 100% | no |
-| 25022 | no | 8.51 | 100% | 4.75 | 100% | yes (1.65) |
-| 25047 | no | 9.17 | 100% | 10.75 | 100% | no |
-| 25057 | no | 9.25 | 100% | 3.73 | 100% | yes (1.36) |
-| 25114 | no | 8.85 | 100% | 4.62 | 100% | yes (1.92) |
-| 25148 | no | 9.80 | 100% | 6.58 | 100% | yes (2.00) |
-| 25149 | no | 8.44 | 100% | 8.44 | 100% | no |
-| 25152 | no | 9.20 | 100% | 5.75 | 100% | yes (1.99) |
-| 25173 | no | 7.94 | 100% | 7.94 | 100% | no |
-| 25183 | no | 8.92 | 100% | 5.44 | 100% | yes (1.43) |
-| 25204 | no | 8.07 | 100% | 7.85 | 100% | no |
-| 25628 | no | 9.83 | 100% | 3.87 | 100% | yes (0.80) |
-| 25646 | no | 8.92 | 100% | 5.34 | 100% | yes (1.70) |
-| 25864 | no | 11.19 | 100% | 3.54 | 100% | yes (1.99) |
-| 26259 | no | 8.15 | 100% | 3.22 | 100% | yes (1.60) |
-| 26261 | no | 9.60 | 100% | 3.76 | 100% | yes (1.49) |
-| 41250 | no | 9.11 | 100% | 5.42 | 100% | yes (1.44) |
-| 47104 | no | 7.94 | 100% | 4.99 | 100% | yes (1.57) |
+| 15450 | no | 9.77 | 100% | 3.94 | 100% | yes (0.53) |
+| 15466 | no | 9.48 | 100% | 3.17 | 100% | yes (0.74) |
+| 24823 | no | 8.92 | 100% | 4.73 | 100% | yes (1.45) |
+| 24846 | no | 7.39 | 100% | 5.49 | 100% | yes (1.88) |
+| 25848 | no | 7.88 | 100% | 3.94 | 100% | yes (1.55) |
+| 25864 | no | 8.64 | 100% | 3.08 | 100% | yes (1.46) |
+| 26690 | no | 7.54 | 100% | 3.25 | 100% | yes (1.53) |
 
 ## By specialty
 
@@ -51,48 +34,140 @@ Rank agreement is Spearman's rho between the two access factors across the state
 
 | Specialty | Catchment (min) | Listings in region | US rate per 1k | Rank agreement | ZIPs moved 15+ | Most improved access (new minus old) | Most worsened |
 |---|---|---|---|---|---|---|---|
-| Primary care / family doctor | 30 | 109,778 | 4.78 | 0.71 | 402 of 1204 | 43438 (-44), 43740 (-43), 43721 (-37) | 45789 (+95), 45619 (+86), 45788 (+82) |
-| Pediatrics (children) | 30 | 24,680 | 1.13 | 0.80 | 310 of 1204 | 45041 (-63), 45247 (-60), 45147 (-53) | 44216 (+79), 44260 (+78), 45051 (+67) |
-| Women's health / OB-GYN | 60 | 11,454 | 0.55 | 0.66 | 447 of 1204 | 43413 (-49), 45005 (-47), 43008 (-45) | 43511 (+74), 43524 (+73), 43516 (+70) |
-| Mental health & counseling | 30 | 174,153 | 7.13 | 0.77 | 432 of 1204 | 44214 (-60), 44606 (-60), 43934 (-52) | 45681 (+95), 45778 (+91), 45766 (+90) |
-| Dental | 30 | 32,130 | 1.64 | 0.71 | 298 of 1204 | 43934 (-37), 45771 (-36), 45779 (-32) | 44072 (+62), 45644 (+54), 45789 (+53) |
-| Eye care | 30 | 17,487 | 0.65 | 0.61 | 577 of 1204 | 43756 (-59), 45893 (-57), 43056 (-48) | 45644 (+95), 43977 (+93), 43727 (+83) |
-| Chiropractic | 30 | 13,017 | 0.64 | 0.63 | 421 of 1204 | 45876 (-48), 43759 (-44), 45820 (-40) | 44454 (+64), 44822 (+62), 45729 (+59) |
-| Physical & occupational therapy | 30 | 64,177 | 2.73 | 0.72 | 393 of 1204 | 44301 (-60), 44304 (-53), 44308 (-52) | 45789 (+74), 45710 (+73), 44818 (+64) |
-| Orthopedics & sports injury | 60 | 10,691 | 0.42 | 0.58 | 551 of 1204 | 45772 (-92), 45783 (-92), 45723 (-85) | 45789 (+76), 44634 (+75), 43153 (+74) |
-| Heart / cardiology | 60 | 6,344 | 0.28 | 0.67 | 639 of 1204 | 45050 (-65), 43008 (-62), 45636 (-61) | 43932 (+70), 44626 (+70), 45789 (+69) |
-| Skin / dermatology | 60 | 1,977 | 0.10 | 0.74 | 453 of 1204 | 43018 (-49), 45041 (-49), 45723 (-47) | 43443 (+70), 43446 (+69), 43502 (+66) |
-| Allergy & immunology | 60 | 762 | 0.03 | 0.71 | 515 of 1204 | 45065 (-84), 45036 (-78), 45030 (-67) | 45789 (+79), 45166 (+73), 43407 (+72) |
-| Lung, breathing & sleep | 60 | 2,953 | 0.14 | 0.73 | 570 of 1204 | 43137 (-61), 43018 (-57), 43033 (-55) | 45830 (+66), 45789 (+62), 45681 (+59) |
-| Digestive / gastroenterology | 60 | 2,684 | 0.13 | 0.77 | 488 of 1204 | 43137 (-67), 43008 (-61), 43001 (-58) | 45068 (+66), 44216 (+62), 44666 (+59) |
-| Kidney / nephrology | 60 | 2,669 | 0.12 | 0.66 | 636 of 1204 | 43008 (-66), 45810 (-66), 43018 (-61) | 43446 (+69), 43910 (+69), 44626 (+69) |
-| Diabetes & hormones | 60 | 1,340 | 0.07 | 0.71 | 587 of 1204 | 45723 (-71), 45783 (-69), 43137 (-67) | 45893 (+70), 45850 (+68), 43446 (+66) |
-| Cancer care / oncology | 90 | 3,726 | 0.18 | 0.51 | 761 of 1204 | 43137 (-74), 43147 (-74), 43018 (-73) | 43446 (+74), 43456 (+72), 43540 (+70) |
-| Arthritis / rheumatology | 60 | 870 | 0.04 | 0.74 | 522 of 1204 | 45041 (-77), 43018 (-74), 43033 (-71) | 45688 (+100), 45841 (+74), 45877 (+69) |
-| Brain & nerves / neurology | 60 | 4,877 | 0.24 | 0.73 | 456 of 1204 | 45005 (-68), 43137 (-60), 45041 (-60) | 45850 (+69), 45896 (+60), 45854 (+55) |
-| Ear, nose & throat | 60 | 1,647 | 0.08 | 0.61 | 708 of 1204 | 43018 (-72), 43137 (-66), 43113 (-63) | 44681 (+79), 43360 (+76), 43318 (+75) |
-| Urology | 60 | 1,755 | 0.08 | 0.61 | 665 of 1204 | 45636 (-94), 43137 (-68), 45810 (-67) | 43446 (+75), 43977 (+71), 43456 (+70) |
-| Foot & ankle / podiatry | 60 | 4,410 | 0.16 | 0.68 | 599 of 1204 | 44412 (-83), 44076 (-71), 44429 (-71) | 45332 (+73), 43360 (+72), 45390 (+71) |
-| Pain management | 60 | 1,766 | 0.09 | 0.60 | 511 of 1204 | 45636 (-67), 45723 (-67), 45764 (-66) | 43044 (+76), 43961 (+71), 45068 (+71) |
-| Plastic & reconstructive surgery | 90 | 1,350 | 0.07 | 0.64 | 650 of 1204 | 43142 (-55), 43018 (-53), 43151 (-53) | 43504 (+74), 44408 (+72), 44454 (+70) |
-| Speech & language therapy | 30 | 17,718 | 0.87 | 0.68 | 439 of 1204 | 44301 (-55), 44304 (-41), 44308 (-39) | 45784 (+82), 45739 (+76), 45332 (+72) |
-| Nutrition & dietitian | 30 | 6,443 | 0.32 | 0.77 | 372 of 1204 | 45631 (-42), 45775 (-42), 43934 (-38) | 45681 (+82), 45644 (+80), 45647 (+69) |
-| Acupuncture, massage & naturopathy | 30 | 5,970 | 0.50 | 0.76 | 199 of 1204 | 45714 (-37), 45773 (-31), 45820 (-31) | 45669 (+74), 45619 (+63), 43105 (+61) |
-| Urgent care & emergency | 30 | 12,196 | 0.50 | 0.71 | 458 of 1204 | 44621 (-58), 43137 (-37), 45424 (-35) | 45729 (+100), 45746 (+100), 45768 (+100) |
-| Imaging & lab | 60 | 11,000 | 0.55 | 0.69 | 523 of 1204 | 43018 (-54), 43137 (-54), 45636 (-54) | 44626 (+70), 45663 (+57), 45244 (+52) |
-| Pharmacy | 30 | 40,605 | 1.68 | 0.69 | 483 of 1204 | 43934 (-45), 43740 (-44), 43721 (-42) | 45681 (+85), 45896 (+75), 43727 (+72) |
-| Home health & in-home care | 30 | 94,984 | 1.49 | 0.61 | 335 of 1204 | 45883 (-38), 44653 (-33), 44093 (-28) | 43446 (+88), 43456 (+88), 45894 (+83) |
-| Nursing & assisted living | 60 | 10,807 | 0.37 | 0.50 | 545 of 1204 | 43717 (-81), 45727 (-73), 43001 (-69) | 43446 (+87), 43456 (+78), 43438 (+68) |
-| Medical equipment & supplies | 60 | 7,419 | 0.34 | 0.68 | 435 of 1204 | 44412 (-52), 44429 (-48), 43413 (-47) | 43446 (+74), 43456 (+68), 43407 (+64) |
-| Hearing & audiology | 60 | 4,661 | 0.20 | 0.61 | 640 of 1204 | 45723 (-77), 44254 (-65), 44214 (-64) | 43977 (+69), 43446 (+64), 45068 (+64) |
-| Behavior therapy (ABA) | 30 | 79,191 | 2.58 | 0.84 | 112 of 1204 | 43934 (-41), 45405 (-39), 43909 (-37) | 43977 (+100), 45068 (+96), 44822 (+95) |
-| Care coordination & community health | 30 | 85,545 | 1.55 | 0.67 | 439 of 1204 | 44214 (-92), 44217 (-91), 44633 (-91) | 43332 (+100), 43438 (+100), 43446 (+100) |
-| General surgery | 60 | 8,143 | 0.39 | 0.63 | 596 of 1204 | 45884 (-61), 45895 (-61), 45810 (-60) | 45663 (+60), 45789 (+56), 44403 (+54) |
-| Infectious disease | 90 | 1,140 | 0.06 | 0.57 | 782 of 1204 | 44056 (-61), 44141 (-61), 44241 (-59) | 45830 (+86), 43718 (+85), 43977 (+85) |
-| Genetics & genetic counseling | 90 | 786 | 0.03 | 0.55 | 650 of 1204 | 43116 (-100), 43126 (-100), 43137 (-100) | 44807 (+74), 44439 (+72), 44062 (+70) |
-| Hospice & palliative care | 60 | 1,440 | 0.09 | 0.60 | 584 of 1204 | 43008 (-57), 43137 (-56), 43116 (-50) | 43977 (+71), 45734 (+70), 45767 (+69) |
+| Primary care / family doctor | 30 | 94,017.601 | 4.30 | 0.75 | 329 of 1221 | 43438 (-57), 43740 (-52), 43721 (-45) | 45788 (+68), 45678 (+60), 45681 (+59) |
+| Pediatrics (children) | 30 | 22,928.2 | 1.11 | 0.83 | 263 of 1221 | 45041 (-64), 45147 (-51), 45249 (-46) | 45051 (+64), 45233 (+58), 45341 (+58) |
+| Women's health / OB-GYN | 60 | 10,241 | 0.53 | 0.64 | 440 of 1221 | 43522 (-40), 44136 (-40), 45005 (-39) | 43511 (+72), 43516 (+70), 43524 (+69) |
+| Mental health & counseling | 30 | 165,591.4 | 7.20 | 0.80 | 356 of 1221 | 44214 (-76), 44217 (-53), 45764 (-48) | 45646 (+92), 45778 (+84), 45699 (+83) |
+| Dental | 30 | 31,510.6 | 1.65 | 0.75 | 231 of 1221 | 43740 (-44), 43319 (-30), 45267 (-28) | 44072 (+52), 45644 (+51), 45788 (+45) |
+| Eye care | 30 | 16,344.6 | 0.62 | 0.61 | 497 of 1221 | 43740 (-76), 43319 (-63), 43336 (-46) | 45644 (+87), 43967 (+80), 43446 (+79) |
+| Chiropractic | 30 | 12,707 | 0.63 | 0.65 | 347 of 1221 | 45814 (-45), 43319 (-42), 43740 (-38) | 45815 (+65), 45831 (+64), 43805 (+62) |
+| Physical & occupational therapy | 30 | 61,609.6 | 2.70 | 0.74 | 319 of 1221 | 44301 (-51), 44306 (-48), 44310 (-44) | 45831 (+65), 45815 (+59), 45778 (+56) |
+| Orthopedics & sports injury | 60 | 9,746.4 | 0.39 | 0.55 | 604 of 1221 | 45723 (-84), 45720 (-80), 45769 (-80) | 44634 (+71), 45696 (+70), 43153 (+68) |
+| Heart / cardiology | 60 | 5,256.6 | 0.24 | 0.63 | 686 of 1221 | 43008 (-62), 43018 (-58), 43046 (-55) | 43791 (+71), 43910 (+69), 43446 (+67) |
+| Skin / dermatology | 60 | 1,709.2 | 0.09 | 0.75 | 436 of 1221 | 45041 (-54), 43018 (-47), 45252 (-41) | 43443 (+70), 43446 (+64), 43456 (+62) |
+| Allergy & immunology | 60 | 674.6 | 0.03 | 0.70 | 584 of 1221 | 45065 (-83), 45036 (-73), 45030 (-69) | 43407 (+77), 43925 (+62), 45858 (+61) |
+| Lung, breathing & sleep | 60 | 2,538.2 | 0.13 | 0.72 | 599 of 1221 | 43018 (-52), 43137 (-51), 44067 (-50) | 45850 (+65), 45854 (+65), 45893 (+64) |
+| Digestive / gastroenterology | 60 | 2,230.2 | 0.11 | 0.74 | 598 of 1221 | 43103 (-61), 45041 (-56), 43137 (-55) | 45370 (+63), 44666 (+57), 43504 (+50) |
+| Kidney / nephrology | 60 | 2,392.6 | 0.11 | 0.61 | 683 of 1221 | 45817 (-65), 45897 (-61), 45810 (-60) | 43910 (+76), 43446 (+72), 43456 (+72) |
+| Diabetes & hormones | 60 | 1,143.4 | 0.06 | 0.69 | 633 of 1221 | 45723 (-69), 45720 (-59), 44286 (-56) | 43446 (+68), 43456 (+68), 45850 (+67) |
+| Cancer care / oncology | 90 | 3,103.4 | 0.15 | 0.47 | 794 of 1221 | 43018 (-68), 43147 (-66), 43110 (-65) | 43456 (+81), 43446 (+79), 43440 (+73) |
+| Arthritis / rheumatology | 60 | 743.8 | 0.04 | 0.71 | 619 of 1221 | 45041 (-79), 43018 (-71), 45636 (-64) | 45830 (+65), 45877 (+65), 43084 (+64) |
+| Brain & nerves / neurology | 60 | 4,168.4 | 0.22 | 0.71 | 487 of 1221 | 45041 (-60), 45005 (-57), 45252 (-53) | 45896 (+74), 45850 (+73), 45854 (+69) |
+| Ear, nose & throat | 60 | 1,412.8 | 0.07 | 0.59 | 795 of 1221 | 43018 (-69), 43103 (-69), 45036 (-59) | 44681 (+84), 43347 (+80), 43318 (+76) |
+| Urology | 60 | 1,474.4 | 0.07 | 0.60 | 698 of 1221 | 45636 (-83), 45817 (-64), 43018 (-63) | 43446 (+82), 43456 (+82), 43438 (+72) |
+| Foot & ankle / podiatry | 60 | 3,983.2 | 0.15 | 0.67 | 595 of 1221 | 44412 (-77), 44429 (-74), 44085 (-70) | 43438 (+79), 43967 (+78), 43446 (+76) |
+| Pain management | 60 | 1,556.8 | 0.09 | 0.60 | 497 of 1221 | 45636 (-56), 44412 (-48), 43317 (-47) | 43910 (+75), 43446 (+65), 43456 (+65) |
+| Plastic & reconstructive surgery | 90 | 1,219.6 | 0.07 | 0.62 | 663 of 1221 | 43128 (-53), 43142 (-53), 43018 (-51) | 43917 (+83), 43504 (+74), 43971 (+74) |
+| Speech & language therapy | 30 | 17,193 | 0.90 | 0.71 | 352 of 1221 | 43545 (-44), 43740 (-40), 43555 (-37) | 45696 (+85), 45678 (+70), 45332 (+65) |
+| Nutrition & dietitian | 30 | 6,204.8 | 0.33 | 0.80 | 318 of 1221 | 45041 (-42), 44214 (-40), 44659 (-37) | 45681 (+83), 45612 (+80), 45644 (+73) |
+| Acupuncture, massage & naturopathy | 30 | 5,880.6 | 0.52 | 0.79 | 145 of 1221 | 43740 (-29), 43319 (-28), 45808 (-20) | 45729 (+57), 45784 (+50), 45739 (+42) |
+| Urgent care & emergency | 30 | 10,303.8 | 0.47 | 0.73 | 427 of 1221 | 45684 (-67), 45620 (-45), 45897 (-45) | 45768 (+100), 45786 (+100), 45788 (+90) |
+| Imaging & lab | 60 | 9,609.2 | 0.49 | 0.65 | 575 of 1221 | 45720 (-53), 43018 (-52), 45636 (-48) | 45652 (+57), 43910 (+56), 45893 (+55) |
+| Pharmacy | 30 | 40,314.4 | 1.72 | 0.73 | 368 of 1221 | 43740 (-63), 45814 (-41), 43721 (-40) | 45896 (+77), 45681 (+75), 45686 (+74) |
+| Home health & in-home care | 30 | 94,677 | 1.61 | 0.67 | 368 of 1221 | 43740 (-41), 43556 (-35), 45821 (-35) | 43967 (+100), 43983 (+97), 43446 (+81) |
+| Nursing & assisted living | 60 | 10,781.6 | 0.39 | 0.46 | 619 of 1221 | 43717 (-81), 43724 (-79), 44412 (-74) | 43967 (+100), 43446 (+84), 43456 (+72) |
+| Medical equipment & supplies | 60 | 7,412.8 | 0.36 | 0.65 | 427 of 1221 | 44412 (-55), 43469 (-52), 43416 (-47) | 43446 (+70), 43456 (+66), 43438 (+61) |
+| Hearing & audiology | 60 | 4,406.6 | 0.19 | 0.59 | 644 of 1221 | 44214 (-69), 44412 (-66), 44254 (-65) | 43967 (+82), 43446 (+62), 43456 (+62) |
+| Behavior therapy (ABA) | 30 | 78,191.8 | 2.88 | 0.86 | 92 of 1221 | 45321 (-39), 44838 (-30), 45382 (-30) | 43967 (+88), 43977 (+77), 43901 (+74) |
+| Care coordination & community health | 30 | 83,807.4 | 1.63 | 0.73 | 422 of 1221 | 44254 (-93), 44214 (-92), 44633 (-92) | 43456 (+100), 43967 (+100), 45688 (+100) |
+| General surgery | 60 | 6,917 | 0.35 | 0.60 | 632 of 1221 | 45817 (-55), 45884 (-54), 43018 (-51) | 45819 (+53), 45428 (+52), 45896 (+52) |
+| Infectious disease | 90 | 960 | 0.05 | 0.54 | 824 of 1221 | 44067 (-66), 44056 (-63), 44241 (-57) | 43719 (+87), 43977 (+87), 43951 (+86) |
+| Genetics & genetic counseling | 90 | 727 | 0.03 | 0.53 | 663 of 1221 | 45034 (-100), 45050 (-100), 45065 (-98) | 44076 (+86), 44099 (+86), 44439 (+86) |
+| Hospice & palliative care | 60 | 1,360 | 0.09 | 0.58 | 601 of 1221 | 43008 (-47), 43018 (-47), 43116 (-47) | 43967 (+88), 45734 (+80), 43557 (+70) |
 
 In the last two columns a negative change means E2SFCA finds **better** access than the crude ratio (a lower access factor), a positive one **worse**.
+
+## People without a car
+
+The stored figure (`e2sfca` above) splits each ZIP's adults by the share of households with no vehicle (ACS B25044) and routes that group on foot (OSRM foot profile on OpenStreetMap paths), with the same catchment edge in minutes as by car; both groups compete for the same clinicians (Mao & Nekorchuk 2013, multi-mode E2SFCA). Walking inside a ZIP is half the walk to its nearest neighbour, 5 to 20 minutes. Households are applied to adults (no ACS table gives vehicles per adult at ZIP level).
+
+- Adults in Ohio in households with no vehicle: about 676,147 of 9,207,746 (7.3%)
+- Focus ZIPs with no Census vehicle figure (scored as if every household has a car): 16
+- Sensitivity check: the same split with the no-car group at 2.5x the drive time instead of walking (a stand-in for transit, rides and waiting; an assumption, not a published figure). It is not stored.
+
+| Specialty | Rank agreement with car-only | ZIPs moved 15+ vs car-only | Most worsened by the no-car split | Rank agreement, walking vs slowdown |
+|---|---|---|---|---|
+| Primary care / family doctor | 0.99 | 24 of 1221 | 44503 (+53), 43967 (+47), 44702 (+34) | 1.00 |
+| Pediatrics (children) | 0.99 | 16 of 1221 | 44503 (+46), 43967 (+36), 44702 (+30) | 1.00 |
+| Women's health / OB-GYN | 0.98 | 13 of 1221 | 44503 (+31), 44702 (+26), 43967 (+22) | 1.00 |
+| Mental health & counseling | 0.99 | 22 of 1221 | 44503 (+73), 43967 (+46), 44702 (+34) | 1.00 |
+| Dental | 0.99 | 12 of 1221 | 44503 (+39), 43967 (+30), 44702 (+26) | 1.00 |
+| Eye care | 0.98 | 27 of 1221 | 43967 (+64), 44503 (+60), 44702 (+39) | 1.00 |
+| Chiropractic | 0.98 | 13 of 1221 | 44503 (+63), 44660 (+52), 44702 (+40) | 1.00 |
+| Physical & occupational therapy | 0.99 | 17 of 1221 | 44702 (+54), 44503 (+52), 43967 (+44) | 1.00 |
+| Orthopedics & sports injury | 0.98 | 28 of 1221 | 43967 (+43), 44503 (+40), 44702 (+39) | 1.00 |
+| Heart / cardiology | 0.98 | 16 of 1221 | 43967 (+45), 44503 (+29), 44702 (+27) | 1.00 |
+| Skin / dermatology | 0.99 | 11 of 1221 | 44503 (+27), 44114 (+26), 44115 (+25) | 1.00 |
+| Allergy & immunology | 0.99 | 14 of 1221 | 45225 (+30), 44503 (+26), 45203 (+25) | 1.00 |
+| Lung, breathing & sleep | 0.99 | 11 of 1221 | 43967 (+34), 44114 (+29), 44115 (+27) | 1.00 |
+| Digestive / gastroenterology | 0.99 | 14 of 1221 | 43967 (+39), 44503 (+27), 44114 (+25) | 1.00 |
+| Kidney / nephrology | 0.98 | 23 of 1221 | 44503 (+34), 43967 (+31), 44702 (+29) | 1.00 |
+| Diabetes & hormones | 0.99 | 14 of 1221 | 45783 (+28), 44114 (+24), 44702 (+24) | 1.00 |
+| Cancer care / oncology | 0.99 | 11 of 1221 | 44503 (+22), 43967 (+20), 45225 (+19) | 1.00 |
+| Arthritis / rheumatology | 0.99 | 15 of 1221 | 44114 (+29), 44115 (+26), 45225 (+26) | 1.00 |
+| Brain & nerves / neurology | 0.99 | 9 of 1221 | 45225 (+23), 44114 (+22), 44115 (+21) | 1.00 |
+| Ear, nose & throat | 0.98 | 16 of 1221 | 44503 (+45), 43967 (+38), 44702 (+33) | 1.00 |
+| Urology | 0.98 | 15 of 1221 | 43967 (+46), 44503 (+29), 44702 (+25) | 1.00 |
+| Foot & ankle / podiatry | 0.98 | 23 of 1221 | 44503 (+64), 43967 (+56), 44702 (+45) | 1.00 |
+| Pain management | 0.98 | 9 of 1221 | 44503 (+37), 44702 (+27), 43967 (+24) | 1.00 |
+| Plastic & reconstructive surgery | 0.98 | 6 of 1221 | 44503 (+25), 44702 (+21), 44308 (+19) | 1.00 |
+| Speech & language therapy | 0.99 | 22 of 1221 | 44503 (+52), 44702 (+52), 43967 (+36) | 1.00 |
+| Nutrition & dietitian | 0.99 | 22 of 1221 | 44503 (+59), 43967 (+33), 44702 (+32) | 1.00 |
+| Acupuncture, massage & naturopathy | 0.99 | 1 of 1221 | 44503 (+25), 44114 (+14), 44115 (+14) | 1.00 |
+| Urgent care & emergency | 0.99 | 26 of 1221 | 44503 (+54), 43967 (+47), 44702 (+43) | 1.00 |
+| Imaging & lab | 0.99 | 13 of 1221 | 44503 (+34), 43967 (+33), 44114 (+25) | 1.00 |
+| Pharmacy | 0.99 | 23 of 1221 | 44503 (+57), 43967 (+47), 44702 (+36) | 1.00 |
+| Home health & in-home care | 0.97 | 13 of 1221 | 43967 (+100), 43842 (+42), 44503 (+34) | 0.99 |
+| Nursing & assisted living | 0.96 | 30 of 1221 | 43967 (+94), 44503 (+63), 44702 (+58) | 1.00 |
+| Medical equipment & supplies | 0.97 | 17 of 1221 | 44503 (+45), 44702 (+30), 43967 (+25) | 1.00 |
+| Hearing & audiology | 0.97 | 24 of 1221 | 44503 (+49), 43967 (+42), 44702 (+37) | 1.00 |
+| Behavior therapy (ABA) | 0.99 | 3 of 1221 | 43967 (+57), 44503 (+43), 45428 (+15) | 1.00 |
+| Care coordination & community health | 0.99 | 8 of 1221 | 43967 (+100), 43842 (+40), 44503 (+40) | 1.00 |
+| General surgery | 0.98 | 10 of 1221 | 43967 (+53), 44503 (+28), 44114 (+22) | 1.00 |
+| Infectious disease | 0.99 | 6 of 1221 | 44114 (+21), 44115 (+20), 44702 (+20) | 1.00 |
+| Genetics & genetic counseling | 1.00 | 8 of 1221 | 45160 (+24), 45225 (+22), 45428 (+20) | 1.00 |
+| Hospice & palliative care | 0.98 | 13 of 1221 | 43967 (+44), 44702 (+26), 44503 (+25) | 1.00 |
+
+A positive change is worse access once people without a car are counted. Rank agreement near 1 between walking and the slowdown means the conclusion does not hinge on which no-car assumption is used.
+
+## Travel burden against CMS Medicare Advantage limits
+
+Drive minutes from each ZIP centre to the nearest practice location (the middle of each ZIP's pinned listings in the specialty, the 8 nearest by straight line routed on roads), against the maximum minutes CMS sets for Medicare Advantage networks (2026 HSD Reference File) in the ZIP's main county. The CMS limit applies to a plan's network; here it is read against every listing, so a ZIP over the limit has no clinician of that kind within the limit at all. Specialty pairs are in `supabase/reference/network-adequacy/specialty-map.csv` (reviewable). Not scored.
+
+- Counties not matched by name to the HSD file: 0
+
+| Specialty | CMS code | ZIPs over the limit | Adults in them | Large Metro | Metro | Micro | Rural | CEAC |
+|---|---|---|---|---|---|---|---|---|
+| Primary care / family doctor | S03 | 57 of 1221 | 68,428 (0.7%) | 1/149 | 53/672 | 3/335 | 0/65 |  |
+| Women's health / OB-GYN | 016 | 2 of 1221 | 555 (0.0%) | 0/149 | 2/672 | 0/335 | 0/65 |  |
+| Mental health & counseling: Psychiatry | 029 | 5 of 1221 | 16,828 (0.2%) | 1/149 | 3/672 | 1/335 | 0/65 |  |
+| Mental health & counseling: Clinical Psychology | 036 | 1 of 1221 | 240 (0.0%) | 0/149 | 1/672 | 0/335 | 0/65 |  |
+| Mental health & counseling: Clinical Social Work | 037 | 8 of 1221 | 7,493 (0.1%) | 0/149 | 7/672 | 1/335 | 0/65 |  |
+| Eye care | 023 | 14 of 1221 | 13,475 (0.1%) | 0/149 | 13/672 | 1/335 | 0/65 |  |
+| Chiropractic | 010 | 2 of 1221 | 555 (0.0%) | 0/149 | 2/672 | 0/335 | 0/65 |  |
+| Physical & occupational therapy | F049 | 0 of 1221 | 0 (0.0%) | 0/149 | 0/672 | 0/335 | 0/65 |  |
+| Orthopedics & sports injury | 025 | 9 of 1221 | 10,983 (0.1%) | 0/149 | 8/672 | 1/335 | 0/65 |  |
+| Heart / cardiology | 008 | 33 of 1221 | 45,779 (0.5%) | 0/149 | 30/672 | 3/335 | 0/65 |  |
+| Skin / dermatology | 011 | 20 of 1221 | 25,409 (0.3%) | 0/149 | 12/672 | 7/335 | 1/65 |  |
+| Allergy & immunology | 007 | 43 of 1221 | 79,779 (0.9%) | 0/149 | 43/672 | 0/335 | 0/65 |  |
+| Lung, breathing & sleep | 030 | 6 of 1221 | 16,902 (0.2%) | 2/149 | 1/672 | 3/335 | 0/65 |  |
+| Digestive / gastroenterology | 014 | 13 of 1221 | 11,782 (0.1%) | 0/149 | 10/672 | 3/335 | 0/65 |  |
+| Kidney / nephrology | 018 | 2 of 1221 | 555 (0.0%) | 0/149 | 2/672 | 0/335 | 0/65 |  |
+| Diabetes & hormones | 012 | 0 of 1221 | 0 (0.0%) | 0/149 | 0/672 | 0/335 | 0/65 |  |
+| Cancer care / oncology | 021 | 3 of 1221 | 658 (0.0%) | 0/149 | 2/672 | 1/335 | 0/65 |  |
+| Arthritis / rheumatology | 031 | 3 of 1221 | 2,831 (0.0%) | 0/149 | 3/672 | 0/335 | 0/65 |  |
+| Brain & nerves / neurology | 019 | 7 of 1221 | 4,333 (0.0%) | 0/149 | 6/672 | 1/335 | 0/65 |  |
+| Ear, nose & throat | 013 | 3 of 1221 | 842 (0.0%) | 0/149 | 3/672 | 0/335 | 0/65 |  |
+| Urology | 033 | 9 of 1221 | 3,449 (0.0%) | 3/149 | 3/672 | 3/335 | 0/65 |  |
+| Foot & ankle / podiatry | 028 | 3 of 1221 | 705 (0.0%) | 0/149 | 2/672 | 1/335 | 0/65 |  |
+| Plastic & reconstructive surgery | 027 | 1 of 1221 | 240 (0.0%) | 0/149 | 1/672 | 0/335 | 0/65 |  |
+| Speech & language therapy | F051 | 0 of 1221 | 0 (0.0%) | 0/149 | 0/672 | 0/335 | 0/65 |  |
+| Imaging & lab | F047 | 3 of 1221 | 16,438 (0.2%) | 1/149 | 2/672 | 0/335 | 0/65 |  |
+| Nursing & assisted living | F046 | 0 of 1221 | 0 (0.0%) | 0/149 | 0/672 | 0/335 | 0/65 |  |
+| General surgery | 015 | 29 of 1221 | 42,100 (0.5%) | 0/149 | 28/672 | 1/335 | 0/65 |  |
+| Infectious disease | 017 | 3 of 1221 | 10,030 (0.1%) | 0/149 | 3/672 | 0/335 | 0/65 |  |
+
+Designation cells are ZIPs over the limit out of ZIPs of that county type.
 
 ## Reading this
 
@@ -100,6 +175,6 @@ In the last two columns a negative change means E2SFCA finds **better** access t
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
 
-## Applied 2026-11-19
+## Applied 2026-11-24
 
-- 48160 rows (ZIP x specialty) stored in access_e2sfca for OH; market-score now uses drive-time access for these ZIPs.
+- 48840 rows (ZIP x specialty) stored in access_e2sfca for OH; market-score now uses drive-time access for these ZIPs.
