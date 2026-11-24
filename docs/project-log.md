@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 441 changes over 71 working days, 2026-05-13 to 2026-11-24.
-- 2026-08-19 onward: from the README changelog (267 entries, written for a reader).
+- 443 changes over 71 working days, 2026-05-13 to 2026-11-24.
+- 2026-08-19 onward: from the README changelog (269 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 106 |
+| November 2026 | 108 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,9 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-24
+
+- The travel-time check against Medicare Advantage limits now matches every county: Doña Ana, Kusilvak, Oglala Lakota and Connecticut's nine planning regions were unmatched before.
+- The yearly Census import now keeps insurance coverage split by age (under 19, 19 to 64, 65 and over), the first step toward a payer score that follows each specialty's patients.
 
 - Scores now weigh access a little differently, after testing the drive-time access figures against county preventable hospital stays: eye care and hearing count access at half weight, care coordination gains half weight, and rheumatology and hospice no longer carry the "not validated" caveat.
 

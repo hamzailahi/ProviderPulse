@@ -51,7 +51,7 @@ export function num(v) {
 const sum = arr => (arr.some(x => x === null) ? null : arr.reduce((s, x) => s + x, 0));
 
 // `r` maps variable id -> raw value (string or number) for one ZCTA.
-export function toRow(zip, r, year, state, picks, sig, prior) {
+export function toRow(zip, r, year, state, picks, sig, prior, ab) {
   const n = k => num(r[k]);
   const income = Array.from({ length: 16 }, (_, i) => n(`B19001_${pad(i + 2)}E`));
   const male = AGE_GROUPS.map(g => sum(g.map(i => n(`B01001_${pad(i)}E`))));
@@ -79,7 +79,7 @@ export function toRow(zip, r, year, state, picks, sig, prior) {
       associate: edu(21), bachelor: edu(22), graduate: sum([edu(23), edu(24), edu(25)])
     },
     ...insuranceFields(r, picks),
-    signals: signalFields(r, sig),
+    signals: ab ? { ...signalFields(r, sig), cov_age: ageFields(r, ab) } : signalFields(r, sig),
     // Population five years earlier, for growth. ACS releases before 2021 use
     // 2010 ZCTAs, so a few ZIPs changed shape; consumers ignore extreme swings.
     pop_prior: prior && prior.value != null ? prior.value : null,
@@ -207,6 +207,54 @@ export function signalFields(r, sig) {
     if (!s) { out[k] = { n: null, of: null }; continue; }
     const n = sum(s.cells.map(id => num(r[id]))), of = sum(s.universe.map(id => num(r[id])));
     out[k] = n !== null && of !== null && n > of ? { n: null, of } : { n, of };
+  }
+  return out;
+}
+
+// ---- Coverage by age (2026-11-24, per-specialty payer yield) --------------------
+// The coverage tables above are already split by age; the totals just add the
+// ages up. Here the same cells are kept in three bands (under 19, 19 to 64,
+// 65+), so a specialty's payer yield can follow its patients' ages. The band
+// comes from the age written in each cell's label; the universe per band is
+// the uninsured table's age subtotals. Stored as signals.cov_age.
+export const AGE_BANDS = ['u19', 'a19_64', 'a65'];
+export function ageBandOf(label) {
+  const m = String(label).match(/!!(?:Under (\d+) years|(\d+) to \d+ years|(\d+) years and over)/);
+  if (!m) return null;
+  const start = m[1] ? 0 : Number(m[2] ?? m[3]);
+  return start < 19 ? 'u19' : start < 65 ? 'a19_64' : 'a65';
+}
+// labels: every fetched table's labels; picks / sig: the chosen cells.
+// Returns { keys: { key: { band: [ids] } }, universe: { band: [ids] } } or null.
+export function pickAgeBands(labels, picks, sig) {
+  if (!picks || !picks.uninsured || !picks.uninsured.length) return null;
+  const keys = {};
+  const add = (k, ids) => { const o = {}; for (const id of ids || []) { const b = ageBandOf(labels[id]); if (!b) return; (o[b] = o[b] || []).push(id); } if (Object.keys(o).length) keys[k] = o; };
+  add('uninsured', picks.uninsured); add('medicare', picks.medicare); add('medicaid', picks.medicaid);
+  for (const k of ['employer', 'direct', 'tricare']) if (sig && sig[k]) add(k, sig[k].cells);
+  if (!keys.uninsured) return null;
+  // Age subtotals of the uninsured table: a label that ends at an age group.
+  const g = picks.uninsured[0].split('_')[0];
+  const universe = {};
+  for (const id of Object.keys(labels).filter(i => i.startsWith(g + '_') && i.endsWith('E')).sort()) {
+    if (!/years( and over)?:?$/.test(labels[id])) continue;
+    const b = ageBandOf(labels[id]); if (b) (universe[b] = universe[b] || []).push(id);
+  }
+  return AGE_BANDS.every(b => universe[b]) ? { keys, universe } : null;
+}
+export function ageVarIds(ab) {
+  if (!ab) return [];
+  return [...new Set(Object.values(ab.universe).flat().concat(Object.values(ab.keys).flatMap(o => Object.values(o).flat())))];
+}
+// { band: { pop, uninsured, medicare, ... } }; unknown is null, a count above its band's people is dropped.
+export function ageFields(r, ab) {
+  if (!ab) return null;
+  const out = {};
+  for (const b of AGE_BANDS) {
+    const pop = sum(ab.universe[b].map(id => num(r[id])));
+    const o = { pop };
+    for (const [k, bands] of Object.entries(ab.keys)) { const v = bands[b] ? sum(bands[b].map(id => num(r[id]))) : null; o[k] = v != null && pop != null && v > pop ? null : v; }
+    out[b] = o;
   }
   return out;
 }

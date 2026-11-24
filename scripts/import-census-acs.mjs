@@ -19,7 +19,7 @@
 // Run: node scripts/import-census-acs.mjs [--dry-run]
 
 import { VARIABLES, EXPECTED_LABELS, toRow, rowProblems, INSURANCE_TABLES, pickInsuranceVars, insuranceVarIds,
-  SIGNAL_RULES, pickSignalVars, signalVarIds } from './lib/acs.mjs';
+  SIGNAL_RULES, pickSignalVars, signalVarIds, pickAgeBands, ageVarIds } from './lib/acs.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CENSUS_API_KEY, ACS_YEAR } = process.env;
@@ -79,6 +79,7 @@ async function insurancePicks(year) {
     }
   }
   const picks = pickInsuranceVars(labels, found);
+  if (picks) Object.defineProperty(picks, 'labels', { value: labels });
   if (!picks) { console.log('  insurance: no cells matched the expected labels; insurance columns will be empty'); return null; }
   for (const k of ['uninsured', 'medicare', 'medicaid']) {
     console.log(`  insurance cells: ${k} ${picks[k].length} from ${found[k] || 'none'}${picks[k].length ? ' (e.g. ' + labels[picks[k][0]] + ')' : ''}`);
@@ -101,6 +102,7 @@ async function signalPicks(year) {
     }
   }
   const sig = pickSignalVars(labels, found);
+  if (sig) Object.defineProperty(sig, 'labels', { value: labels });
   for (const k of Object.keys(SIGNAL_RULES)) {
     const s = sig && sig[k];
     console.log(`  signal cells: ${k} ${s ? s.cells.length : 0} from ${found[k] || 'none'}${s ? ' (e.g. ' + labels[s.cells[0]] + ')' : ''}`);
@@ -176,8 +178,10 @@ async function main() {
   await checkLabels(year);
   const picks = await insurancePicks(year);
   const sig = await signalPicks(year);
+  const ab = pickAgeBands({ ...(picks && picks.labels), ...(sig && sig.labels) }, picks, sig);
+  console.log(ab ? `  coverage by age: ${Object.entries(ab.keys).map(([k, o]) => k + ' ' + Object.keys(o).join('/')).join(', ')}` : '  coverage by age: not found; signals.cov_age left out');
   const prior = await priorPopulation(year);
-  const raw = await fetchAll(year, [...new Set(insuranceVarIds(picks).concat(signalVarIds(sig)))]);
+  const raw = await fetchAll(year, [...new Set(insuranceVarIds(picks).concat(signalVarIds(sig), ageVarIds(ab)))]);
   if (raw.size < MIN_ZCTAS) throw new Error(`only ${raw.size} ZCTAs returned (floor ${MIN_ZCTAS}); refusing to write`);
 
   const states = dryRun && !SUPABASE_URL ? new Map() : await zipStates();
@@ -185,7 +189,7 @@ async function main() {
   let unsound = 0, noState = 0;
   for (const [zip, rec] of raw) {
     const row = toRow(zip, rec, year, states.get(String(zip).padStart(5, '0')), picks, sig,
-      prior ? { year: prior.year, value: prior.values.has(String(zip).padStart(5, '0')) ? prior.values.get(String(zip).padStart(5, '0')) : null } : null);
+      prior ? { year: prior.year, value: prior.values.has(String(zip).padStart(5, '0')) ? prior.values.get(String(zip).padStart(5, '0')) : null } : null, ab);
     if (!row.state) noState++;
     if (rowProblems(row).length) unsound++;
     rows.push(row);

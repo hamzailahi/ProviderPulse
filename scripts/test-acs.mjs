@@ -190,5 +190,20 @@ check('a failed or missing ACS read never breaks the score', pay && pay.income_b
   const sv = pickSignalVars(labels, { no_vehicle: 'B25044' });
   check('households with no vehicle add owners and renters over all households', sv && sv.no_vehicle && sv.no_vehicle.cells.join() === 'B25044_003E,B25044_010E' && sv.no_vehicle.universe.join() === 'B25044_001E', JSON.stringify(sv));
 }
+{
+  const { ageBandOf, pickAgeBands, ageFields } = await import('./lib/acs.mjs');
+  check('age bands from Census labels', ageBandOf('Estimate!!Total:!!Under 19 years:!!No health insurance coverage') === 'u19' && ageBandOf('Estimate!!Total:!!Male:!!6 to 18 years:') === 'u19'
+    && ageBandOf('Estimate!!Total:!!19 to 64 years:!!With Medicare coverage') === 'a19_64' && ageBandOf('Estimate!!Total:!!65 years and over:') === 'a65' && ageBandOf('Estimate!!Total:!!Male:!!75 years and over:') === 'a65' && ageBandOf('Estimate!!Total:') === null);
+  const L = { C27001_001E: 'Estimate!!Total:', C27001_002E: 'Estimate!!Total:!!Under 19 years:', C27001_004E: 'Estimate!!Total:!!Under 19 years:!!No health insurance coverage',
+    C27001_005E: 'Estimate!!Total:!!19 to 64 years:', C27001_007E: 'Estimate!!Total:!!19 to 64 years:!!No health insurance coverage',
+    C27001_008E: 'Estimate!!Total:!!65 years and over:', C27001_010E: 'Estimate!!Total:!!65 years and over:!!No health insurance coverage',
+    C27006_004E: 'Estimate!!Total:!!19 to 64 years:!!With Medicare coverage', C27006_007E: 'Estimate!!Total:!!65 years and over:!!With Medicare coverage',
+    C27004_003E: 'Estimate!!Total:!!Under 19 years:!!With employer-based health insurance', C27004_006E: 'Estimate!!Total:!!19 to 64 years:!!With employer-based health insurance', C27004_009E: 'Estimate!!Total:!!65 years and over:!!With employer-based health insurance' };
+  const ab = pickAgeBands(L, { uninsured: ['C27001_004E', 'C27001_007E', 'C27001_010E'], medicare: ['C27006_004E', 'C27006_007E'], medicaid: [] }, { employer: { cells: ['C27004_003E', 'C27004_006E', 'C27004_009E'] } });
+  check('coverage cells kept by age band, universe from the age subtotals', ab && ab.universe.u19.join() === 'C27001_002E' && ab.keys.medicare.a65.join() === 'C27006_007E' && !ab.keys.medicare.u19 && ab.keys.employer.a19_64.join() === 'C27004_006E', JSON.stringify(ab));
+  const f = ageFields({ C27001_002E: 100, C27001_004E: 5, C27001_005E: 300, C27001_007E: 30, C27001_008E: 80, C27001_010E: 1, C27006_004E: 10, C27006_007E: 78, C27004_003E: 60, C27004_006E: 200, C27004_009E: 400 }, ab);
+  check('per band counts; a count above its band is unknown, a band with no cell is null', f.u19.pop === 100 && f.u19.uninsured === 5 && f.u19.medicare === null && f.a65.medicare === 78 && f.a65.employer === null && f.a19_64.employer === 200, JSON.stringify(f));
+  check('no age subtotals means no age split', pickAgeBands({ C27001_004E: L.C27001_004E }, { uninsured: ['C27001_004E'] }, null) === null);
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

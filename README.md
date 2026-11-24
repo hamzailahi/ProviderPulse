@@ -653,6 +653,9 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- The travel-time check against Medicare Advantage limits now matches every county: Doña Ana, Kusilvak, Oglala Lakota and Connecticut's nine planning regions were unmatched before.
+- The yearly Census import now keeps insurance coverage split by age (under 19, 19 to 64, 65 and over), the first step toward a payer score that follows each specialty's patients.
+
 - Scores now weigh access a little differently, after testing the drive-time access figures against county preventable hospital stays: eye care and hearing count access at half weight, care coordination gains half weight, and rheumatology and hospice no longer carry the "not validated" caveat.
 
 - The back-test now checks the access score the live site actually uses: where a drive-time access figure is stored for a ZIP and specialty, it is tested against county preventable hospital stays instead of the older 10-mile count.

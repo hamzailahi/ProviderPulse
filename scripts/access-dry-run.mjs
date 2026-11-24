@@ -229,12 +229,16 @@ writeFileSync(arg('csv'), 'specialty,zip,adults,crude_per_1k,e2sfca_per_1k,crude
 // file by state and county name (the HSD file keys counties by SSA code, and
 // no FIPS is in it). A fact for review, not a score.
 const qcsv = p => readFileSync(p, 'utf8').trim().split('\n').slice(1).map(l => { const o = []; let cur = '', q = false; for (const ch of l) { if (ch === '"') q = !q; else if (ch === ',' && !q) { o.push(cur); cur = ''; } else cur += ch; } o.push(cur); return o; });
-const normCounty = s => String(s || '').toLowerCase().replace(/\b(county|parish|borough|census area|municipality|city and borough)\b/g, '').replace(/^st\.? /, 'saint ').replace(/[^a-z]/g, '');
+// Accents dropped (Doña Ana), "(formerly ...)" dropped (Kusilvak, Oglala Lakota).
+const normCounty = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\(formerly[^)]*\)/i, '').toLowerCase().replace(/\b(county|parish|borough|census area|municipality|city and borough)\b/g, '').replace(/^st\.? /, 'saint ').replace(/[^a-z]/g, '');
 let burden = null;
 if (arg('td') && arg('specmap') && arg('zipcounty')) {
   const td = new Map();   // state|county|code -> {min, des}
   for (const [, st, county, des, code, , mx] of qcsv(arg('td'))) td.set(`${st}|${normCounty(county)}|${code}`, { max: +mx, des });
-  const zc = new Map(qcsv(arg('zipcounty')).map(([z, st, county]) => [z, { st, county }]));
+  // Reviewed aliases (Connecticut's 2022 planning regions to the old counties the HSD file uses).
+  const alias = new Map();
+  if (arg('aliases')) for (const [st, county, hsd] of qcsv(arg('aliases'))) alias.set(`${st}|${normCounty(county)}`, hsd);
+  const zc = new Map(qcsv(arg('zipcounty')).map(([z, st, county]) => [z, { st, county: alias.get(`${st}|${normCounty(county)}`) || county }]));
   // A row may narrow the label to NUCC classifications (mental health is split
   // into CMS's psychiatry, clinical psychology and clinical social work).
   const smap = qcsv(arg('specmap')).map(([label, code, cms, , cls]) => [label, code, cms, (cls || '').split(';').filter(Boolean)]);

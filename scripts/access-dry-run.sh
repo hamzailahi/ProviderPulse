@@ -85,7 +85,7 @@ echo "== E2SFCA"
 slug=$(echo "${STATE_LABEL:-region}" | tr 'A-Z ' 'a-z-')
 node scripts/access-dry-run.mjs --zips "$WORK/zips.csv" --supply "$WORK/supply.csv" --bench "$WORK/bench.csv" \
   --osrm http://127.0.0.1:5000 --osrm-foot http://127.0.0.1:5001 --nocar "$WORK/nocar.csv" --focus "$FOCUS" --label "${STATE_LABEL:-region}" --sample "${SAMPLE:-}" \
-  --td supabase/reference/network-adequacy/time-distance.csv --specmap supabase/reference/network-adequacy/specialty-map.csv --zipcounty "$WORK/zipcounty.csv" --pins "$WORK/pins.csv" --burden "$WORK/$slug-burden.csv" \
+  --td supabase/reference/network-adequacy/time-distance.csv --specmap supabase/reference/network-adequacy/specialty-map.csv --zipcounty "$WORK/zipcounty.csv" --aliases supabase/reference/network-adequacy/county-aliases.csv --pins "$WORK/pins.csv" --burden "$WORK/$slug-burden.csv" \
   --report "$REF/$slug-dry-run.md" --csv "$WORK/$slug-access.csv" --load "$WORK/load.csv"
 gzip -kf "$WORK/$slug-access.csv"; [ -f "$WORK/$slug-burden.csv" ] && gzip -kf "$WORK/$slug-burden.csv"
 docker rm -f osrm osrmfoot >/dev/null || true
