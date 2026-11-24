@@ -70,12 +70,12 @@
   // under 0.05 none (0). Patients travel for most specialists, so a
   // 10-mile supply count says little there. A specialty not in the table
   // (no outcome test: pediatrics, OB-GYN, dermatology ...) keeps 1. Access
-  // is still computed and shown, and still drives the archetype. Rerun the
-  // back-test after the drive-time rerun and update this table.
+  // is still computed and shown, and still drives the archetype. Since 2026-11-24 the back-test
+  // tests the stored drive-time access, and this table follows that run.
   var ACCESS_SHARE = {
-    'Mental health & counseling': 1, 'Dental': 1, 'Eye care': 1, 'Chiropractic': 1,
+    'Mental health & counseling': 1, 'Dental': 1, 'Eye care': 0.5, 'Chiropractic': 1,
     'Physical & occupational therapy': 1, 'Nutrition & dietitian': 1,
-    'Acupuncture, massage & naturopathy': 1, 'Hearing & audiology': 1,
+    'Acupuncture, massage & naturopathy': 1, 'Hearing & audiology': 0.5,
     'Orthopedics & sports injury': 0.5, 'Diabetes & hormones': 0.5,
     'Foot & ankle / podiatry': 0.5, 'General surgery': 0.5,
     'Primary care / family doctor': 0, 'Heart / cardiology': 0, 'Allergy & immunology': 0,
@@ -84,15 +84,14 @@
     'Ear, nose & throat': 0, 'Urology': 0, 'Pain management': 0, 'Speech & language therapy': 0,
     'Urgent care & emergency': 0, 'Imaging & lab': 0, 'Pharmacy': 0,
     'Home health & in-home care': 0, 'Nursing & assisted living': 0,
-    'Medical equipment & supplies': 0, 'Care coordination & community health': 0,
+    'Medical equipment & supplies': 0, 'Care coordination & community health': 0.5,
     'Hospice & palliative care': 0
   };
   // Specialties whose combined score did not track preventable stays
   // (correlation under 0.10): a caveat and a confidence penalty.
   var UNVALIDATED = {
-    'Allergy & immunology': 1, 'Cancer care / oncology': 1, 'Arthritis / rheumatology': 1,
-    'Ear, nose & throat': 1, 'Urgent care & emergency': 1, 'Imaging & lab': 1,
-    'Hospice & palliative care': 1
+    'Allergy & immunology': 1, 'Cancer care / oncology': 1,
+    'Ear, nose & throat': 1, 'Urgent care & emergency': 1, 'Imaging & lab': 1
   };
   // Payer yield (2026-11-20, the user's go-ahead after the back-test: it beat
   // the insured rate against clinician entry in all 40 specialties). What an

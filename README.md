@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-24
 
+- Scores now weigh access a little differently, after testing the drive-time access figures against county preventable hospital stays: eye care and hearing count access at half weight, care coordination gains half weight, and rheumatology and hospice no longer carry the "not validated" caveat.
+
 - The back-test now checks the access score the live site actually uses: where a drive-time access figure is stored for a ZIP and specialty, it is tested against county preventable hospital stays instead of the older 10-mile count.
 
 - The back-test was rerun after the drive-time rebuild. Results moved by at most 0.01, so no specialty's need, access or pay weight changed.

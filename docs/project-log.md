@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 440 changes over 71 working days, 2026-05-13 to 2026-11-24.
-- 2026-08-19 onward: from the README changelog (266 entries, written for a reader).
+- 441 changes over 71 working days, 2026-05-13 to 2026-11-24.
+- 2026-08-19 onward: from the README changelog (267 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 105 |
+| November 2026 | 106 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-24
+
+- Scores now weigh access a little differently, after testing the drive-time access figures against county preventable hospital stays: eye care and hearing count access at half weight, care coordination gains half weight, and rheumatology and hospice no longer carry the "not validated" caveat.
 
 - The back-test now checks the access score the live site actually uses: where a drive-time access figure is stored for a ZIP and specialty, it is tested against county preventable hospital stays instead of the older 10-mile count.
 
