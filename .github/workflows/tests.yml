@@ -113,6 +113,21 @@ jobs:
       - name: Report a wrong listing
         run: node scripts/test-listing-report.mjs
 
+      - name: Search demand stats (privacy suppression)
+        run: node scripts/test-demand-stats.mjs
+
+      - name: Medicare clinician lookup (CMS errors never cached)
+        run: node scripts/test-cms-provider.mjs
+
+      - name: Provider practice locations
+        run: node scripts/test-provider-locations.mjs
+
+      - name: Pre-visit briefing
+        run: node scripts/test-appointment-briefing.mjs
+
+      - name: Document gate, audit report, ZIP queue
+        run: node scripts/test-gates-and-reports.mjs
+
       - name: NPPES weekly refresh
         run: node scripts/test-nppes-refresh.mjs
 

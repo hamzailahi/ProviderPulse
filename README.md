@@ -578,6 +578,11 @@ node scripts/test-providers-near.mjs      # the assistant's competitor lookup: c
 node scripts/test-catchment.mjs           # the market score's area: every ZIP within 10 miles, ZIP groups, a failed load refuses to score
 node scripts/test-provider-npis.mjs        # one account, many NPIs: checks, review, own rows only, publishing and booking
 node scripts/test-self-check.mjs           # a provider's own listing check: their NPI only, nothing written
+node scripts/test-demand-stats.mjs        # search demand stats: small groups and any total that would reveal them are withheld
+node scripts/test-cms-provider.mjs        # Medicare clinician lookup: CMS errors are never cached as "not found"
+node scripts/test-provider-locations.mjs  # practice locations: only real providers, never "verified" from the browser
+node scripts/test-appointment-briefing.mjs # pre-visit briefing: confirmed visits only, no name or date of birth to the model
+node scripts/test-gates-and-reports.mjs   # document upload stays off, audit report escaping, ZIP backfill queue
 node scripts/test-listing-report.mjs       # report a wrong listing: only the NPI and issue are stored, repeats throttled
 node scripts/test-admin.mjs                 # the admin and viewer accounts and their view switch
 node scripts/test-address-fit.mjs          # typed addresses only match places that fit what was typed
@@ -652,6 +657,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-11-25
+
+- Code review: the public search-demand figures no longer show a total that would let someone work out a hidden small count (a total of 12 beside a visible 10 revealed 2 searches); the practice-locations page now checks the account really owns a provider listing instead of trusting a role the account sets itself; the printed directory audit no longer breaks on a confidence stored as text. Removed about 6,500 characters of unused dashboard code (an old colour palette, a v1 session banner, four helpers from the retired AI endpoint) and an unused directory helper. Five new test files (98 tests) cover demand stats, the Medicare lookup, practice locations, pre-visit briefings, the document gate, the audit report and the ZIP backfill queue.
 
 - The caution note on the five weakest specialties now gives the back-test figures instead of a general warning.
 

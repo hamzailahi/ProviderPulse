@@ -106,21 +106,6 @@ function clinicsQuery(filter) {
 // implying it is the practice's main site.
 function tagSrc(rows, src) { (rows || []).forEach(function (r) { r._src = src; }); return rows; }
 
-function providerRowsQuery(filter) {
-  return Promise.all([
-    clinicsQuery(filter),
-    // Both carry the NPPES practice phone (organizations since migration 040).
-    tableQuery('provider_individuals', PROVIDER_ROW_SELECT + ',phone', filter),
-    tableQuery('clinic_secondary_locations', 'npi:parent_npi,name,address,city,state,zip,primary_taxonomy,taxonomy_code,latitude,longitude', filter)
-  ]).then(function (results) {
-    var all = tagSrc(results[0], 'clinic').concat(tagSrc(results[1], 'individual'), tagSrc(results[2], 'secondary'));
-    // Any table that hit the page cap means the answer is a sample, and the
-    // results list says so instead of presenting it as complete.
-    all.truncated = results.some(function (r) { return (r || []).length >= CLINICS_PAGE_CAP; });
-    all.failed = results.some(function (r) { return r && r.failed; });
-    return all;
-  });
-}
 
 // A lat/lng box query on the three provider tables that splits instead of
 // failing. Dense areas timed out on one table (57014 at the anon role's 3s

@@ -457,28 +457,7 @@
         const BASE_URL = 'https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/';
 
         function safeParseNum(val) { return parseFloat(String(val).replace(/[$,\s]/g, '')) || 0; }
-        function getColor(i, t) { return `hsl(${i * (360 / Math.max(t, 1))}, 75%, 55%)`; }
         function debounce(func, wait) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); }; }
-
-        // ── Session display & logout ──────────────────────────────
-        function logoutMap() {
-            localStorage.removeItem('map_session');
-            // There is no /login.html on the v2 site — this used to 404. The root
-            // is the patient app, which is the right place to land.
-            window.location.href = '/';
-        }
-
-        (function() {
-            const session = JSON.parse(localStorage.getItem('map_session') || 'null');
-            if (session) {
-                const expires = new Date(session.expires_at);
-                const diff = expires - Date.now();
-                const hrs = Math.floor(diff / 3600000);
-                const mins = Math.floor((diff % 3600000) / 60000);
-                document.getElementById('sessionInfo').textContent =
-                    `${session.email} · expires in ${hrs}h ${mins}m`;
-            }
-        })();
 
         // ── Supabase Search ──────────────────────────────────────────
         const SUPABASE_URL = "https://khkmdultmrggpfvkbfzj.supabase.co";
@@ -3658,12 +3637,6 @@
             });
         }
 
-        // Auto-open sheet when data loads on mobile
-        const _origProcessData = typeof processData === 'function' ? processData : null;
-        function openSheetOnDataLoad() {
-            if (isMobile()) toggleBottomSheet(true);
-        }
-
         // Deep link from care navigator: #goto=<address>, #pin=<lat>,<lng>,<name>,
         // or #zip=<zip>&tax=<taxonomy,list>&rec=<npi,list> for a whole search area;
         // #q=<search>&spec=<label> is the dashboard's own remembered search
@@ -4807,55 +4780,6 @@
             if (filter) paintCross(filter);
         }
 
-        function getSpecColor(specialty) {
-            const SPEC_COLORS = {
-                'Cardiology': '#f85149',
-                'Interventional Cardiology': '#ff7b72',
-                'Clinical Cardiac Electrophysiology': '#ffa198',
-                'Advanced Heart Failure and Transplant Cardiology': '#ffb3ae',
-                'Cardiac Surgery': '#e03830',
-                'Nephrology': '#79c0ff',
-                'Psychiatry': '#d2a8ff',
-                'Geriatric Psychiatry': '#c0a0f0',
-                'Neuropsychiatry': '#b090e0',
-                'Psychologist, Clinical': '#a080d0',
-                'Neurology': '#ffa657',
-                'Neurosurgery': '#f09040',
-                'Epileptologists': '#e08030',
-                'Internal Medicine': '#3fb950',
-                'Family Practice': '#58a6ff',
-                'General Practice': '#4896ef',
-                'Hospitalist': '#3886df',
-                'Geriatric Medicine': '#28a060',
-                'Endocrinology': '#ffb3c1',
-                'Gastroenterology': '#7ee787',
-                'Pulmonary Disease': '#a5d6ff',
-                'Rheumatology': '#e3b341',
-                'Infectious Disease': '#f0c060',
-                'Hematology-Oncology': '#e3b341',
-                'Medical Oncology': '#d4a431',
-                'Radiation Oncology': '#c59421',
-                'Surgical Oncology': '#b68411',
-                'Gynecological Oncology': '#a77401',
-                'Orthopedic Surgery': '#f0883e',
-                'General Surgery': '#e0782e',
-                'Vascular Surgery': '#d0681e',
-                'Thoracic Surgery': '#c0580e',
-                'Urology': '#8b949e',
-                'Ophthalmology': '#7b849e',
-                'Otolaryngology': '#6b748e',
-                'Dermatology': '#5b647e',
-                'Obstetrics & Gynecology': '#ffb3c1',
-                'Pain Management': '#c9a227',
-                'Interventional Pain Management': '#b99217',
-                'Physical Medicine and Rehabilitation': '#58a6ff',
-                'Sleep Medicine': '#4479a1',
-                'Allergy/ Immunology': '#22863a',
-                'Nurse Practitioner': '#6e7681',
-                'Physician Assistant': '#5e6671',
-            };
-            return SPEC_COLORS[specialty] || '#8b949e';
-        }
 
         // --- AI QUERY ---
         function toggleFilterRail() {
@@ -4868,66 +4792,9 @@
 
 
 
-        function buildDemographicsContext() {
-            const ADULT_KEYS = [
-                'Total: 19 to 25 years', 'Total: 26 to 34 years',
-                'Total: 35 to 44 years', 'Total: 45 to 54 years',
-                'Total: 55 to 64 years', 'Total: 65 to 74 years',
-                'Total: 75 years and older'
-            ];
 
-            const zips = {};
-            Object.entries(zipDemographics).forEach(([zip, row]) => {
-                if (!zip || zip === 'undefined') return;
-                const padded = String(zip).padStart(5, '0');
-                if (zips[padded]) return;
 
-                const totalPop = safeParseNum(row['Total Population'] || row['Total_Total'] || 0);
-                const adultPop = ADULT_KEYS.reduce((sum, k) => sum + safeParseNum(row[k] || 0), 0);
-                const insuredPop = safeParseNum(row['Insured Population'] || 0);
-                const insuredRate = totalPop > 0 ? Math.round((insuredPop / totalPop) * 100) : null;
 
-                zips[padded] = {
-                    zip: padded,
-                    state: row['state'] || row['State'] || null,
-                    total_population: Math.round(totalPop),
-                    adult_population_18plus: Math.round(adultPop),
-                    insured_population: Math.round(insuredPop),
-                    insured_pct: insuredRate
-                };
-            });
-            return Object.values(zips).filter(z => z.total_population > 0).slice(0, 200);
-        }
-
-        function buildPLACESContext() {
-            if (!window.placesDataCache || Object.keys(window.placesDataCache).length === 0) return null;
-            return Object.entries(window.placesDataCache).map(([measure, value]) => ({ measure, value }));
-        }
-
-        function buildCMSContext() {
-            if (!window.cmsDataCache || Object.keys(window.cmsDataCache).length === 0) return null;
-            return window.cmsDataCache;
-        }
-
-        function buildProceduresContext() {
-            if (!proceduresRawData || Object.keys(proceduresRawData).length === 0) return null;
-            const rows = [];
-            Object.entries(proceduresRawData).forEach(([specialty, procs]) => {
-                Object.values(procs).forEach(p => {
-                    rows.push({
-                        specialty,
-                        hcpcs_cd: p.hcpcs_cd,
-                        hcpcs_desc: p.hcpcs_desc ? p.hcpcs_desc.substring(0, 60) : '',
-                        tot_benes: Math.round(p.tot_benes),
-                        tot_srvcs: Math.round(p.tot_srvcs),
-                        avg_mdcr_pymt: p.count > 0 ? Math.round(p.avg_mdcr_pymt_amt / p.count) : 0
-                    });
-                });
-            });
-            // Sort by tot_benes desc, cap at 500 rows to stay within token limit
-            rows.sort((a, b) => b.tot_benes - a.tot_benes);
-            return rows.length > 0 ? rows.slice(0, 500) : null;
-        }
 
 
 

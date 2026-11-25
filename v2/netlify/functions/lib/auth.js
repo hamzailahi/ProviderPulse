@@ -67,6 +67,13 @@ function isStaff(env, user) {
 // the one role signal an account holder cannot forge.
 async function isProvider(env, user) {
   if (isStaff(env, user)) return true;
+  return hasProviderProfile(env, user);
+}
+
+// The account owns a provider_profiles row (staff, admin and viewer accounts
+// do not count). For endpoints that write a provider's own records, where a
+// staff or viewer session must not write anything (provider-locations).
+async function hasProviderProfile(env, user) {
   if (!user || !user.id || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return false;
   try {
     const res = await fetch(
@@ -84,4 +91,4 @@ async function isProvider(env, user) {
   }
 }
 
-module.exports = { getUser, isProvider, isStaff, isAdmin, isViewer };
+module.exports = { getUser, isProvider, hasProviderProfile, isStaff, isAdmin, isViewer };

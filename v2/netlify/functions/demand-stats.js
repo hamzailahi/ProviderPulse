@@ -106,6 +106,14 @@ exports.handler = async (event) => {
       };
     });
 
+    // Whether the total could reconstruct a suppressed count: with one group
+    // hidden, total minus the visible counts IS that count (12 searches, 10
+    // shown, 2 hidden). Judged on every group, before any taxonomy filter.
+    const hidden = groups.filter(g => g.count < MIN_GROUP);
+    const visibleSum = groups.filter(g => g.count >= MIN_GROUP).reduce((t, g) => t + g.count, 0);
+    const residual = rows.length - visibleSum;
+    const totalLeaks = hidden.length === 1 || (hidden.length > 1 && residual > 0 && residual < MIN_GROUP);
+
     if (taxonomy) groups = groups.filter(g => matches(g.taxonomy, taxonomy) || matches(taxonomy, g.taxonomy));
 
     // Suppress before sorting, so a suppressed group cannot be ranked by a
@@ -129,8 +137,8 @@ exports.handler = async (event) => {
         window_days: WINDOW_DAYS,
         available: true,
         min_group: MIN_GROUP,
-        total_searches: totalSearches >= MIN_GROUP ? totalSearches : null,
-        total_suppressed: totalSearches < MIN_GROUP,
+        total_searches: totalSearches >= MIN_GROUP && !totalLeaks ? totalSearches : null,
+        total_suppressed: totalSearches < MIN_GROUP || totalLeaks,
         suppressed_groups: suppressedGroups,
         groups: published
       })

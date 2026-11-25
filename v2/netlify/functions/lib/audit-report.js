@@ -97,7 +97,7 @@ function renderAuditReport(audit, findings) {
         </div>
         <div class="f-score">
           <span class="badge ${VERDICT_TONE[f.verdict] || 'unk'}">${esc(VERDICT_LABEL[f.verdict] || f.verdict || '—')}</span>
-          <span class="conf">${f.confidence == null ? '—' : f.confidence.toFixed(2)}</span>
+          <span class="conf">${f.confidence == null || !Number.isFinite(Number(f.confidence)) ? '—' : Number(f.confidence).toFixed(2)}</span>
         </div>
       </div>
       ${f.narrative ? `<p class="f-narr">${esc(f.narrative)}</p>` : '<p class="f-narr muted">No rationale recorded.</p>'}

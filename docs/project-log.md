@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 464 changes over 72 working days, 2026-05-13 to 2026-11-25.
-- 2026-08-19 onward: from the README changelog (290 entries, written for a reader).
+- 465 changes over 72 working days, 2026-05-13 to 2026-11-25.
+- 2026-08-19 onward: from the README changelog (291 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 129 |
+| November 2026 | 130 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-25
+
+- Code review: the public search-demand figures no longer show a total that would let someone work out a hidden small count (a total of 12 beside a visible 10 revealed 2 searches); the practice-locations page now checks the account really owns a provider listing instead of trusting a role the account sets itself; the printed directory audit no longer breaks on a confidence stored as text. Removed about 6,500 characters of unused dashboard code (an old colour palette, a v1 session banner, four helpers from the retired AI endpoint) and an unused directory helper. Five new test files (98 tests) cover demand stats, the Medicare lookup, practice locations, pre-visit briefings, the document gate, the audit report and the ZIP backfill queue.
 
 - The caution note on the five weakest specialties now gives the back-test figures instead of a general warning.
 

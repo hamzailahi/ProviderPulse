@@ -33,6 +33,7 @@ const FIELDS = [
 const MAX_LOCATIONS = 25;
 
 const { geocode: geocodeAddress } = require('./lib/geocode');
+const { hasProviderProfile } = require('./lib/auth');
 
 function pick(obj, keys) {
   const out = {};
@@ -73,8 +74,9 @@ exports.handler = async (event) => {
   });
   if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Invalid or expired session' }) };
   const user = await userRes.json();
-  const role = (user.user_metadata && user.user_metadata.role) || '';
-  if (role !== 'provider') {
+  // Decided server-side from provider_profiles, never from user_metadata.role,
+  // which the account holder can write (2026-11-25).
+  if (!(await hasProviderProfile(env, user))) {
     return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'Provider accounts only' }) };
   }
 
