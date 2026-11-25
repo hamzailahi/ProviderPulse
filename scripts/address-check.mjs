@@ -68,6 +68,7 @@ for await (const line of readline.createInterface({ input: Readable.fromWeb(res.
 }
 console.log('CMS rows for our clinicians', rows, 'NPIs', dac.size);
 
+const mvState = new Map(), mvSpec = new Map(), allSpec = new Map(); let noAddr = 0;
 const K = ['confirmed_zip', 'same_state_other_zip', 'other_state_only', 'other_state_but_nppes_lists_it', 'not_in_medicare_file'];
 const tally = Object.fromEntries(K.map(k => [k, 0]));
 const byState = new Map(), bySpec = new Map();
@@ -96,7 +97,9 @@ for (const [npi, o] of ours) {
     csv.write([npi, cls, o.st, o.zip, sts.join(' '), zs.join(' '), zs.length === 1 ? 'yes' : 'no'].join(',') + '\n');
   }
   const isMove = cls === 'other_state_only' || cls === 'other_state_but_nppes_lists_it';
-  if (isMove && moves) { const b = best(list); if (b) { moves.write([npi, q(b.adr), q(b.city), b.st, b.zip, q(b.fac)].join(',') + '\n'); nMoves++; } }
+  if (isMove) { const b = best(list); if (b) { if (moves) moves.write([npi, q(b.adr), q(b.city), b.st, b.zip, q(b.fac)].join(',') + '\n'); nMoves++;
+    mvState.set(o.st, (mvState.get(o.st) || 0) + 1); mvSpec.set(sp, (mvSpec.get(sp) || 0) + 1); } else noAddr++; }
+  allSpec.set(sp, (allSpec.get(sp) || 0) + 1);
   if (!isMove && o.medicare && restore) { restore.write(npi + '\n'); nRestore++; }
   if (cls === 'same_state_other_zip' && sites) for (const x of list) if (x.adr && x.zip !== o.zip) { sites.write([npi, q(x.adr), q(x.city), x.st, x.zip, q(x.fac)].join(',') + '\n'); nSites++; }
   if (check.has(npi)) console.log('CHECK', npi, cls, 'ours', o.st, o.zip, '| Medicare:', (list || []).map(x => [x.adr, x.city, x.st, x.zip, x.fac].filter(Boolean).join(', ')).join(' || ') || 'none');
@@ -116,6 +119,12 @@ const L = ['# Clinician address check (dry run)', '', `Run ${new Date().toISOStr
   '## By specialty', '', '| Specialty | In Medicare | Confirmed ZIP | Other ZIP same state | Other state only |', '|---|---|---|---|---|',
   ...[...bySpec].map(([s, b]) => [s, b, Object.entries(b).filter(([k]) => k !== 'not_in_medicare_file').reduce((a, [, v]) => a + v, 0)]).filter(x => x[2] >= 500).sort((a, b) => b[2] - a[2])
     .map(([s, b, e]) => `| ${s} | ${e.toLocaleString()} | ${pc(b.confirmed_zip, e)} | ${pc(b.same_state_other_zip, e)} | ${pc(b.other_state_only, e)} |`), ''];
+L.push('## Moves: both other-state classes with one usable Medicare address (2026-11-25)', '',
+  `A move is written when the listing is in the "other state only" or "other state, NPPES lists it" class and one Medicare address can be chosen (the one CMS lists most often). Moves: ${nMoves.toLocaleString()}; in those classes but no usable address: ${noAddr.toLocaleString()}. Share of all clinicians: ${pc(nMoves, n)}; of those in Medicare: ${pc(nMoves, enrolled)}.`, '',
+  '### Top 10 listed states', '', '| State | Moves | Share of all moves |', '|---|---|---|',
+  ...[...mvState].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([st, c]) => `| ${st} | ${c.toLocaleString()} | ${pc(c, nMoves)} |`), '',
+  '### By specialty (top 10, then all)', '', '| Specialty | Moves | Clinicians in the specialty | Share of the specialty |', '|---|---|---|---|',
+  ...[...mvSpec].sort((a, b) => b[1] - a[1]).map(([sp, c]) => `| ${sp} | ${c.toLocaleString()} | ${(allSpec.get(sp) || 0).toLocaleString()} | ${pc(c, allSpec.get(sp) || 0)} |`), '');
 L.push('## What the apply step would do', '', `- Show the Medicare address for ${nMoves.toLocaleString()} clinicians whose Medicare enrollment is only in other states (the NPPES address is kept beside it).`,
   `- List ${nSites.toLocaleString()} other Medicare offices for clinicians in the right state but another ZIP ("also practises at").`,
   `- Put the NPPES address back for ${nRestore.toLocaleString()} clinicians shown at a Medicare address who no longer qualify.`, '');
