@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-25
 
+- A read-only report now shows which data year each county's ER, readmission and preventable-stay figure in the back-test comes from.
+
 - The validation results document now carries confidence intervals, results with controls and on held-out counties, one national drive-time comparison per specialty, how site weighting moves ZIPs across the national rate, moved clinicians by state and specialty, and the Medicare Advantage time check with every county matched.
 
 - A public transit pilot for people without a car: in five metros, the drive-time access check can now also route households with no vehicle by bus and train (published timetables), as a report beside the walking figure. Nothing live changes.
