@@ -9,7 +9,7 @@
 // zips.csv   zip,lat,lon,adults        every ZIP in the region (focus + border strip)
 // supply.csv zip,taxonomy_code,n       listings per ZIP and code (both tables)
 // bench.csv  key,rate_per_1k           national specialty rates (market_benchmarks)
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { e2sfca, e2sfcaMulti, crudeRatio, accessFactor, catchmentFor, milesBetween, spearman } from './lib/e2sfca.mjs';
 const require = createRequire(import.meta.url);
@@ -150,6 +150,14 @@ if (footUrl) {
   }
 }
 const walkMinutes = (a, b) => { const v = W[idx.get(a) * N + idx.get(b)]; return Number.isFinite(v) ? v : null; };
+// Transit pilot (2026-11-25): r5py times on GTFS plus walking for ZIP pairs
+// reachable within 120 minutes (scripts/access-transit.py). The no-car group
+// takes the faster of walking and transit; a pair transit cannot reach, and
+// travel inside a ZIP, stay on foot. Reported beside walking, never stored.
+const TR = new Map();
+if (arg('transit')) for (const [f, t, m] of csv(arg('transit'))) { const v = +m; if (Number.isFinite(v)) TR.set(f + '|' + t, v); }
+const transitMinutes = (a, b) => { const w = walkMinutes(a, b), t = a === b ? undefined : TR.get(a + '|' + b); return t == null ? w : w == null ? t : Math.min(w, t); };
+const transitReach = new Set([...TR.keys()].map(k => k.split('|')[0]));
 const slowMinutes = (a, b) => { const v = minutes(a, b); return v == null ? null : v * SLOWDOWN; };
 const noCar = new Map();
 if (arg('nocar')) for (const [z, sh] of csv(arg('nocar'))) { const v = +sh; if (/^\d{5}$/.test(z) && Number.isFinite(v)) noCar.set(z, Math.max(0, Math.min(1, v))); }
@@ -184,6 +192,8 @@ for (const [label] of SCORED) {
   // Scored: car for households with one, walking for those without.
   const MM = W ? e2sfcaMulti(zips, supply, [{ minutes, share: z => 1 - shareNoCar(z) }, { minutes: walkMinutes, share: shareNoCar }], d0) : null;
   const SS = W ? e2sfcaMulti(zips, supply, [{ minutes, share: z => 1 - shareNoCar(z) }, { minutes: slowMinutes, share: shareNoCar }], d0) : null;
+  const TT = W && TR.size ? e2sfcaMulti(zips, supply, [{ minutes, share: z => 1 - shareNoCar(z) }, { minutes: transitMinutes, share: shareNoCar }], d0) : null;
+  const tPairs = [], tCar = [], tGain = []; let tMoved = 0;
   const A = MM ? new Map([...MM].map(([z, v]) => [z, v.total])) : A0;
   const sensPairs = [], carPairs = []; let movedByCar = 0; const carDrop = [];
   const pairs = [];
@@ -202,8 +212,10 @@ for (const [label] of SCORED) {
     const f0 = accessFactor(a0 == null ? null : a0 * 1000, rate), fs = accessFactor(sv == null ? null : sv * 1000, rate);
     if (fa != null && f0 != null && !unreliable.has(z.zip)) { carPairs.push([f0, fa]); if (Math.abs(fa - f0) >= 15) movedByCar++; carDrop.push([fa - f0, z.zip]); }
     if (fa != null && fs != null && !unreliable.has(z.zip)) sensPairs.push([fa, fs]);
+    const tv = TT ? TT.get(z.zip).total : null, ft = accessFactor(tv == null ? null : tv * 1000, rate);
+    if (fa != null && ft != null && !unreliable.has(z.zip)) { tPairs.push([fa, ft]); if (Math.abs(ft - fa) >= 15) tMoved++; tGain.push([ft - fa, z.zip]); if (f0 != null) tCar.push([f0, ft]); }
     rows.push([label, z.zip, z.adults, fmt(c), fmt(a), fc ?? '', fa ?? '', d0, unreliable.has(z.zip) ? 'unreliable_routing' : '',
-      fmt(a0), f0 ?? '', fmt(sv), fs ?? '', noCar.has(z.zip) ? shareNoCar(z.zip).toFixed(3) : ''].join(','));
+      fmt(a0), f0 ?? '', fmt(sv), fs ?? '', noCar.has(z.zip) ? shareNoCar(z.zip).toFixed(3) : '', fmt(tv), ft ?? ''].join(','));
     if (fa != null && fc != null && !unreliable.has(z.zip)) {
       pairs.push([fc, fa]);
       if (Math.abs(fa - fc) >= 15) moved++;
@@ -215,11 +227,13 @@ for (const [label] of SCORED) {
   carDrop.sort((x, y) => y[0] - x[0]);
   summary.push({ label, d0, rate, n: pairs.length, rho, moved, up: bigUp.slice(0, 3), down: bigDown.slice(0, 3),
     carRho: spearman(carPairs.map(p => p[0]), carPairs.map(p => p[1])), movedByCar, carN: carPairs.length, carWorst: carDrop.slice(0, 3),
+    tRho: spearman(tPairs.map(p => p[0]), tPairs.map(p => p[1])), tCarRho: spearman(tCar.map(p => p[0]), tCar.map(p => p[1])), tMoved, tN: tPairs.length,
+    tBest: tGain.sort((x, y) => x[0] - y[0]).filter(([d]) => d < 0).slice(0, 3),
     sensRho: spearman(sensPairs.map(p => p[0]), sensPairs.map(p => p[1])),
     listings: [...supply.values()].reduce((x, y) => x + y, 0) });
 }
 if (arg('load')) writeFileSync(arg('load'), 'zip,specialty,per_1k,catchment_minutes\n' + load.join('\n') + '\n');
-writeFileSync(arg('csv'), 'specialty,zip,adults,crude_per_1k,e2sfca_per_1k,crude_access,e2sfca_access,catchment_minutes,flag,car_only_per_1k,car_only_access,slowdown_per_1k,slowdown_access,no_car_share\n' + rows.join('\n') + '\n');
+writeFileSync(arg('csv'), 'specialty,zip,adults,crude_per_1k,e2sfca_per_1k,crude_access,e2sfca_access,catchment_minutes,flag,car_only_per_1k,car_only_access,slowdown_per_1k,slowdown_access,no_car_share,transit_per_1k,transit_access\n' + rows.join('\n') + '\n');
 
 
 // ---- step 8 (2026-11-22): travel burden against CMS Medicare Advantage time
@@ -349,6 +363,17 @@ if (W) {
     '| Specialty | Rank agreement with car-only | ZIPs moved 15+ vs car-only | Most worsened by the no-car split | Rank agreement, walking vs slowdown |', '|---|---|---|---|---|',
     ...summary.map(s => `| ${s.label} | ${r2(s.carRho)} | ${s.movedByCar} of ${s.carN} | ${s.carWorst.filter(([d]) => d > 0).map(([d, z]) => `${z} (+${d})`).join(', ')} | ${r2(s.sensRho)} |`), '',
     'A positive change is worse access once people without a car are counted. Rank agreement near 1 between walking and the slowdown means the conclusion does not hinge on which no-car assumption is used.', '');
+}
+if (W && TR.size) {
+  const feeds = existsSync(arg('transit') + '.feeds.json') ? JSON.parse(readFileSync(arg('transit') + '.feeds.json', 'utf8')) : [];
+  const dep = existsSync(arg('transit') + '.departure') ? readFileSync(arg('transit') + '.departure', 'utf8').trim() : 'unknown';
+  lines.push('## Public transit pilot', '',
+    `The no-car group again, now taking the faster of walking and public transit (r5py on the region's GTFS feeds plus OpenStreetMap paths; median door-to-door minutes over a 60-minute window leaving ${dep}, a weekday mid-morning chosen as an assumption; pairs over 120 minutes or with no service stay on foot). Car households are unchanged. Not stored and not used by the live score.`, '',
+    `- GTFS feeds used (Mobility Database catalog, boxes overlapping the region, national and multi-state feeds left out): ${feeds.length}${feeds.length ? ' (' + feeds.map(f => f.provider).join('; ') + ')' : ''}`,
+    `- ZIP pairs reachable by transit within 120 minutes: ${TR.size.toLocaleString()}; focus ZIPs that reach at least one other ZIP by transit: ${focus.filter(z => transitReach.has(z.zip)).length} of ${focus.length}`, '',
+    '| Specialty | Rank agreement, walking vs transit | ZIPs moved 15+ vs walking | Most improved by transit (transit minus walking) | Rank agreement, transit vs car-only |', '|---|---|---|---|---|',
+    ...summary.map(s => `| ${s.label} | ${r2(s.tRho)} | ${s.tMoved} of ${s.tN} | ${s.tBest.map(([d, z]) => `${z} (${d})`).join(', ')} | ${r2(s.tCarRho)} |`), '',
+    'A negative change is better access once transit is counted. Rank agreement near 1 means walking alone already ordered the ZIPs the same way.', '');
 }
 if (SAMPLE.length) {
   lines.push('## Sample ZIPs', '', '| ZIP | Specialty | Crude per 1k | E2SFCA per 1k | Crude access | E2SFCA access |', '|---|---|---|---|---|---|');

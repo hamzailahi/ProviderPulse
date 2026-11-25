@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-25
 
+- A public transit pilot for people without a car: in five metros, the drive-time access check can now also route households with no vehicle by bus and train (published timetables), as a report beside the walking figure. Nothing live changes.
+
 - The back-test now reports confidence intervals, p-values, results with controls and on held-out counties; new read-only jobs give the drive-time vs radius comparison nationally and check where moved clinicians billed Medicare. The address check reports moved clinicians by state and specialty as counts.
 
 - New docs/validation_results.md: every validation figure (back-test, drive time vs radius, address corrections, Medicare Advantage time limits) with the script and query behind it, and a plain list of results that do not exist yet. A small script, scripts/validation-summary.mjs, totals the 52 state drive-time reports.

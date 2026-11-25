@@ -81,11 +81,20 @@ docker run --rm -v "$WORK/foot:/data" $IMG osrm-customize /data/region.osrm >/de
 docker run -d --name osrmfoot -p 5001:5000 -v "$WORK/foot:/data" $IMG osrm-routed --algorithm mld --max-table-size 1000 /data/region.osrm >/dev/null
 for i in $(seq 1 60); do curl -s "http://127.0.0.1:5001/nearest/v1/walking/$MINLON,$MINLAT" >/dev/null && break; sleep 2; done
 
-echo "== E2SFCA"
 slug=$(echo "${STATE_LABEL:-region}" | tr 'A-Z ' 'a-z-')
+TRANSIT_ARGS=()
+if [ "${TRANSIT:-0}" = 1 ]; then
+  # Transit pilot (2026-11-25): a metro box, its GTFS feeds, r5py. Report under
+  # its own name so the state reports stay as they are; never applied.
+  [ "${MODE:-dry_run}" = apply ] && { echo "::error::the transit pilot is a dry run only"; exit 1; }
+  echo "== Transit (GTFS from the Mobility Database catalog, r5py)"
+  python3 -I scripts/access-transit.py "$WORK/zips.csv" "$WORK/osm/region.osm.pbf" "$WORK/gtfs" "$WORK/transit.csv" "$BBOX"
+  TRANSIT_ARGS=(--transit "$WORK/transit.csv"); slug="$slug-transit-pilot"
+fi
+echo "== E2SFCA"
 node scripts/access-dry-run.mjs --zips "$WORK/zips.csv" --supply "$WORK/supply.csv" --bench "$WORK/bench.csv" \
   --osrm http://127.0.0.1:5000 --osrm-foot http://127.0.0.1:5001 --nocar "$WORK/nocar.csv" --focus "$FOCUS" --label "${STATE_LABEL:-region}" --sample "${SAMPLE:-}" \
-  --td supabase/reference/network-adequacy/time-distance.csv --specmap supabase/reference/network-adequacy/specialty-map.csv --zipcounty "$WORK/zipcounty.csv" --aliases supabase/reference/network-adequacy/county-aliases.csv --pins "$WORK/pins.csv" --burden "$WORK/$slug-burden.csv" \
+  --td supabase/reference/network-adequacy/time-distance.csv --specmap supabase/reference/network-adequacy/specialty-map.csv --zipcounty "$WORK/zipcounty.csv" --aliases supabase/reference/network-adequacy/county-aliases.csv --pins "$WORK/pins.csv" "${TRANSIT_ARGS[@]}" --burden "$WORK/$slug-burden.csv" \
   --report "$REF/$slug-dry-run.md" --csv "$WORK/$slug-access.csv" --load "$WORK/load.csv"
 gzip -kf "$WORK/$slug-access.csv"; [ -f "$WORK/$slug-burden.csv" ] && gzip -kf "$WORK/$slug-burden.csv"
 docker rm -f osrm osrmfoot >/dev/null || true

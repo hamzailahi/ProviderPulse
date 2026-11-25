@@ -31,6 +31,10 @@ on:
       geofabrik:
         description: Geofabrik us/<state> extracts covering the box
         default: "us/tennessee us/kentucky us/virginia us/north-carolina us/georgia us/alabama us/mississippi us/arkansas us/missouri us/south-carolina us/west-virginia us/illinois"
+      transit:
+        description: Transit pilot (metro box only; dry run; report named <label>-transit-pilot)
+        type: boolean
+        default: false
       sample:
         description: ZIPs to show in detail
         default: "38017 38018 38103 37203 37902 37402 37683 38551 37336 38464"
@@ -65,6 +69,12 @@ jobs:
           sudo fallocate -l 16G "$d/swapfile" && sudo chmod 600 "$d/swapfile"
           sudo mkswap "$d/swapfile" >/dev/null && sudo swapon "$d/swapfile"
           free -g
+      - uses: actions/setup-java@v4
+        if: inputs.transit
+        with: { distribution: temurin, java-version: '21' }
+      - name: Transit tools
+        if: inputs.transit
+        run: pip install --quiet r5py geopandas
       - name: Dry run
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -75,6 +85,7 @@ jobs:
           BBOX: ${{ inputs.bbox }}
           GEOFABRIK: ${{ inputs.geofabrik }}
           SAMPLE: ${{ inputs.sample }}
+          TRANSIT: ${{ inputs.transit && '1' || '0' }}
           WORK: ${{ runner.temp }}/access
           NODE_OPTIONS: --max-old-space-size=6144
         run: bash scripts/access-dry-run.sh

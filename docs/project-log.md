@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 456 changes over 72 working days, 2026-05-13 to 2026-11-25.
-- 2026-08-19 onward: from the README changelog (282 entries, written for a reader).
+- 457 changes over 72 working days, 2026-05-13 to 2026-11-25.
+- 2026-08-19 onward: from the README changelog (283 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 121 |
+| November 2026 | 122 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-25
+
+- A public transit pilot for people without a car: in five metros, the drive-time access check can now also route households with no vehicle by bus and train (published timetables), as a report beside the walking figure. Nothing live changes.
 
 - The back-test now reports confidence intervals, p-values, results with controls and on held-out counties; new read-only jobs give the drive-time vs radius comparison nationally and check where moved clinicians billed Medicare. The address check reports moved clinicians by state and specialty as counts.
 
