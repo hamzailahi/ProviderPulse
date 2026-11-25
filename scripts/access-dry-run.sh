@@ -88,7 +88,7 @@ if [ "${TRANSIT:-0}" = 1 ]; then
   # its own name so the state reports stay as they are; never applied.
   [ "${MODE:-dry_run}" = apply ] && { echo "::error::the transit pilot is a dry run only"; exit 1; }
   echo "== Transit (GTFS from the Mobility Database catalog, r5py)"
-  python3 -I scripts/access-transit.py "$WORK/zips.csv" "$WORK/osm/region.osm.pbf" "$WORK/gtfs" "$WORK/transit.csv" "$BBOX"
+  python3 scripts/access-transit.py "$WORK/zips.csv" "$WORK/osm/region.osm.pbf" "$WORK/gtfs" "$WORK/transit.csv" "$BBOX"
   TRANSIT_ARGS=(--transit "$WORK/transit.csv"); slug="$slug-transit-pilot"
 fi
 echo "== E2SFCA"

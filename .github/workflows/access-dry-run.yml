@@ -74,7 +74,7 @@ jobs:
         with: { distribution: temurin, java-version: '21' }
       - name: Transit tools
         if: inputs.transit
-        run: pip install --quiet r5py geopandas
+        run: python3 -m pip install --quiet r5py geopandas
       - name: Dry run
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
