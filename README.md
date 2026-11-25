@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-25
 
+- Insights now says, under each specialty's score, how well that score tracked preventable hospital stays in the back-test, beside the federal shortage designation, and asks for care where it did worse.
+
 - Corrected the validation document's opening note, which still said no significance tests had been run.
 
 - The validation document now reports the public transit pilot for people without a car in Boston, Chicago, Washington DC, Philadelphia and New York City.

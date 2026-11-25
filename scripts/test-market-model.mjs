@@ -203,5 +203,15 @@ console.log('Payer yield (2026-11-20)');
   check('no yield keeps the insured rate', old.factors.pay === 78 && old.evidence.pay.basis === 'insured');
   check('payer mix shares', JSON.stringify(M.payerMix({ insured: 0.9, employer: 60, direct: 0, tricare: 0, medicare: 25, medicaid: 15 })) === '{"commercial_pct":60,"medicare_pct":25,"medicaid_pct":15,"uninsured_pct":10}');
 }
+console.log('Back-test evidence (2026-11-25)');
+{
+  const E = M.EVIDENCE, rows = Object.values(E);
+  check('16 ahead, 7 behind, 10 tied, as in the report', rows.filter(r => r[3] > 0).length === 16 && rows.filter(r => r[3] < 0).length === 7 && rows.filter(r => r[3] === 0).length === 10);
+  check('every evidence label is a scored specialty', Object.keys(E).every(l => SPECIALTIES.some(x => (Array.isArray(x) ? x[0] : x) === l)), Object.keys(E).filter(l => !SPECIALTIES.some(x => (Array.isArray(x) ? x[0] : x) === l)).join(', '));
+  check('dental text carries its figures', /0\.43 vs 0\.13, 2,978 counties/.test(M.evidenceText('Dental')));
+  check('a flagged specialty says read with care', /with care/.test(M.evidenceText('Cancer care / oncology')));
+  check('no row says no test', /No hospital-outcome back-test/.test(M.evidenceText('Pediatrics (children)')));
+  check('every caution specialty is behind HPSA', Object.keys(M.UNVALIDATED).every(l => E[l] && E[l][3] < 0));
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

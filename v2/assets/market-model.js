@@ -93,6 +93,55 @@
     'Allergy & immunology': 1, 'Cancer care / oncology': 1,
     'Ear, nose & throat': 1, 'Urgent care & emergency': 1, 'Imaging & lab': 1
   };
+  // Back-test evidence per specialty (2026-11-25, the user's go-ahead to show
+  // it in Insights): [counties, score rho, HPSA rho, verdict] against county
+  // preventable hospital stays, copied from supabase/reference/backtest-entry.md
+  // section 4a. Verdict from the paired bootstrap of score minus HPSA: 1 the
+  // 95% interval is above zero, -1 below, 0 it spans zero. A specialty with
+  // no row had no outcome test. Update with the report when it is rerun.
+  var EVIDENCE = {
+    'Primary care / family doctor': [2874, 0.28, 0.17, 1],
+    'Mental health & counseling': [2874, 0.31, 0.06, 1],
+    'Dental': [2978, 0.43, 0.13, 1],
+    'Eye care': [2874, 0.31, 0.17, 1],
+    'Chiropractic': [2874, 0.34, 0.17, 1],
+    'Physical & occupational therapy': [2874, 0.27, 0.17, 1],
+    'Orthopedics & sports injury': [2874, 0.23, 0.17, 1],
+    'Heart / cardiology': [2874, 0.16, 0.17, 0],
+    'Allergy & immunology': [2874, 0.07, 0.17, -1],
+    'Lung, breathing & sleep': [2978, 0.21, 0.17, 0],
+    'Digestive / gastroenterology': [2978, 0.20, 0.17, 0],
+    'Kidney / nephrology': [2874, 0.14, 0.17, 0],
+    'Diabetes & hormones': [2874, 0.30, 0.17, 1],
+    'Cancer care / oncology': [2874, -0.04, 0.17, -1],
+    'Arthritis / rheumatology': [2874, 0.11, 0.17, -1],
+    'Brain & nerves / neurology': [2874, 0.22, 0.17, 1],
+    'Ear, nose & throat': [2874, 0.05, 0.17, -1],
+    'Urology': [2874, 0.22, 0.17, 1],
+    'Foot & ankle / podiatry': [2874, 0.26, 0.17, 1],
+    'Pain management': [2874, 0.12, 0.17, 0],
+    'Speech & language therapy': [2874, 0.19, 0.17, 0],
+    'Nutrition & dietitian': [2874, 0.33, 0.17, 1],
+    'Acupuncture, massage & naturopathy': [2874, 0.37, 0.17, 1],
+    'Urgent care & emergency': [2874, -0.18, 0.17, -1],
+    'Imaging & lab': [2874, -0.05, 0.17, -1],
+    'Pharmacy': [2874, 0.29, 0.17, 1],
+    'Home health & in-home care': [2874, 0.17, 0.17, 0],
+    'Nursing & assisted living': [2874, 0.24, 0.17, 1],
+    'Medical equipment & supplies': [2874, 0.17, 0.17, 0],
+    'Hearing & audiology': [2874, 0.12, 0.17, 0],
+    'Care coordination & community health': [2874, 0.23, 0.17, 1],
+    'General surgery': [2874, 0.14, 0.17, 0],
+    'Hospice & palliative care': [2874, 0.10, 0.17, -1]
+  };
+  function evidenceText(label) {
+    var e = EVIDENCE[label];
+    if (!e) return 'No hospital-outcome back-test exists for this specialty yet.';
+    var n = e[0].toLocaleString('en-US'), sc = e[1].toFixed(2), hp = e[2].toFixed(2);
+    if (e[3] > 0) return 'Back-test: this score tracks preventable hospital stays better than the federal shortage designation (rank correlation ' + sc + ' vs ' + hp + ', ' + n + ' counties).';
+    if (e[3] < 0) return 'Back-test: the federal shortage designation tracks preventable hospital stays better here (' + hp + ' vs ' + sc + ' for this score, ' + n + ' counties). Read this score with care.';
+    return 'Back-test: this score and the federal shortage designation track preventable hospital stays about equally (' + sc + ' vs ' + hp + ', ' + n + ' counties).';
+  }
   // Payer yield (2026-11-20, the user's go-ahead after the back-test: it beat
   // the insured rate against clinician entry in all 40 specialties). What an
   // average resident's coverage pays a practice relative to Medicare: Census
@@ -643,7 +692,7 @@
   }
 
   var API = {
-    VERSION: VERSION, WEIGHTS: WEIGHTS, YIELD: YIELD, payerYield: payerYield, payerYieldAge: payerYieldAge, ageTilt: ageTilt, payerMix: payerMix, ACCESS_SHARE: ACCESS_SHARE, NEED_SHARE: NEED_SHARE, PAY_SHARE: PAY_SHARE, UNVALIDATED: UNVALIDATED, weightsFor: weightsFor, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
+    VERSION: VERSION, WEIGHTS: WEIGHTS, YIELD: YIELD, payerYield: payerYield, payerYieldAge: payerYieldAge, ageTilt: ageTilt, payerMix: payerMix, ACCESS_SHARE: ACCESS_SHARE, NEED_SHARE: NEED_SHARE, PAY_SHARE: PAY_SHARE, UNVALIDATED: UNVALIDATED, EVIDENCE: EVIDENCE, evidenceText: evidenceText, weightsFor: weightsFor, PROFILES: PROFILES, ARCHETYPES: ARCHETYPES, SHORTAGE_DISCIPLINE: SHORTAGE_DISCIPLINE,
     score: score, classify: classify, pct: pct, rankIn: rankIn, measureIds: measureIds, MEASURE_NAME: MEASURE_NAME,
     FACILITY_TYPES: FACILITY_TYPES, facilities: facilities, facilityCodes: facilityCodes
   };

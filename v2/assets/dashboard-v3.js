@@ -857,7 +857,8 @@ function paintModel(p, d, M) {
       el('div', { class: 'ins-vcol' },
         el('p', { class: 'ins-bigscore' }, el('b', {}, sc == null ? '--' : String(sc)), el('span', {}, '/ 100 opportunity score')), scoreBar,
         h.scores ? el('p', { class: 'ins-help' }, 'Patients need care here: ' + (h.scores.patient_need == null ? 'n/a' : h.scores.patient_need) +
-          ' · A practice can make it here: ' + (h.scores.viability == null ? 'n/a' : h.scores.viability)) : null),
+          ' · A practice can make it here: ' + (h.scores.viability == null ? 'n/a' : h.scores.viability)) : null,
+        window.MarketModel && MarketModel.evidenceText ? el('p', { class: 'ins-help ins-evidence' }, MarketModel.evidenceText(h.specialty)) : null),
       el('div', { class: 'ins-vcol' },
         el('p', { class: 'ins-confl', title: 'How much of the model is backed by local data' }, bars, h.confidence.charAt(0).toUpperCase() + h.confidence.slice(1) + ' confidence'),
         el('p', { class: 'ins-help' }, h.caveats.length ? h.caveats.length + ' data note' + (h.caveats.length === 1 ? '' : 's') + ' under How the score is built.' : 'Every factor is backed by local data.'))),
