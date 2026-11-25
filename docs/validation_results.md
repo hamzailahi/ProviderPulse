@@ -12,8 +12,9 @@ Rules used here:
 
 - No figure is estimated, rounded further, or recomputed from a rounded one.
   Correlations are shown at the two decimals the scripts print.
-- "Not computed" means not computed. No result is described as significant
-  unless a test was run, and none was (see 1.6).
+- "Not computed" means not computed. Intervals, p-values, controls and a
+  holdout exist only where 1.6 reports them; nothing else is described as
+  significant.
 - Reports are the versions in git at commit time; `git log -- <file>` gives
   each run's date and commit.
 
