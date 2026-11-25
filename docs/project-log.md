@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 463 changes over 72 working days, 2026-05-13 to 2026-11-25.
-- 2026-08-19 onward: from the README changelog (289 entries, written for a reader).
+- 464 changes over 72 working days, 2026-05-13 to 2026-11-25.
+- 2026-08-19 onward: from the README changelog (290 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 128 |
+| November 2026 | 129 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-25
+
+- The caution note on the five weakest specialties now gives the back-test figures instead of a general warning.
 
 - Insights now says, under each specialty's score, how well that score tracked preventable hospital stays in the back-test, beside the federal shortage designation, and asks for care where it did worse.
 

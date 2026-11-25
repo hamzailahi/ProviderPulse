@@ -515,7 +515,7 @@
       if (ev.need && ev.need.basis !== 'specialty' && ev.need.basis !== 'learned') conf -= 0.15;
       if (ev.access && ev.access.basis === 'group') conf -= 0.15;
       if (input.catchmentTruncated) { conf -= 0.1; caveats.push('This area has more listings than one request returns, so supply counts are a floor.'); }
-      if (UNVALIDATED[label]) { conf -= 0.15; caveats.push('In our back-test this specialty\'s score did not track preventable hospital stays, so read it with care.'); }
+      if (UNVALIDATED[label]) { conf -= 0.15; caveats.push(evidenceText(label)); }
       if (input.adults != null && input.adults < 5000) { conf -= 0.15; caveats.push('Fewer than 5,000 adults in the catchment: small numbers swing the result.'); }
       var confidence = conf >= 0.8 ? 'high' : conf >= 0.55 ? 'medium' : 'low';
 
