@@ -217,36 +217,63 @@ and was not adopted.
 
 ### 1.6 Controls, holdout and out-of-sample checks
 
-**There were none in the back-test.** Plainly:
+Added 2026-11-25 as section 4 of `supabase/reference/backtest-entry.md`
+(numbers also in `supabase/reference/backtest-entry-stats.json`), produced by
+`scripts/backtest-entry.mjs` with `scripts/lib/stats.mjs`. Methods: 95%
+intervals for Spearman's rho by Fisher z with the Bonett and Wright (2000)
+standard error; two-sided p-values from the t approximation; a paired
+bootstrap of "score rho minus HPSA rho" over the same counties (500 resamples,
+seed 1; 200 over ZIPs for entry); partial Spearman controlling for county
+adults (log), adult-weighted median household income and share 65+; and a
+county holdout (counties split in two by a hash of the FIPS code). With
+thousands of units nearly every rho is statistically significant, so the
+intervals are the useful figure.
 
-- No train/test split or holdout. The factor weights in 1.4 were set from the
-  same counties and ZIPs they are reported on, so the post-adjustment fit is
-  in-sample.
-- No significance tests, p-values or confidence intervals were computed.
-- No controls (urbanity, income, age) were applied. The report itself warns
-  that poorer, older counties have both more need and more preventable stays.
-  It shows need alone and access alone so they can be told apart, but that is
-  not a control.
-- The outcomes are Medicare fee-for-service only and county-level. 2020
-  supply counts NPIs still active today at today's address, because
-  deactivated NPPES records carry no address.
+**Preventable hospital stays (2,874 to 2,978 counties).** The paired 95%
+interval for "score minus HPSA" lies wholly above zero in 16 of 33
+specialties, wholly below zero in 7, and spans zero in 10. Examples: dental
+0.43 [0.40, 0.46] vs HPSA 0.13 [0.09, 0.16], difference [0.26, 0.35]; mental
+health 0.31 [0.28, 0.35] vs 0.06 [0.02, 0.09], difference [0.20, 0.30];
+primary care 0.28 [0.25, 0.32] vs 0.17 [0.13, 0.20], difference [0.07, 0.16].
+HPSA is ahead for oncology (score -0.04 [-0.08, -0.01]), ENT, allergy,
+rheumatology and others listed in the report. Score rhos range from -0.18 to
+0.43.
 
-The only holdout in the repository is in the **parked** demand model
-(`assets/demand-model.js`): whole states held out. It found 0 of 33 usable
-models and is not part of the live score.
+**ER visits (2,903 to 3,007 counties).** Score ahead of HPSA in 18 of 33
+(interval of the difference above zero), HPSA ahead in 5, overlap in 10.
+**Readmissions:** HPSA's interval lies above the score's in 25 of 33, and
+they overlap in 8; the score is ahead in none.
 
-**Not yet produced, and what it would take:**
+**With controls (2,871 to 2,975 counties).** After adjusting both sides for
+county size, income and age, the score's partial rho with preventable stays
+is higher than HPSA's in 31 of 33 specialties. It ranges from -0.14 (urgent
+care) to 0.31 (dental; acupuncture also 0.31), and is 0.15 or more in 17. HPSA's partial rho is 0.01 in 31
+specialties (-0.02 and -0.04 in dental and mental health): once size, income
+and age are held fixed, the shortage designation tracks preventable stays
+hardly at all, while the score keeps much of its signal.
 
-1. **95% confidence intervals:** add a bootstrap over counties (and ZIPs) to
-   `backtest-entry.mjs`, 1,000 resamples per specialty. This is a read-only
-   rerun of `backtest-entry.yml`, about the same run time as before.
-2. **p-values:** a permutation test, or the t approximation for Spearman,
-   computed in the script from unrounded rho and N. This should not be done
-   by hand from the two-decimal figures above.
-3. **Holdout:** set the share thresholds on a random half of counties (or on
-   held-out states) and report rho on the other half.
-4. **Controls:** partial Spearman controlling for log population density,
-   median income and share 65+, all already in `census_acs_zcta`.
+**Holdout (half A 1,426 to 1,475 counties, half B 1,448 to 1,503).** The
+weight rules from 1.4, read on half A and checked on half B, give the same
+access weight class in 28 of 33 specialties, the same need weight class in
+31 of 33, and the same caution flag in 31 of 33. Score rho on the two halves
+differs by at most 0.05 (for example primary care 0.30 / 0.26, dental 0.45 /
+0.41, urgent care -0.15 / -0.20).
+
+**Clinician entry 2021 to 2025 (20,458 ZIPs, same ZIPs for all three
+measures).** Payer yield beats the insured rate in all 40 specialties, with
+the interval of the difference above zero in every one (100% of resamples).
+Against HPSA it is ahead in 7 (chiropractic, therapy, orthopedics, speech,
+nutrition, acupuncture, hearing), behind in 29, and overlapping in 4.
+Distance from competitors runs from -0.74 [-0.75, -0.74] (genetics) to -0.18
+[-0.19, -0.17] (primary care) over 21,552 ZIPs: negative with tight
+intervals in every specialty.
+
+**Still not done.** Controls are county size, income and age only (no
+rurality index, race or disability). The holdout splits counties, not states,
+so neighbouring counties can sit on both sides. Outcomes remain Medicare
+fee-for-service and county-level, and 2020 supply still counts NPIs active
+today at today's address. The only state holdout in the repository remains
+the parked demand model (0 of 33 usable).
 
 ---
 
@@ -312,21 +339,22 @@ Across all 2,076 state-by-specialty figures: lowest -0.17, median 0.68,
 highest 0.95. The lowest values come from the smallest areas, DC (31 focus
 ZIPs) and Delaware (66); small N makes those state figures unstable.
 
-**What this is not:** a single national Spearman rho over all 33,295 ZIPs.
-The column above is a ZIP-weighted mean of 52 state rhos, which is not the
-same statistic.
+**National rho (added 2026-11-25).** `supabase/reference/access-national.md`
+(`scripts/access-national.mjs`, workflow `access-national.yml`, read only)
+correlates the stored drive-time access (`access_e2sfca`, every ZIP) with the
+10-mile count recomputed over the same 33,295 ZIPs, both through the model's
+access factor and against the site-weighted national rate. One Spearman rho
+per specialty over all ZIPs, with a 95% interval:
 
-**Not yet produced, and what it would take:** the true national rho needs
-every ZIP's two access figures in one place. The per-ZIP CSVs are 7-day run
-artifacts, not in git. Two ways to get them:
+- Range 0.60 to 0.81 across the 40 scored specialties, every p < 0.001.
+- Lowest: oncology 0.60 [0.59, 0.60], urgent care 0.60 [0.59, 0.61],
+  pharmacy 0.60 [0.59, 0.61], primary care 0.62 [0.61, 0.63].
+- Highest: pediatrics 0.81 [0.81, 0.82], acupuncture 0.81 [0.81, 0.82].
 
-1. A read-only job that joins `access_e2sfca` (the drive-time figure, every
-   ZIP and specialty) with the 10-mile count recomputed from
-   `listing_counts_zip` and `zip_pop_centres`, then prints one rho per
-   specialty with N. No rerouting, minutes to run.
-2. Or rerun the 52 state jobs and keep the CSVs (hours).
-
-Option 1 is the cheaper route.
+The state-level figures above stay as they are. The national rho is the
+single statistic to cite. The reports for Connecticut, New Mexico, Alaska and
+South Dakota were rerun on 2026-11-25 (see section 4), so the state table
+reflects those reruns.
 
 ### 2.2 Multi-site weighting (0.6 at the main office)
 
@@ -358,18 +386,34 @@ All 40 specialties are in the report. The range is -0.6% (home health) to
 -21.5% (cardiology). Specialties that share a code overlap, so the rows do not
 sum.
 
-**Markets flipping above or below the national rate: not yet produced.** The
-only before/after market comparison is `supabase/reference/weight-compare.md`
-(`scripts/live/weight-compare.mjs`, 2026-11-19): 4 ZIPs by 3 specialties,
-against the unweighted national rate. In it, 38017 primary care moved from
-5.78 to 4.93 per 1,000 against a US rate of 4.78 (still above), and 76104
-primary care from 5.06 to 4.37 (from above to below). That is 12 cells, not a
-national count.
+**Markets crossing the national rate (added 2026-11-25).** Section 2 of
+`supabase/reference/access-national.md`, 33,295 ZIPs per specialty, 10-mile
+count. "Before" counts every listing as 1 against the plain national rate;
+"after" counts a multi-site clinician as 0.6 against the site-weighted
+national rate, the pair the live score uses since 2026-11-24. Selected rows:
 
-To produce the national count: a read-only job that, per scored ZIP and
-specialty, compares the 10-mile rate before and after weighting with the
-plain and the weighted national rate (`market_benchmarks`, `rate_per_1k` and
-`rate_per_1k_weighted`) and counts crossings. Same inputs as 2.1 option 1.
+| Specialty | Above before | Above after | Fell below | Rose above |
+|---|---|---|---|---|
+| Primary care / family doctor | 10,158 | 10,172 | 419 | 433 |
+| Heart / cardiology | 8,379 | 8,396 | 298 | 315 |
+| Kidney / nephrology | 9,965 | 10,302 | 310 | 647 |
+| Urgent care & emergency | 11,252 | 11,539 | 308 | 595 |
+| Ear, nose & throat | 9,058 | 9,336 | 301 | 579 |
+| Foot & ankle / podiatry | 9,863 | 9,698 | 511 | 346 |
+| Mental health & counseling | 9,397 | 9,408 | 69 | 80 |
+| Nursing & assisted living | 14,737 | 14,747 | 13 | 23 |
+
+All 40 are in the report. Because the national rate falls with the local
+counts, the total above the line barely moves. The change is in which ZIPs
+sit there: in every specialty some ZIPs fall below and others rise above
+(from 10 and 26 for medical equipment to 511 and 346 for podiatry). For
+comparison, weighting the local counts while keeping the plain national rate
+(the mismatch the live score avoids) would put primary care at 6,698 ZIPs
+above instead of 10,158.
+
+The earlier 12-cell comparison (`supabase/reference/weight-compare.md`,
+2026-11-19) stays as a worked example: 76104 primary care went from 5.06 to
+4.37 per 1,000 against a US rate of 4.78.
 
 ### 2.3 Do the earlier figures still hold?
 
@@ -478,25 +522,41 @@ clinicians in the "other state only" class, not counts. The highest shares:
 
 Full table in the report.
 
-**Not yet produced:** counts by specialty, and both "other state" classes
-together by state and specialty. These are a one-line change to
-`address-check.mjs`'s report plus a read-only rerun of `address-check.yml`.
+**By state and specialty (added 2026-11-25).** Section "Moves" of
+`supabase/reference/address-check.md` (dry-run rerun of `address-check.yml`):
+138,150 moves (720 more in those classes had no usable Medicare address);
+1.8% of all clinicians and 8.4% of those in Medicare.
+
+- Top listed states: NY 10,702 (7.7% of moves), PA 7,953, FL 7,808, CA
+  7,560, TX 7,297, IL 5,909, OH 4,982, MA 4,408, MI 4,403, VA 4,314.
+- By specialty, as a share of that specialty's clinicians: urgent care &
+  emergency 9,499 of 81,956 (11.6%), hospital-based clinicians 18,951 of
+  223,642 (8.5%), imaging & lab 7,303 of 88,913 (8.2%), general surgery,
+  neurology and oncology 5.7% each, cardiology 5.3%, primary care 26,648 of
+  744,434 (3.6%), mental health 16,175 of 1,444,604 (1.1%).
 
 ### 3.3 Recent billing at the old vs the new address
 
-**Not yet produced.** Nothing in the repository compares where the 138,150
-billed Medicare. What it would take: CMS's Medicare Physician and Other
-Practitioners by Provider file (the newest year, 2024) carries each NPI's
-practice address (`Rndrng_Prvdr_St1`, city, state, ZIP5). The job
-`import-medicare-activity.mjs` already finds that file in the CMS catalog. A
-read-only job would join it to the moved NPIs and count three groups:
+**Produced 2026-11-25, and not yet a fair test.**
+`supabase/reference/moved-billing.md` (`scripts/moved-billing.mjs`, workflow
+`moved-billing.yml`, read only) joins the 138,150 moved clinicians to CMS's
+Medicare Physician and Other Practitioners by Provider file, data year 2024
+(1,296,739 rows).
 
-- the billing address matches the old NPPES address (`nppes_*` columns);
-- it matches the new Medicare address;
-- it matches neither.
+- Found in the billing file: 85,334 (61.8%). The other 52,816 did not bill
+  traditional Medicare under their own NPI that year, or billed only through
+  a group. They are not read as inactive.
+- Of those found, by ZIP: 80,105 (93.9%) billed at the old NPPES address,
+  1,652 (1.9%) at the new Medicare address, and 3,577 (4.2%) at neither. By
+  state: 80,698 (94.6%) old, 3,394 (4.0%) new, 1,242 (1.5%) neither.
 
-The by-provider file has one address per NPI, so the result is "the address
-on the 2024 billing record", not every address billed from.
+**Do not cite this as evidence that the moves are wrong, or right.** The
+billing year (2024) comes before the enrollment data that triggered the moves
+(CMS Doctors and Clinicians, release 2026-10-30). A clinician who moved in
+2025 or 2026 billed 2024 from the old address. A fair test needs the
+2025 billing file (CMS has not published it as of this writing) or a check
+of where each clinician enrolled each year. What the figure does show is that
+the old addresses were real practice addresses in 2024.
 
 ---
 
@@ -516,45 +576,46 @@ maximum minutes for that county type. CMS applies the limit to a plan's
 network. Here it is read against every listing, so "over" means no listing of
 that kind at all within the limit. It is not a test of any plan.
 
-Totals over 32,782 ZIPs with a county match. Adults in focus ZIPs:
-261,050,446 (the sum of each report's adult count).
+Totals over 33,111 ZIPs with a county match (every county matched since
+the Connecticut, New Mexico, Alaska and South Dakota reruns of 2026-11-25).
+Adults in focus ZIPs: 261,050,446 (the sum of each report's adult count).
 
-| Specialty | CMS code | ZIPs over | Share of ZIPs | Adults in those ZIPs | Share of adults |
-|---|---|---|---|---|---|
-| Primary care / family doctor | S03 | 1,598 | 4.9% | 3,145,138 | 1.2% |
-| Women's health / OB-GYN | 016 | 342 | 1.0% | 200,876 | 0.1% |
-| Mental health: psychiatry | 029 | 1,014 | 3.1% | 1,064,013 | 0.4% |
-| Mental health: clinical psychology | 036 | 392 | 1.2% | 276,384 | 0.1% |
-| Mental health: clinical social work | 037 | 491 | 1.5% | 358,187 | 0.1% |
-| Eye care | 023 | 814 | 2.5% | 794,693 | 0.3% |
-| Chiropractic | 010 | 289 | 0.9% | 136,215 | 0.1% |
-| Physical & occupational therapy | F049 | 243 | 0.7% | 122,146 | 0.0% |
-| Orthopedics | 025 | 1,175 | 3.6% | 1,211,240 | 0.5% |
-| Cardiology | 008 | 3,132 | 9.6% | 4,852,576 | 1.9% |
-| Dermatology | 011 | 2,472 | 7.5% | 3,633,132 | 1.4% |
-| Allergy & immunology | 007 | 2,782 | 8.5% | 4,746,911 | 1.8% |
-| Lung, breathing & sleep | 030 | 1,542 | 4.7% | 1,833,184 | 0.7% |
-| Gastroenterology | 014 | 2,827 | 8.6% | 4,261,599 | 1.6% |
-| Nephrology | 018 | 696 | 2.1% | 623,844 | 0.2% |
-| Diabetes & hormones | 012 | 648 | 2.0% | 994,366 | 0.4% |
-| Oncology | 021 | 1,728 | 5.3% | 2,370,070 | 0.9% |
-| Rheumatology | 031 | 1,807 | 5.5% | 2,737,448 | 1.0% |
-| Neurology | 019 | 1,866 | 5.7% | 2,246,630 | 0.9% |
-| Ear, nose & throat | 013 | 1,531 | 4.7% | 1,872,294 | 0.7% |
-| Urology | 033 | 2,048 | 6.2% | 3,305,950 | 1.3% |
-| Podiatry | 028 | 1,142 | 3.5% | 1,286,506 | 0.5% |
-| Plastic surgery | 027 | 1,289 | 3.9% | 1,903,989 | 0.7% |
-| Speech & language therapy | F051 | 417 | 1.3% | 291,128 | 0.1% |
-| Imaging & lab | F047 | 641 | 2.0% | 647,718 | 0.2% |
-| Nursing & assisted living | F046 | 401 | 1.2% | 377,075 | 0.1% |
-| General surgery | 015 | 1,491 | 4.5% | 1,880,964 | 0.7% |
-| Infectious disease | 017 | 1,412 | 4.3% | 1,855,220 | 0.7% |
+| Specialty | CMS code | States | ZIPs over | Share of ZIPs | Adults in those ZIPs | Share of adults |
+|---|---|---|---|---|---|---|
+| Primary care / family doctor | S03 | 52 | 1,609 of 33,111 | 4.9% | 3,186,447 | 1.2% |
+| Women's health / OB-GYN | 016 | 52 | 354 of 33,111 | 1.1% | 205,759 | 0.1% |
+| Mental health & counseling: Psychiatry | 029 | 52 | 1,029 of 33,111 | 3.1% | 1,070,614 | 0.4% |
+| Mental health & counseling: Clinical Psychology | 036 | 52 | 406 of 33,111 | 1.2% | 281,958 | 0.1% |
+| Mental health & counseling: Clinical Social Work | 037 | 52 | 503 of 33,111 | 1.5% | 363,070 | 0.1% |
+| Eye care | 023 | 52 | 830 of 33,111 | 2.5% | 802,927 | 0.3% |
+| Chiropractic | 010 | 52 | 301 of 33,111 | 0.9% | 141,098 | 0.1% |
+| Physical & occupational therapy | F049 | 52 | 255 of 33,111 | 0.8% | 127,029 | 0.0% |
+| Orthopedics & sports injury | 025 | 52 | 1,192 of 33,111 | 3.6% | 1,220,445 | 0.5% |
+| Heart / cardiology | 008 | 52 | 3,160 of 33,111 | 9.5% | 4,871,455 | 1.9% |
+| Skin / dermatology | 011 | 52 | 2,505 of 33,111 | 7.6% | 3,675,382 | 1.4% |
+| Allergy & immunology | 007 | 52 | 2,807 of 33,111 | 8.5% | 4,759,060 | 1.8% |
+| Lung, breathing & sleep | 030 | 52 | 1,558 of 33,111 | 4.7% | 1,861,307 | 0.7% |
+| Digestive / gastroenterology | 014 | 52 | 2,865 of 33,111 | 8.7% | 4,286,781 | 1.6% |
+| Kidney / nephrology | 018 | 52 | 712 of 33,111 | 2.2% | 630,975 | 0.2% |
+| Diabetes & hormones | 012 | 52 | 663 of 33,111 | 2.0% | 1,002,588 | 0.4% |
+| Cancer care / oncology | 021 | 52 | 1,754 of 33,111 | 5.3% | 2,398,861 | 0.9% |
+| Arthritis / rheumatology | 031 | 52 | 1,843 of 33,111 | 5.6% | 2,758,133 | 1.1% |
+| Brain & nerves / neurology | 019 | 52 | 1,895 of 33,111 | 5.7% | 2,263,721 | 0.9% |
+| Ear, nose & throat | 013 | 52 | 1,558 of 33,111 | 4.7% | 1,889,866 | 0.7% |
+| Urology | 033 | 52 | 2,074 of 33,111 | 6.3% | 3,364,024 | 1.3% |
+| Foot & ankle / podiatry | 028 | 52 | 1,155 of 33,111 | 3.5% | 1,292,132 | 0.5% |
+| Plastic & reconstructive surgery | 027 | 52 | 1,318 of 33,111 | 4.0% | 1,917,648 | 0.7% |
+| Speech & language therapy | F051 | 52 | 418 of 33,111 | 1.3% | 291,368 | 0.1% |
+| Imaging & lab | F047 | 52 | 654 of 33,111 | 2.0% | 653,218 | 0.3% |
+| Nursing & assisted living | F046 | 52 | 415 of 33,111 | 1.3% | 384,043 | 0.1% |
+| General surgery | 015 | 52 | 1,512 of 33,111 | 4.6% | 1,895,557 | 0.7% |
+| Infectious disease | 017 | 52 | 1,431 of 33,111 | 4.3% | 1,871,586 | 0.7% |
 
-**Known gap in these reports:** 12 counties were unmatched to the HSD file
-when these runs were made. They are Connecticut's 9 planning regions plus Doña Ana (NM),
-Kusilvak (AK) and Oglala Lakota (SD); the fix landed 2026-11-24, after the runs. ZIPs in them
-have no time-limit result here. Rerunning Connecticut, New Mexico, Alaska and
-South Dakota adds them.
+**County gap closed (2026-11-25).** The four states were rerun after the
+county-name fix of 2026-11-24, and every county now matches the HSD file (0
+unmatched, previously 12). The rerun's region boxes and neighbouring-state
+lists were set by hand, so those four states' region counts can differ
+slightly from their earlier runs.
 
 Another limit: the reports give adults, not total population, and break
 results down by CMS county type per state, not nationally.
@@ -576,10 +637,13 @@ specialties (-0.18 to -0.74 over 20,588 ZIPs). That market signal points away
 from underserved areas. Third, the national drive-time rebuild across 33,295
 ZIPs found that a 10-mile radius and actual drive-time access often disagree
 (state-level rank agreement from -0.17 to 0.95, median 0.68). Measured
-against CMS's own Medicare Advantage time limits, 4,852,576 adults (1.9%) live
-in ZIPs with no cardiologist and 3,145,138 (1.2%) in ZIPs with no primary care
-listing within the limit. All of these figures are correlations from
-in-sample tests with no confidence intervals yet (see 1.6).
+against CMS's own Medicare Advantage time limits, 4,871,455 adults (1.9%) live
+in ZIPs with no cardiologist and 3,186,447 (1.2%) in ZIPs with no primary care
+listing within the limit. Over all 33,295 ZIPs at once, the two measures'
+rank agreement runs 0.60 to 0.81 by specialty. The health-need comparison
+holds up under controls: after adjusting for county size, income and age, the
+score beats HPSA in 31 of 33 specialties, and its weight rules repeat on
+held-out counties (see 1.6).
 
 ---
 
@@ -590,6 +654,9 @@ git show 89996ce:supabase/reference/backtest-entry.md     # payer yield vs insur
 cat supabase/reference/backtest-entry.md                  # sections 1.1 to 1.4
 git show 1543f37:supabase/reference/access-e2sfca/tennessee-dry-run.md  # first Tennessee run (2.3)
 node scripts/validation-summary.mjs                       # national tables (2.1, 4)
+cat supabase/reference/access-national.md                 # national rho, weighting crossings (2.1, 2.2)
+cat supabase/reference/moved-billing.md                   # 3.3
+cat supabase/reference/backtest-entry-stats.json          # 1.6 (section 4 of backtest-entry.md)
 cat supabase/reference/clinician-status-dry-run.md supabase/reference/weight-compare.md  # 2.2
 cat supabase/reference/address-check.md                   # section 3
 git show 89996ce:supabase/reference/backtest-entry.md | awk -F'|' '/^## 2\./{f=1} /^## 3\./{f=0} f && $3~/[0-9]/ {n++; w+=($6>$5); h+=($10>$6)} END{print n, w, h}'  # 40 40 31 (1.5)

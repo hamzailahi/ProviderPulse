@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-25
 
+- The validation results document now carries confidence intervals, results with controls and on held-out counties, one national drive-time comparison per specialty, how site weighting moves ZIPs across the national rate, moved clinicians by state and specialty, and the Medicare Advantage time check with every county matched.
+
 - A public transit pilot for people without a car: in five metros, the drive-time access check can now also route households with no vehicle by bus and train (published timetables), as a report beside the walking figure. Nothing live changes.
 
 - The back-test now reports confidence intervals, p-values, results with controls and on held-out counties; new read-only jobs give the drive-time vs radius comparison nationally and check where moved clinicians billed Medicare. The address check reports moved clinicians by state and specialty as counts.
