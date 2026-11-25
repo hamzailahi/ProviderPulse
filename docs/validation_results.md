@@ -445,9 +445,6 @@ is not representative of every state.
 all 40 the range is -0.6% to -21.5%. State it as "10.8% to 21.5% for
 physician specialties", or give the full range.
 
----
-
-
 ### 2.4 People without a car: public transit pilot (five metros)
 
 **Script:** `scripts/access-transit.py` (r5py on the metro's GTFS feeds plus
@@ -493,6 +490,8 @@ most, are in each report.
 **Limits.** One departure window on one day, chosen as an assumption.
 Published timetables, not real-time service. Five metros only; no rural
 transit was tested. ZIP centres stand in for homes and practices.
+
+---
 
 ## 3. Directory mismatch counts
 
