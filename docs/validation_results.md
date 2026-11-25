@@ -46,11 +46,23 @@ commit `453de9f`); the earlier runs are in git (`89996ce` 2026-11-20,
 | Entry outcome years | NPI-1 enumeration dates 2021 to 2025 | report intro |
 | Score as of | end of 2020 for the entry test; today's supply for the outcome test | report intro |
 
-**Not yet produced:** the report does not print which data year of
-`cms_county_utilization` each county's ER and readmission figure came from,
-or the data years inside the CHR 2025 release. To produce: add
-`select year, count(*) from cms_county_utilization group by year` and the CHR
-file's year column to the report (read only, minutes).
+**Outcome data years (added 2026-11-25).** From
+`supabase/reference/outcome-years.md` (`scripts/outcome-years.sh`, workflow
+`outcome-years.yml`, read only; same selection as the back-test: per county,
+the newest year with a value):
+
+| Outcome | Source table | Data year | Counties |
+|---|---|---|---|
+| ER visits per 1,000 | `cms_county_utilization` | 2024 | 3,143 |
+| Readmission rate | `cms_county_utilization` | 2024 | 3,000 |
+| Preventable hospital stays | `county_preventable_stays` (County Health Rankings v005) | release 2025 | 3,069 |
+
+`cms_county_utilization` holds one year only (2024, 3,197 rows). County
+Health Rankings' analytic CSV carries its release year, not the measurement
+year behind v005, so the database cannot say which calendar year the
+preventable-stays rates describe. Cite them as "County Health Rankings 2025
+release" and take the measurement year from County Health Rankings' own
+documentation for that release.
 
 The exact query for the county outcomes (from `backtest-entry.sh`, line 19):
 
