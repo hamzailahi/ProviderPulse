@@ -79,6 +79,17 @@ import geopandas as gpd, r5py
 from shapely.geometry import Point
 pts = [r for r in csv.DictReader(open(zips_csv))]
 gdf = gpd.GeoDataFrame({'id': [r['zip'] for r in pts]}, geometry=[Point(float(r['lon']), float(r['lat'])) for r in pts], crs='EPSG:4326')
+# Check each feed alone with R5's own GTFS loader first: some bad feeds fail
+# without naming themselves once loaded together (DC, 2026-11-25).
+import com.conveyal.gtfs
+good = []
+for p, u in zip(paths, used):
+    try:
+        com.conveyal.gtfs.GTFSFeed.writableTempFileFromGtfs(p).close(); good.append((p, u))
+    except Exception as e:
+        print('dropping feed R5 cannot load:', os.path.basename(p), u[1], str(e).splitlines()[-1][:200])
+if not good: sys.exit('no GTFS feed R5 can load')
+paths = [g[0] for g in good]; used = [g[1] for g in good]
 # A feed R5 still cannot read is left out and named in the report's feed list,
 # never silently: try again without it, at most 10 times.
 for attempt in range(11):
