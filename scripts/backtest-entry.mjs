@@ -9,6 +9,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { spearman, milesBetween } from './lib/e2sfca.mjs';
+import { pSpearman, ciSpearman, bootDiff, partialSpearman, half, shareOf } from './lib/stats.mjs';
 const require = createRequire(import.meta.url);
 const MarketModel = require('../v2/assets/market-model.js');
 const TaxonomyMap = require('../v2/assets/taxonomy-map.js');
@@ -140,12 +141,13 @@ export function run(input, opts = {}) {
       const disc = MarketModel.SHORTAGE_DISCIPLINE[sp.specialty] || 'primary';
       const hpsaScore = ck == null ? null : hpCounties.has(ck) ? (hp.get(ck)[disc] || 0) : 0;
       const pay = f.pay ?? null, comp = f.competition ?? null, po = payOf.get(z.zip);
+      const payInsured = po && po.insuredPct != null ? Math.round(0.7 * po.insuredPct + 0.3 * (po.incomePct ?? po.insuredPct)) : null;
       const payYield = po && po.yieldPct != null ? Math.round(0.7 * po.yieldPct + 0.3 * (po.incomePct ?? po.yieldPct)) : null;
       const ya = po && po.yieldAge && po.yieldAge[sp.specialty];
       const payYieldAge = ya != null ? Math.round(0.7 * ya + 0.3 * (po.incomePct ?? ya)) : null;
       const basis = sp.evidence && sp.evidence.access ? sp.evidence.access.basis : null;
       out.push({ accessBasis: basis, zip: z.zip, fips: fipsOf.get(z.zip) || null, specialty: sp.specialty, need, access, needScore: need != null && access != null ? (need + access) / 2 : null,
-        pay, payYield, payYieldAge, competition: comp, viability: pay != null && comp != null ? (pay + comp) / 2 : null,
+        pay, payInsured, payYield, payYieldAge, competition: comp, viability: pay != null && comp != null ? (pay + comp) / 2 : null,
         hpsa: hpsaScore, hpsaMatched: ck != null, entryPer1k: (ent[sp.specialty] || 0) / adults * 1000, adults });
     }
   }
@@ -209,7 +211,84 @@ export function outcomes(rows, util) {
   return res;
 }
 
+
+// Confidence, controls and holdout for the outcome test (2026-11-25, the
+// user's ask). Same county rows as outcomes(): adult-weighted county scores.
+// ctl: zip -> {income, s65}. Units are counties; intervals are the analytic
+// Bonett-Wright interval, the score-minus-HPSA difference a paired bootstrap
+// over the same counties (500 resamples, seed 1). Controls: county adults
+// (log), adult-weighted median household income and share 65+, as ranks.
+// Holdout: counties split in two by a hash of the FIPS code; the weight and
+// caution rules are read on half A and checked on half B.
+export function outcomeStats(rows, util, ctl, B = 500) {
+  const by = new Map();
+  for (const r of rows) { if (!r.fips) continue; const k = r.specialty + '|' + r.fips; const a = by.get(k) || { s: r.specialty, f: r.fips, h: null, sc: 0, sw: 0, need: 0, nw: 0, acc: 0, aw: 0, ad: 0, inc: 0, iw: 0, s65: 0, ow: 0 };
+    if (r.hpsaMatched && r.hpsa != null) a.h = Math.max(a.h ?? 0, r.hpsa);
+    if (r.needScore != null) { a.sc += r.needScore * r.adults; a.sw += r.adults; }
+    if (r.need != null) { a.need += r.need * r.adults; a.nw += r.adults; }
+    if (r.access != null) { a.acc += r.access * r.adults; a.aw += r.adults; }
+    a.ad += r.adults; const c = ctl.get(r.zip);
+    if (c && c.income != null) { a.inc += c.income * r.adults; a.iw += r.adults; }
+    if (c && c.s65 != null) { a.s65 += c.s65 * r.adults; a.ow += r.adults; }
+    by.set(k, a); }
+  const U = new Map(util.map(u => [u.fips, u]));
+  const per = new Map();
+  for (const a of by.values()) { const u = U.get(a.f); if (!u || !a.sw) continue;
+    (per.get(a.s) || per.set(a.s, []).get(a.s)).push({ f: a.f, score: a.sc / a.sw, need: a.nw ? a.need / a.nw : null, access: a.aw ? a.acc / a.aw : null, hpsa: a.h, u,
+      lad: Math.log(a.ad), inc: a.iw ? a.inc / a.iw : null, s65: a.ow ? a.s65 / a.ow : null }); }
+  const res = [];
+  for (const [label, cs] of per) {
+    const o = { label };
+    for (const out of ['pqi', 'er', 'readm']) {
+      const v = cs.filter(c => c.u[out] != null && c.hpsa != null);   // same counties for score and HPSA
+      if (v.length < 30) { o[out] = null; continue; }
+      const y = v.map(c => c.u[out]), sc = v.map(c => c.score), hp = v.map(c => c.hpsa);
+      const rs = spearman(sc, y), rh = spearman(hp, y), n = v.length;
+      const vc = v.filter(c => c.inc != null && c.s65 != null);
+      const ctrl = vc.length >= 30 ? [vc.map(c => c.lad), vc.map(c => c.inc), vc.map(c => c.s65)] : null;
+      o[out] = { n, rs, ciS: ciSpearman(rs, n), pS: pSpearman(rs, n), rh, ciH: ciSpearman(rh, n), pH: pSpearman(rh, n),
+        diff: out === 'pqi' || out === 'er' ? bootDiff(sc, hp, y, B, 1) : null,
+        nCtl: vc.length, prs: ctrl ? partialSpearman(vc.map(c => c.score), vc.map(c => c.u[out]), ctrl) : null,
+        prh: ctrl ? partialSpearman(vc.map(c => c.hpsa), vc.map(c => c.u[out]), ctrl) : null };
+    }
+    // Holdout on preventable stays.
+    const hv = cs.filter(c => c.u.pqi != null);
+    const side = k => hv.filter(c => half(c.f) === k);
+    const rhoOn = (set, key) => { const w = set.filter(c => c[key] != null); return w.length < 30 ? null : spearman(w.map(c => c[key]), w.map(c => c.u.pqi)); };
+    const A = side('A'), Bs = side('B');
+    o.hold = { nA: A.length, nB: Bs.length,
+      accessA: rhoOn(A, 'access'), accessB: rhoOn(Bs, 'access'), needA: rhoOn(A, 'need'), needB: rhoOn(Bs, 'need'), scoreA: rhoOn(A, 'score'), scoreB: rhoOn(Bs, 'score') };
+    const h = o.hold;
+    h.accessSame = shareOf(h.accessA) === shareOf(h.accessB); h.needSame = shareOf(h.needA) === shareOf(h.needB);
+    h.flagA = h.scoreA != null && h.scoreA < 0.10; h.flagB = h.scoreB != null && h.scoreB < 0.10;
+    res.push(o);
+  }
+  return res;
+}
+
+// Confidence for the entry test (ZIPs): payer yield, the insured-rate factor
+// it replaced, HPSA and competition against 2021 to 2025 entry. Paired
+// bootstrap over the same ZIPs (200 resamples, seed 2) for yield minus insured
+// rate and yield minus HPSA.
+export function entryStats(rows, B = 200) {
+  const by = new Map(); for (const r of rows) (by.get(r.specialty) || by.set(r.specialty, []).get(r.specialty)).push(r);
+  const res = [];
+  for (const [label, rs] of by) {
+    const v = rs.filter(r => r.payYield != null && r.payInsured != null && r.hpsaMatched);
+    if (v.length < 30) { res.push({ label, n: v.length }); continue; }
+    const y = v.map(r => r.entryPer1k), yl = v.map(r => r.payYield), ins = v.map(r => r.payInsured), hp = v.map(r => r.hpsa), n = v.length;
+    const ry = spearman(yl, y), ri = spearman(ins, y), rh = spearman(hp, y);
+    const cv = rs.filter(r => r.competition != null), rc = spearman(cv.map(r => r.competition), cv.map(r => r.entryPer1k));
+    res.push({ label, n, ry, ciY: ciSpearman(ry, n), pY: pSpearman(ry, n), ri, ciI: ciSpearman(ri, n), pI: pSpearman(ri, n), rh, ciH: ciSpearman(rh, n),
+      dYI: bootDiff(yl, ins, y, B, 2), dYH: bootDiff(yl, hp, y, B, 3), nC: cv.length, rc, ciC: ciSpearman(rc, cv.length), pC: pSpearman(rc, cv.length) });
+  }
+  return res;
+}
+
 if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
+  // Share 65+ from the 18 five-year bands (index 13 = 65 to 69 onward).
+  const share65 = (am, af) => { try { const a = JSON.parse(am || 'null'), b = JSON.parse(af || 'null'); if (!Array.isArray(a) || !Array.isArray(b)) return null;
+    const t = [...a, ...b].reduce((x, y) => x + (Number(y) || 0), 0), o = [...a.slice(13), ...b.slice(13)].reduce((x, y) => x + (Number(y) || 0), 0); return t > 0 ? o / t : null; } catch { return null; } };
   const num = v => (v === '' || v == null ? null : Number(v));
   const input = {
     counts: read('counts').map(([zip, code, entity, b, e]) => ({ zip, code, entity, before: +b || 0, entered: +e || 0 })),
@@ -218,8 +297,8 @@ if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
     bench: read('bench').map(([kind, key, data]) => ({ kind, key, data: JSON.parse(data) })),
     hpsa: read('hpsa').map(([state, county, discipline, score]) => ({ state, county, discipline, score: num(score) || 0 })),
     zipcounty: read('zipcounty').map(([zip, fips, county, state]) => ({ zip, fips, county, state })),
-    acs: read('acs').map(([zip, state, uni, unins, inc, mcr, mcd, emp, dir, tri, cov]) => ({ zip, state, insured: num(uni) > 0 && num(unins) != null ? 1 - num(unins) / num(uni) : null, income: num(inc),
-      medicare: num(mcr), medicaid: num(mcd), employer: num(emp), direct: num(dir), tricare: num(tri), covAge: cov ? JSON.parse(cov) : null }))
+    acs: read('acs').map(([zip, state, uni, unins, inc, mcr, mcd, emp, dir, tri, cov, am, af]) => ({ zip, state, insured: num(uni) > 0 && num(unins) != null ? 1 - num(unins) / num(uni) : null, income: num(inc),
+      medicare: num(mcr), medicaid: num(mcd), employer: num(emp), direct: num(dir), tricare: num(tri), covAge: cov ? JSON.parse(cov) : null, s65: share65(am, af) }))
   };
   // util: fips, er_per_1000, readmission_rate, then the 7 PQI columns for ages 65 to 74
   const util = read('util').map(c => ({ fips: c[0], er: num(c[1]), readm: num(c[2]), pqi: num(c[3]) }));
@@ -228,6 +307,8 @@ if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
   let e2sfca = null;
   if (arg('e2sfca')) { e2sfca = new Map(); for (const [zip, spec, per1k, mins] of read('e2sfca')) { const m = e2sfca.get(zip) || {}; m[spec] = { per_1k: num(per1k), catchment_minutes: num(mins) }; e2sfca.set(zip, m); } }
   const now = run(input, { supply: 'all', e2sfca }), out = outcomes(now, util);
+  const ctl = new Map(input.acs.map(a => [a.zip, { income: a.income, s65: a.s65 }]));
+  const ost = outcomeStats(now, util, ctl), est = entryStats(rows);
   const e2n = now.filter(r => r.accessBasis === 'e2sfca').length, accN = now.filter(r => r.access != null).length;
   console.log('access from drive time', e2n, 'of', accN);
   writeFileSync(arg('csv'), 'zip,specialty,need,access,need_score,pay,competition,viability,hpsa,entry_per_1k\n' + rows.map(r => [r.zip, '"' + r.specialty + '"', r.need ?? '', r.access ?? '', r.needScore ?? '', r.pay ?? '', r.competition ?? '', r.viability ?? '', r.hpsa ?? '', r.entryPer1k.toFixed(4)].join(',')).join('\n') + '\n');
@@ -261,6 +342,27 @@ if (process.argv[1] && process.argv[1].endsWith('backtest-entry.mjs')) {
     'Negative means new clinicians went where supply was already dense, not where the need score pointed.', '',
     '| Specialty | ZIPs | Need score | Need alone | Access alone | Top vs bottom fifth |', '|---|---|---|---|---|---|',
     ...sum.map(s2 => `| ${s2.label} | ${s2.n.toLocaleString()} | ${f(s2.rhoScore)} | ${f(s2.rhoNeed)} | ${f(s2.rhoAccess)} | ${x(s2.liftScore)} |`), ''];
+  const ci = c => (c ? `[${c[0].toFixed(2)}, ${c[1].toFixed(2)}]` : 'n/a');
+  const pv = p => (p == null ? 'n/a' : p < 0.001 ? '<0.001' : p.toFixed(3));
+  const dd = d => (d ? `[${d.lo.toFixed(2)}, ${d.hi.toFixed(2)}]` : 'n/a');
+  lines.push('## 4. Confidence, controls and holdout (2026-11-25)', '',
+    'Added for citation. Units are counties for 4a to 4c and ZIPs for 4d. "95% CI" is the analytic interval for Spearman\'s rho (Fisher z with the Bonett and Wright 2000 standard error); "p" is two-sided from the t approximation with n-2 degrees of freedom. "Score - HPSA" is a paired bootstrap over the same counties (500 resamples, seed 1): the 95% interval of the difference in rho, and the share of resamples where the score\'s rho was higher. Score and HPSA use exactly the same counties here (those with an HPSA match), so n can differ slightly from section 1. With thousands of units even small correlations are statistically significant; the interval is the useful figure.', '',
+    '### 4a. Preventable hospital stays: score vs HPSA', '',
+    '| Specialty | Counties | Score rho | 95% CI | p | HPSA rho | 95% CI | p | Score - HPSA, 95% CI | Resamples score > HPSA |', '|---|---|---|---|---|---|---|---|---|---|',
+    ...ost.filter(o => o.pqi).map(o => { const q = o.pqi; return `| ${o.label} | ${q.n.toLocaleString()} | ${f(q.rs)} | ${ci(q.ciS)} | ${pv(q.pS)} | ${f(q.rh)} | ${ci(q.ciH)} | ${pv(q.pH)} | ${dd(q.diff)} | ${q.diff ? (q.diff.share_above_0 * 100).toFixed(0) + '%' : 'n/a'} |`; }), '',
+    '### 4b. ER visits and readmissions: score vs HPSA', '',
+    '| Specialty | Counties | ER: score rho [CI] | ER: HPSA rho [CI] | ER: score - HPSA, 95% CI | Readmissions: score rho [CI] | Readmissions: HPSA rho [CI] |', '|---|---|---|---|---|---|---|',
+    ...ost.filter(o => o.er && o.readm).map(o => `| ${o.label} | ${o.er.n.toLocaleString()} | ${f(o.er.rs)} ${ci(o.er.ciS)} | ${f(o.er.rh)} ${ci(o.er.ciH)} | ${dd(o.er.diff)} | ${f(o.readm.rs)} ${ci(o.readm.ciS)} | ${f(o.readm.rh)} ${ci(o.readm.ciH)} |`), '',
+    '### 4c. With controls, and on held-out counties', '',
+    'Partial Spearman: score and outcome each adjusted (on ranks, by least squares) for county adults (log), adult-weighted median household income and share 65+. Holdout: counties split in two by a hash of the FIPS code; the weight rule (rho 0.15+ full, 0.05 to 0.15 half, under 0.05 none) and the caution rule (score under 0.10) are read on half A and checked on half B.', '',
+    '| Specialty | Counties with controls | Preventable stays: score partial rho | HPSA partial rho | Half A / B counties | Score rho A / B | Access weight A -> B same? | Need weight A -> B same? | Caution A / B |', '|---|---|---|---|---|---|---|---|---|',
+    ...ost.filter(o => o.pqi).map(o => { const q = o.pqi, h = o.hold; return `| ${o.label} | ${q.nCtl.toLocaleString()} | ${f(q.prs)} | ${f(q.prh)} | ${h.nA} / ${h.nB} | ${f(h.scoreA)} / ${f(h.scoreB)} | ${h.accessSame ? 'yes' : 'no'} | ${h.needSame ? 'yes' : 'no'} | ${h.flagA ? 'yes' : 'no'} / ${h.flagB ? 'yes' : 'no'} |`; }), '',
+    `Holdout agreement: access weight class same on both halves in ${ost.filter(o => o.hold.accessSame).length} of ${ost.length} specialties, need weight class in ${ost.filter(o => o.hold.needSame).length} of ${ost.length}, caution flag in ${ost.filter(o => o.hold.flagA === o.hold.flagB).length} of ${ost.length}.`, '',
+    '### 4d. Clinician entry 2021 to 2025 (ZIPs): payer yield vs insured rate and HPSA', '',
+    'Same ZIPs for all three measures (those with yield, insured rate and an HPSA match). Paired bootstrap over ZIPs, 200 resamples (seed 2 and 3).', '',
+    '| Specialty | ZIPs | Payer yield rho [CI] | Insured rate rho [CI] | HPSA rho [CI] | Yield - insured, 95% CI | Resamples yield > insured | Yield - HPSA, 95% CI | Competition rho [CI], ZIPs |', '|---|---|---|---|---|---|---|---|---|',
+    ...est.filter(e => e.ry != null).map(e => `| ${e.label} | ${e.n.toLocaleString()} | ${f(e.ry)} ${ci(e.ciY)} | ${f(e.ri)} ${ci(e.ciI)} | ${f(e.rh)} ${ci(e.ciH)} | ${dd(e.dYI)} | ${e.dYI ? (e.dYI.share_above_0 * 100).toFixed(0) + '%' : 'n/a'} | ${dd(e.dYH)} | ${f(e.rc)} ${ci(e.ciC)}, ${e.nC.toLocaleString()} |`), '');
+  writeFileSync(arg('report').replace(/\.md$/, '-stats.json'), JSON.stringify({ outcomes: ost, entry: est }, null, 1));
   writeFileSync(arg('report'), lines.join('\n'));
   console.log(lines.slice(0, 40).join('\n'));
 }
