@@ -653,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ### 2026-11-25
 
+- The validation document now reports the public transit pilot for people without a car in Boston, Chicago, Washington DC, Philadelphia and New York City.
+
 - The validation document now names the data year behind each back-test outcome (ER visits and readmissions 2024; preventable stays from the 2025 County Health Rankings release).
 
 - A read-only report now shows which data year each county's ER, readmission and preventable-stay figure in the back-test comes from.

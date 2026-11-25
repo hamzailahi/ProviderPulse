@@ -447,6 +447,53 @@ physician specialties", or give the full range.
 
 ---
 
+
+### 2.4 People without a car: public transit pilot (five metros)
+
+**Script:** `scripts/access-transit.py` (r5py on the metro's GTFS feeds plus
+OpenStreetMap paths) with `scripts/access-dry-run.mjs`, workflow
+`access-dry-run.yml` with `transit: true`. **Reports:**
+`supabase/reference/access-e2sfca/<metro>-transit-pilot-dry-run.md`, run
+2026-11-25. Read only; nothing stored.
+
+**Method.** The stored drive-time figure already splits each ZIP's adults into
+households with a car (drive times) and without one (walking times). The pilot
+lets the no-car group take the faster of walking and public transit: median
+door-to-door minutes over 10:00 to 11:00 on Wednesday 2026-12-02 (a departure
+time chosen as an assumption), at most 120 minutes; a pair transit cannot
+reach stays on foot. Car households are unchanged. Feeds come from the
+Mobility Database catalog, every GTFS feed whose box overlaps the metro;
+national and multi-state feeds are left out, and a feed the router cannot
+read is dropped. Focus ZIPs are the core ZIP3 prefixes only (Boston 021 to
+022, Chicago 606 to 608, Washington 200 to 205, Philadelphia 190 to 191, New
+York 100 to 104 and 110 to 114).
+
+| Metro | Focus ZIPs | Adults with no vehicle (share) | GTFS feeds | ZIP pairs reachable by transit | Lowest rank agreement, walking vs transit | Specialties under 0.90 | ZIP x specialty cells moved 15+ points |
+|---|---|---|---|---|---|---|---|
+| Boston | 55 | 311,929 of 1,214,964 (25.7%) | 16 | 8,908 | 0.34 (rheumatology) | 6 of 37 | 6 (at most 1 per specialty) |
+| Chicago | 64 | 574,008 of 2,392,678 (24.0%) | 7 | 12,662 | 0.92 (genetics) | 0 of 40 | 0 |
+| Washington DC | 47 | 219,261 of 986,248 (22.2%) | 16 | 13,715 | 0.92 (infectious disease) | 0 of 40 | 17 (infectious disease 7, genetics 5) |
+| Philadelphia | 115 | 421,194 of 2,190,668 (19.2%) | 12 | 15,726 | 0.70 (genetics) | 3 of 40 | 6 (at most 3 per specialty) |
+| New York City | 193 | 3,765,675 of 7,155,234 (52.6%) | 40 | 95,454 | 0.90 (dermatology) | 0 of 40 | 432 |
+
+Boston shows "n/a" for 3 specialties (oncology, infectious disease,
+genetics), too few ZIPs with listings to rank. Washington DC: 44 of 47 focus
+ZIPs reach another ZIP by transit; every focus ZIP does in the other metros.
+
+**Reading it.** Adding transit to walking changes the ranking of ZIPs
+little for everyday care: walking and transit agree at 0.90 or more in every
+specialty in Chicago, Washington DC and New York City. The changes concentrate
+in rare specialties, where transit reaches clinicians walking cannot. New York
+City, where 52.6% of adults live in households with no vehicle, moved the
+most: 432 ZIP x specialty cells by 15 points or more, led by infectious
+disease (51 of 193 ZIPs), oncology (36), dermatology (35), plastic surgery (33)
+and gastroenterology (30). Per-specialty tables, and the ZIPs that improved
+most, are in each report.
+
+**Limits.** One departure window on one day, chosen as an assumption.
+Published timetables, not real-time service. Five metros only; no rural
+transit was tested. ZIP centres stand in for homes and practices.
+
 ## 3. Directory mismatch counts
 
 **Script:** `scripts/address-check.mjs` (classification), `scripts/address-apply.sh`
@@ -668,6 +715,7 @@ git show 1543f37:supabase/reference/access-e2sfca/tennessee-dry-run.md  # first 
 node scripts/validation-summary.mjs                       # national tables (2.1, 4)
 cat supabase/reference/access-national.md                 # national rho, weighting crossings (2.1, 2.2)
 cat supabase/reference/moved-billing.md                   # 3.3
+cat supabase/reference/access-e2sfca/*-transit-pilot-dry-run.md  # 2.4
 cat supabase/reference/backtest-entry-stats.json          # 1.6 (section 4 of backtest-entry.md)
 cat supabase/reference/clinician-status-dry-run.md supabase/reference/weight-compare.md  # 2.2
 cat supabase/reference/address-check.md                   # section 3

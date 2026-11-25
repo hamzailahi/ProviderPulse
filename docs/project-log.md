@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 460 changes over 72 working days, 2026-05-13 to 2026-11-25.
-- 2026-08-19 onward: from the README changelog (286 entries, written for a reader).
+- 461 changes over 72 working days, 2026-05-13 to 2026-11-25.
+- 2026-08-19 onward: from the README changelog (287 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 125 |
+| November 2026 | 126 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-25
+
+- The validation document now reports the public transit pilot for people without a car in Boston, Chicago, Washington DC, Philadelphia and New York City.
 
 - The validation document now names the data year behind each back-test outcome (ER visits and readmissions 2024; preventable stays from the 2025 County Health Rankings release).
 
