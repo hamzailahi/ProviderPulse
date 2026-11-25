@@ -1,6 +1,6 @@
 # E2SFCA access dry run: Alaska
 
-Run 2026-11-24 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
+Run 2026-11-25 by scripts/access-dry-run.mjs. Read only: nothing in the database or on the site changed.
 
 Compares the access factor the market model uses today (listings per adult within about 10 straight-line miles, against the national rate) with the Enhanced Two-Step Floating Catchment Area method (Luo & Qi 2009) using drive time and a Gaussian distance decay (Dai 2010), per scored specialty. Both are mapped to the same 0 to 100 access factor (100 = no supply, 50 = the national rate, 0 = twice it or more), so they can be compared directly.
 
@@ -179,42 +179,72 @@ The stored figure (`e2sfca` above) splits each ZIP's adults by the share of hous
 
 A positive change is worse access once people without a car are counted. Rank agreement near 1 between walking and the slowdown means the conclusion does not hinge on which no-car assumption is used.
 
+## Sample ZIPs
+
+| ZIP | Specialty | Crude per 1k | E2SFCA per 1k | Crude access | E2SFCA access |
+|---|---|---|---|---|---|
+| 99503 | Primary care / family doctor | 7.572 | 7.069 | 12 | 18 |
+| 99503 | Mental health & counseling | 16.389 | 16.321 | 0 | 0 |
+| 99503 | Heart / cardiology | 0.326 | 0.261 | 31 | 45 |
+| 99503 | Cancer care / oncology | 0.237 | 0.197 | 23 | 36 |
+| 99503 | Urgent care & emergency | 0.952 | 0.863 | 0 | 8 |
+| 99701 | Primary care / family doctor | 5.965 | 7.641 | 31 | 11 |
+| 99701 | Mental health & counseling | 16.930 | 22.906 | 0 | 0 |
+| 99701 | Heart / cardiology | 0.109 | 0.120 | 77 | 75 |
+| 99701 | Cancer care / oncology | 0.092 | 0.097 | 70 | 69 |
+| 99701 | Urgent care & emergency | 0.638 | 0.858 | 32 | 8 |
+| 99801 | Primary care / family doctor | 5.243 | 5.353 | 39 | 38 |
+| 99801 | Mental health & counseling | 18.249 | 18.625 | 0 | 0 |
+| 99801 | Heart / cardiology | 0.000 | 0.000 | 100 | 100 |
+| 99801 | Cancer care / oncology | 0.158 | 0.159 | 49 | 48 |
+| 99801 | Urgent care & emergency | 0.687 | 0.701 | 27 | 25 |
+| 99654 | Primary care / family doctor | 3.573 | 4.871 | 58 | 43 |
+| 99654 | Mental health & counseling | 12.337 | 17.878 | 14 | 0 |
+| 99654 | Heart / cardiology | 0.067 | 0.104 | 86 | 78 |
+| 99654 | Cancer care / oncology | 0.126 | 0.155 | 59 | 49 |
+| 99654 | Urgent care & emergency | 0.397 | 0.596 | 58 | 36 |
+| 99559 | Primary care / family doctor | 9.671 | 10.621 | 0 | 0 |
+| 99559 | Mental health & counseling | 69.492 | 73.494 | 0 | 0 |
+| 99559 | Heart / cardiology | 0.000 |  | 100 |  |
+| 99559 | Cancer care / oncology | 0.000 |  | 100 |  |
+| 99559 | Urgent care & emergency | 0.815 | 0.858 | 13 | 8 |
+
 ## Travel burden against CMS Medicare Advantage limits
 
 Drive minutes from each ZIP centre to the nearest practice location (the middle of each ZIP's pinned listings in the specialty, the 8 nearest by straight line routed on roads), against the maximum minutes CMS sets for Medicare Advantage networks (2026 HSD Reference File) in the ZIP's main county. The CMS limit applies to a plan's network; here it is read against every listing, so a ZIP over the limit has no clinician of that kind within the limit at all. Specialty pairs are in `supabase/reference/network-adequacy/specialty-map.csv` (reviewable). Not scored.
 
-- Counties not matched by name to the HSD file: 1 (AK Kusilvak Census Area)
+- Counties not matched by name to the HSD file: 0
 
 | Specialty | CMS code | ZIPs over the limit | Adults in them | Large Metro | Metro | Micro | Rural | CEAC |
 |---|---|---|---|---|---|---|---|---|
-| Primary care / family doctor | S03 | 31 of 225 | 8,290 (1.5%) |  | 2/17 | 1/10 | 0/2 | 28/196 |
-| Women's health / OB-GYN | 016 | 109 of 225 | 37,202 (6.8%) |  | 1/17 | 1/10 | 0/2 | 107/196 |
-| Mental health & counseling: Psychiatry | 029 | 160 of 225 | 70,410 (12.9%) |  | 2/17 | 1/10 | 0/2 | 157/196 |
-| Mental health & counseling: Clinical Psychology | 036 | 101 of 225 | 36,222 (6.6%) |  | 1/17 | 1/10 | 0/2 | 99/196 |
-| Mental health & counseling: Clinical Social Work | 037 | 77 of 225 | 13,413 (2.4%) |  | 1/17 | 1/10 | 0/2 | 75/196 |
-| Eye care | 023 | 97 of 225 | 29,615 (5.4%) |  | 2/17 | 1/10 | 0/2 | 94/196 |
-| Chiropractic | 010 | 97 of 225 | 20,359 (3.7%) |  | 1/17 | 1/10 | 0/2 | 95/196 |
-| Physical & occupational therapy | F049 | 82 of 225 | 17,348 (3.2%) |  | 2/17 | 1/10 | 0/2 | 79/196 |
-| Orthopedics & sports injury | 025 | 147 of 225 | 72,075 (13.2%) |  | 2/17 | 1/10 | 0/2 | 144/196 |
-| Heart / cardiology | 008 | 167 of 225 | 129,210 (23.6%) |  | 3/17 | 1/10 | 2/2 | 161/196 |
-| Skin / dermatology | 011 | 161 of 225 | 93,862 (17.1%) |  | 2/17 | 1/10 | 0/2 | 158/196 |
-| Allergy & immunology | 007 | 164 of 225 | 126,119 (23.0%) |  | 2/17 | 1/10 | 2/2 | 159/196 |
-| Lung, breathing & sleep | 030 | 153 of 225 | 82,028 (15.0%) |  | 1/17 | 1/10 | 0/2 | 151/196 |
-| Digestive / gastroenterology | 014 | 164 of 225 | 125,895 (23.0%) |  | 2/17 | 1/10 | 2/2 | 159/196 |
-| Kidney / nephrology | 018 | 160 of 225 | 98,567 (18.0%) |  | 1/17 | 1/10 | 0/2 | 158/196 |
-| Diabetes & hormones | 012 | 127 of 225 | 66,106 (12.1%) |  | 1/17 | 1/10 | 0/2 | 125/196 |
-| Cancer care / oncology | 021 | 159 of 225 | 89,462 (16.3%) |  | 2/17 | 1/10 | 0/2 | 156/196 |
-| Arthritis / rheumatology | 031 | 181 of 225 | 232,637 (42.5%) |  | 1/17 | 10/10 | 2/2 | 168/196 |
-| Brain & nerves / neurology | 019 | 162 of 225 | 102,532 (18.7%) |  | 2/17 | 1/10 | 0/2 | 159/196 |
-| Ear, nose & throat | 013 | 149 of 225 | 84,787 (15.5%) |  | 2/17 | 1/10 | 0/2 | 146/196 |
-| Urology | 033 | 162 of 225 | 97,405 (17.8%) |  | 2/17 | 1/10 | 0/2 | 159/196 |
-| Foot & ankle / podiatry | 028 | 162 of 225 | 96,904 (17.7%) |  | 2/17 | 1/10 | 0/2 | 159/196 |
-| Plastic & reconstructive surgery | 027 | 155 of 225 | 86,149 (15.7%) |  | 1/17 | 1/10 | 0/2 | 153/196 |
-| Speech & language therapy | F051 | 140 of 225 | 55,624 (10.2%) |  | 1/17 | 1/10 | 0/2 | 138/196 |
-| Imaging & lab | F047 | 125 of 225 | 70,867 (12.9%) |  | 2/17 | 1/10 | 2/2 | 120/196 |
-| Nursing & assisted living | F046 | 100 of 225 | 30,702 (5.6%) |  | 2/17 | 1/10 | 0/2 | 97/196 |
-| General surgery | 015 | 155 of 225 | 73,569 (13.4%) |  | 2/17 | 1/10 | 0/2 | 152/196 |
-| Infectious disease | 017 | 172 of 225 | 134,082 (24.5%) |  | 1/17 | 1/10 | 2/2 | 168/196 |
+| Primary care / family doctor | S03 | 31 of 237 | 8,290 (1.5%) |  | 2/17 | 1/10 | 0/2 | 28/208 |
+| Women's health / OB-GYN | 016 | 121 of 237 | 42,085 (7.6%) |  | 1/17 | 1/10 | 0/2 | 119/208 |
+| Mental health & counseling: Psychiatry | 029 | 172 of 237 | 75,293 (13.6%) |  | 2/17 | 1/10 | 0/2 | 169/208 |
+| Mental health & counseling: Clinical Psychology | 036 | 113 of 237 | 41,105 (7.4%) |  | 1/17 | 1/10 | 0/2 | 111/208 |
+| Mental health & counseling: Clinical Social Work | 037 | 89 of 237 | 18,296 (3.3%) |  | 1/17 | 1/10 | 0/2 | 87/208 |
+| Eye care | 023 | 109 of 237 | 34,498 (6.2%) |  | 2/17 | 1/10 | 0/2 | 106/208 |
+| Chiropractic | 010 | 109 of 237 | 25,242 (4.6%) |  | 1/17 | 1/10 | 0/2 | 107/208 |
+| Physical & occupational therapy | F049 | 94 of 237 | 22,231 (4.0%) |  | 2/17 | 1/10 | 0/2 | 91/208 |
+| Orthopedics & sports injury | 025 | 159 of 237 | 76,958 (13.9%) |  | 2/17 | 1/10 | 0/2 | 156/208 |
+| Heart / cardiology | 008 | 179 of 237 | 134,093 (24.3%) |  | 3/17 | 1/10 | 2/2 | 173/208 |
+| Skin / dermatology | 011 | 173 of 237 | 98,745 (17.9%) |  | 2/17 | 1/10 | 0/2 | 170/208 |
+| Allergy & immunology | 007 | 176 of 237 | 131,002 (23.7%) |  | 2/17 | 1/10 | 2/2 | 171/208 |
+| Lung, breathing & sleep | 030 | 165 of 237 | 86,911 (15.7%) |  | 1/17 | 1/10 | 0/2 | 163/208 |
+| Digestive / gastroenterology | 014 | 176 of 237 | 130,778 (23.7%) |  | 2/17 | 1/10 | 2/2 | 171/208 |
+| Kidney / nephrology | 018 | 172 of 237 | 103,450 (18.7%) |  | 1/17 | 1/10 | 0/2 | 170/208 |
+| Diabetes & hormones | 012 | 139 of 237 | 70,989 (12.8%) |  | 1/17 | 1/10 | 0/2 | 137/208 |
+| Cancer care / oncology | 021 | 171 of 237 | 94,345 (17.1%) |  | 2/17 | 1/10 | 0/2 | 168/208 |
+| Arthritis / rheumatology | 031 | 193 of 237 | 237,520 (43.0%) |  | 1/17 | 10/10 | 2/2 | 180/208 |
+| Brain & nerves / neurology | 019 | 174 of 237 | 107,415 (19.4%) |  | 2/17 | 1/10 | 0/2 | 171/208 |
+| Ear, nose & throat | 013 | 161 of 237 | 89,670 (16.2%) |  | 2/17 | 1/10 | 0/2 | 158/208 |
+| Urology | 033 | 174 of 237 | 102,288 (18.5%) |  | 2/17 | 1/10 | 0/2 | 171/208 |
+| Foot & ankle / podiatry | 028 | 174 of 237 | 101,787 (18.4%) |  | 2/17 | 1/10 | 0/2 | 171/208 |
+| Plastic & reconstructive surgery | 027 | 167 of 237 | 91,032 (16.5%) |  | 1/17 | 1/10 | 0/2 | 165/208 |
+| Speech & language therapy | F051 | 141 of 237 | 55,864 (10.1%) |  | 1/17 | 1/10 | 0/2 | 139/208 |
+| Imaging & lab | F047 | 137 of 237 | 75,750 (13.7%) |  | 2/17 | 1/10 | 2/2 | 132/208 |
+| Nursing & assisted living | F046 | 112 of 237 | 35,585 (6.4%) |  | 2/17 | 1/10 | 0/2 | 109/208 |
+| General surgery | 015 | 167 of 237 | 78,452 (14.2%) |  | 2/17 | 1/10 | 0/2 | 164/208 |
+| Infectious disease | 017 | 184 of 237 | 138,965 (25.1%) |  | 1/17 | 1/10 | 2/2 | 180/208 |
 
 Designation cells are ZIPs over the limit out of ZIPs of that county type.
 
@@ -223,7 +253,3 @@ Designation cells are ZIPs over the limit out of ZIPs of that county type.
 - E2SFCA counts clinicians just outside a fixed 10-mile circle (with a smaller weight) and stops counting ones that are close in a straight line but a long drive away (across a river or mountain).
 - It also divides each practice's capacity among every community that can reach it, so a cluster of clinicians serving a whole region no longer makes only its own ZIP look oversupplied.
 - Nothing here changes the live score. Adopting it is a separate decision.
-
-## Applied 2026-11-24
-
-- 9480 rows (ZIP x specialty) stored in access_e2sfca for AK; market-score now uses drive-time access for these ZIPs.
