@@ -51,6 +51,16 @@ for fid, prov, url in feeds:
         with zipfile.ZipFile(p) as z:
             names = set(z.namelist())
         if not {'stops.txt', 'stop_times.txt', 'trips.txt'} <= names: raise ValueError('not a full GTFS feed')
+        # R5 refuses a table that is present but empty (header only); drop such
+        # optional files by rewriting the zip without them.
+        with zipfile.ZipFile(p) as z:
+            keep = {n: z.read(n) for n in z.namelist()}
+        empty = [n for n, b in keep.items() if n.endswith('.txt') and len(b.strip().splitlines()) < 2]
+        if any(n in empty for n in ('stops.txt', 'stop_times.txt', 'trips.txt')): raise ValueError('empty core table')
+        if empty:
+            with zipfile.ZipFile(p, 'w', zipfile.ZIP_DEFLATED) as z:
+                for n, b in keep.items():
+                    if n not in empty: z.writestr(n, b)
         paths.append(p); used.append((fid, prov))
     except Exception as e:
         print('skip feed', fid, prov, e)
@@ -69,7 +79,18 @@ import geopandas as gpd, r5py
 from shapely.geometry import Point
 pts = [r for r in csv.DictReader(open(zips_csv))]
 gdf = gpd.GeoDataFrame({'id': [r['zip'] for r in pts]}, geometry=[Point(float(r['lon']), float(r['lat'])) for r in pts], crs='EPSG:4326')
-net = r5py.TransportNetwork(pbf, paths)
+# A feed R5 still cannot read is left out and named in the report's feed list,
+# never silently: try again without it, at most 10 times.
+for attempt in range(11):
+    try:
+        net = r5py.TransportNetwork(pbf, paths); break
+    except Exception as e:
+        bad = [p for p in paths if os.path.basename(p) in str(e)]
+        if not bad or attempt == 10: raise
+        print('dropping feed R5 cannot load:', os.path.basename(bad[0]), str(e).splitlines()[-1][:200])
+        i = paths.index(bad[0]); paths.pop(i); used.pop(i)
+        if not paths: sys.exit('no GTFS feed R5 can load')
+json.dump([{'id': f, 'provider': p} for f, p in used], open(out + '.feeds.json', 'w'), indent=1)
 kw = dict(origins=gdf, destinations=gdf, departure=dep, departure_time_window=datetime.timedelta(minutes=60),
           transport_modes=[r5py.TransportMode.TRANSIT, r5py.TransportMode.WALK], max_time=datetime.timedelta(minutes=MAX_MIN))
 if hasattr(r5py, 'TravelTimeMatrix'):
