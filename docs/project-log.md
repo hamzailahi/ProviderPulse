@@ -2,19 +2,23 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 454 changes over 71 working days, 2026-05-13 to 2026-11-24.
-- 2026-08-19 onward: from the README changelog (280 entries, written for a reader).
+- 455 changes over 72 working days, 2026-05-13 to 2026-11-25.
+- 2026-08-19 onward: from the README changelog (281 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 119 |
+| November 2026 | 120 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
 | July 2026 | 37 |
 | June 2026 | 22 |
 | May 2026 | 31 |
+
+## 2026-11-25
+
+- New docs/validation_results.md: every validation figure (back-test, drive time vs radius, address corrections, Medicare Advantage time limits) with the script and query behind it, and a plain list of results that do not exist yet. A small script, scripts/validation-summary.mjs, totals the 52 state drive-time reports.
 
 ## 2026-11-24
 

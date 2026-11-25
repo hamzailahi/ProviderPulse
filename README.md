@@ -12,7 +12,7 @@
 
 Live at **https://providerpulse-v2.netlify.app**
 
-*Last updated 2026-11-24. See the [Changelog](#changelog) for what changed and when.*
+*Last updated 2026-11-25. See the [Changelog](#changelog) for what changed and when.*
 
 ## Contents
 
@@ -650,6 +650,10 @@ The appointment and briefing flows are verified by hand and in the
 browser harness, but don't yet have dedicated scripts in `scripts/`.
 
 ## Changelog
+
+### 2026-11-25
+
+- New docs/validation_results.md: every validation figure (back-test, drive time vs radius, address corrections, Medicare Advantage time limits) with the script and query behind it, and a plain list of results that do not exist yet. A small script, scripts/validation-summary.mjs, totals the 52 state drive-time reports.
 
 ### 2026-11-24
 
