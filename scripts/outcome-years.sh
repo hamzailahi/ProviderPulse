@@ -15,11 +15,11 @@ q() { psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -A -F ' | ' -P footer=off
   echo
   echo "## ER visits per 1,000 (cms_county_utilization)"; echo
   echo '```'
-  q "select year, count(*) counties from (select fips, max(year) year from public.cms_county_utilization where fips is not null and er_visits_per_1000 is not null group by fips) t group by year order by year"
+  q "select yr as year, count(*) counties from (select fips, max(year) as yr from public.cms_county_utilization where fips is not null and er_visits_per_1000 is not null group by fips) t group by yr order by yr"
   echo '```'; echo
   echo "## Readmission rate (cms_county_utilization)"; echo
   echo '```'
-  q "select year, count(*) counties from (select fips, max(year) year from public.cms_county_utilization where fips is not null and readmission_rate is not null group by fips) t group by year order by year"
+  q "select yr as year, count(*) counties from (select fips, max(year) as yr from public.cms_county_utilization where fips is not null and readmission_rate is not null group by fips) t group by yr order by yr"
   echo '```'; echo
   echo "## Every year present in cms_county_utilization"; echo
   echo '```'
