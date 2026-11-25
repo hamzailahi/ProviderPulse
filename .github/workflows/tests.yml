@@ -52,9 +52,6 @@ jobs:
       - name: Claimed-listing specialty gating
         run: node scripts/test-claimed-relevance.mjs
 
-      - name: Learned demand model and its trainer
-        run: node scripts/test-demand-model.mjs
-
       - name: Census SAHIE county uninsured estimates
         run: node scripts/test-sahie.mjs
 
@@ -109,6 +106,9 @@ jobs:
 
       - name: Public Medicare activity lookup
         run: node scripts/test-npi-activity.mjs
+
+      - name: Roles come from the database, never user_metadata
+        run: node scripts/test-account-role.mjs
 
       - name: Report a wrong listing
         run: node scripts/test-listing-report.mjs

@@ -115,7 +115,6 @@ exports.handler = async (event) => {
   });
   if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Invalid or expired session' }) };
   const user = await userRes.json();
-  const role = (user.user_metadata && user.user_metadata.role) || '';
 
   const appointmentId = event.httpMethod === 'GET'
     ? String((event.queryStringParameters || {}).appointment_id || '').trim()
@@ -268,7 +267,7 @@ exports.handler = async (event) => {
   // Field names and counts only -- never chief_concern, conditions, or fact
   // values, which are PHI.
   await audit(env, {
-    actor: user.id, actor_role: role, action: 'appointment_briefing_generated', target: targetId, ip,
+    actor: user.id, actor_role: (await require('./lib/auth').accountRole(env, user)) || 'unknown', action: 'appointment_briefing_generated', target: targetId, ip,
     detail: { source, narrative_source: narrativeSource, fact_count: facts.length, has_conditions: conditions.length > 0 }
   });
 

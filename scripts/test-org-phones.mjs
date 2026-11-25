@@ -1,14 +1,12 @@
-// Organization phones from NPPES (scripts/org-phone-backfill.sh): which
-// numbers are usable, which rows change, the parser end to end on a small
-// file shaped like the npidata_pfile, and the NPI Registry API pass on a fake
-// API (the 1,200-record ceiling, ZIP+4 splits, failures never empty).
+// Phone rules and the NPI Registry API crawler: which numbers are usable,
+// which rows change (scripts/lib/phones.mjs, also used by the fax backfill),
+// and the API pass on a fake API (the 1,200-record ceiling, ZIP+4 splits,
+// failures never empty) and its pacer (scripts/lib/nppes-api-phones.mjs, used
+// by the weekly NPPES refresh). The one-off organization phone backfill that
+// first used them was removed 2026-11-25; its scripts' end-to-end tests went
+// with it.
 //
 // node scripts/test-org-phones.mjs
-import { execFileSync, execFile } from 'node:child_process';
-import { createServer } from 'node:http';
-import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { cleanPhone, phoneChanges } from './lib/phones.mjs';
 import { apiError, collectPhones, makePacer, recordPhone } from './lib/nppes-api-phones.mjs';
 
@@ -31,29 +29,7 @@ check('a new phone and a changed phone are written', r.changes.map(c => c[0]).jo
 check('a phone already right is skipped', r.stats.already_right === 1);
 check('no NPPES phone leaves the row alone (never blanked)', r.stats.no_nppes_phone === 1 && !r.changes.some(c => c[0] === '1000000004'));
 
-console.log('\n3. Parser and matcher end to end');
-const dir = mkdtempSync(join(tmpdir(), 'phones-'));
-const head = ['NPI', 'Entity Type Code', 'Provider Organization Name (Legal Business Name)', 'NPI Deactivation Date', 'Provider Business Practice Location Address Telephone Number'];
-const rows = [
-  ['1000000001', '2', 'CITY PHARMACY', '', '8175551111'],
-  ['1000000002', '1', '', '', '8175552222'],            // an individual: not this job
-  ['1000000003', '2', 'OLD CLINIC, INC', '01/01/2020', '8175553333'],   // deactivated
-  ['1000000004', '2', 'NO PHONE LLC', '', ''],
-  ['1000000005', '2', 'BAD PHONE LLC', '', '123']];
-const csv = [head, ...rows].map(r => r.map(v => '"' + v + '"').join(',')).join('\n') + '\n';
-const out = execFileSync('node', ['scripts/nppes-phones.mjs'], { input: csv, env: { ...process.env, NPPES_MIN_ROWS: '1' }, stdio: ['pipe', 'pipe', 'pipe'] }).toString();
-check('only active organizations with a usable phone are written', out === 'npi,phone\n1000000001,8175551111\n', JSON.stringify(out));
-writeFileSync(join(dir, 'nppes.csv'), out);
-writeFileSync(join(dir, 'clinics.csv'), 'npi,phone\n1000000001,\n1000000004,\n');
-execFileSync('node', ['scripts/org-phone-assign.mjs', '--rows', join(dir, 'clinics.csv'), '--nppes', join(dir, 'nppes.csv'),
-  '--assign', join(dir, 'assign.csv'), '--summary', join(dir, 'summary.md')], { stdio: 'pipe' });
-check('the assignment file holds the one phone to write', readFileSync(join(dir, 'assign.csv'), 'utf8') === 'npi,phone\n1000000001,8175551111\n');
-check('the summary counts it', /to write: \*\*1\*\*/.test(readFileSync(join(dir, 'summary.md'), 'utf8')));
-let threw = false;
-try { execFileSync('node', ['scripts/nppes-phones.mjs'], { input: 'NPI,Entity Type Code\n1,2\n', env: { ...process.env, NPPES_MIN_ROWS: '1' }, stdio: 'pipe' }); } catch (e) { threw = true; }
-check('a file without the phone column is refused', threw);
-
-console.log('\n4. NPI Registry API pass (fake API)');
+console.log('\n3. NPI Registry API pass (fake API)');
 // An organization record as the API returns it.
 const org = (npi, zip9, phone, extra = {}) => ({ number: npi, enumeration_type: 'NPI-2', basic: { status: 'A' },
   addresses: [{ address_purpose: 'MAILING', postal_code: '999990000', telephone_number: '800-555-0000' },
@@ -106,36 +82,7 @@ let stopped = false;
 try { await collectPhones(many, fakeApi({ down: true }).get, { concurrency: 4 }); } catch (e) { stopped = /failing/.test(e.message); }
 check('an API that is down ends the run early instead of reading as no phones', stopped);
 
-console.log('\n5. The API script end to end (local fake server)');
-// The server refuses address_purpose=PRIMARY, as an older API version might,
-// so the script must fall back to LOCATION.
-const seenQs = [];
-const server = createServer((req, res) => {
-  const q = new URL(req.url, 'http://x').searchParams;
-  seenQs.push(Object.fromEntries(q));
-  let body;
-  if (q.get('address_purpose') === 'PRIMARY') body = { Errors: [{ description: 'address_purpose PRIMARY is not valid' }] };
-  else if (q.get('number')) body = { result_count: 1, results: world.filter(r => r.number === q.get('number')) };
-  else body = { results: world.filter(r => matches(r, q.get('postal_code'))).slice(+q.get('skip'), +q.get('skip') + +q.get('limit')) };
-  res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(body));
-});
-await new Promise(r => server.listen(0, '127.0.0.1', r));
-const base = `http://127.0.0.1:${server.address().port}/api/`;
-writeFileSync(join(dir, 'clinics3.csv'), 'npi,phone,zip\n' + world.slice(0, 3).map(r => `${r.number},,76117`).join('\n') + '\n' + world.slice(3).map(r => `${r.number},,10001`).join('\n') + '\n');
-const runCli = extra => new Promise(resolve => execFile('node', ['scripts/nppes-phones-api.mjs', '--clinics', join(dir, 'clinics3.csv'), '--out', join(dir, 'api-phones.csv'),
-  '--stats', join(dir, 'api-stats.json'), '--summary', join(dir, 'api.md'), '--rate', '500', ...extra], { env: { ...process.env, NPPES_API_BASE: base, NPPES_API_MIN_PHONES: '1' } },
-  (err, stdout, stderr) => resolve({ err, stderr })));
-const cli = await runCli([]);
-const phonesOut = readFileSync(join(dir, 'api-phones.csv'), 'utf8').trim().split('\n');
-check('the script falls back to LOCATION when PRIMARY is refused', !cli.err && /using LOCATION/.test(cli.stderr), cli.stderr.slice(-300));
-check('it asks for organizations only, by practice address', seenQs.some(q => q.enumeration_type === 'NPI-2' && q.address_purpose === 'LOCATION' && q.version === '2.1'));
-check('it writes npi,phone for every organization found', phonesOut[0] === 'npi,phone' && phonesOut.length === 1 + 1501, String(phonesOut.length));
-check('the summary names the source and says it is complete', /NPI Registry API/.test(readFileSync(join(dir, 'api.md'), 'utf8')) && /Complete/.test(readFileSync(join(dir, 'api.md'), 'utf8')));
-const sample = await runCli(['--zip-limit', '1']);
-check('a sample queries only the largest ZIP', !sample.err && JSON.parse(readFileSync(join(dir, 'api-stats.json'), 'utf8')).zips === 1);
-server.close();
-
-console.log('\n6. Pacing (fake clock)');
+console.log('\n4. Pacing (fake clock)');
 let clock = 0;
 const fakeSleep = async ms => { clock += ms; };
 let pacer = makePacer({ startRate: 4, rate: 6, pauseMs: 60000, growEvery: 3, now: () => clock, sleep: fakeSleep });

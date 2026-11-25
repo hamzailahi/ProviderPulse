@@ -70,25 +70,48 @@ async function isProvider(env, user) {
   return hasProviderProfile(env, user);
 }
 
-// The account owns a provider_profiles row (staff, admin and viewer accounts
-// do not count). For endpoints that write a provider's own records, where a
-// staff or viewer session must not write anything (provider-locations).
-async function hasProviderProfile(env, user) {
-  if (!user || !user.id || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return false;
+// Whether the account owns a row in `table` (its own id). true / false, or
+// null when the lookup itself failed, so a caller can say "try again" rather
+// than "not allowed". Service role, never user_metadata.
+async function ownsRow(env, table, user) {
+  if (!user || !user.id || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
   try {
     const res = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/provider_profiles?id=eq.${encodeURIComponent(user.id)}&select=id&limit=1`,
+      `${env.SUPABASE_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(user.id)}&select=id&limit=1`,
       {
         headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
         signal: AbortSignal.timeout(5000)
       }
     );
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const rows = await res.json();
     return Array.isArray(rows) && rows.length > 0;
   } catch {
-    return false;
+    return null;
   }
 }
 
-module.exports = { getUser, isProvider, hasProviderProfile, isStaff, isAdmin, isViewer };
+// The account owns a provider_profiles row (staff, admin and viewer accounts
+// do not count). For endpoints that write a provider's own records, where a
+// staff or viewer session must not write anything (provider-locations).
+async function hasProviderProfile(env, user) {
+  return (await ownsRow(env, 'provider_profiles', user)) === true;
+}
+
+// The account's role as the database says it (2026-11-25; until then the
+// appointment, briefing, navigator and document endpoints read the
+// user-writable user_metadata.role). 'provider' when it owns a
+// provider_profiles row (only the NPPES-verified registration makes one),
+// else 'patient' when it owns a patient_profiles row (only patient sign-up
+// makes one), else ''. null when a lookup failed: callers answer 503, never
+// treat it as either role.
+async function accountRole(env, user) {
+  const provider = await ownsRow(env, 'provider_profiles', user);
+  if (provider === null) return null;
+  if (provider) return 'provider';
+  const patient = await ownsRow(env, 'patient_profiles', user);
+  if (patient === null) return null;
+  return patient ? 'patient' : '';
+}
+
+module.exports = { getUser, isProvider, hasProviderProfile, accountRole, isStaff, isAdmin, isViewer };

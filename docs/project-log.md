@@ -2,13 +2,13 @@
 
 Every change to the product, newest first, with the date it shipped. Generated from the Changelog in README.md by `scripts/build-project-log.mjs`; do not edit by hand.
 
-- 465 changes over 72 working days, 2026-05-13 to 2026-11-25.
-- 2026-08-19 onward: from the README changelog (291 entries, written for a reader).
+- 466 changes over 72 working days, 2026-05-13 to 2026-11-25.
+- 2026-08-19 onward: from the README changelog (292 entries, written for a reader).
 - 2026-05-13 to 2026-08-16: from the code history (174 commit messages), at the end of this file.
 
 | Month | Changes |
 |---|---|
-| November 2026 | 130 |
+| November 2026 | 131 |
 | October 2026 | 131 |
 | September 2026 | 28 |
 | August 2026 | 86 |
@@ -17,6 +17,8 @@ Every change to the product, newest first, with the date it shipped. Generated f
 | May 2026 | 31 |
 
 ## 2026-11-25
+
+- Clean-up and security, the user's go-ahead: the appointment, briefing, AI care navigator and document endpoints now take a caller's role (patient or provider) from the database, from the profile row only registration creates, instead of a label the account holder can edit. Until now anyone could call themselves a patient and use the navigator's AI calls. A failed lookup answers "try again", never either role. Removed the parked learned demand model (it never produced a usable model; the score no longer reads its rows or fetches the Census rows it needed, so each market score makes one fewer database request), the scoring model's unused specialty-group fallbacks, and eleven finished one-off GitHub jobs with their scripts (taxonomy backfill and indexes, organization phone backfill, ArcGIS, Overture and Nominatim sample geocoding trials, the concentration dry run, and the CMS, PECOS, AHRQ and menopause discovery jobs). Everything removed stays in git history and their reports stay in `supabase/reference/`. A new test file (31 tests) covers the role checks.
 
 - Code review: the public search-demand figures no longer show a total that would let someone work out a hidden small count (a total of 12 beside a visible 10 revealed 2 searches); the practice-locations page now checks the account really owns a provider listing instead of trusting a role the account sets itself; the printed directory audit no longer breaks on a confidence stored as text. Removed about 6,500 characters of unused dashboard code (an old colour palette, a v1 session banner, four helpers from the retired AI endpoint) and an unused directory helper. Five new test files (98 tests) cover demand stats, the Medicare lookup, practice locations, pre-visit briefings, the document gate, the audit report and the ZIP backfill queue.
 

@@ -20,6 +20,7 @@ function reset() {
   db = {
     provider_profiles: [{ id: ACC, npi: '1234567893', first_name: 'ANN', last_name: 'LEE', org_name: null, entity_type: 1, review_status: 'clear' },
       { id: OTHER, npi: '1407942097', first_name: 'BOB', last_name: 'KIM', review_status: 'clear' }],
+    patient_profiles: [{ id: 'cccccccc-0000-4000-8000-000000000003' }],
     provider_npis: [], provider_npi_insurance: [], leie_exclusions: [], audit_log: [], provider_insurance: [], provider_locations: [], appointment_requests: []
   };
   nppes = {}; calls = [];

@@ -499,7 +499,7 @@ hand, in the Supabase SQL editor. The latest is
 | `PATIENT_SIGNUP_EMAILS` | comma-separated emails allowed to register as patients while sign-up is otherwise closed, for internal testing with the tester's own information. Everyone else still gets "not open yet" |
 | `DOCUMENT_UPLOAD_ENABLED` | patient document upload endpoints |
 | `CENSUS_API_KEY` | `import-census-acs.yml` and `import-sahie.yml`; a free Census API key (https://api.census.gov/data/key_signup.html, activate it from the email) stored as a GitHub secret. Required: the Census answers data requests without one with "Missing Key" |
-| `SUPABASE_DB_URL` | `schema-snapshot.yml`, `taxonomy-inventory.yml`, `taxonomy-backfill.yml`, `taxonomy-indexes.yml` and `db-size-report.yml` only; the Session pooler connection string from Supabase's Connect button (port 5432, with the database password), stored as a GitHub secret. The direct connection string won't work from GitHub's runners |
+| `SUPABASE_DB_URL` | `schema-snapshot.yml`, `taxonomy-inventory.yml`, `db-size-report.yml` and the other database jobs; the Session pooler connection string from Supabase's Connect button (port 5432, with the database password), stored as a GitHub secret. The direct connection string won't work from GitHub's runners |
 | `HUD_API_TOKEN` | `zip-county-crosswalk-import.yml` only; a free HUD USER token stored as a GitHub secret, not a Netlify variable |
 
 The MapTiler key is public by design and restricted to the site's domain
@@ -518,7 +518,6 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `medicare-advantage-payers-import.yml` | monthly, the 22nd | CMS MA enrollment by state joined to the MA Contract Directory, so plans show the brand name patients recognize rather than the legal entity |
 | `payer-sources.yml` | manual, read only | finds the CMS insurer filings (MLR) and Medicaid managed care plan files the expanded plan list is built from, and records their columns and samples |
 | `zip-county-crosswalk-import.yml` | quarterly, the 25th of Jan/Apr/Jul/Oct | HUD USPS ZIP Code Crosswalk API: which county each ZIP falls in, weighted by residential addresses |
-| `train-demand-model.yml` | manual only (parked 2026-10-06, see the changelog) | trains the learned demand model from the CMS Medicare claims-by-provider file, the Census detail and CDC PLACES; dry run first |
 | `import-sahie.yml` | yearly, September 10 (SAHIE trails by about two years) | Census SAHIE county uninsured estimates for people under 65 into `sahie_county` |
 | `import-census-acs.yml` | yearly, January 15 (the ACS 5-year release lands each December) | ACS 5-year detail by ZIP into `census_acs_zcta`: household income in 16 bands, median income, poverty, age by sex, race and ethnicity, education |
 | `market-benchmarks.yml` | quarterly, the 27th of Jan/Apr/Jul/Oct | builds the market model's benchmarks from CDC PLACES and the provider tables: national health-measure percentiles, national listings per specialty, and each state's listings per 1,000 residents |
@@ -528,7 +527,6 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `hospital-campus-candidates.yml` | manual, read only | lists likely hospital campuses missing from patient search (a hospital-named organization under a pharmacy, lab or similar code, no hospital listing nearby) for review before any are added |
 | `npi-zip-enrich.yml` | hourly | incremental NPPES backfill, limited to ZIPs someone has actually searched |
 | `taxonomy-inventory.yml` | manual only | lists every taxonomy name stored in the directory tables with row counts, plus the newest official NUCC code set and the CMS Medicare specialty crosswalk, in `supabase/reference/`, and rebuilds the taxonomy map from them; read only against the database |
-| `taxonomy-indexes.yml` | manual only | builds the `taxonomy_code` indexes (migration 030) without locking the tables, then checks all three are valid |
 | `procedure-sources.yml` | manual, read only | describes the Medicaid provider spending file (HHS) and the Medicare hospital outpatient and inpatient files (CMS) the Procedures panel's extra sources are built from |
 | `procedure-tables.yml` | manual, yearly once HHS and CMS publish a new year | builds the Procedures panel's Medicaid table (per ZIP, specialty and procedure code) and the Medicare hospital tables (per hospital and payment group) from those files; `dry_run` writes nothing and reports what was dropped and how big it is; `apply` refuses unless the free disk entered covers the load |
 | `procedure-summary.yml` | manual, after a new CMS year is loaded | adds up the Medicare procedures table per ZIP, specialty and code on the GitHub runner (no sorting in the database); `dry_run` reports the size, `apply` loads `medicare_procedures_zip` (migration 046) in one transaction, checks the totals, and refuses unless the free disk entered is three times the estimate |
@@ -545,8 +543,6 @@ by hand from the Actions tab (`workflow_dispatch`).
 | `db-size-report.yml` | manual only | read-only report of table, index and write-ahead-log sizes and dead rows, written to `supabase/reference/db-size-report.md` |
 | `live-patient-audit.yml` | manual, read only | drives the deployed patient app on desktop and phone with real searches and records timings, results, accessibility (axe-core) and layout problems; `push_branch` (tmp/ only) copies the results for a cloud session |
 | `apply-migration.yml` | manual only | runs one ordinary migration from a fixed list through psql and prints what it made, then checks the public key cannot read a private table (041) |
-| `org-phone-backfill.yml` | manual only | fills organizations' phone numbers from the NPPES monthly file (`source: file`) or the NPI Registry API, ZIP by ZIP (`source: api`, while CMS's download site is down). `dry_run` writes nothing and reports how many would change; `apply` adds the column (migration 040), writes in batches and refuses unless the free disk entered covers the rewrite; `from_run` reuses an api dry run's results |
-| `taxonomy-backfill.yml` | manual only | gives every listing its official NUCC taxonomy code from the NPPES monthly file and loads the `taxonomy_map` table. `dry_run` writes nothing and reports coverage and exceptions; `apply` refuses unless the free disk entered covers the rewrite |
 | `schema-snapshot.yml` | weekly, Mondays | dumps the live database's structure (tables, indexes, policies, grants; no data) to `supabase/schema/public.sql` and commits it only when it changed, so every such commit records a schema change |
 | `tests.yml` | every pull request and push to main | syntax check, loading every function, and the test scripts below |
 
@@ -561,7 +557,6 @@ node scripts/test-accuracy-signals.mjs    # the directory-accuracy scoring engin
 node scripts/test-query-plan.mjs          # the query-plan allowlist behind the assistant's database tool
 node scripts/test-claimed-relevance.mjs   # specialty gating on claimed listings and NPPES results
 node scripts/test-market-model.mjs        # the market opportunity model
-node scripts/test-demand-model.mjs        # the learned demand model, its trainer, and how scoring uses it
 node scripts/test-sahie.mjs               # Census county uninsured estimates and how Insights reports them
 node scripts/test-acs.mjs                 # the Census detail import, and the richer income ranking
 node scripts/test-scenario.mjs            # the what-if re-score changes supply only
@@ -578,6 +573,7 @@ node scripts/test-providers-near.mjs      # the assistant's competitor lookup: c
 node scripts/test-catchment.mjs           # the market score's area: every ZIP within 10 miles, ZIP groups, a failed load refuses to score
 node scripts/test-provider-npis.mjs        # one account, many NPIs: checks, review, own rows only, publishing and booking
 node scripts/test-self-check.mjs           # a provider's own listing check: their NPI only, nothing written
+node scripts/test-account-role.mjs        # roles come from the database (a provider or patient profile row), never from what an account says about itself
 node scripts/test-demand-stats.mjs        # search demand stats: small groups and any total that would reveal them are withheld
 node scripts/test-cms-provider.mjs        # Medicare clinician lookup: CMS errors are never cached as "not found"
 node scripts/test-provider-locations.mjs  # practice locations: only real providers, never "verified" from the browser
@@ -592,7 +588,7 @@ node scripts/test-nppes-refresh.mjs        # weekly NPPES refresh: new, changed 
 node scripts/test-npi-activity.mjs         # the public Medicare-activity lookup: published columns only, unknown never "inactive"
 node scripts/test-procedure-finder.mjs     # the patient procedure finder: real CMS codes, words to procedures, per-clinician counts
 node scripts/test-display-names.mjs       # listing names and cities as patients see them
-node scripts/test-org-phones.mjs          # organization phones from NPPES: usable numbers, which rows change, the parser end to end, the API pass on a fake API
+node scripts/test-org-phones.mjs          # phone rules (usable numbers, which rows change) and the weekly refresh's NPI Registry API crawler on a fake API
 node scripts/test-procedures-tool.mjs     # the assistant's procedures tool on a fake database: averages, word search, failures reported, hospitals, the per-ZIP totals table for broad reads
 node scripts/test-area-zips.mjs           # stray ZIPs a city search leaves out
 node scripts/test-code-list.mjs           # Procedures tab code lists: what counts as a list, the by-code, by-clinician and by-ZIP summaries
@@ -657,6 +653,8 @@ browser harness, but don't yet have dedicated scripts in `scripts/`.
 ## Changelog
 
 ### 2026-11-25
+
+- Clean-up and security, the user's go-ahead: the appointment, briefing, AI care navigator and document endpoints now take a caller's role (patient or provider) from the database, from the profile row only registration creates, instead of a label the account holder can edit. Until now anyone could call themselves a patient and use the navigator's AI calls. A failed lookup answers "try again", never either role. Removed the parked learned demand model (it never produced a usable model; the score no longer reads its rows or fetches the Census rows it needed, so each market score makes one fewer database request), the scoring model's unused specialty-group fallbacks, and eleven finished one-off GitHub jobs with their scripts (taxonomy backfill and indexes, organization phone backfill, ArcGIS, Overture and Nominatim sample geocoding trials, the concentration dry run, and the CMS, PECOS, AHRQ and menopause discovery jobs). Everything removed stays in git history and their reports stay in `supabase/reference/`. A new test file (31 tests) covers the role checks.
 
 - Code review: the public search-demand figures no longer show a total that would let someone work out a hidden small count (a total of 12 beside a visible 10 revealed 2 searches); the practice-locations page now checks the account really owns a provider listing instead of trusting a role the account sets itself; the printed directory audit no longer breaks on a confidence stored as text. Removed about 6,500 characters of unused dashboard code (an old colour palette, a v1 session banner, four helpers from the retired AI endpoint) and an unused directory helper. Five new test files (98 tests) cover demand stats, the Medicare lookup, practice locations, pre-visit briefings, the document gate, the audit report and the ZIP backfill queue.
 

@@ -61,7 +61,14 @@ exports.handler = async (event) => {
   });
   if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Invalid or expired session' }) };
   const user = await userRes.json();
-  const role = (user.user_metadata && user.user_metadata.role) || '';
+  // The side the caller acts on comes from the database (a provider_profiles
+  // or patient_profiles row of their own), never from user_metadata, which
+  // the account holder can edit. trg_appointment_guard enforces the same
+  // split in SQL.
+  const role = await require('./lib/auth').accountRole(env, user);
+  if (role === null) {
+    return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Could not check your account. Try again.' }) };
+  }
   if (role !== 'provider' && role !== 'patient') {
     return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'No role on account' }) };
   }

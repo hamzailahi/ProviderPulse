@@ -31,7 +31,13 @@ exports.handler = async (event) => {
   });
   if (!userRes.ok) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Invalid or expired session' }) };
   const user = await userRes.json();
-  if (((user.user_metadata || {}).role) !== 'patient') {
+  // The role comes from the database (a patient_profiles row), never from
+  // user_metadata, which the account holder can edit.
+  const accountRoleNow = await require('./lib/auth').accountRole(env, user);
+  if (accountRoleNow === null) {
+    return { statusCode: 503, headers: CORS, body: JSON.stringify({ error: 'Could not check your account. Try again.' }) };
+  }
+  if (accountRoleNow !== 'patient') {
     return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'Patient accounts only' }) };
   }
 

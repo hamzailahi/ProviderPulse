@@ -16,8 +16,7 @@
 
      need        CDC PLACES modelled prevalence of the conditions that drive
                  THIS specialty's caseload, plus age mix, as a national
-                 percentile (per-measure benchmarks), or, only when a caller
-                 passes group fallbacks, a group percentile.
+                 percentile (per-measure benchmarks).
      access      Clinicians of this specialty per 1,000 adults in the
                  catchment vs the national rate. 50 = national rate,
                  100 = none, 0 = twice the national rate.
@@ -334,11 +333,10 @@
 
      input = {
        specialties: SPECIALTIES rows [label, mapTerms, nppesTerm],
-       groupOf(label) -> group key, OPTIONAL: only for the group-level need and
-         access fallbacks below (groupNeedPct / groupAccess). market-score no
-         longer passes any of the three (the six groups were retired
-         2026-10-11); a specialty without a benchmark or measure is then left
-         unknown and says so.
+       (A specialty without a benchmark or measure is left unknown and says
+       so. The group-level fallbacks, groupOf / groupNeedPct / groupAccess,
+       were removed 2026-11-25: nothing had passed them since the six groups
+       were retired 2026-10-11.)
        rows: catchment listings [{ taxonomy_code, primary_taxonomy, latitude, longitude }],
        codesFor(label) -> NUCC codes in that specialty (TaxonomyMap.codesFor);
          when given, a listing belongs to a specialty by its code. Without it
@@ -348,8 +346,6 @@
        adults: catchment adults 18+,
        milesBetween(aLat, aLng, bLat, bLng),
        places: { measureid: catchment population-weighted prevalence },
-       groupNeedPct: { groupKey: national percentile 0-100 } (fallback),
-       groupAccess: { groupKey: access score 0-100 } (fallback),
        demo: { over65, under18, age19to44 } as percentiles within the state,
        pay: { insuredPct, incomePct } percentiles within the state,
        shortage: { primary|dental|mental: { score, basis:'county'|'state'|'none' } },
@@ -386,7 +382,6 @@
 
     input.specialties.forEach(function (s) {
       var label = s[0], prof = PROFILES[label] || { m: [], d: [] };
-      var group = input.groupOf ? input.groupOf(label) : null;
       var f = {}, ev = {}, caveats = [];
 
       /* ---- need ---- */
@@ -408,11 +403,6 @@
           : { measure: m[0], label: MEASURE_NAME[m[0]] || m[0], value: Math.round(raw * 10) / 10, percentile: Math.round(p), inverted: false });
         basis = 'specialty';
       });
-      if (!parts.length && prof.m.length && input.groupNeedPct && input.groupNeedPct[group] != null) {
-        acc += input.groupNeedPct[group] * 1; wsum += 1; basis = 'group';
-        parts.push({ measure: 'group:' + group, label: 'group health-need index', percentile: Math.round(input.groupNeedPct[group]) });
-        caveats.push('Need is benchmarked at the specialty-group level until national per-measure benchmarks are built.');
-      }
       prof.d.forEach(function (d) {
         var p = input.demo ? input.demo[d[0]] : null;
         if (p == null || !isFinite(p)) return;
@@ -420,15 +410,7 @@
         parts.push({ demo: d[0], label: DEMO_LABEL[d[0]], percentile: Math.round(p) });
         basis = basis || 'demographic';
       });
-      var learned = input.learnedNeed ? input.learnedNeed[label] : null;
-      if (learned && learned.percentile != null) {
-        // A trained model (assets/demand-model.js) that predicted held-out
-        // states well replaces the hand-weighted blend above for this specialty.
-        f.need = clamp(learned.percentile);
-        ev.need = { basis: 'learned', percentile: learned.percentile, per_1k: learned.per_1k, r2_cv: learned.r2_cv,
-          drivers: learned.drivers, parts: (learned.drivers || []).map(function (d) { return { label: d.label, direction: d.direction }; }) };
-        caveats.push('Need is learned from Medicare fee-for-service use (held-out R\u00b2 ' + learned.r2_cv + '), so it does not see Medicare Advantage, commercial or Medicaid patients.');
-      } else if (wsum) { f.need = clamp(acc / wsum); ev.need = { basis: basis, parts: parts }; }
+      if (wsum) { f.need = clamp(acc / wsum); ev.need = { basis: basis, parts: parts }; }
       else caveats.push('No defensible health-need measure exists for this specialty; scored on supply and payers only.');
 
       /* ---- access ---- */
@@ -462,10 +444,6 @@
       } else if (per1k != null && rate) {
         f.access = clamp(100 - (per1k / rate) * 50);
         ev.access = { basis: 'specialty', per_1k: round2(per1k), national_per_1k: round2(rate), clinicians: clin, weighted_clinicians: round2(fte) };
-      } else if (input.groupAccess && input.groupAccess[group] != null) {
-        f.access = clamp(input.groupAccess[group]);
-        ev.access = { basis: 'group', per_1k: per1k == null ? null : round2(per1k), clinicians: clin };
-        caveats.push('Supply is compared at the specialty-group level until national per-specialty rates are built.');
       }
 
       /* ---- pay ---- */
@@ -512,8 +490,7 @@
 
       /* ---- confidence ---- */
       var conf = tw;                                    // share of model weight backed by data
-      if (ev.need && ev.need.basis !== 'specialty' && ev.need.basis !== 'learned') conf -= 0.15;
-      if (ev.access && ev.access.basis === 'group') conf -= 0.15;
+      if (ev.need && ev.need.basis !== 'specialty') conf -= 0.15;   // need from the age mix alone
       if (input.catchmentTruncated) { conf -= 0.1; caveats.push('This area has more listings than one request returns, so supply counts are a floor.'); }
       if (UNVALIDATED[label]) { conf -= 0.15; caveats.push(evidenceText(label)); }
       if (input.adults != null && input.adults < 5000) { conf -= 0.15; caveats.push('Fewer than 5,000 adults in the catchment: small numbers swing the result.'); }
@@ -530,7 +507,7 @@
         viability: f.pay != null ? Math.round(f.pay) : null
       };
       out.push({
-        specialty: label, group: group, score: sc, scores: scores, weights: { need: r3(W.need), access: r3(W.access), pay: r3(W.pay) }, archetype: arche, archetype_name: ARCHETYPES[arche].name,
+        specialty: label, score: sc, scores: scores, weights: { need: r3(W.need), access: r3(W.access), pay: r3(W.pay) }, archetype: arche, archetype_name: ARCHETYPES[arche].name,
         strategy: ARCHETYPES[arche].strategy, confidence: confidence, factors: roundAll(f), evidence: ev,
         reasons: reasons(f, ev, label, W), caveats: dedupe(caveats), clinicians: clin
       });
@@ -576,13 +553,9 @@
 
   function explain(k, v, e, label) {
     var hi = v >= 60, lo = v < 40;
-    if (k === 'need' && e.basis === 'learned') {
-      var why = (e.drivers || []).slice(0, 2).map(function (d) { return d.label; }).join(' and ');
-      return (hi ? 'Higher' : lo ? 'Lower' : 'Average') + ' expected demand than most US counties (' + ord(v) + ' pct), learned from Medicare use' + (why ? ', driven by ' + why : '') + '.';
-    }
     if (k === 'need') {
       var top = (e.parts || []).slice().sort(function (a, b) { return b.percentile - a.percentile; })[0];
-      var what = top ? (top.measure && top.measure.indexOf('group:') !== 0 ? MEASURE_NAME[top.measure] || top.measure : top.label || 'health measures') : 'health measures';
+      var what = top ? (top.measure ? MEASURE_NAME[top.measure] || top.measure : top.label || 'health measures') : 'health measures';
       return (hi ? 'Higher' : lo ? 'Lower' : 'Average') + ' modelled need than most of the US (' + ord(v) + ' pct), led by ' + what + '.';
     }
     if (k === 'access' && e.basis === 'e2sfca') {
@@ -590,9 +563,7 @@
     }
     if (k === 'access') {
       if (!e.clinicians) return 'No ' + label.toLowerCase() + ' clinicians in the catchment.';
-      return e.national_per_1k
-        ? e.per_1k + ' ' + label.toLowerCase() + ' clinicians per 1,000 adults vs ' + e.national_per_1k + ' nationally.'
-        : (hi ? 'Thinner' : lo ? 'Denser' : 'Typical') + ' supply than the national rate for this specialty group (' + e.clinicians + ' listings).';
+      return e.per_1k + ' ' + label.toLowerCase() + ' clinicians per 1,000 adults vs ' + e.national_per_1k + ' nationally.';
     }
     if (k === 'pay') return 'Payer mix ranks at the ' + ord(v) + ' percentile of ZIPs in the state (insured rate ' + ord(e.insured_pct) +
       (e.income_pct != null ? (e.income_basis === 'acs' ? ', household income ' : ', $75k+ households ') + ord(e.income_pct) : '') + ').';

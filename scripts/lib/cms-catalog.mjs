@@ -1,5 +1,5 @@
-// CMS DCAT catalog resolution, shared by scripts/import-medicare-activity.mjs
-// and scripts/train-demand-model.mjs. Moved here unchanged from the importer
+// CMS DCAT catalog resolution for the Medicare importers (the demand-model
+// trainer that also used it was removed 2026-11-25). Moved here unchanged from the importer
 // (see its header for why dataset URLs are resolved at run time, not pinned).
 
 const CMS_CATALOG = 'https://data.cms.gov/data.json';

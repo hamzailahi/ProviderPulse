@@ -1,7 +1,7 @@
 // node scripts/hhi-build.mjs --individuals F --out F --report F
 // Step 7 (2026-11-20): market concentration per ZIP3 and scored specialty,
 // by Medicare billing group (the more accurate of the two views tried in
-// hhi-dry-run.mjs: a group is who the clinician bills through; the system
+// the 2026-11-20 dry run, since removed: a group is who the clinician bills through; the system
 // view counted hospital privileges, which overstate control). The specialty
 // is the clinician's own NUCC code (export of provider_individuals), never
 // CMS's specialty name. Cells under MIN clinicians get no figure.

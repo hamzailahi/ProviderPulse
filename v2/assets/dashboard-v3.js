@@ -785,11 +785,6 @@ function concLine(c) {
 }
 function evidenceLine(k, e) {
   if (!e) return 'No data for this area';
-  if (k === 'need' && e.basis === 'learned') {
-    return 'Learned from Medicare use: about ' + e.per_1k + ' patients per 1,000 enrollees expected' +
-      ((e.drivers || []).length ? ' · ' + e.drivers.map(function (d) { return d.label + (d.direction === 'up' ? ' ↑' : ' ↓'); }).join(', ') : '') +
-      ' · held-out R² ' + e.r2_cv;
-  }
   if (k === 'need') {
     return (e.parts || []).slice().sort(function (a, b) { return b.percentile - a.percentile; }).slice(0, 3)
       .map(function (x) { return (x.label || x.measure) + ' ' + ordinal(x.percentile); }).join(' · ');   // inverted labels already say "missed"
@@ -797,7 +792,7 @@ function evidenceLine(k, e) {
   if (k === 'access' && e.basis === 'e2sfca') return 'Drive-time access: ' + e.per_1k + ' per 1,000 adults within about ' + e.catchment_minutes + ' minutes (distance-weighted, shared with every community that drives there) vs ' + e.national_per_1k + ' nationally · ' + fmtN(e.clinicians) + ' within the catchment';
   if (k === 'access' && !e.clinicians) return 'None within the catchment' + (e.national_per_1k ? ' (' + e.national_per_1k + ' per 1,000 nationally)' : '');
   if (k === 'access') return fmtN(e.clinicians) + ' within the catchment' + (e.per_1k != null ? ', ' + e.per_1k + ' per 1,000 adults' : '') +
-    (e.national_per_1k ? ' vs ' + e.national_per_1k + ' nationally' : ' (compared at group level)');
+    (e.national_per_1k ? ' vs ' + e.national_per_1k + ' nationally' : ' (no national rate to compare with)');
   if (k === 'pay') {
     var det = e.income_detail, mx = e.payer_mix;
     if (e.basis === 'payer_yield' && mx) {
@@ -910,7 +905,7 @@ function paintModel(p, d, M) {
     ranked.length > 8 ? el('button', { type: 'button', class: 'ins-more', onclick: function () { showAllSpecs = !showAllSpecs; paintInsights(); } },
       showAllSpecs ? 'Show top 8' : 'Show all ' + ranked.length) : null,
     el('p', { class: 'ins-src' }, 'Model ' + M.version + '. ' + (M.benchmarks === 'specialty'
-      ? 'Benchmarked against national rates per specialty.' : 'National per-specialty benchmarks not built yet; compared at specialty-group level.'))));
+      ? 'Benchmarked against national rates per specialty.' : 'National per-specialty rates did not load, so supply is left out of the score.'))));
 }
 
 /* "What if?": re-score this ZIP and specialty with N more clinicians. Supply

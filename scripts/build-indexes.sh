@@ -3,7 +3,8 @@
 # statement commits on its own (the Supabase SQL editor wraps a paste in one
 # transaction, which CONCURRENTLY refuses: 25001). Invalid leftovers from a
 # failed earlier build are dropped first, and every index the migration names
-# must be valid at the end. Generalizes scripts/taxonomy-indexes.sh (030).
+# must be valid at the end. (The first of these, 030, ran through a
+# taxonomy-only copy of this script, removed 2026-11-25.)
 #
 # Usage: SUPABASE_DB_URL=... scripts/build-indexes.sh supabase/migrations/038_geo_indexes.sql
 set -euo pipefail

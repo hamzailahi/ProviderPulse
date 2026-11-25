@@ -57,7 +57,6 @@ const WEIGHTS = { supply: 0.57, payer: 0.43 };
 // The explainable per-specialty opportunity model (archetype, score,
 // confidence, reasons). See that file's header for the five factors.
 const MarketModel = require('../../assets/market-model.js');
-const DemandModel = require('../../assets/demand-model.js');
 const SPECIALTIES = require('../../assets/specialties.js').SCORED;
 // Specialty membership is by NUCC code, from the reviewed table.
 const TaxonomyMap = require('../../assets/taxonomy-map.js');
@@ -664,17 +663,12 @@ exports.handler = async (event) => {
           return [{ rows: pick('c'), truncated: false, failed: false }, { rows: pick('i'), truncated: false, failed: false }];
         };
         const counted = await loadCounts().catch(() => null);
-        const [clinicPage, individualPage, placesPage, catchAcsPage] = await Promise.all([
+        const [clinicPage, individualPage, placesPage] = await Promise.all([
           counted ? counted[0] : loadListings('clinics'),
           counted ? counted[1] : loadListings('provider_individuals'),
           pagedGet(`cdc_places?zip=in.(${memberZips.join(',')})` +
             `&measureid=in.(${MarketModel.measureIds().join(',')})` +
-            `&select=zip,measureid,value,pop_18plus,data_year`, 'zip', { cap: 4000, ms: 7000 }),
-          // Census detail for the learned demand model. Optional: a missing table
-          // or failed read means no learned value, and the hand-weighted need stays.
-          pagedGet(`census_acs_zcta?zip=in.(${memberZips.join(',')})` +
-            '&select=zip,pop_total,households,median_hh_income,poverty_universe,poverty_below,age_male,age_female,ins_universe,ins_uninsured,ins_medicaid,education',
-            'zip', { cap: 400, ms: 6000 }).catch(() => ({ rows: [] }))
+            `&select=zip,measureid,value,pop_18plus,data_year`, 'zip', { cap: 4000, ms: 7000 })
         ]);
 
         catchment = {
@@ -782,7 +776,7 @@ exports.handler = async (event) => {
           // National benchmarks (scripts/build-market-benchmarks.mjs). Absent
           // until that job has run; the model then falls back and says so.
           const bmRows = await get('market_benchmarks?select=kind,key,data&limit=500', 4000);
-          const benchmarks = { measures: {}, specialties: {} }, demandModels = {}, careRates = {};
+          const benchmarks = { measures: {}, specialties: {} }, careRates = {};
           (Array.isArray(bmRows) ? bmRows : []).forEach(r => {
             if (r.kind === 'measure') benchmarks.measures[r.key] = r.data;
             // Like for like: weighted local counts against the weighted national
@@ -790,27 +784,7 @@ exports.handler = async (event) => {
             if (r.kind === 'specialty') benchmarks.specialties[r.key] = weighted && r.data && r.data.rate_per_1k_weighted != null
               ? Object.assign({}, r.data, { rate_per_1k: r.data.rate_per_1k_weighted }) : r.data;
             if (r.kind === 'care_type' && r.data && r.data.rate_per_10k != null) careRates[r.key] = r.data.rate_per_10k;
-            if (r.kind === 'demand_model') demandModels[r.key] = r.data;
           });
-
-          // Learned demand (assets/demand-model.js, trained by
-          // scripts/train-demand-model.mjs): the catchment is built from the same
-          // Census and PLACES inputs, the same way, as the counties it learned from.
-          const learnedNeed = {};
-          const catchAcs = (catchAcsPage && catchAcsPage.rows) || [];
-          if (catchAcs.length && Object.keys(demandModels).length) {
-            const area = {};
-            catchAcs.forEach(r => DemandModel.addAcs(area, r, 1));
-            area.places = places;
-            const nameOf = m => (MarketModel.MEASURE_NAME || {})[m] || m;
-            Object.keys(demandModels).forEach(label => {
-              const dm = demandModels[label];
-              if (!dm || !dm.usable || !Array.isArray(dm.features)) return;
-              const ms = dm.features.filter(n => n.indexOf('m_') === 0).map(n => n.slice(2));
-              const got = DemandModel.apply(dm, DemandModel.features(area, ms), nameOf);
-              if (got) learnedNeed[label] = got;
-            });
-          }
 
           // Drive-time access for this ZIP where a state run has stored it (049).
           // A failed or empty read keeps the 10-mile ratio; evidence says which.
@@ -829,7 +803,7 @@ exports.handler = async (event) => {
             places, demo, pay, shortage,
             benchmarks: Object.keys(benchmarks.measures).length || Object.keys(benchmarks.specialties).length ? benchmarks : null,
             catchmentTruncated: catchment.truncated, radiusMiles: catchment.furthest_miles || CATCHMENT_MAX_MILES,
-            learnedNeed, accessE2sfca
+            accessE2sfca
           };
           const scored = MarketModel.score(baseInput);
           if (noPlaces) scored.specialties.forEach(x => {
@@ -838,7 +812,7 @@ exports.handler = async (event) => {
           const want = String((event.queryStringParameters || {}).specialty || '');
           model = {
             version: scored.version, weights: scored.weights,
-            benchmarks: scored.specialties.some(x => x.evidence.access && (x.evidence.access.basis === 'specialty' || x.evidence.access.basis === 'e2sfca')) ? 'specialty' : 'group',
+            benchmarks: scored.specialties.some(x => x.evidence.access && (x.evidence.access.basis === 'specialty' || x.evidence.access.basis === 'e2sfca')) ? 'specialty' : 'none',
             headline: scored.specialties.some(x => x.specialty === want) ? want : 'Primary care / family doctor',
             specialties: scored.specialties
           };

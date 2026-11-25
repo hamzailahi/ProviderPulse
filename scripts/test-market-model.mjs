@@ -21,7 +21,6 @@ const anchors = { p05: 2, p25: 4, p50: 6, p75: 8, p95: 10 };
 function base(over) {
   return Object.assign({
     specialties: [CARD],
-    groupOf: () => 'specialty',
     rows: [],
     taxMatches, milesBetween,
     center: { lat: 35, lng: -90 },
@@ -47,7 +46,7 @@ check('same but weak payers = Safety-net opportunity', r.archetype === 'safety_n
 r = one(base({ rows: [] }));
 check('no clinicians at all = Unserved', r.archetype === 'unserved' && r.clinicians === 0);
 check('unserved still gets a high competition factor', r.factors.competition === 95);
-r = one(base({ rows: [], benchmarks: null, groupAccess: { specialty: 40 } }));
+r = one(base({ rows: [], benchmarks: null }));
 check('zero clinicians means access 100 even without a national rate', r.factors.access === 100 && r.evidence.access.basis === 'none_found');
 r = one(base({ rows: cardRows(60, 0.5) }));    // 0.6/1k vs 0.2 national: dense
 check('dense supply + strong payers = Crowded premium', r.archetype === 'crowded_premium', JSON.stringify(r.factors));
@@ -63,22 +62,23 @@ r = one(base({ rows: cardRows(5, 6), pay: {} }));
 check('missing payer data leaves pay out (not 50)', r.factors.pay === undefined || r.factors.pay === null);
 const full = one(base({ rows: cardRows(5, 6) }));
 check('missing a factor lowers confidence', ['high', 'medium', 'low'].indexOf(r.confidence) >= ['high', 'medium', 'low'].indexOf(full.confidence));
-r = one(base({ specialties: [DERM], rows: [], places: {}, demo: {}, pay: {}, shortage: {}, benchmarks: null, groupAccess: {} }));
+r = one(base({ specialties: [DERM], rows: [], places: {}, demo: {}, pay: {}, shortage: {}, benchmarks: null }));
 check('no data at all = Not enough data', r.archetype === 'insufficient' && r.confidence === 'low');
 
 console.log('\n3. Benchmarks and fallbacks');
-r = one(base({ rows: cardRows(5, 6), benchmarks: null, groupNeedPct: { specialty: 70 }, groupAccess: { specialty: 65 } }));
-check('without benchmarks, need falls back to the group percentile', r.evidence.need.basis === 'group' && r.factors.need >= 70 * 0.5);
-check('without benchmarks, access falls back to the group score', r.evidence.access.basis === 'group' && r.factors.access === 65);
-check('fallbacks are disclosed as caveats', r.caveats.some(c => /group level/.test(c)) && r.caveats.length >= 2);
-check('fallbacks lower confidence vs full benchmarks', r.confidence !== 'high' || full.confidence === 'high');
+r = one(base({ rows: cardRows(5, 6), benchmarks: null }));
+check('without a national rate, access is left out, never filled', r.factors.access == null && !r.evidence.access);
+check('without measure anchors, need rests on the age mix only', r.evidence.need && r.evidence.need.basis === 'demographic' && r.evidence.need.parts.every(x => x.demo));
+check('need from the age mix alone lowers confidence vs full benchmarks', r.confidence !== 'high' || full.confidence === 'high');
+check('the removed group fallbacks are ignored if a caller still passes them', one(base({ rows: cardRows(5, 6), benchmarks: null, groupNeedPct: { specialty: 70 }, groupAccess: { specialty: 65 } })).factors.access == null);
+check('no result carries a learned-need or group basis', !JSON.stringify(r).includes('"learned"') && !JSON.stringify(r).includes('"group"'));
 r = one(base({ rows: cardRows(5, 6), shortage: { primary: { score: 12, basis: 'state' } } }));
 check('HPSA is reported for comparison but never scored (retired 2026-11-19)', r.factors.shortage === undefined && r.evidence.hpsa_reference && r.evidence.hpsa_reference.basis === 'state' && !('shortage' in r.factors), JSON.stringify(r.factors));
 const rNo = one(base({ rows: cardRows(5, 6) }));
 check('the score does not move with the HPSA score', rNo.score === r.score);
 
 console.log('\n4. Need measures');
-const prim = one(base({ specialties: [PRIMARY], groupOf: () => 'primary', places: { CHECKUP: 2 }, demo: {},
+const prim = one(base({ specialties: [PRIMARY], places: { CHECKUP: 2 }, demo: {},
   benchmarks: { measures: { CHECKUP: anchors }, specialties: { 'Primary care / family doctor': { rate_per_1k: 0.6 } } } }));
 check('prevention measures are inverted (low checkups = high need)', prim.evidence.need.parts[0].inverted && prim.factors.need >= 90, JSON.stringify(prim.evidence.need));
 {
@@ -94,7 +94,7 @@ check('a reason per weighted factor (cardiology: access carries no weight), stro
 check('reasons name the driving condition', r.reasons.some(x => /heart disease|blood pressure|cholesterol|stroke/.test(x.text)), JSON.stringify(r.reasons));
 r = one(base({ rows: cardRows(5, 6), pay: { insuredPct: 91, incomePct: 72 } }));
 check('percentiles read as ordinals (91st, 72nd)', JSON.stringify(r.reasons).includes('91st') || JSON.stringify(r.reasons).includes('72nd') || !r.reasons.some(x => /percentile/.test(x.text)), JSON.stringify(r.reasons));
-check('group-level fallbacks cap confidence below high', one(base({ rows: cardRows(5, 6), benchmarks: null, groupNeedPct: { specialty: 70 }, groupAccess: { specialty: 65 } })).confidence !== 'high');
+{ const R = ['high', 'medium', 'low']; check('missing benchmarks never raise confidence', R.indexOf(one(base({ rows: cardRows(5, 6), benchmarks: null })).confidence) >= R.indexOf(one(base({ rows: cardRows(5, 6) })).confidence)); }
 check('strategy text accompanies every archetype', Object.values(M.ARCHETYPES).every(a => a.strategy.length > 20));
 
 console.log('\n6. Percentile helpers');
