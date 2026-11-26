@@ -1,20 +1,20 @@
 # Listing counts per ZIP and code
 
-Built 2026-11-19 by scripts/build-listing-counts.py, mode apply.
+Built 2026-11-26 by scripts/build-listing-counts.py, mode apply.
 
-- Read: 1,994,406 organizations, 7,554,360 clinicians (68s export).
+- Read: 1,995,838 organizations, 7,559,824 clinicians (46s export).
 - Left out for no usable ZIP: 8.
-- Summary: 1,883,409 rows covering 9,548,758 listings.
+- Summary: 1,888,245 rows covering 9,555,654 listings.
 
 | ZIP | Clinicians | Organizations | Rows |
 |---|---|---|---|
-| 02114 | 9,475 | 236 | 395 |
-| 10001 | 5,411 | 920 | 341 |
-| 10016 | 10,852 | 1,377 | 567 |
-| 38017 | 565 | 226 | 178 |
-| 60611 | 9,837 | 811 | 499 |
-| 77030 | 19,856 | 900 | 585 |
+| 02114 | 9,179 | 236 | 392 |
+| 10001 | 5,289 | 918 | 339 |
+| 10016 | 10,749 | 1,378 | 563 |
+| 38017 | 572 | 227 | 179 |
+| 60611 | 9,567 | 811 | 500 |
+| 77030 | 19,506 | 901 | 590 |
 
 ## Applied
 
-Loaded 1,883,409 rows, 9,548,758 listings; counts match.
+Loaded 1,888,245 rows, 9,555,654 listings; counts match.
